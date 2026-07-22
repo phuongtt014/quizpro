@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuizPro — Hệ thống thi trực tuyến</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --indigo:#534AB7;--indigo-light:#EEEDFE;--indigo-mid:#AFA9EC;--indigo-dark:#3C3489;
+  --teal:#0F6E56;--teal-light:#E1F5EE;--teal-mid:#5DCAA5;
+  --coral:#D85A30;--coral-light:#FAECE7;
+  --amber:#BA7517;--amber-light:#FAEEDA;
+  --surface-0:#F7F6F3;--surface-1:#F0EEE9;--surface-2:#FFFFFF;
+  --text-primary:#1a1a18;--text-secondary:#5c5c57;--text-muted:#8a8a84;
+  --border:rgba(0,0,0,0.1);--border-strong:rgba(0,0,0,0.18);
+  --radius:8px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text-primary);background:var(--surface-0);min-height:100vh}
+
+/* TOPBAR */
+.topbar{background:#534AB7;padding:0 1.25rem;display:flex;align-items:center;gap:0;position:sticky;top:0;z-index:100}
+.topbar-brand{display:flex;align-items:center;gap:8px;padding:14px 0;margin-right:2rem;color:#fff;font-size:15px;font-weight:600;text-decoration:none}
+.topbar-brand svg{opacity:.8}
+.tab{padding:14px 14px;font-size:13px;color:#AFA9EC;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:6px;transition:color 0.15s;white-space:nowrap}
+.tab:hover{color:#fff}
+.tab.active{color:#fff;border-bottom-color:#5DCAA5}
+
+/* LAYOUT */
+.body{padding:1.25rem;max-width:900px;margin:0 auto}
+.page{display:none}.page.active{display:block}
+
+/* HERO */
+.hero-strip{background:#EEEDFE;border:0.5px solid #AFA9EC;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+.hero-title{font-size:15px;font-weight:600;color:#3C3489}
+.hero-sub{font-size:12px;color:#534AB7;margin-top:2px}
+
+/* METRICS */
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.25rem}
+.met{background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:.875rem 1rem;display:flex;align-items:center;gap:12px}
+.met-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px}
+.met-icon.indigo{background:#EEEDFE;color:#534AB7}
+.met-icon.teal{background:#E1F5EE;color:#0F6E56}
+.met-icon.coral{background:#FAECE7;color:#D85A30}
+.met-val{font-size:22px;font-weight:600;color:var(--text-primary)}
+.met-lbl{font-size:11px;color:var(--text-secondary);margin-top:1px}
+
+/* SECTION LABEL */
+.section-label{font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.07em;text-transform:uppercase;margin:0 0 .625rem;padding-bottom:6px;border-bottom:0.5px solid var(--border)}
+
+/* CARDS */
+.card{background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem}
+.card-head{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin-bottom:1rem;color:var(--text-primary)}
+.card-head .icon{font-size:18px}
+
+/* FORM */
+label{font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;font-weight:500}
+input,select{width:100%;padding:8px 10px;font-size:13px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:#fff;color:var(--text-primary);outline:none;font-family:inherit}
+input:focus,select:focus{border-color:#534AB7;box-shadow:0 0 0 3px #EEEDFE}
+.field{margin-bottom:10px}
+
+/* UPLOAD */
+.upload-zone{border:1.5px dashed #AFA9EC;border-radius:10px;padding:1.5rem;text-align:center;cursor:pointer;background:#EEEDFE;color:#534AB7;font-size:13px;transition:all 0.15s}
+.upload-zone:hover{background:#CECBF6;border-color:#534AB7}
+.upload-zone .up-icon{font-size:28px;margin-bottom:6px}
+
+/* BUTTONS */
+.btn{padding:8px 16px;font-size:13px;font-weight:500;border-radius:var(--radius);cursor:pointer;display:inline-flex;align-items:center;gap:6px;border:0.5px solid var(--border-strong);background:#fff;color:var(--text-primary);font-family:inherit;transition:all 0.15s}
+.btn:hover{background:var(--surface-1)}
+.btn-primary{background:#534AB7;border-color:#534AB7;color:#fff}
+.btn-primary:hover{background:#3C3489;border-color:#3C3489}
+.btn-teal{background:#0F6E56;border-color:#0F6E56;color:#fff}
+.btn-teal:hover{background:#085041}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-ghost{border-color:transparent;background:transparent;color:var(--text-secondary)}
+.btn-ghost:hover{background:var(--surface-1);color:var(--text-primary)}
+.flex-row{display:flex;gap:8px;align-items:flex-end}
+.flex-row .field{flex:1;margin-bottom:0}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:500}
+.b-success{background:#EAF3DE;color:#27500A}
+.b-warning{background:#FAEEDA;color:#633806}
+.b-indigo{background:#EEEDFE;color:#3C3489}
+.b-danger{background:#FCEBEB;color:#791F1F}
+.b-teal{background:#E1F5EE;color:#085041}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 10px;font-weight:600;color:var(--text-secondary);border-bottom:0.5px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+td{padding:9px 10px;border-bottom:0.5px solid var(--border);color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface-1)}
+
+/* RANK */
+.rank-circle{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
+.r1{background:#FFD700;color:#7a5a00}.r2{background:#C0C0C0;color:#3a3a3a}.r3{background:#CD7F32;color:#4a2000}.rn{background:var(--surface-1);color:var(--text-muted)}
+
+/* PROGRESS */
+.bar-wrap{height:6px;background:var(--surface-1);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width 0.4s}
+
+/* TIMER */
+.timer-pill{background:#FCEBEB;border:0.5px solid #F7C1C1;border-radius:20px;padding:4px 14px;display:inline-flex;align-items:center;gap:6px}
+.timer-val{font-size:20px;font-weight:600;color:#A32D2D;font-variant-numeric:tabular-nums;letter-spacing:0.04em}
+
+/* OPTION BUTTONS */
+.opt-btn{width:100%;padding:10px 14px;margin-bottom:8px;border:0.5px solid var(--border-strong);border-radius:10px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-primary);text-align:left;font-family:inherit;transition:all 0.15s}
+.opt-btn:hover{border-color:#AFA9EC;background:#EEEDFE}
+.opt-btn.selected{border-color:#534AB7;background:#EEEDFE;color:#3C3489;font-weight:500}
+.opt-btn.correct{border-color:#5DCAA5;background:#E1F5EE;color:#085041}
+.opt-btn.wrong{border-color:#F0997B;background:#FAECE7;color:#993C1D}
+.opt-letter{width:26px;height:26px;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;background:var(--surface-1);color:var(--text-secondary)}
+.opt-btn.selected .opt-letter{background:#534AB7;color:#fff}
+.opt-btn.correct .opt-letter{background:#0F6E56;color:#fff}
+.opt-btn.wrong .opt-letter{background:#D85A30;color:#fff}
+
+/* ANALYSIS */
+.q-wrong-item{padding:10px 12px;border-radius:10px;margin-bottom:8px;background:#fff;border:0.5px solid var(--border);display:flex;align-items:center;gap:12px}
+
+/* ALERTS */
+.alert-indigo{background:#EEEDFE;border:0.5px solid #AFA9EC;color:#3C3489;border-radius:var(--radius);padding:10px 14px;font-size:13px}
+.alert-teal{background:#E1F5EE;border:0.5px solid #9FE1CB;color:#085041;border-radius:var(--radius);padding:10px 14px;font-size:13px}
+.alert-coral{background:#FAECE7;border:0.5px solid #F5C4B3;color:#993C1D;border-radius:var(--radius);padding:10px 14px;font-size:13px}
+
+/* SCORE */
+.score-big{font-size:52px;font-weight:700;line-height:1}
+
+/* MODAL OVERLAY */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem}
+.modal-box{background:#fff;border-radius:16px;padding:1.5rem;width:100%;max-width:480px;max-height:80vh;overflow-y:auto}
+
+/* GRID */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:600px){.grid2{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}.tab span{display:none}}
+
+/* TOAST */
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;background:#3C3489;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:500;z-index:300;opacity:0;transform:translateY(8px);transition:all 0.2s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+
+/* CODE BLOCK */
+.code-block{background:var(--surface-1);border-radius:var(--radius);padding:1rem;font-family:'Courier New',monospace;font-size:11px;color:var(--text-secondary);white-space:pre-wrap;max-height:200px;overflow-y:auto;border:0.5px solid var(--border)}
+
+/* LOGIN AVATAR */
+.login-avatar{width:60px;height:60px;background:#EEEDFE;border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:28px}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <a class="topbar-brand" href="#" onclick="return false">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="m9 12 2 2 4-4"/></svg>
+    QuizPro
+  </a>
+  <button class="tab active" onclick="nav(this,'admin')"><span>📊</span><span>Tổng quan</span></button>
+  <button class="tab" onclick="nav(this,'exam')"><span>✏️</span><span>Trang thi</span></button>
+  <button class="tab" onclick="nav(this,'ranking')"><span>🏆</span><span>Xếp hạng</span></button>
+  <button class="tab" onclick="nav(this,'analysis')"><span>📈</span><span>Phân tích</span></button>
+  <button class="tab" onclick="nav(this,'setup')"><span>⚙️</span><span>Cài đặt</span></button>
+</div>
+
+<div class="body">
+
+  <!-- ===== ADMIN PAGE ===== -->
+  <div id="page-admin" class="page active">
+    <div class="hero-strip">
+      <div style="font-size:28px">📅</div>
+      <div style="flex:1">
+        <div class="hero-title" id="hero-exam-name">Kiểm tra tháng 7/2026</div>
+        <div class="hero-sub" id="hero-exam-info">30 phút · 10 câu hỏi · Hạn: 22/07/2026 17:00</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-sm btn-ghost" onclick="copyExamLink()">🔗 Copy link</button>
+        <span class="badge b-success">● Đang mở</span>
+      </div>
+    </div>
+
+    <div class="metrics">
+      <div class="met">
+        <div class="met-icon indigo">👥</div>
+        <div><div class="met-val" id="m-total">5</div><div class="met-lbl">Người đã thi</div></div>
+      </div>
+      <div class="met">
+        <div class="met-icon teal">📈</div>
+        <div><div class="met-val" id="m-avg">68%</div><div class="met-lbl">Điểm trung bình</div></div>
+      </div>
+      <div class="met">
+        <div class="met-icon coral">🎖️</div>
+        <div><div class="met-val" id="m-pass">4/5</div><div class="met-lbl">Đạt yêu cầu</div></div>
+      </div>
+    </div>
+
+    <p class="section-label">Tạo đợt thi mới</p>
+    <div class="card">
+      <div class="grid2">
+        <div class="field"><label>Tên đợt thi</label><input id="new-exam-name" placeholder="VD: Kiểm tra Q3/2026"></div>
+        <div class="field"><label>Thời gian (phút)</label><input id="new-exam-time" type="number" value="30" min="5" max="180"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Ngày thi</label><input id="new-exam-date" type="date"></div>
+        <div class="field"><label>Điểm đạt tối thiểu (%)</label><input id="new-exam-pass" type="number" value="50" min="0" max="100"></div>
+      </div>
+      <div class="field">
+        <label>File câu hỏi (Excel .xlsx / .csv)</label>
+        <div class="upload-zone" onclick="document.getElementById('file-input').click()">
+          <div class="up-icon">📊</div>
+          Kéo thả hoặc nhấp để chọn file
+          <div style="font-size:11px;color:#534AB7;margin-top:4px;opacity:.8">Cột A: câu hỏi · B-E: đáp án A-D · F: đáp án đúng (A/B/C/D)</div>
+        </div>
+        <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(this)">
+        <div id="file-ok" style="display:none;margin-top:8px"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="createExam()">➕ Tạo đợt thi</button>
+        <button class="btn" onclick="openImportHelp()">❓ Mẫu file Excel</button>
+      </div>
+    </div>
+
+    <p class="section-label">Danh sách đợt thi</p>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table>
+        <thead><tr><th>Tên đợt thi</th><th>Ngày</th><th>TG</th><th>Câu</th><th>Đã thi</th><th>Trạng thái</th><th></th></tr></thead>
+        <tbody id="exam-list-body">
+          <tr>
+            <td style="font-weight:600;max-width:200px">Kiểm tra tháng 7/2026</td>
+            <td style="color:var(--text-secondary)">22/07</td>
+            <td style="color:var(--text-secondary)">30 ph</td>
+            <td>10</td><td>5</td>
+            <td><span class="badge b-success">● Mở</span></td>
+            <td><button class="btn btn-sm btn-ghost" onclick="copyExamLink()">🔗</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600;max-width:200px">Onboarding tháng 6</td>
+            <td style="color:var(--text-secondary)">15/06</td>
+            <td style="color:var(--text-secondary)">20 ph</td>
+            <td>15</td><td>18</td>
+            <td><span class="badge b-warning">Kết thúc</span></td>
+            <td><button class="btn btn-sm btn-ghost" onclick="showToast('Đã copy link đợt thi cũ')">🔗</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== EXAM PAGE ===== -->
+  <div id="page-exam" class="page">
+
+    <div id="login-view">
+      <div style="max-width:380px;margin:2rem auto">
+        <div style="text-align:center;margin-bottom:1.5rem">
+          <div class="login-avatar">📝</div>
+          <div style="font-size:20px;font-weight:700">Đăng nhập thi</div>
+          <div style="font-size:13px;color:var(--text-secondary);margin-top:6px">Nhập thông tin để bắt đầu làm bài</div>
+        </div>
+        <div class="card">
+          <div class="field"><label>Email công ty *</label><input type="email" id="u-email" placeholder="ten@congty.com"></div>
+          <div class="field"><label>Họ và tên *</label><input id="u-name" placeholder="Nguyễn Văn A"></div>
+          <div class="field"><label>Chọn đợt thi *</label>
+            <select id="u-exam">
+              <option value="">— Chọn đợt thi —</option>
+              <option value="t7">Kiểm tra tháng 7/2026 (30 phút · 10 câu)</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="startExam()">
+            ▶ Bắt đầu thi
+          </button>
+          <div style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:10px">Kết quả sẽ được lưu tự động</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="exam-view" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:14px;font-weight:600" id="ev-title">Kiểm tra tháng 7/2026</div>
+          <div style="font-size:12px;color:var(--text-secondary)" id="ev-user">Nguyễn Văn A</div>
+        </div>
+        <div class="timer-pill">
+          ⏱ <span class="timer-val" id="timer">30:00</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">
+        <div class="bar-wrap" style="flex:1"><div class="bar-fill" id="q-bar" style="width:10%;background:#534AB7"></div></div>
+        <span style="font-size:12px;color:var(--text-secondary);white-space:nowrap" id="q-lbl">Câu 1/10</span>
+      </div>
+      <div class="card">
+        <div style="font-size:14px;font-weight:600;margin-bottom:1rem;line-height:1.6;color:var(--text-primary)" id="q-text"></div>
+        <div id="opts"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.75rem;flex-wrap:wrap;gap:8px">
+        <button class="btn btn-ghost" id="btn-prev" onclick="prevQ()" disabled>← Trước</button>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center" id="dot-nav"></div>
+        <button class="btn btn-primary" id="btn-next" onclick="nextQ()">Tiếp →</button>
+      </div>
+    </div>
+
+    <div id="result-view" style="display:none">
+      <div style="max-width:460px;margin:1rem auto">
+        <div class="card" style="text-align:center;padding:2rem 1.5rem">
+          <div id="r-icon" style="font-size:48px;margin-bottom:12px"></div>
+          <div class="score-big" id="r-score" style="color:#534AB7">8/10</div>
+          <div style="font-size:14px;color:var(--text-secondary);margin:8px 0 1.5rem" id="r-pct">80% · Đạt</div>
+          <div id="r-msg" style="font-size:13px;color:var(--text-secondary);background:var(--surface-0);border-radius:var(--radius);padding:10px;margin-bottom:1.25rem;line-height:1.6"></div>
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="nav(document.querySelectorAll('.tab')[2],'ranking')">🏆 Xem xếp hạng</button>
+            <button class="btn" onclick="toggleReview()">📋 Xem đáp án</button>
+            <button class="btn" onclick="retakeExam()">🔄 Thi lại</button>
+          </div>
+        </div>
+        <div id="review-section" style="display:none;margin-top:1rem"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== RANKING PAGE ===== -->
+  <div id="page-ranking" class="page">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+      <select style="width:220px" id="rank-filter" onchange="renderRanking()">
+        <option>Kiểm tra tháng 7/2026</option>
+        <option>Onboarding tháng 6</option>
+      </select>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm" onclick="exportCSV()">⬇ Xuất CSV</button>
+        <button class="btn btn-sm" onclick="renderRanking();showToast('Đã làm mới dữ liệu')">🔄 Làm mới</button>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;overflow-x:auto">
+      <table style="min-width:560px">
+        <thead><tr>
+          <th style="width:44px;text-align:center">#</th>
+          <th>Họ tên</th>
+          <th>Email</th>
+          <th style="width:70px">Điểm</th>
+          <th style="width:130px">Phần trăm</th>
+          <th style="width:90px">Trạng thái</th>
+        </tr></thead>
+        <tbody id="rank-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== ANALYSIS PAGE ===== -->
+  <div id="page-analysis" class="page">
+    <div class="alert-indigo" style="margin-bottom:1rem">
+      💡 Câu hỏi sắp xếp theo tỉ lệ trả lời sai — từ nhiều nhất đến ít nhất.
+    </div>
+    <div class="grid2" style="margin-bottom:1rem">
+      <div class="card">
+        <div class="card-head"><span class="icon">📊</span>Phân bố điểm số</div>
+        <div id="dist-chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">🎯</span>Tỉ lệ đạt / chưa đạt</div>
+        <div id="pass-chart"></div>
+      </div>
+    </div>
+    <p class="section-label">Câu hỏi có nhiều người sai nhất</p>
+    <div id="wrong-list"></div>
+  </div>
+
+  <!-- ===== SETUP PAGE ===== -->
+  <div id="page-setup" class="page">
+    <div class="card">
+      <div class="card-head"><span class="icon">🔗</span>Kết nối Google Sheets (Database)</div>
+      <div class="alert-indigo" style="margin-bottom:1rem">
+        Dán Google Apps Script URL để lưu kết quả thi từ 20+ người cùng lúc lên Google Sheets.
+      </div>
+      <div class="field"><label>Web App URL</label><input id="gas-url" placeholder="https://script.google.com/macros/s/.../exec"></div>
+      <div class="field"><label>Google Sheets ID (tùy chọn)</label><input id="sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        <button class="btn btn-primary" onclick="testConn()">🔌 Kiểm tra kết nối</button>
+        <button class="btn" onclick="toggleGASCode()">💻 Xem code Apps Script</button>
+      </div>
+      <div id="conn-status" style="display:none;margin-top:10px"></div>
+      <div id="gas-code-area" style="display:none;margin-top:10px">
+        <div class="code-block" id="gas-code-text"></div>
+        <button class="btn btn-sm" style="margin-top:6px" onclick="copyGASCode()">📋 Copy code</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="icon">🛡️</span>Quản lý Admin</div>
+      <div class="flex-row" style="margin-bottom:12px">
+        <div class="field"><label>Email admin mới</label><input id="new-admin" type="email" placeholder="admin@congty.com"></div>
+        <button class="btn btn-teal" onclick="addAdmin()">+ Thêm</button>
+      </div>
+      <div style="border:0.5px solid var(--border);border-radius:10px;overflow:hidden">
+        <table>
+          <thead><tr><th>Email</th><th>Vai trò</th><th style="width:60px"></th></tr></thead>
+          <tbody id="admin-body">
+            <tr><td>admin@congty.com</td><td><span class="badge b-indigo">👑 Quản trị chính</span></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="icon">📖</span>Hướng dẫn deploy lên GitHub Pages</div>
+      <div style="font-size:13px;line-height:1.9;color:var(--text-secondary)">
+        <p><strong style="color:var(--text-primary)">Bước 1:</strong> Tạo tài khoản tại <a href="https://github.com" target="_blank" style="color:#534AB7">github.com</a></p>
+        <p><strong style="color:var(--text-primary)">Bước 2:</strong> Tạo Repository mới, đặt tên <code style="background:var(--surface-1);padding:1px 5px;border-radius:4px">quizpro</code> (hoặc tên bất kỳ)</p>
+        <p><strong style="color:var(--text-primary)">Bước 3:</strong> Upload file <code style="background:var(--surface-1);padding:1px 5px;border-radius:4px">index.html</code> vào repository</p>
+        <p><strong style="color:var(--text-primary)">Bước 4:</strong> Vào Settings → Pages → Source: Deploy from branch → main → Save</p>
+        <p><strong style="color:var(--text-primary)">Bước 5:</strong> Sau ~1 phút link sẽ có dạng: <code style="background:var(--surface-1);padding:1px 5px;border-radius:4px">https://username.github.io/quizpro</code></p>
+        <p style="margin-top:8px;padding:8px;background:#EEEDFE;border-radius:var(--radius);color:#3C3489">✅ Hoàn toàn miễn phí · Có HTTPS · Truy cập từ mọi thiết bị</p>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end .body -->
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- IMPORT HELP MODAL -->
+<div class="modal-overlay" id="import-modal" style="display:none" onclick="if(event.target===this)closeImportHelp()">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <div style="font-size:16px;font-weight:700">📊 Mẫu file Excel</div>
+      <button class="btn btn-sm btn-ghost" onclick="closeImportHelp()">✕</button>
+    </div>
+    <div class="alert-indigo" style="margin-bottom:1rem">File Excel cần có đúng 6 cột theo thứ tự sau:</div>
+    <div style="overflow-x:auto;border:0.5px solid var(--border);border-radius:var(--radius)">
+      <table style="min-width:500px">
+        <thead><tr><th>A — Câu hỏi</th><th>B — Đáp án A</th><th>C — Đáp án B</th><th>D — Đáp án C</th><th>E — Đáp án D</th><th>F — Đúng</th></tr></thead>
+        <tbody>
+          <tr>
+            <td style="white-space:normal;max-width:180px">Thời gian làm việc tiêu chuẩn?</td>
+            <td>40 giờ</td><td>44 giờ</td><td>48 giờ</td><td>52 giờ</td>
+            <td style="font-weight:600;color:#0F6E56">A</td>
+          </tr>
+          <tr>
+            <td style="white-space:normal;max-width:180px">Ngày phép năm tối thiểu?</td>
+            <td>10 ngày</td><td>12 ngày</td><td>14 ngày</td><td>16 ngày</td>
+            <td style="font-weight:600;color:#0F6E56">B</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:12px;color:var(--text-muted);margin-top:10px">Cột F nhập chữ A, B, C hoặc D (viết hoa, không dấu cách)</p>
+    <div style="margin-top:1rem;text-align:right"><button class="btn btn-primary" onclick="closeImportHelp()">Đã hiểu</button></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   DATA
+   ============================================================ */
+const QUESTIONS=[
+  {q:'Luật Lao động Việt Nam quy định thời gian làm việc tiêu chuẩn là bao nhiêu giờ/tuần?',opts:['40 giờ','44 giờ','48 giờ','52 giờ'],ans:0},
+  {q:'Người lao động được hưởng bao nhiêu ngày nghỉ phép năm tối thiểu?',opts:['10 ngày','12 ngày','14 ngày','16 ngày'],ans:1},
+  {q:'Hệ số lương làm thêm giờ vào ngày thường là bao nhiêu?',opts:['1.3 lần','1.5 lần','2.0 lần','2.5 lần'],ans:1},
+  {q:'BHXH bắt buộc người sử dụng lao động đóng bao nhiêu % lương?',opts:['17%','18%','20%','21.5%'],ans:2},
+  {q:'Thời gian thử việc tối đa cho vị trí chuyên môn kỹ thuật cao là bao lâu?',opts:['30 ngày','45 ngày','60 ngày','90 ngày'],ans:2},
+];
+
+let RESULTS=JSON.parse(localStorage.getItem('quizpro_results')||'null')||[
+  {name:'Nguyễn Thị Lan',email:'lan@co.com',score:9,total:10,pct:90,time:'18:23',pass:true,ans:[0,1,1,2,2]},
+  {name:'Trần Văn Minh',email:'minh@co.com',score:7,total:10,pct:70,time:'22:11',pass:true,ans:[0,1,1,3,2]},
+  {name:'Lê Thị Hoa',email:'hoa@co.com',score:6,total:10,pct:60,time:'25:40',pass:true,ans:[0,1,1,2,1]},
+  {name:'Phạm Quốc Đạt',email:'dat@co.com',score:4,total:10,pct:40,time:'28:59',pass:false,ans:[0,0,1,2,3]},
+  {name:'Hoàng Thị Mai',email:'mai@co.com',score:8,total:10,pct:80,time:'20:15',pass:true,ans:[0,1,1,2,0]},
+];
+
+const GAS_CODE=`// Google Apps Script — dán vào script.google.com
+const SHEET_ID = 'YOUR_SHEET_ID_HERE';
+
+function doPost(e) {
+  var d = JSON.parse(e.postData.contents);
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  if (d.action === 'submit_result') {
+    var sh = ss.getSheetByName('Results')
+            || ss.insertSheet('Results');
+    if (sh.getLastRow() === 0)
+      sh.appendRow(['Email','Name','Exam','Score',
+                    'Total','Pct','Time','Date','Answers']);
+    sh.appendRow([d.email, d.name, d.exam, d.score,
+      d.total, d.pct, d.timeTaken, new Date(),
+      JSON.stringify(d.answers)]);
+    return ok();
+  }
+  if (d.action === 'get_results') {
+    var sh = ss.getSheetByName('Results');
+    if (!sh) return ContentService
+      .createTextOutput(JSON.stringify({results:[]}))
+      .setMimeType(ContentService.MimeType.JSON);
+    return ContentService
+      .createTextOutput(JSON.stringify(
+        {results: sh.getDataRange().getValues()}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet(e) { return doPost(e); }
+
+function ok() {
+  return ContentService
+    .createTextOutput(JSON.stringify({ok:true}))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let curQ=0, sel={}, timerInt=null, tLeft=1800;
+let examUser={name:'',email:''};
+
+/* ============================================================
+   NAV
+   ============================================================ */
+function nav(el,page){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('page-'+page).classList.add('active');
+  if(page==='ranking')renderRanking();
+  if(page==='analysis')renderAnalysis();
+}
+
+/* ============================================================
+   ADMIN
+   ============================================================ */
+function updateMetrics(){
+  document.getElementById('m-total').textContent=RESULTS.length;
+  const avg=RESULTS.length?Math.round(RESULTS.reduce((s,r)=>s+r.pct,0)/RESULTS.length)+'%':'—';
+  document.getElementById('m-avg').textContent=avg;
+  const pass=RESULTS.filter(r=>r.pass).length;
+  document.getElementById('m-pass').textContent=RESULTS.length?pass+'/'+RESULTS.length:'—';
+}
+
+function handleFile(inp){
+  const f=inp.files[0];if(!f)return;
+  const el=document.getElementById('file-ok');
+  el.style.display='block';
+  el.className='alert-teal';
+  el.innerHTML='✅ '+f.name+' — Đọc được '+QUESTIONS.length+' câu hỏi (demo)';
+}
+
+function createExam(){
+  const name=document.getElementById('new-exam-name').value.trim();
+  const time=document.getElementById('new-exam-time').value;
+  if(!name){showToast('Vui lòng nhập tên đợt thi','error');return;}
+  showToast('Đã tạo: '+name);
+  document.getElementById('hero-exam-name').textContent=name;
+  document.getElementById('hero-exam-info').textContent=time+' phút · '+QUESTIONS.length+' câu hỏi';
+  // Add select option
+  const sel=document.getElementById('u-exam');
+  const opt=document.createElement('option');
+  opt.value='new'; opt.textContent=name+' ('+time+' phút)';
+  sel.appendChild(opt);
+}
+
+function copyExamLink(){
+  const url=window.location.href.split('#')[0];
+  navigator.clipboard.writeText(url).then(()=>showToast('Đã copy link thi!')).catch(()=>showToast('Link: '+url));
+}
+
+function openImportHelp(){document.getElementById('import-modal').style.display='flex';}
+function closeImportHelp(){document.getElementById('import-modal').style.display='none';}
+
+/* ============================================================
+   EXAM
+   ============================================================ */
+function startExam(){
+  const email=document.getElementById('u-email').value.trim();
+  const name=document.getElementById('u-name').value.trim();
+  const exam=document.getElementById('u-exam').value;
+  if(!email||!name){showToast('Vui lòng điền email và họ tên','error');return;}
+  if(!exam){showToast('Vui lòng chọn đợt thi','error');return;}
+  if(!/\S+@\S+\.\S+/.test(email)){showToast('Email không hợp lệ','error');return;}
+  examUser={name,email};
+  curQ=0;sel={};tLeft=30*60;
+  show('exam-view');hide('login-view');hide('result-view');
+  document.getElementById('ev-title').textContent='Kiểm tra tháng 7/2026';
+  document.getElementById('ev-user').textContent=name+' · '+email;
+  renderQ();startTimer();
+}
+
+function renderQ(){
+  const q=QUESTIONS[curQ];
+  document.getElementById('q-text').textContent=(curQ+1)+'. '+q.q;
+  document.getElementById('q-lbl').textContent='Câu '+(curQ+1)+' / '+QUESTIONS.length;
+  document.getElementById('q-bar').style.width=Math.round((curQ+1)/QUESTIONS.length*100)+'%';
+  const L=['A','B','C','D'];
+  document.getElementById('opts').innerHTML=q.opts.map((o,i)=>`
+    <button class="opt-btn${sel[curQ]===i?' selected':''}" onclick="pick(${i})">
+      <span class="opt-letter">${L[i]}</span>${o}
+    </button>`).join('');
+  document.getElementById('btn-prev').disabled=curQ===0;
+  const last=curQ===QUESTIONS.length-1;
+  document.getElementById('btn-next').textContent=last?'Nộp bài ✓':'Tiếp →';
+  document.getElementById('btn-next').className='btn '+(last?'btn-teal':'btn-primary');
+  // dots
+  document.getElementById('dot-nav').innerHTML=QUESTIONS.map((_,i)=>`
+    <div onclick="jumpQ(${i})" title="Câu ${i+1}" style="width:${i===curQ?'20':'8'}px;height:8px;border-radius:4px;background:${i===curQ?'#534AB7':sel[i]!==undefined?'#AFA9EC':'var(--border-strong)'};cursor:pointer;transition:all 0.2s;flex-shrink:0"></div>`).join('');
+}
+
+function pick(i){sel[curQ]=i;renderQ();}
+function jumpQ(i){curQ=i;renderQ();}
+function nextQ(){if(curQ<QUESTIONS.length-1){curQ++;renderQ();}else submitExam();}
+function prevQ(){if(curQ>0){curQ--;renderQ();}}
+
+function submitExam(){
+  clearInterval(timerInt);
+  let score=0;
+  QUESTIONS.forEach((q,i)=>{if(sel[i]===q.ans)score++;});
+  const pct=Math.round(score/QUESTIONS.length*100);
+  const pass=pct>=50;
+  const elapsed=30*60-tLeft;
+  const mm=String(Math.floor(elapsed/60)).padStart(2,'0');
+  const ss=String(elapsed%60).padStart(2,'0');
+
+  // Save result
+  const r={name:examUser.name,email:examUser.email,score,total:QUESTIONS.length,pct,time:mm+':'+ss,pass,ans:Object.values(sel)};
+  RESULTS.push(r);
+  localStorage.setItem('quizpro_results',JSON.stringify(RESULTS));
+  updateMetrics();
+
+  // Show result
+  hide('exam-view');show('result-view');
+  document.getElementById('r-icon').textContent=pass?'🎉':'😔';
+  document.getElementById('r-score').textContent=score+'/'+QUESTIONS.length;
+  document.getElementById('r-score').style.color=pass?'#534AB7':'#A32D2D';
+  document.getElementById('r-pct').textContent=pct+'% · '+(pass?'✅ Đạt':'❌ Chưa đạt');
+  document.getElementById('r-msg').textContent=pass
+    ?'Chúc mừng '+examUser.name.split(' ').pop()+'! Bạn đã hoàn thành bài thi với kết quả tốt. Hãy xem bảng xếp hạng để biết thứ hạng của mình.'
+    :'Bạn chưa đạt yêu cầu lần này. Hãy xem lại đáp án để học hỏi và thi lại nhé!';
+
+  // Submit to Google Sheets if configured
+  const gasUrl=document.getElementById('gas-url')?document.getElementById('gas-url').value:'';
+  if(gasUrl){
+    fetch(gasUrl,{method:'POST',body:JSON.stringify({action:'submit_result',...r,exam:'Kiểm tra tháng 7/2026',timeTaken:mm+':'+ss})}).catch(()=>{});
+  }
+}
+
+function toggleReview(){
+  const rv=document.getElementById('review-section');
+  const show=rv.style.display==='none';
+  rv.style.display=show?'block':'none';
+  if(!show)return;
+  const L=['A','B','C','D'];
+  rv.innerHTML=QUESTIONS.map((q,i)=>{
+    const correct=sel[i]===q.ans;
+    return `<div class="card" style="margin-bottom:8px;border-left:3px solid ${correct?'#5DCAA5':'#F0997B'}">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px;line-height:1.5">${i+1}. ${q.q}</div>
+      ${q.opts.map((o,j)=>{
+        let cls='';
+        if(j===q.ans)cls='correct';
+        else if(j===sel[i]&&!correct)cls='wrong';
+        return `<div class="opt-btn ${cls}" style="cursor:default;margin-bottom:6px">
+          <span class="opt-letter">${L[j]}</span>${o}${j===q.ans?' ✓':''}${j===sel[i]&&!correct?' ✗':''}
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+function retakeExam(){
+  hide('result-view');show('login-view');
+  document.getElementById('review-section').style.display='none';
+}
+
+function startTimer(){
+  clearInterval(timerInt);
+  timerInt=setInterval(()=>{
+    tLeft--;
+    const m=Math.floor(tLeft/60),s=tLeft%60;
+    const el=document.getElementById('timer');
+    if(el)el.textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    if(tLeft<=60&&el)el.parentElement.style.background='#FCEBEB';
+    if(tLeft<=0){clearInterval(timerInt);submitExam();}
+  },1000);
+}
+
+/* ============================================================
+   RANKING
+   ============================================================ */
+function renderRanking(){
+  const sorted=[...RESULTS].sort((a,b)=>b.score-a.score||a.time.localeCompare(b.time));
+  document.getElementById('rank-body').innerHTML=sorted.map((r,i)=>`<tr>
+    <td style="text-align:center"><div class="rank-circle ${i===0?'r1':i===1?'r2':i===2?'r3':'rn'}" style="margin:0 auto">${i+1}</div></td>
+    <td style="font-weight:${i<3?'600':'400'};max-width:140px">${r.name}</td>
+    <td style="color:var(--text-secondary);max-width:160px">${r.email}</td>
+    <td>${r.score}/${r.total}</td>
+    <td><div style="display:flex;align-items:center;gap:6px">
+      <div class="bar-wrap" style="flex:1;min-width:50px"><div class="bar-fill" style="width:${r.pct}%;background:${r.pct>=80?'#1D9E75':r.pct>=50?'#534AB7':'#E24B4A'}"></div></div>
+      <span style="font-size:12px;color:var(--text-secondary);min-width:32px">${r.pct}%</span>
+    </div></td>
+    <td><span class="badge ${r.pass?'b-success':'b-danger'}">${r.pass?'Đạt':'Chưa đạt'}</span></td>
+  </tr>`).join('');
+}
+
+function exportCSV(){
+  const sorted=[...RESULTS].sort((a,b)=>b.score-a.score);
+  const rows=[['Hạng','Họ tên','Email','Điểm','Phần trăm','Thời gian','Trạng thái']];
+  sorted.forEach((r,i)=>rows.push([i+1,r.name,r.email,r.score+'/'+r.total,r.pct+'%',r.time,r.pass?'Đạt':'Chưa đạt']));
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='bang-xep-hang.csv';a.click();
+}
+
+/* ============================================================
+   ANALYSIS
+   ============================================================ */
+function renderAnalysis(){
+  const wrong=QUESTIONS.map((q,qi)=>{
+    const n=RESULTS.filter(r=>r.ans&&r.ans[qi]!==undefined&&r.ans[qi]!==q.ans).length;
+    return{q:q.q,n,pct:RESULTS.length?Math.round(n/RESULTS.length*100):0};
+  }).sort((a,b)=>b.pct-a.pct);
+
+  document.getElementById('wrong-list').innerHTML=wrong.map((w,i)=>`
+    <div class="q-wrong-item">
+      <div style="width:42px;height:42px;border-radius:10px;background:${w.pct>60?'#FCEBEB':w.pct>30?'#FAEEDA':'#EAF3DE'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <span style="font-size:13px;font-weight:700;color:${w.pct>60?'#791F1F':w.pct>30?'#633806':'#27500A'}">${w.pct}%</span>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;margin-bottom:6px;line-height:1.5;white-space:normal">${i+1}. ${w.q}</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${w.pct}%;background:${w.pct>60?'#E24B4A':w.pct>30?'#BA7517':'#639922'}"></div></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);text-align:center;min-width:36px;flex-shrink:0">${w.n}/${RESULTS.length}<br>sai</div>
+    </div>`).join('');
+
+  const ranges=[{l:'90–100%',min:90,max:100,c:'#1D9E75'},{l:'70–89%',min:70,max:89,c:'#534AB7'},{l:'50–69%',min:50,max:69,c:'#BA7517'},{l:'Dưới 50%',min:0,max:49,c:'#E24B4A'}];
+  document.getElementById('dist-chart').innerHTML=ranges.map(r=>{
+    const cnt=RESULTS.filter(s=>s.pct>=r.min&&s.pct<=r.max).length;
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:3px"><span>${r.l}</span><span>${cnt} người</span></div>
+      <div class="bar-wrap"><div class="bar-fill" style="width:${RESULTS.length?Math.round(cnt/RESULTS.length*100):0}%;background:${r.c}"></div></div>
+    </div>`;
+  }).join('');
+
+  const pass=RESULTS.filter(r=>r.pass).length;
+  const pw=RESULTS.length?Math.round(pass/RESULTS.length*100):0;
+  document.getElementById('pass-chart').innerHTML=`
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <div style="flex:1;background:#E1F5EE;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:24px;font-weight:700;color:#0F6E56">${pass}</div>
+        <div style="font-size:11px;color:#085041;margin-top:2px">Đạt ✅</div>
+      </div>
+      <div style="flex:1;background:#FCEBEB;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:24px;font-weight:700;color:#A32D2D">${RESULTS.length-pass}</div>
+        <div style="font-size:11px;color:#791F1F;margin-top:2px">Chưa đạt ❌</div>
+      </div>
+    </div>
+    <div class="bar-wrap" style="height:10px"><div class="bar-fill" style="width:${pw}%;background:#1D9E75"></div></div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:6px;text-align:center">${pw}% đạt yêu cầu (≥50%)</div>`;
+}
+
+/* ============================================================
+   SETUP
+   ============================================================ */
+function testConn(){
+  const url=document.getElementById('gas-url').value.trim();
+  const el=document.getElementById('conn-status');
+  el.style.display='block';
+  if(!url){el.className='alert-coral';el.textContent='⚠️ Vui lòng nhập URL trước';return;}
+  el.className='alert-indigo';el.textContent='⏳ Đang kiểm tra...';
+  fetch(url,{method:'POST',body:JSON.stringify({action:'ping'})})
+    .then(()=>{el.className='alert-teal';el.textContent='✅ Kết nối thành công — Google Sheets sẵn sàng nhận dữ liệu';})
+    .catch(()=>{el.className='alert-coral';el.textContent='❌ Không kết nối được — Kiểm tra lại URL và quyền Deploy';});
+}
+
+function toggleGASCode(){
+  const b=document.getElementById('gas-code-area');
+  const show=b.style.display==='none';
+  b.style.display=show?'block':'none';
+  document.getElementById('gas-code-text').textContent=GAS_CODE;
+}
+
+function copyGASCode(){
+  navigator.clipboard.writeText(GAS_CODE).then(()=>showToast('Đã copy code Apps Script!'));
+}
+
+function addAdmin(){
+  const v=document.getElementById('new-admin').value.trim();
+  if(!v){showToast('Nhập email admin trước','error');return;}
+  if(!/\S+@\S+\.\S+/.test(v)){showToast('Email không hợp lệ','error');return;}
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td>${v}</td><td><span class="badge b-warning">Quản trị viên</span></td>
+    <td><button class="btn btn-sm" style="border-color:transparent;color:#A32D2D;background:transparent" onclick="this.closest('tr').remove();showToast('Đã xóa admin')">🗑</button></td>`;
+  document.getElementById('admin-body').appendChild(tr);
+  document.getElementById('new-admin').value='';
+  showToast('Đã thêm admin: '+v);
+}
+
+/* ============================================================
+   UTILS
+   ============================================================ */
+function show(id){document.getElementById(id).style.display='block';}
+function hide(id){document.getElementById(id).style.display='none';}
+
+function showToast(msg,type){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.style.background=type==='error'?'#A32D2D':'#3C3489';
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+document.getElementById('new-exam-date').value=new Date().toISOString().split('T')[0];
+updateMetrics();
+renderRanking();
+renderAnalysis();
+</script>
+</body>
+</html>
