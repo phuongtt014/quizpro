@@ -55,11 +55,25 @@ clasp deploy
    - Gán **tài khoản Google đang chạy script làm Admin hệ thống** trong
      sheet `NhanSu` — đây là người đầu tiên có quyền vào tab Thiết lập.
 2. Deploy Web App: **Deploy → New deployment → Web app**.
-   - Execute as: **User accessing the web app** (đã đặt sẵn trong
-     `appsscript.json`).
+   - Execute as: **Me** (đã đặt sẵn trong `appsscript.json`). Lý do chọn
+     "Me" thay vì "User accessing the web app": với "User accessing",
+     mỗi người truy cập phải tự cấp quyền OAuth riêng lần đầu, việc này
+     có thể bị domain Workspace (đặc biệt domain giáo dục) chặn/hạn chế
+     khiến trang treo vô thời hạn ở "Đang tải...". Với "Me", chỉ người
+     deploy cần cấp quyền một lần; `Session.getActiveUser()` vẫn nhận
+     diện đúng từng người truy cập miễn access giới hạn trong domain và
+     admin không chặn riêng thông tin này.
    - Who has access: **Anyone within [tên tổ chức]** (yêu cầu tài khoản
      Google Workspace cùng domain — đúng theo lựa chọn đăng nhập bằng
      Google account).
+   - Nếu sau khi deploy vẫn không nhận diện được người dùng (tab userbox
+     báo "Chưa được cấp quyền nội bộ" dù email đã có trong `NhanSu`), rất
+     có thể domain Workspace chặn chia sẻ định danh người dùng cho script
+     chạy dưới quyền người khác — cần liên hệ quản trị Workspace mở
+     "Drive SDK" / cho phép chia sẻ thông tin người dùng nội bộ cho ứng
+     dụng tự phát triển, hoặc quay lại dùng "User accessing the web app"
+     sau khi domain đã whitelist các domain ở mục **7. Xử lý sự cố mạng**
+     bên dưới.
 3. Truy cập URL Web App bằng tài khoản Admin vừa gán → vào tab **Thiết lập**
    để:
    - Thêm đầy đủ Đơn vị/Phòng ban, Phân mục hồ sơ, Mã điểm.
@@ -106,6 +120,27 @@ Mã hồ sơ + Mã xác nhận mà không cần vai trò gì.
   file trực tiếp lên server.
 
 ## 6. Giới hạn đã biết / có thể mở rộng thêm sau
+
+## 7. Xử lý sự cố mạng (trang treo ở "Đang tải...")
+
+Nếu trang web app tải xong giao diện (form, các tab) nhưng ô thông tin
+người dùng ở góc trên phải kẹt mãi ở "Đang tải..." không hiện tên/lỗi gì
+— đây là dấu hiệu kênh RPC (`google.script.run`) của Apps Script bị chặn
+bởi mạng/tường lửa/proxy nội bộ (thường gặp ở mạng trường học có lọc nội
+dung), không phải lỗi trong code. Cần quản trị mạng mở (whitelist) các
+domain sau để Apps Script hoạt động được:
+
+```
+script.google.com
+script.googleusercontent.com
+*.googleusercontent.com
+accounts.google.com
+apis.google.com
+```
+
+Cách xác nhận nhanh: thử truy cập web app qua mạng khác (4G/hotspot) hoặc
+qua VPN — nếu chạy được bình thường thì chắc chắn là do mạng chặn, không
+phải do cấu hình web app hay code.
 
 - Chat tải lại khi mở modal hoặc bấm Gửi (không real-time); có thể thêm
   polling định kỳ nếu cần.

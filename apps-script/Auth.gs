@@ -8,8 +8,18 @@
 function getCurrentUser_() {
   var email = Session.getActiveUser().getEmail();
   if (!email) {
-    // Trường hợp không lấy được email (hiếm khi web app deploy "Anyone")
-    throw new Error('Không xác định được tài khoản Google. Vui lòng đăng nhập bằng tài khoản Google được cấp quyền.');
+    // Không lấy được email người truy cập (có thể do executeAs="Me" và domain
+    // admin hạn chế chia sẻ thông tin người dùng, hoặc access không giới hạn
+    // domain). Không throw để Form gửi hồ sơ/Tra cứu vẫn dùng được bình
+    // thường - chỉ các tab yêu cầu vai trò sẽ bị ẩn cho tới khi xác định được.
+    return {
+      email: '',
+      hoTen: '',
+      donVi: '',
+      vaiTro: null,
+      dangHoatDong: false,
+      trongHeThong: false
+    };
   }
   var nhanSu = findOne_(SHEET_NAMES.NHAN_SU, 'Email', email);
   if (!nhanSu) {
