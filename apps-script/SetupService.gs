@@ -85,7 +85,7 @@ function upsertNhanSu(user, item) {
 }
 
 /** Khởi tạo dữ liệu mẫu ban đầu (chỉ chạy nếu các sheet danh mục đang trống) - gọi thủ công từ Apps Script editor */
-function khoiTaoDuLieuMauNeuTrong_() {
+function khoiTaoDuLieuMau() {
   ensureAllSheets_();
 
   if (readAll_(SHEET_NAMES.DON_VI).length === 0) {

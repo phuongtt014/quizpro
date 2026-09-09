@@ -47,7 +47,7 @@ clasp deploy
 
 ## 3. Cấu hình trước khi dùng
 
-1. Mở dự án Apps Script, chạy hàm `khoiTaoDuLieuMauNeuTrong_` một lần (menu
+1. Mở dự án Apps Script, chạy hàm `khoiTaoDuLieuMau` một lần (menu
    **Run** → chọn hàm → Run) để:
    - Tạo 1 Google Sheet CSDL mới (Spreadsheet ID được lưu vào
      Script Properties, key `SPREADSHEET_ID`).

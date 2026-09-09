@@ -4,7 +4,7 @@
  */
 
 function doGet(e) {
-  khoiTaoDuLieuMauNeuTrong_();
+  khoiTaoDuLieuMau();
   var tpl = HtmlService.createTemplateFromFile('Index');
   return tpl.evaluate()
     .setTitle('Quản lý công việc nhóm')
