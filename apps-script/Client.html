@@ -75,14 +75,27 @@ window.addEventListener('DOMContentLoaded', function () {
   var box = document.getElementById('userbox');
   var daXongInit = false;
 
-  // Nếu sau 12s vẫn chưa nhận được phản hồi từ máy chủ (kể cả lỗi), báo rõ lên giao diện
-  // thay vì để "Đang tải..." lặng lẽ mãi mãi - thường do mạng/tường lửa chặn kênh RPC.
-  setTimeout(function () {
-    if (!daXongInit) {
-      box.innerHTML = '<b style="color:#ffd">⚠ Không nhận được phản hồi từ máy chủ sau 12 giây.</b>' +
-        'Có thể do mạng/tường lửa chặn kênh giao tiếp Apps Script. Thử đổi mạng (4G) hoặc liên hệ IT.';
+  console.log('[APP] Bắt đầu gọi boSungBoiCanh lúc ' + new Date().toLocaleTimeString());
+  if (!box) {
+    console.error('[APP] KHÔNG TÌM THẤY phần tử #userbox trong DOM! Kiểm tra lại Index.html.');
+  }
+
+  // Đếm giờ hiển thị trực tiếp trên giao diện, không phụ thuộc thời gian canh tay.
+  var demGiay = 0;
+  var interval = setInterval(function () {
+    demGiay++;
+    console.log('[APP] Đã chờ ' + demGiay + 's, daXongInit=' + daXongInit);
+    if (!daXongInit && box) {
+      box.innerHTML = '<b>Đang tải... (' + demGiay + 's)</b>';
     }
-  }, 12000);
+    if (daXongInit || demGiay >= 20) {
+      clearInterval(interval);
+      if (!daXongInit && box) {
+        box.innerHTML = '<b style="color:#ffd">⚠ Không nhận được phản hồi từ máy chủ sau ' + demGiay + ' giây.</b>' +
+          'Có thể do mạng/tường lửa chặn kênh giao tiếp Apps Script. Thử đổi mạng (4G) hoặc liên hệ IT.';
+      }
+    }
+  }, 1000);
 
   google.script.run
     .withSuccessHandler(function (ctx) {
