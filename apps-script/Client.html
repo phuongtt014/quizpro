@@ -71,16 +71,38 @@ function runServer(fnName, args, onOk, onErr) {
 window.addEventListener('DOMContentLoaded', function () {
   bindTabButtons();
   bindStaticHandlers();
-  runServer('boSungBoiCanh', undefined, function (ctx) {
-    APP.user = ctx.user;
-    APP.roleLabels = ctx.roleLabels;
-    APP.danhMuc = ctx.danhMuc;
-    APP.congViecStatusList = ctx.congViecStatusList;
-    renderUserBox();
-    applyRoleVisibility();
-    fillDropdowns();
-    loadForActivePage();
-  });
+
+  var box = document.getElementById('userbox');
+  var daXongInit = false;
+
+  // Nếu sau 12s vẫn chưa nhận được phản hồi từ máy chủ (kể cả lỗi), báo rõ lên giao diện
+  // thay vì để "Đang tải..." lặng lẽ mãi mãi - thường do mạng/tường lửa chặn kênh RPC.
+  setTimeout(function () {
+    if (!daXongInit) {
+      box.innerHTML = '<b style="color:#ffd">⚠ Không nhận được phản hồi từ máy chủ sau 12 giây.</b>' +
+        'Có thể do mạng/tường lửa chặn kênh giao tiếp Apps Script. Thử đổi mạng (4G) hoặc liên hệ IT.';
+    }
+  }, 12000);
+
+  google.script.run
+    .withSuccessHandler(function (ctx) {
+      daXongInit = true;
+      APP.user = ctx.user;
+      APP.roleLabels = ctx.roleLabels;
+      APP.danhMuc = ctx.danhMuc;
+      APP.congViecStatusList = ctx.congViecStatusList;
+      renderUserBox();
+      applyRoleVisibility();
+      fillDropdowns();
+      loadForActivePage();
+    })
+    .withFailureHandler(function (err) {
+      daXongInit = true;
+      var msg = (err && err.message) ? err.message : String(err);
+      box.innerHTML = '<b style="color:#ffd">⚠ Lỗi khởi tạo</b>' + esc(msg);
+      showError(err);
+    })
+    .boSungBoiCanh();
 });
 
 function renderUserBox() {
