@@ -290,33 +290,38 @@ function ensureAllSheets_() {
   });
 }
 
-function getHeaderMap_(sheet) {
-  var lastCol = sheet.getLastColumn();
-  if (lastCol === 0) return {};
-  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  var map = {};
-  headers.forEach(function (h, idx) {
-    if (h) map[h] = idx;
-  });
-  return map;
+// Cache toàn bộ dữ liệu thô (getValues()) của từng sheet trong phạm vi 1
+// request - readAll_/findOne_/findMany_ gọi nhiều lần trên cùng 1 sheet chỉ
+// tốn đúng 1 lượt gọi Sheets API (getDataRange) thay vì nhiều lượt
+// getLastRow/getLastColumn/getRange riêng lẻ như trước - giảm đáng kể độ trễ
+// khi chuyển trang.
+var CACHED_SHEET_DATA_ = {};
+
+function getSheetData_(sheetName) {
+  if (CACHED_SHEET_DATA_[sheetName]) return CACHED_SHEET_DATA_[sheetName];
+  var sheet = getSheet_(sheetName);
+  var data = sheet.getDataRange().getValues();
+  CACHED_SHEET_DATA_[sheetName] = data;
+  return data;
+}
+
+function invalidateSheetCache_(sheetName) {
+  delete CACHED_SHEET_DATA_[sheetName];
 }
 
 /** Đọc toàn bộ sheet thành mảng object {tenCot: giaTri} */
 function readAll_(sheetName) {
-  var sheet = getSheet_(sheetName);
-  var lastRow = sheet.getLastRow();
-  var lastCol = sheet.getLastColumn();
-  if (lastRow < 2 || lastCol === 0) return [];
-  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  var values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  var data = getSheetData_(sheetName);
+  if (data.length < 2) return [];
+  var headers = data[0];
   var out = [];
-  for (var r = 0; r < values.length; r++) {
-    var obj = { _row: r + 2 };
+  for (var r = 1; r < data.length; r++) {
+    var obj = { _row: r + 1 };
     var isEmpty = true;
     for (var c = 0; c < headers.length; c++) {
       if (!headers[c]) continue;
-      obj[headers[c]] = values[r][c];
-      if (values[r][c] !== '' && values[r][c] !== null) isEmpty = false;
+      obj[headers[c]] = data[r][c];
+      if (data[r][c] !== '' && data[r][c] !== null) isEmpty = false;
     }
     if (!isEmpty) out.push(obj);
   }
@@ -326,12 +331,13 @@ function readAll_(sheetName) {
 /** Thêm 1 dòng theo object {tenCot: giaTri} */
 function appendRow_(sheetName, obj) {
   var sheet = getSheet_(sheetName);
-  var lastCol = sheet.getLastColumn();
-  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var data = getSheetData_(sheetName);
+  var headers = data[0] || [];
   var row = headers.map(function (h) {
     return obj.hasOwnProperty(h) ? obj[h] : '';
   });
   sheet.appendRow(row);
+  invalidateSheetCache_(sheetName);
   return sheet.getLastRow();
 }
 
@@ -355,12 +361,18 @@ function findMany_(sheetName, field, value) {
 /** Cập nhật 1 dòng (theo số dòng vật lý _row) với các field mới - merge object */
 function updateRow_(sheetName, rowIndex, patch) {
   var sheet = getSheet_(sheetName);
-  var map = getHeaderMap_(sheet);
+  var data = getSheetData_(sheetName);
+  var headers = data[0] || [];
+  var map = {};
+  headers.forEach(function (h, idx) {
+    if (h) map[h] = idx;
+  });
   Object.keys(patch).forEach(function (key) {
     if (map.hasOwnProperty(key)) {
       sheet.getRange(rowIndex, map[key] + 1).setValue(patch[key]);
     }
   });
+  invalidateSheetCache_(sheetName);
 }
 
 /** Cập nhật theo điều kiện khoá chính keyField=keyValue, trả về true nếu tìm thấy */
@@ -726,6 +738,37 @@ function guiTinTraCuu(params) {
  * Nghiệp vụ Tab quản lý công việc: cập nhật trạng thái, đánh giá TĐV,
  * chấm điểm, khung chat công việc.
  */
+
+/** Tạo trực tiếp 1 công việc mới, không cần qua Form hồ sơ (Trưởng nhóm trở lên) */
+function taoCongViecMoi(user, params) {
+  requireRoleAtLeast_(user, ROLES.TRUONG_NHOM);
+  throwIf_(!params || !params.noiDung, 'Vui lòng nhập Nội dung công việc.');
+  throwIf_(!params.nguoiPhuTrach, 'Vui lòng chọn Người phụ trách.');
+  throwIf_(!params.thoiHan, 'Vui lòng chọn Thời hạn.');
+
+  var now = nowStr_();
+  var maCongViec = generateMaCongViec_();
+  appendRow_(SHEET_NAMES.CONG_VIEC, {
+    MaCongViec: maCongViec,
+    MaHoSo: '',
+    NoiDung: params.noiDung,
+    NguoiPhuTrach: params.nguoiPhuTrach,
+    MoTa: params.moTa || '',
+    TaiLieuDinhKem: joinLinks_(parseLinks_(params.taiLieuDinhKem)),
+    TrangThai: CONGVIEC_STATUS.CAN_LAM,
+    PhanLoai: params.phanLoai || '',
+    ThoiGianBatDau: now,
+    ThoiHan: params.thoiHan,
+    ThoiGianHoanThanh: '',
+    DiemHienTai: DIEM_MAC_DINH_CONG_VIEC,
+    MaDanhGiaTDV: '',
+    GhiChuTDV: '',
+    NguoiTao: user.email,
+    NgayTao: now,
+    NgayCapNhat: now
+  });
+  return { maCongViec: maCongViec };
+}
 
 /** Danh sách công việc hiển thị theo quyền: nhân viên chỉ thấy việc của mình */
 function listCongViec(user) {
@@ -1481,6 +1524,10 @@ function pageCongViec_(user, params) {
   if (params.id) {
     return pageCongViecDetail_(user, params.id);
   }
+  if (params.view === 'tao' && isTruongNhomTroLen_(user)) {
+    return pageTaoCongViecMoi_(user);
+  }
+
   var rows = listCongViec(user);
   var body = rows.map(function (r) {
     var diem = Number(r.DiemHienTai);
@@ -1491,9 +1538,37 @@ function pageCongViec_(user, params) {
       '<td><a class="btn secondary" href="' + escHtml_(linkTo_('congviec', { id: r.MaCongViec })) + '">Chi tiết</a></td></tr>';
   }).join('');
 
-  return '<div class="card"><h2>Quản lý công việc</h2>' +
+  var taoMoiBtn = isTruongNhomTroLen_(user)
+    ? '<div class="btn-row"><a class="btn" href="' + escHtml_(linkTo_('congviec', { view: 'tao' })) + '">+ Tạo công việc mới</a></div>'
+    : '';
+
+  return '<div class="card"><h2>Quản lý công việc</h2>' + taoMoiBtn +
     '<div class="table-wrap"><table><thead><tr><th>Mã CV</th><th>Nội dung</th><th>Người phụ trách</th><th>Phân loại</th><th>Trạng thái</th><th>Thời hạn</th><th>Điểm</th><th></th></tr></thead>' +
     '<tbody>' + (body || '<tr><td colspan="8"><div class="empty-state">Chưa có công việc nào.</div></td></tr>') + '</tbody></table></div></div>';
+}
+
+/** Form tạo công việc mới trực tiếp, không cần qua Form hồ sơ */
+function pageTaoCongViecMoi_(user) {
+  requireRoleAtLeast_(user, ROLES.TRUONG_NHOM);
+  var dm = getDanhMucDungChung();
+  var nhanSuOpts = dm.nhanSu.map(function (n) { return { value: n.Email, label: n.HoTen }; });
+  var phanLoaiOpts = dm.phanMuc.map(function (p) { return { value: p.TenPhanMuc, label: p.TenPhanMuc }; });
+
+  return '<div class="card">' +
+    '<p><a href="' + escHtml_(linkTo_('congviec')) + '">&larr; Quay lại danh sách</a></p>' +
+    '<h2>Tạo công việc mới</h2>' +
+    '<form method="POST" action="' + escHtml_(getWebAppUrl_()) + '">' +
+    hiddenInputs_({ action: 'taoCongViecMoi', returnPage: 'congviec' }) +
+    '<div class="field"><label>Nội dung *</label><input name="noiDung" required></div>' +
+    '<div class="grid grid-2">' +
+    '<div class="field"><label>Người phụ trách *</label>' + selectHtml_('nguoiPhuTrach', nhanSuOpts, '', '-- Chọn --', 'required') + '</div>' +
+    '<div class="field"><label>Phân loại</label>' + selectHtml_('phanLoai', phanLoaiOpts, '', '-- Chọn --') + '</div>' +
+    '</div>' +
+    '<div class="field"><label>Mô tả</label><textarea name="moTa"></textarea></div>' +
+    '<div class="field link-list-input"><label>Tài liệu đính kèm (mỗi link 1 dòng)</label><textarea name="taiLieuDinhKem"></textarea></div>' +
+    '<div class="field"><label>Thời hạn *</label><input type="date" name="thoiHan" required></div>' +
+    '<div class="btn-row"><button class="btn" type="submit">Tạo công việc</button></div>' +
+    '</form></div>';
 }
 
 function pageCongViecDetail_(user, maCongViec) {
@@ -1571,6 +1646,17 @@ function pageCongViecDetail_(user, maCongViec) {
   return html;
 }
 
+function doPostTaoCongViecMoi_(e) {
+  var res = taoCongViecMoi(getCurrentUser_(), {
+    noiDung: e.parameter.noiDung,
+    nguoiPhuTrach: e.parameter.nguoiPhuTrach,
+    phanLoai: e.parameter.phanLoai,
+    moTa: e.parameter.moTa,
+    taiLieuDinhKem: e.parameter.taiLieuDinhKem,
+    thoiHan: e.parameter.thoiHan
+  });
+  return { flash: { type: 'ok', msg: 'Đã tạo công việc ' + res.maCongViec + '.' }, redirectParams: { id: res.maCongViec } };
+}
 function doPostCapNhatTrangThaiCongViec_(e) {
   capNhatTrangThaiCongViec(getCurrentUser_(), { maCongViec: e.parameter.id, trangThaiMoi: e.parameter.trangThaiMoi, linkKetQua: e.parameter.linkKetQua });
   return { flash: { type: 'ok', msg: 'Đã cập nhật trạng thái công việc ' + e.parameter.id + '.' }, redirectParams: { id: e.parameter.id } };
@@ -1902,6 +1988,7 @@ function xuLyAction_(e) {
     case 'guiTinTraCuu': return doPostGuiTinTraCuu_(e);
     case 'assignHoSo': return doPostAssignHoSo_(e);
     case 'rejectHoSo': return doPostRejectHoSo_(e);
+    case 'taoCongViecMoi': return doPostTaoCongViecMoi_(e);
     case 'capNhatTrangThaiCongViec': return doPostCapNhatTrangThaiCongViec_(e);
     case 'suaThoiGianHoanThanh': return doPostSuaThoiGianHoanThanh_(e);
     case 'danhGiaTDV': return doPostDanhGiaTDV_(e);
