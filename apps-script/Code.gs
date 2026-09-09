@@ -1082,13 +1082,14 @@ function baoCaoBangDiem(user) {
  * đọc các danh mục (để đổ vào dropdown của Form/Tab khác).
  */
 
-/** Dữ liệu dropdown dùng chung cho Form hồ sơ & các tab (không cần quyền Admin để đọc) */
-function getDanhMucDungChung() {
-  var donVi = readAll_(SHEET_NAMES.DON_VI).filter(function (r) { return r.TrangThai === TRANG_THAI_HOAT_DONG.HOAT_DONG; });
-  var phanMuc = readAll_(SHEET_NAMES.PHAN_MUC).filter(function (r) { return r.TrangThai === TRANG_THAI_HOAT_DONG.HOAT_DONG; });
-  var maDiem = readAll_(SHEET_NAMES.MA_DIEM).filter(function (r) { return r.TrangThai === TRANG_THAI_HOAT_DONG.HOAT_DONG; });
-  var nhanSu = readAll_(SHEET_NAMES.NHAN_SU).filter(function (r) { return r.TrangThai === TRANG_THAI_HOAT_DONG.HOAT_DONG; });
-  return { donVi: donVi, phanMuc: phanMuc, maDiem: maDiem, nhanSu: nhanSu };
+/**
+ * Đọc 1 sheet danh mục, chỉ lấy dòng "Hoạt động" - dùng thay cho việc đọc
+ * gộp cả 4 sheet danh mục (DonVi/PhanMuc/MaDiem/NhanSu) khi 1 trang chỉ
+ * cần 1-2 danh mục, tránh gọi Sheets API cho những sheet không dùng tới
+ * (mỗi sheet không cần vẫn tốn ~1 lượt gọi API nếu đọc gộp như trước).
+ */
+function activeRows_(sheetName) {
+  return readAll_(sheetName).filter(function (r) { return r.TrangThai === TRANG_THAI_HOAT_DONG.HOAT_DONG; });
 }
 
 /** Toàn bộ dữ liệu Thiết lập (chỉ Admin) để hiển thị & chỉnh sửa trong tab Thiết lập */
@@ -1343,9 +1344,8 @@ function renderRedirect_(url, flash) {
  * PageForm.gs - Trang "Gửi hồ sơ"
  */
 function pageForm_(user, params) {
-  var dm = getDanhMucDungChung();
-  var donViOpts = dm.donVi.map(function (d) { return { value: d.MaDonVi, label: d.TenDonVi }; });
-  var phanMucOpts = dm.phanMuc.map(function (p) { return { value: p.MaPhanMuc, label: p.TenPhanMuc }; });
+  var donViOpts = activeRows_(SHEET_NAMES.DON_VI).map(function (d) { return { value: d.MaDonVi, label: d.TenDonVi }; });
+  var phanMucOpts = activeRows_(SHEET_NAMES.PHAN_MUC).map(function (p) { return { value: p.MaPhanMuc, label: p.TenPhanMuc }; });
 
   return '<div class="card">' +
     '<h2>Form nhận hồ sơ</h2>' +
@@ -1399,13 +1399,11 @@ function doPostSubmitHoSo_(e) {
  */
 function pageTiepNhan_(user, params) {
   requireRoleAtLeast_(user, ROLES.TRUONG_NHOM);
-  var rows = listHoSoTiepNhan(user);
-  var dm = getDanhMucDungChung();
-  var nhanSuOpts = dm.nhanSu.map(function (n) { return { value: n.Email, label: n.HoTen }; });
 
   if (params.view === 'phancong' && params.maHoSo) {
     var hs = findOne_(SHEET_NAMES.HO_SO, 'MaHoSo', params.maHoSo);
     if (!hs) throw new Error('Không tìm thấy hồ sơ.');
+    var nhanSuOpts = activeRows_(SHEET_NAMES.NHAN_SU).map(function (n) { return { value: n.Email, label: n.HoTen }; });
     return '<div class="card"><h2>Phân công hồ sơ ' + escHtml_(hs.MaHoSo) + '</h2>' +
       '<p><b>' + escHtml_(hs.TieuDe) + '</b></p>' +
       '<form method="POST" action="' + escHtml_(getWebAppUrl_()) + '">' +
@@ -1429,6 +1427,7 @@ function pageTiepNhan_(user, params) {
       '</form></div>';
   }
 
+  var rows = listHoSoTiepNhan(user);
   var body = rows.map(function (r) {
     var actions = '';
     if (r.TrangThai === 'Mới' || r.TrangThai === 'Đã phân công') {
@@ -1550,9 +1549,8 @@ function pageCongViec_(user, params) {
 /** Form tạo công việc mới trực tiếp, không cần qua Form hồ sơ */
 function pageTaoCongViecMoi_(user) {
   requireRoleAtLeast_(user, ROLES.TRUONG_NHOM);
-  var dm = getDanhMucDungChung();
-  var nhanSuOpts = dm.nhanSu.map(function (n) { return { value: n.Email, label: n.HoTen }; });
-  var phanLoaiOpts = dm.phanMuc.map(function (p) { return { value: p.TenPhanMuc, label: p.TenPhanMuc }; });
+  var nhanSuOpts = activeRows_(SHEET_NAMES.NHAN_SU).map(function (n) { return { value: n.Email, label: n.HoTen }; });
+  var phanLoaiOpts = activeRows_(SHEET_NAMES.PHAN_MUC).map(function (p) { return { value: p.TenPhanMuc, label: p.TenPhanMuc }; });
 
   return '<div class="card">' +
     '<p><a href="' + escHtml_(linkTo_('congviec')) + '">&larr; Quay lại danh sách</a></p>' +
@@ -1614,8 +1612,7 @@ function pageCongViecDetail_(user, maCongViec) {
   }
 
   if (isQuanLy) {
-    var dm = getDanhMucDungChung();
-    var madiemOpts = dm.maDiem.map(function (m) { return { value: m.MaDiem, label: m.MaDiem + ' - ' + m.LyDo + ' (' + m.SoDiem + ')' }; });
+    var madiemOpts = activeRows_(SHEET_NAMES.MA_DIEM).map(function (m) { return { value: m.MaDiem, label: m.MaDiem + ' - ' + m.LyDo + ' (' + m.SoDiem + ')' }; });
     html += '<h3 style="margin-top:1rem">Đánh giá của TĐV (chỉ Quản lý)</h3>' +
       '<form method="POST" action="' + escHtml_(getWebAppUrl_()) + '">' +
       hiddenInputs_({ action: 'danhGiaTDV', returnPage: 'congviec', id: cv.MaCongViec }) +
@@ -1682,9 +1679,8 @@ function doPostGuiChatCongViec_(e) {
  */
 function pageDiem_(user, params) {
   requireRoleAtLeast_(user, ROLES.TRUONG_NHOM);
-  var dm = getDanhMucDungChung();
-  var nhanSuOpts = dm.nhanSu.map(function (n) { return { value: n.Email, label: n.HoTen }; });
-  var maDiemOpts = dm.maDiem.map(function (m) { return { value: m.MaDiem, label: m.MaDiem + ' - ' + m.LyDo + ' (' + m.SoDiem + ')' }; });
+  var nhanSuOpts = activeRows_(SHEET_NAMES.NHAN_SU).map(function (n) { return { value: n.Email, label: n.HoTen }; });
+  var maDiemOpts = activeRows_(SHEET_NAMES.MA_DIEM).map(function (m) { return { value: m.MaDiem, label: m.MaDiem + ' - ' + m.LyDo + ' (' + m.SoDiem + ')' }; });
   var congViecRows = readAll_(SHEET_NAMES.CONG_VIEC);
   var cvOpts = congViecRows.map(function (c) { return { value: c.MaCongViec, label: c.MaCongViec + ' - ' + c.NoiDung }; });
 
