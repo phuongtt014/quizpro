@@ -243,19 +243,21 @@ var CACHED_DB_ = null;
 
 function getDb_() {
   if (CACHED_DB_) return CACHED_DB_;
+  // Ưu tiên getActiveSpreadsheet() trước - nhanh hơn openById() vì script
+  // đang gắn liền (bound) trực tiếp với Sheet, không cần tra cứu qua
+  // PropertiesService + mở lại theo ID.
+  var active = SpreadsheetApp.getActiveSpreadsheet();
+  if (active) {
+    CACHED_DB_ = active;
+    return CACHED_DB_;
+  }
   var props = PropertiesService.getScriptProperties();
   var id = props.getProperty(SPREADSHEET_ID_PROPERTY_KEY);
   if (id) {
     CACHED_DB_ = SpreadsheetApp.openById(id);
     return CACHED_DB_;
   }
-  var active = SpreadsheetApp.getActiveSpreadsheet();
-  if (active) {
-    props.setProperty(SPREADSHEET_ID_PROPERTY_KEY, active.getId());
-    CACHED_DB_ = active;
-    return CACHED_DB_;
-  }
-  // Chưa có DB nào -> tạo mới
+  // Chưa có DB nào -> tạo mới (trường hợp script không gắn liền Sheet nào)
   var ss = SpreadsheetApp.create('QuizPro - CSDL Quản lý công việc nhóm');
   props.setProperty(SPREADSHEET_ID_PROPERTY_KEY, ss.getId());
   CACHED_DB_ = ss;
@@ -1926,8 +1928,11 @@ function doPost(e) {
 
 function handleRequest_(e, opts) {
   opts = opts || {};
+  var t0 = Date.now();
   khoiTaoDuLieuMauNeuChuaChay_();
+  var t1 = Date.now();
   var user = getCurrentUser_();
+  var t2 = Date.now();
   var params = (e && e.parameter) || {};
   var page = params.page || 'form';
 
@@ -1947,7 +1952,16 @@ function handleRequest_(e, opts) {
   } catch (err) {
     content = '<div class="card"><p style="color:#D85A30"><b>Lỗi:</b> ' + escHtml_(err.message) + '</p></div>';
   }
-  return renderShell_(user, page, content, null);
+  var t3 = Date.now();
+  var out = renderShell_(user, page, content, null);
+  var t4 = Date.now();
+  console.log('[TIMING] trang=' + page +
+    ' khoiTao=' + (t1 - t0) + 'ms' +
+    ' getUser=' + (t2 - t1) + 'ms' +
+    ' buildContent=' + (t3 - t2) + 'ms' +
+    ' renderShell=' + (t4 - t3) + 'ms' +
+    ' TONG=' + (t4 - t0) + 'ms');
+  return out;
 }
 
 function buildPageContent_(page, user, params) {
