@@ -17,21 +17,33 @@ HTTP GET/POST chuẩn (giống mọi trang web thông thường) nên không b�
 ```
 apps-script/
 ├─ appsscript.json      # Manifest (quyền, chế độ triển khai)
-└─ Code.gs              # TOÀN BỘ ứng dụng: dữ liệu, nghiệp vụ, giao diện,
-                         # routing doGet()/doPost() - gộp 1 file duy nhất,
-                         # không có file .html nào (CSS nhúng thẳng trong
-                         # file bằng 1 biến chuỗi APP_CSS_).
+├─ Code.gs              # TOÀN BỘ logic: dữ liệu, nghiệp vụ, routing
+│                        # doGet()/doPost() - gộp 1 file .gs duy nhất
+└─ Index.html           # Khung giao diện dùng chung (CSS + nav + nội
+                         # dung) - template server-side (<?!= %>), KHÔNG
+                         # chứa JavaScript/google.script.run nào
 ```
 
-Chỉ có **đúng 2 file** cần đưa vào Apps Script Editor: `appsscript.json`
-(manifest) và `Code.gs`. Không cần tạo thêm file HTML nào — mọi trang đều
-được dựng bằng cách ghép chuỗi HTML ngay trong `Code.gs` rồi trả về qua
-`HtmlService.createHtmlOutput(html)`.
+Chỉ có **đúng 3 file** cần đưa vào Apps Script Editor: `appsscript.json`
+(manifest, chỉnh trong Project Settings), `Code.gs` (giữ nguyên file mặc
+định đã có, xoá nội dung cũ rồi dán đè) và `Index.html` (tạo file HTML
+mới tên đúng `Index`). `Code.gs` dựng nội dung từng trang bằng cách ghép
+chuỗi HTML rồi gán vào biến template (`tpl.content = ...`) trước khi gọi
+`Index.html` render ra — đây vẫn là render phía server thuần tuý (giống
+hệt việc doPost trả về 1 trang HTML bình thường), khác hoàn toàn với
+kiểu SPA gọi `google.script.run` trước đây.
 
 Bên trong `Code.gs`, code được chia thành các khối theo comment `// ====`
 cho dễ đọc/tìm (Constants, SheetDB, Utils, Auth, MailService, các Service
 nghiệp vụ, Render helpers, từng trang Page*, và cuối cùng là Routing
-doGet/doPost) — nhưng vẫn chỉ là 1 file duy nhất, copy-paste 1 lần.
+doGet/doPost) — nhưng vẫn chỉ là 1 file `.gs`, copy-paste 1 lần.
+
+**Hiệu năng chuyển trang**: mọi request trước đây gọi lại toàn bộ hàm
+khởi tạo dữ liệu mẫu (`khoiTaoDuLieuMau`, đọc 4-5 sheet để kiểm tra rỗng
++ đảm bảo đủ 9 sheet) khiến việc bấm chuyển tab bị chậm. Đã sửa: hàm này
+giờ chỉ chạy **đúng 1 lần** (đánh dấu bằng Script Property
+`DA_KHOI_TAO_XONG`), đồng thời Spreadsheet/Sheet đã mở được cache lại
+trong phạm vi 1 lượt request để tránh mở lại nhiều lần.
 
 ## 2. Cách triển khai
 
@@ -46,16 +58,19 @@ clasp push
 clasp deploy
 ```
 
-### Cách B — copy thủ công vào Apps Script Editor (đơn giản, chỉ 2 file)
+### Cách B — copy thủ công vào Apps Script Editor (chỉ 2 file .gs/.html)
 
 1. Vào https://script.google.com (hoặc Tiện ích mở rộng → Apps Script từ
    Google Sheet của bạn).
 2. Xoá nội dung mặc định trong `Code.gs`, copy toàn bộ nội dung file
    `Code.gs` trong thư mục này vào.
-3. Bật **Project Settings** → tick "Show appsscript.json manifest file in
+3. Bấm dấu **+** cạnh "Files" → **HTML** → đặt tên **`Index`** (editor tự
+   thêm đuôi `.html`) → copy toàn bộ nội dung file `Index.html` trong thư
+   mục này vào.
+4. Bật **Project Settings** → tick "Show appsscript.json manifest file in
    editor" → mở file `appsscript.json` vừa hiện ra, dán đúng nội dung
    file `appsscript.json` trong thư mục này vào.
-4. Lưu lại (Ctrl+S). Xong — không cần tạo thêm file nào khác.
+5. Lưu lại (Ctrl+S). Xong — không cần tạo thêm file nào khác.
 
 ## 3. Cấu hình trước khi dùng
 

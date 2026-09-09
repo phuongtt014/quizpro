@@ -236,24 +236,36 @@ function throwIf_(cond, msg) {
  * đọc/ghi theo tên cột (không phụ thuộc thứ tự cột vật lý).
  */
 
+// Cache Spreadsheet đã mở trong phạm vi 1 lượt thực thi (1 request) - tránh
+// mở lại nhiều lần (SpreadsheetApp.openById tốn thời gian) khi 1 trang gọi
+// nhiều hàm đọc/ghi sheet khác nhau.
+var CACHED_DB_ = null;
+
 function getDb_() {
+  if (CACHED_DB_) return CACHED_DB_;
   var props = PropertiesService.getScriptProperties();
   var id = props.getProperty(SPREADSHEET_ID_PROPERTY_KEY);
   if (id) {
-    return SpreadsheetApp.openById(id);
+    CACHED_DB_ = SpreadsheetApp.openById(id);
+    return CACHED_DB_;
   }
   var active = SpreadsheetApp.getActiveSpreadsheet();
   if (active) {
     props.setProperty(SPREADSHEET_ID_PROPERTY_KEY, active.getId());
-    return active;
+    CACHED_DB_ = active;
+    return CACHED_DB_;
   }
   // Chưa có DB nào -> tạo mới
   var ss = SpreadsheetApp.create('QuizPro - CSDL Quản lý công việc nhóm');
   props.setProperty(SPREADSHEET_ID_PROPERTY_KEY, ss.getId());
-  return ss;
+  CACHED_DB_ = ss;
+  return CACHED_DB_;
 }
 
+var CACHED_SHEETS_ = {};
+
 function getSheet_(sheetName) {
+  if (CACHED_SHEETS_[sheetName]) return CACHED_SHEETS_[sheetName];
   var ss = getDb_();
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
@@ -267,6 +279,7 @@ function getSheet_(sheetName) {
       sheet.setFrozenRows(1);
     }
   }
+  CACHED_SHEETS_[sheetName] = sheet;
   return sheet;
 }
 
@@ -1105,6 +1118,19 @@ function upsertNhanSu(user, item) {
   return { ok: true };
 }
 
+/**
+ * Chỉ chạy khoiTaoDuLieuMau() (tạo sheet + seed dữ liệu mẫu) MỘT LẦN DUY
+ * NHẤT trong suốt vòng đời deployment, đánh dấu bằng Script Property.
+ * Trước đây gọi lại mỗi lần chuyển trang khiến việc bấm tab rất chậm
+ * (phải đọc lại 4-5 sheet để kiểm tra rỗng + đảm bảo đủ 9 sheet mỗi lần).
+ */
+function khoiTaoDuLieuMauNeuChuaChay_() {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('DA_KHOI_TAO_XONG') === '1') return;
+  khoiTaoDuLieuMau();
+  props.setProperty('DA_KHOI_TAO_XONG', '1');
+}
+
 /** Khởi tạo dữ liệu mẫu ban đầu (chỉ chạy nếu các sheet danh mục đang trống) - gọi thủ công từ Apps Script editor */
 function khoiTaoDuLieuMau() {
   ensureAllSheets_();
@@ -1783,79 +1809,6 @@ function doPostUpsertNhanSu_(e) {
 }
 
 
-// ============================================================
-// CSS (nhúng trực tiếp, không cần file Styles.html riêng)
-// ============================================================
-var APP_CSS_ = `
-*{box-sizing:border-box;margin:0;padding:0}
-  :root{
-    --indigo:#534AB7;--indigo-light:#EEEDFE;--indigo-mid:#AFA9EC;--indigo-dark:#3C3489;
-    --teal:#0F6E56;--teal-light:#E1F5EE;
-    --coral:#D85A30;--coral-light:#FAECE7;
-    --amber:#BA7517;--amber-light:#FAEEDA;
-    --surface-0:#F7F6F3;--surface-1:#F0EEE9;--surface-2:#FFFFFF;
-    --text-primary:#1a1a18;--text-secondary:#5c5c57;--text-muted:#8a8a84;
-    --border:rgba(0,0,0,0.1);--border-strong:rgba(0,0,0,0.18);
-    --radius:8px;
-  }
-  html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text-primary);background:var(--surface-0)}
-  a{color:var(--indigo)}
-  .topbar{background:var(--indigo);padding:0 1rem;display:flex;align-items:center;flex-wrap:wrap;position:sticky;top:0;z-index:100}
-  .topbar-brand{display:flex;align-items:center;gap:8px;padding:12px 0;margin-right:1.5rem;color:#fff;font-size:15px;font-weight:600;white-space:nowrap}
-  .tab-btn{padding:12px 12px;font-size:13px;color:var(--indigo-mid);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
-  .tab-btn:hover{color:#fff}
-  .tab-btn.active{color:#fff;border-bottom-color:var(--teal)}
-  .userbox{margin-left:auto;color:#fff;font-size:12px;padding:8px 0;text-align:right}
-  .userbox b{display:block;font-size:13px}
-  .body{padding:1rem;max-width:1080px;margin:0 auto}
-  .page{display:none}.page.active{display:block}
-  .card{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem}
-  .card h2{font-size:15px;margin-bottom:.75rem;color:var(--indigo-dark)}
-  .grid{display:grid;gap:.75rem}
-  .grid-2{grid-template-columns:1fr 1fr}
-  @media(max-width:640px){.grid-2{grid-template-columns:1fr}}
-  label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:4px}
-  input,select,textarea{width:100%;padding:.5rem .6rem;font-size:13px;border:1px solid var(--border-strong);border-radius:6px;font-family:inherit;background:#fff;color:var(--text-primary)}
-  textarea{min-height:80px;resize:vertical}
-  .field{margin-bottom:.75rem}
-  .btn{display:inline-flex;align-items:center;gap:6px;padding:.5rem .9rem;border-radius:6px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:var(--indigo);color:#fff}
-  .btn:hover{background:var(--indigo-dark)}
-  .btn.secondary{background:var(--surface-1);color:var(--text-primary);border:1px solid var(--border-strong)}
-  .btn.danger{background:var(--coral)}
-  .btn.success{background:var(--teal)}
-  .btn:disabled{opacity:.5;cursor:not-allowed}
-  .btn-row{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem}
-  table{width:100%;border-collapse:collapse;font-size:12.5px}
-  th,td{text-align:left;padding:.5rem .5rem;border-bottom:1px solid var(--border)}
-  th{color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.03em}
-  tr:hover td{background:var(--surface-1)}
-  .table-wrap{overflow-x:auto}
-  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
-  .pill.gray{background:var(--surface-1);color:var(--text-secondary)}
-  .pill.indigo{background:var(--indigo-light);color:var(--indigo-dark)}
-  .pill.teal{background:var(--teal-light);color:var(--teal)}
-  .pill.coral{background:var(--coral-light);color:var(--coral)}
-  .pill.amber{background:var(--amber-light);color:var(--amber)}
-  .muted{color:var(--text-muted);font-size:12px}
-  .hidden{display:none!important}
-  .toast{position:fixed;bottom:20px;right:20px;background:var(--text-primary);color:#fff;padding:.7rem 1rem;border-radius:8px;font-size:13px;z-index:999;max-width:320px;box-shadow:0 4px 16px rgba(0,0,0,.2)}
-  .toast.error{background:var(--coral)}
-  .toast.success{background:var(--teal)}
-  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:500;padding:1rem}
-  .modal{background:#fff;border-radius:12px;padding:1.25rem;max-width:640px;width:100%;max-height:88vh;overflow:auto}
-  .modal h3{margin-bottom:.75rem;color:var(--indigo-dark)}
-  .close-x{float:right;cursor:pointer;font-size:18px;color:var(--text-muted)}
-  .chat-box{border:1px solid var(--border);border-radius:8px;padding:.6rem;max-height:220px;overflow-y:auto;background:var(--surface-1);margin-bottom:.5rem}
-  .chat-msg{margin-bottom:.5rem;font-size:12.5px}
-  .chat-msg b{color:var(--indigo-dark)}
-  .chat-msg .t{color:var(--text-muted);font-size:11px;margin-left:6px}
-  .link-list-input textarea{min-height:60px}
-  .score-badge{font-weight:700;font-size:14px}
-  .score-badge.pos{color:var(--teal)}
-  .score-badge.neg{color:var(--coral)}
-  .empty-state{padding:2rem;text-align:center;color:var(--text-muted);font-size:13px}
-  .section-note{font-size:12px;color:var(--text-muted);margin-bottom:.5rem}
-`;
 
 // ============================================================
 // Routing: doGet / doPost / renderShell_
@@ -1891,7 +1844,7 @@ function doPost(e) {
 
 function handleRequest_(e, opts) {
   opts = opts || {};
-  khoiTaoDuLieuMau();
+  khoiTaoDuLieuMauNeuChuaChay_();
   var user = getCurrentUser_();
   var params = (e && e.parameter) || {};
   var page = params.page || 'form';
@@ -1928,18 +1881,15 @@ function buildPageContent_(page, user, params) {
   }
 }
 
-/** Dựng HTML đầy đủ của trang - không dùng HtmlService.createTemplateFromFile,
- * ghép chuỗi trực tiếp để không cần file .html riêng nào. */
+/** Dựng trang từ file Index.html (template server-side, không dùng google.script.run) */
 function renderShell_(user, page, content, flash) {
-  var html = '<!DOCTYPE html><html lang="vi"><head><base target="_top">' +
-    '<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
-    '<style>' + APP_CSS_ + '</style>' +
-    '</head><body>' +
-    renderNav_(user, page) +
-    '<div class="body">' + renderFlash_(flash) + content + '</div>' +
-    '</body></html>';
-  return HtmlService.createHtmlOutput(html)
+  var tpl = HtmlService.createTemplateFromFile('Index');
+  tpl.navHtml = renderNav_(user, page);
+  tpl.flashHtml = renderFlash_(flash);
+  tpl.content = content;
+  return tpl.evaluate()
     .setTitle('Quản lý công việc nhóm')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
