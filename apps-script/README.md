@@ -17,27 +17,21 @@ HTTP GET/POST chuẩn (giống mọi trang web thông thường) nên không b�
 ```
 apps-script/
 ├─ appsscript.json      # Manifest (quyền, chế độ triển khai)
-├─ Constants.gs         # Tên sheet, danh sách trạng thái, vai trò
-├─ SheetDB.gs           # Lớp truy xuất Google Sheet (đọc/ghi theo tên cột)
-├─ Utils.gs             # Sinh mã hồ sơ/công việc/phiếu, mã xác nhận...
-├─ Auth.gs              # Xác định user hiện tại + vai trò từ sheet NhanSu
-├─ MailService.gs       # Gửi email thông báo cho người gửi hồ sơ
-├─ HoSoService.gs       # Nghiệp vụ Form hồ sơ + Tiếp nhận + Tra cứu
-├─ CongViecService.gs   # Nghiệp vụ Quản lý công việc + chat + đánh giá TĐV
-├─ DiemService.gs       # Phiếu điểm cộng/trừ + luồng duyệt + Báo cáo
-├─ SetupService.gs      # Tab Thiết lập (Admin) + khởi tạo dữ liệu mẫu
-├─ Render.gs            # Hàm dựng HTML dùng chung: nav, pill, form, redirect
-├─ PageForm.gs          # Trang "Gửi hồ sơ"
-├─ PageTiepNhan.gs      # Trang "Tiếp nhận"
-├─ PageTraCuu.gs        # Trang "Tra cứu"
-├─ PageCongViec.gs      # Trang "Công việc" (danh sách + chi tiết)
-├─ PageDiem.gs          # Trang "Điểm cộng/trừ"
-├─ PageBaoCao.gs        # Trang "Báo cáo"
-├─ PageThietLap.gs      # Trang "Thiết lập" (Admin)
-├─ Code.gs              # doGet()/doPost() - bộ định tuyến trung tâm
-├─ Layout.html          # Khung trang chung (nav + nội dung)
-└─ Styles.html          # CSS
+└─ Code.gs              # TOÀN BỘ ứng dụng: dữ liệu, nghiệp vụ, giao diện,
+                         # routing doGet()/doPost() - gộp 1 file duy nhất,
+                         # không có file .html nào (CSS nhúng thẳng trong
+                         # file bằng 1 biến chuỗi APP_CSS_).
 ```
+
+Chỉ có **đúng 2 file** cần đưa vào Apps Script Editor: `appsscript.json`
+(manifest) và `Code.gs`. Không cần tạo thêm file HTML nào — mọi trang đều
+được dựng bằng cách ghép chuỗi HTML ngay trong `Code.gs` rồi trả về qua
+`HtmlService.createHtmlOutput(html)`.
+
+Bên trong `Code.gs`, code được chia thành các khối theo comment `// ====`
+cho dễ đọc/tìm (Constants, SheetDB, Utils, Auth, MailService, các Service
+nghiệp vụ, Render helpers, từng trang Page*, và cuối cùng là Routing
+doGet/doPost) — nhưng vẫn chỉ là 1 file duy nhất, copy-paste 1 lần.
 
 ## 2. Cách triển khai
 
@@ -52,13 +46,16 @@ clasp push
 clasp deploy
 ```
 
-### Cách B — copy thủ công vào Apps Script Editor
+### Cách B — copy thủ công vào Apps Script Editor (đơn giản, chỉ 2 file)
 
-1. Vào https://script.google.com → Tạo dự án mới.
-2. Tạo lần lượt các file `.gs` và `.html` đúng tên như trong thư mục này,
-   copy nội dung tương ứng vào.
-3. Vào **Project Settings** → dán nội dung `appsscript.json` (hoặc bật
-   "Show appsscript.json" và chỉnh trực tiếp).
+1. Vào https://script.google.com (hoặc Tiện ích mở rộng → Apps Script từ
+   Google Sheet của bạn).
+2. Xoá nội dung mặc định trong `Code.gs`, copy toàn bộ nội dung file
+   `Code.gs` trong thư mục này vào.
+3. Bật **Project Settings** → tick "Show appsscript.json manifest file in
+   editor" → mở file `appsscript.json` vừa hiện ra, dán đúng nội dung
+   file `appsscript.json` trong thư mục này vào.
+4. Lưu lại (Ctrl+S). Xong — không cần tạo thêm file nào khác.
 
 ## 3. Cấu hình trước khi dùng
 
