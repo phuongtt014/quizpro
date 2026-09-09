@@ -1,0 +1,233 @@
+<div class="view" id="view-congviec">
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <h2 style="margin:0;">Quản lý công việc</h2>
+      <button class="btn btn-primary btn-sm" id="cv-btn-new" style="display:none;" onclick="openNewCongViecModal()">+ Tạo công việc</button>
+    </div>
+    <div class="grid cols-3" style="max-width:640px;">
+      <div class="field"><label>Trạng thái</label>
+        <select id="cv-f-trangthai" onchange="loadCongViec()">
+          <option value="">Tất cả</option>
+          <option value="CanLam">Cần làm</option>
+          <option value="DangLam">Đang làm</option>
+          <option value="DaNop">Đã nộp</option>
+          <option value="TDVXacNhan">TĐV xác nhận</option>
+          <option value="TamNgung">Tạm ngưng</option>
+          <option value="HuyBo">Hủy bỏ</option>
+        </select>
+      </div>
+      <div class="field"><label>Phân loại</label><select id="cv-f-phanloai"><option value="">Tất cả</option></select></div>
+      <div class="field" style="display:flex; align-items:flex-end;"><button class="btn" onclick="loadCongViec()">Lọc</button></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Mã CV</th><th>Nội dung</th><th>Người phụ trách</th><th>Phân loại</th><th>Thời hạn</th><th>Trạng thái</th><th>Điểm</th></tr></thead>
+        <tbody id="cv-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  function onShowView_congviec() {
+    document.getElementById('cv-btn-new').style.display = roleAtLeast('TruongNhom') ? '' : 'none';
+    api('listPhanMuc', STATE.token).then(function (res) {
+      if (!res.ok) return;
+      var sel = document.getElementById('cv-f-phanloai');
+      sel.innerHTML = '<option value="">Tất cả</option>' + res.items.map(function (p) { return '<option value="' + esc(p.TenPhanMuc) + '">' + esc(p.TenPhanMuc) + '</option>'; }).join('');
+    });
+    loadCongViec();
+  }
+
+  function loadCongViec() {
+    var filters = { trangThai: document.getElementById('cv-f-trangthai').value, phanLoai: document.getElementById('cv-f-phanloai').value };
+    api('listCongViec', STATE.token, filters).then(function (res) {
+      if (!res.ok) return;
+      var tbody = document.getElementById('cv-tbody');
+      if (!res.items.length) { tbody.innerHTML = '<tr><td colspan="7" class="muted">Không có công việc.</td></tr>'; return; }
+      tbody.innerHTML = res.items.map(function (c) {
+        return '<tr style="cursor:pointer" onclick="openCongViecDetail(\'' + c.MaCV + '\')">' +
+          '<td>' + esc(c.MaCV) + '</td><td>' + esc(c.NoiDung) + '</td><td>' + esc(c.NguoiPhuTrach) + '</td>' +
+          '<td>' + esc(c.PhanLoai) + '</td><td>' + fmtDateTime(c.ThoiHan) + '</td>' +
+          '<td>' + taskStatusBadge(c.TrangThai) + '</td><td>' + (c.DiemCuoiCung !== '' ? c.DiemCuoiCung : '—') + '</td></tr>';
+      }).join('');
+    });
+  }
+
+  function openNewCongViecModal() {
+    api('listActiveUsers', STATE.token).then(function (res) {
+      if (!res.ok) return;
+      var userOpts = res.items.map(function (u) { return '<option value="' + esc(u.username) + '">' + esc(u.hoTen) + '</option>'; }).join('');
+      openModal('Tạo công việc mới',
+        '<div class="field"><label>Nội dung *</label><input id="nc-noidung"></div>' +
+        '<div class="grid cols-2">' +
+        '<div class="field"><label>Người phụ trách *</label><select id="nc-nguoiphutrach">' + userOpts + '</select></div>' +
+        '<div class="field"><label>Phân loại</label><select id="nc-phanloai"></select></div>' +
+        '</div>' +
+        '<div class="grid cols-2">' +
+        '<div class="field"><label>Thời gian bắt đầu</label><input id="nc-batdau" type="datetime-local"></div>' +
+        '<div class="field"><label>Thời hạn *</label><input id="nc-thoihan" type="datetime-local"></div>' +
+        '</div>' +
+        '<div class="field"><label>Mô tả</label><textarea id="nc-mota" rows="3"></textarea></div>' +
+        '<div class="field"><label>Tài liệu đính kèm (link)</label><div id="nc-links"></div></div>' +
+        '<button class="btn btn-primary" onclick="confirmNewCongViec()">Tạo công việc</button>');
+      api('listPhanMuc', STATE.token).then(function (r) {
+        document.getElementById('nc-phanloai').innerHTML = r.items.map(function (p) { return '<option value="' + esc(p.TenPhanMuc) + '">' + esc(p.TenPhanMuc) + '</option>'; }).join('');
+      });
+      initLinkEditor(document.getElementById('nc-links'));
+    });
+  }
+
+  function confirmNewCongViec() {
+    var payload = {
+      noiDung: document.getElementById('nc-noidung').value.trim(),
+      nguoiPhuTrach: document.getElementById('nc-nguoiphutrach').value,
+      phanLoai: document.getElementById('nc-phanloai').value,
+      thoiGianBatDau: document.getElementById('nc-batdau').value,
+      thoiHan: document.getElementById('nc-thoihan').value,
+      moTa: document.getElementById('nc-mota').value.trim(),
+      taiLieuLinks: document.getElementById('nc-links').getLinks()
+    };
+    if (!payload.noiDung || !payload.nguoiPhuTrach || !payload.thoiHan) { toast('Vui lòng điền đầy đủ thông tin bắt buộc (*).', 'err'); return; }
+    api('createCongViecDirect', STATE.token, payload).then(function (res) {
+      if (!res.ok) return;
+      toast('Đã tạo công việc ' + res.maCV, 'ok');
+      closeModal(); loadCongViec();
+    });
+  }
+
+  var CV_DETAIL_MA = null;
+
+  function openCongViecDetail(maCV) {
+    CV_DETAIL_MA = maCV;
+    api('getCongViecDetail', STATE.token, maCV).then(function (res) {
+      if (!res.ok) return;
+      openModal('Công việc ' + maCV, renderCongViecDetail(res.congViec, res.chat), true);
+    });
+  }
+
+  function refreshCongViecDetail() {
+    api('getCongViecDetail', STATE.token, CV_DETAIL_MA).then(function (res) {
+      if (!res.ok) return;
+      document.querySelector('#generic-modal .modal').innerHTML =
+        '<button class="modal-close" onclick="closeModal()">&times;</button><h2>Công việc ' + esc(CV_DETAIL_MA) + '</h2>' + renderCongViecDetail(res.congViec, res.chat);
+      loadCongViec();
+    });
+  }
+
+  function renderCongViecDetail(c, chat) {
+    var isManager = roleAtLeast('QuanLy');
+    var isAssigneeOrLead = c.NguoiPhuTrach === STATE.user.username || roleAtLeast('TruongNhom');
+
+    var html = '<table>' +
+      '<tr><th>Nội dung</th><td>' + esc(c.NoiDung) + '</td></tr>' +
+      '<tr><th>Người phụ trách</th><td>' + esc(c.NguoiPhuTrach) + '</td></tr>' +
+      '<tr><th>Mô tả</th><td>' + esc(c.MoTa) + '</td></tr>' +
+      '<tr><th>Tài liệu đính kèm</th><td>' + renderLinksHtml(c.TaiLieuDinhKem) + '</td></tr>' +
+      '<tr><th>Trạng thái</th><td>' + taskStatusBadge(c.TrangThai) + '</td></tr>' +
+      '<tr><th>Phân loại</th><td>' + esc(c.PhanLoai) + '</td></tr>' +
+      '<tr><th>Thời gian bắt đầu</th><td>' + fmtDateTime(c.ThoiGianBatDau) + '</td></tr>' +
+      '<tr><th>Thời hạn</th><td>' + fmtDateTime(c.ThoiHan) + '</td></tr>' +
+      '<tr><th>Thời gian hoàn thành</th><td id="cvd-hoanthanh-view">' + (c.ThoiGianHoanThanh ? fmtDateTime(c.ThoiGianHoanThanh) : '—') +
+        (isManager ? ' <button class="btn btn-sm" onclick="editHoanThanh()">Sửa</button>' : '') + '</td></tr>' +
+      '<tr><th>Link kết quả</th><td>' + (c.LinkKetQua ? renderLinksHtml(c.LinkKetQua) : '—') + '</td></tr>' +
+      '<tr><th>Điểm nền</th><td>' + c.DiemNen + '</td></tr>' +
+      '<tr><th>Mã điểm đánh giá TĐV</th><td>' + (c.MaDiemDanhGia || '—') + (c.SoDiemDanhGia !== '' ? ' (' + c.SoDiemDanhGia + ' điểm)' : '') + '</td></tr>' +
+      '<tr><th>Điểm cuối cùng</th><td><b>' + (c.DiemCuoiCung !== '' ? c.DiemCuoiCung : '—') + '</b></td></tr>' +
+      '<tr><th>Ghi chú của TĐV</th><td>' + (c.GhiChuTDV || '—') + '</td></tr>' +
+      '</table>';
+
+    html += '<h3 style="margin-top:16px;">Cập nhật trạng thái</h3><div class="row-actions" style="margin-bottom:14px;">';
+    if (isAssigneeOrLead) {
+      if (c.TrangThai === 'CanLam') html += '<button class="btn btn-sm" onclick="setTrangThai(\'DangLam\')">Bắt đầu làm</button>';
+      if (c.TrangThai === 'DangLam') html += '<button class="btn btn-sm btn-success" onclick="openDaNopModal()">Chuyển Đã nộp</button>';
+    }
+    if (roleAtLeast('TruongNhom') && c.TrangThai !== 'TamNgung' && c.TrangThai !== 'HuyBo' && c.TrangThai !== 'TDVXacNhan') {
+      html += '<button class="btn btn-sm" onclick="setTrangThai(\'TamNgung\')">Tạm ngưng</button>';
+      html += '<button class="btn btn-sm btn-danger" onclick="setTrangThai(\'HuyBo\')">Hủy bỏ</button>';
+    }
+    if (isManager && c.TrangThai === 'DaNop') {
+      html += '<button class="btn btn-sm btn-success" onclick="openXacNhanTDVModal()">Xác nhận TĐV + chấm điểm</button>';
+    }
+    html += '</div>';
+
+    html += '<h3>Khung chat công việc</h3>' +
+      '<div class="chat-box" id="cvd-chat">' + renderChatHtml(chat) + '</div>' +
+      '<div class="field"><textarea id="cvd-msg" rows="2" placeholder="Nhập nội dung, dán link tài liệu sẽ tự gom vào Tài liệu đính kèm..."></textarea></div>' +
+      '<div class="row-actions"><button class="btn btn-primary btn-sm" onclick="guiChatCongViec()">Gửi</button>' +
+      '<button class="btn btn-sm" onclick="refreshCongViecDetail()">🔄 Làm mới</button></div>';
+
+    return html;
+  }
+
+  function renderChatHtml(chat) {
+    if (!chat.length) return '<span class="muted">Chưa có trao đổi nào.</span>';
+    return chat.map(function (m) {
+      return '<div class="chat-msg"><div class="meta">' + esc(m.NguoiGui) + ' · ' + fmtDateTime(m.ThoiGian) + '</div><div class="body">' + esc(m.NoiDung) + '</div></div>';
+    }).join('');
+  }
+
+  function guiChatCongViec() {
+    var msg = document.getElementById('cvd-msg').value.trim();
+    if (!msg) { toast('Vui lòng nhập nội dung.', 'err'); return; }
+    api('addChatMessage', STATE.token, CV_DETAIL_MA, msg).then(function (res) {
+      if (!res.ok) return;
+      document.getElementById('cvd-msg').value = '';
+      refreshCongViecDetail();
+    });
+  }
+
+  function setTrangThai(trangThai, extra) {
+    api('updateTrangThai', STATE.token, CV_DETAIL_MA, trangThai, extra || {}).then(function (res) {
+      if (!res.ok) return;
+      toast('Đã cập nhật trạng thái.', 'ok');
+      refreshCongViecDetail();
+    });
+  }
+
+  function openDaNopModal() {
+    openModal('Chuyển sang Đã nộp',
+      '<div class="field"><label>Link trả kết quả</label><input id="dn-link" type="url" placeholder="https://..."></div>' +
+      '<p class="muted">Bắt buộc nếu công việc gắn với hồ sơ tiếp nhận từ Form.</p>' +
+      '<button class="btn btn-primary" onclick="confirmDaNop()">Xác nhận</button>');
+  }
+  function confirmDaNop() {
+    var link = document.getElementById('dn-link').value.trim();
+    closeModal();
+    setTrangThai('DaNop', { linkKetQua: link });
+  }
+
+  function editHoanThanh() {
+    openModal('Sửa thời gian hoàn thành',
+      '<div class="field"><label>Thời gian hoàn thành</label><input id="ht-value" type="datetime-local"></div>' +
+      '<button class="btn btn-primary" onclick="confirmHoanThanh()">Lưu</button>');
+  }
+  function confirmHoanThanh() {
+    var v = document.getElementById('ht-value').value;
+    if (!v) { toast('Vui lòng chọn thời gian.', 'err'); return; }
+    api('managerUpdateCongViec', STATE.token, CV_DETAIL_MA, { thoiGianHoanThanh: v }).then(function (res) {
+      if (!res.ok) return;
+      toast('Đã cập nhật.', 'ok'); closeModal(); refreshCongViecDetail();
+    });
+  }
+
+  function openXacNhanTDVModal() {
+    api('listMaDiem', STATE.token).then(function (res) {
+      if (!res.ok) return;
+      var opts = '<option value="">Không có điểm cộng/trừ</option>' + res.items.map(function (m) {
+        return '<option value="' + esc(m.MaDiem) + '">' + esc(m.MaDiem) + ' — ' + esc(m.MoTa) + ' (' + m.SoDiem + ')</option>';
+      }).join('');
+      openModal('Xác nhận TĐV + chấm điểm',
+        '<div class="field"><label>Mã điểm đánh giá</label><select id="tdv-madiem">' + opts + '</select></div>' +
+        '<div class="field"><label>Ghi chú của TĐV</label><textarea id="tdv-ghichu" rows="3"></textarea></div>' +
+        '<button class="btn btn-primary" onclick="confirmXacNhanTDV()">Xác nhận hoàn tất</button>');
+    });
+  }
+  function confirmXacNhanTDV() {
+    var payload = { xacNhanTDV: true, maDiemDanhGia: document.getElementById('tdv-madiem').value, ghiChuTDV: document.getElementById('tdv-ghichu').value.trim() };
+    api('managerUpdateCongViec', STATE.token, CV_DETAIL_MA, payload).then(function (res) {
+      if (!res.ok) return;
+      toast('Đã xác nhận TĐV.', 'ok'); closeModal(); refreshCongViecDetail();
+    });
+  }
+</script>

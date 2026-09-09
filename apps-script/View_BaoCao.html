@@ -1,0 +1,78 @@
+<div class="view" id="view-baocao">
+  <div class="card no-print">
+    <h2>Báo cáo hiệu suất</h2>
+    <div class="grid cols-3" style="max-width:640px;">
+      <div class="field"><label>Loại kỳ</label>
+        <select id="bc-loaiky"><option value="thang">Theo tháng</option><option value="quy">Theo quý</option></select>
+      </div>
+      <div class="field"><label>Kỳ (bỏ trống = toàn bộ thời gian)</label><input id="bc-ky" placeholder="VD: 2026-09 hoặc 2026-Q3"></div>
+      <div class="field" style="display:flex; align-items:flex-end; gap:8px;">
+        <button class="btn" onclick="loadBaoCao()">Xem báo cáo</button>
+        <button class="btn btn-primary" onclick="window.print()">🖨 Xuất PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="bc-content"></div>
+</div>
+
+<script>
+  function onShowView_baocao() { loadBaoCao(); }
+
+  function loadBaoCao() {
+    var params = { loaiKy: document.getElementById('bc-loaiky').value, ky: document.getElementById('bc-ky').value.trim() };
+    api('getReportData', STATE.token, params).then(function (res) {
+      if (!res.ok) return;
+      document.getElementById('bc-content').innerHTML = renderBaoCao(res, params);
+    });
+  }
+
+  function renderBaoCao(res, params) {
+    var html = '<div class="card"><h3>Tổng quan kỳ ' + (params.ky || 'toàn bộ thời gian') + '</h3>' +
+      '<div class="grid cols-4">' +
+      statTile(res.tongSoHoSo, 'Hồ sơ tiếp nhận') +
+      statTile(res.tongSoCongViec, 'Công việc') +
+      statTile(res.dungHan, 'Hoàn thành đúng hạn') +
+      statTile(res.treHan, 'Hoàn thành trễ hạn') +
+      '</div></div>';
+
+    html += '<div class="card"><h3>Bảng xếp hạng điểm nhân sự</h3><div class="table-wrap"><table>' +
+      '<thead><tr><th>Hạng</th><th>Họ tên</th><th>Đơn vị</th><th>Điểm công việc (TĐV xác nhận)</th><th>Điểm cộng/trừ</th><th>Tổng điểm</th></tr></thead><tbody>' +
+      res.ranking.map(function (r, i) {
+        return '<tr><td>' + (i + 1) + '</td><td>' + esc(r.hoTen) + '</td><td>' + esc(r.donVi) + '</td>' +
+          '<td>' + r.diemCongViec + ' (' + r.soCongViecHoanThanh + ' việc)</td><td>' + r.diemCongTru + '</td><td><b>' + r.tongDiem + '</b></td></tr>';
+      }).join('') + '</tbody></table></div></div>';
+
+    html += '<div class="grid cols-2">' +
+      barChartCard('Công việc theo trạng thái', Object.keys(res.statusLabel).map(function (k) { return { label: res.statusLabel[k], value: res.statusCount[k] || 0 }; })) +
+      barChartCard('Công việc theo phân loại', objToBars(res.byPhanLoai)) +
+      '</div>';
+
+    html += '<div class="grid cols-2">' +
+      barChartCard('Công việc theo đơn vị người phụ trách', objToBars(res.byDonVi)) +
+      barChartCard('Hồ sơ tiếp nhận theo phân mục', objToBars(res.byPhanMucHoSo)) +
+      '</div>';
+
+    return html;
+  }
+
+  function statTile(num, label) {
+    return '<div class="stat-tile"><div class="num">' + num + '</div><div class="label">' + esc(label) + '</div></div>';
+  }
+
+  function objToBars(obj) {
+    return Object.keys(obj).map(function (k) { return { label: k, value: obj[k] }; });
+  }
+
+  function barChartCard(title, items) {
+    var max = Math.max.apply(null, items.map(function (i) { return i.value; }).concat([1]));
+    var rows = items.map(function (i) {
+      var pct = Math.round((i.value / max) * 100);
+      return '<div style="margin-bottom:8px;">' +
+        '<div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:3px;"><span>' + esc(i.label) + '</span><b>' + i.value + '</b></div>' +
+        '<div style="background:var(--gray-bg); border-radius:6px; height:9px;"><div style="width:' + pct + '%; background:var(--primary); height:9px; border-radius:6px;"></div></div>' +
+        '</div>';
+    }).join('') || '<span class="muted">Không có dữ liệu.</span>';
+    return '<div class="card"><h3>' + esc(title) + '</h3>' + rows + '</div>';
+  }
+</script>

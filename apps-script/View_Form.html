@@ -1,0 +1,71 @@
+<div class="view" id="view-form">
+  <div class="card" style="max-width:760px;">
+    <h2>Form nộp hồ sơ</h2>
+    <div class="grid cols-2">
+      <div class="field"><label>Họ tên người gửi *</label><input id="f-hoten"></div>
+      <div class="field"><label>Email nhận thông báo *</label><input id="f-email" type="email"></div>
+      <div class="field"><label>Số điện thoại</label><input id="f-sdt"></div>
+      <div class="field"><label>Đơn vị / phòng ban *</label><select id="f-donvi"></select></div>
+    </div>
+    <div class="field"><label>Tiêu đề *</label><input id="f-tieude"></div>
+    <div class="field"><label>Phân mục *</label><select id="f-phanmuc"></select></div>
+    <div class="field"><label>Nội dung chi tiết *</label><textarea id="f-noidung" rows="5"></textarea></div>
+    <div class="field"><label>Tài liệu đính kèm (link)</label><div id="f-links"></div></div>
+    <button class="btn btn-primary" onclick="submitForm()">Gửi hồ sơ</button>
+  </div>
+
+  <div class="card" id="f-result" style="display:none; max-width:760px;">
+    <h2>✅ Đã gửi hồ sơ thành công</h2>
+    <p>Vui lòng lưu lại 2 mã dưới đây để tra cứu tiến độ ở tab <b>Tra cứu</b>. Hệ thống cũng đã gửi email thông tin này.</p>
+    <div class="grid cols-2">
+      <div class="stat-tile"><div class="label">Mã hồ sơ</div><div class="num" id="f-result-ma"></div></div>
+      <div class="stat-tile"><div class="label">Mã xác nhận</div><div class="num" id="f-result-xn"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function onShowView_form() {
+    document.getElementById('f-result').style.display = 'none';
+    document.getElementById('f-hoten').value = STATE.user.hoTen || '';
+    document.getElementById('f-email').value = STATE.user.email || '';
+    document.getElementById('f-sdt').value = STATE.user.soDienThoai || '';
+    document.getElementById('f-tieude').value = '';
+    document.getElementById('f-noidung').value = '';
+    initLinkEditor(document.getElementById('f-links'));
+    Promise.all([api('listDonVi', STATE.token), api('listPhanMuc', STATE.token)]).then(function (res) {
+      fillSelect('f-donvi', res[0].items, 'TenDonVi', 'TenDonVi', STATE.user.donVi);
+      fillSelect('f-phanmuc', res[1].items, 'TenPhanMuc', 'TenPhanMuc');
+    });
+  }
+
+  function fillSelect(id, items, valueKey, labelKey, selected) {
+    var sel = document.getElementById(id);
+    sel.innerHTML = items.map(function (it) {
+      return '<option value="' + esc(it[valueKey]) + '"' + (it[valueKey] === selected ? ' selected' : '') + '>' + esc(it[labelKey]) + '</option>';
+    }).join('');
+  }
+
+  function submitForm() {
+    var payload = {
+      hoTen: document.getElementById('f-hoten').value.trim(),
+      email: document.getElementById('f-email').value.trim(),
+      soDienThoai: document.getElementById('f-sdt').value.trim(),
+      donVi: document.getElementById('f-donvi').value,
+      tieuDe: document.getElementById('f-tieude').value.trim(),
+      phanMuc: document.getElementById('f-phanmuc').value,
+      noiDungChiTiet: document.getElementById('f-noidung').value.trim(),
+      taiLieuLinks: document.getElementById('f-links').getLinks()
+    };
+    if (!payload.hoTen || !payload.email || !payload.tieuDe || !payload.noiDungChiTiet) {
+      toast('Vui lòng điền đầy đủ thông tin bắt buộc (*).', 'err'); return;
+    }
+    api('submitHoSo', STATE.token, payload).then(function (res) {
+      if (!res.ok) return;
+      toast('Gửi hồ sơ thành công!', 'ok');
+      document.getElementById('f-result').style.display = 'block';
+      document.getElementById('f-result-ma').textContent = res.maHoSo;
+      document.getElementById('f-result-xn').textContent = res.maXacNhan;
+    });
+  }
+</script>

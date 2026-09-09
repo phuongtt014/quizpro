@@ -1,0 +1,84 @@
+<div class="view" id="view-tiepnhan">
+  <div class="card">
+    <h2>Tiếp nhận hồ sơ</h2>
+    <div class="field" style="max-width:260px;">
+      <label>Lọc theo trạng thái</label>
+      <select id="tn-filter" onchange="loadTiepNhan()">
+        <option value="ChoTiepNhan">Chờ tiếp nhận</option>
+        <option value="DaPhanCong">Đã phân công</option>
+        <option value="TuChoi">Từ chối</option>
+        <option value="">Tất cả</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Mã hồ sơ</th><th>Người gửi</th><th>Tiêu đề</th><th>Phân mục</th><th>Ngày gửi</th><th>Trạng thái</th><th></th></tr></thead>
+        <tbody id="tn-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  function onShowView_tiepnhan() { loadTiepNhan(); }
+
+  function loadTiepNhan() {
+    var filter = document.getElementById('tn-filter').value;
+    api('listHoSoTiepNhan', STATE.token, filter).then(function (res) {
+      if (!res.ok) return;
+      var tbody = document.getElementById('tn-tbody');
+      if (!res.items.length) { tbody.innerHTML = '<tr><td colspan="7" class="muted">Không có hồ sơ.</td></tr>'; return; }
+      tbody.innerHTML = res.items.map(function (h) {
+        var actions = h.TrangThai === 'ChoTiepNhan'
+          ? '<div class="row-actions"><button class="btn btn-sm btn-primary" onclick="openAssignModal(\'' + h.MaHoSo + '\')">Phân công</button>' +
+            '<button class="btn btn-sm btn-danger" onclick="openRejectModal(\'' + h.MaHoSo + '\')">Từ chối</button></div>'
+          : (h.TrangThai === 'TuChoi' ? '<span class="muted">' + esc(h.LyDoTuChoi) + '</span>' : '<span class="muted">Mã CV: ' + esc(h.MaCV) + '</span>');
+        return '<tr><td>' + esc(h.MaHoSo) + '</td><td>' + esc(h.HoTenNguoiGui) + '<br><span class="muted">' + esc(h.DonVi) + '</span></td>' +
+          '<td>' + esc(h.TieuDe) + '</td><td>' + esc(h.PhanMuc) + '</td><td>' + fmtDateTime(h.NgayTao) + '</td>' +
+          '<td>' + hoSoStatusBadge(h.TrangThai) + '</td><td>' + actions + '</td></tr>';
+      }).join('');
+    });
+  }
+
+  function openAssignModal(maHoSo) {
+    api('listActiveUsers', STATE.token).then(function (res) {
+      if (!res.ok) return;
+      var options = res.items.map(function (u) { return '<option value="' + esc(u.username) + '">' + esc(u.hoTen) + ' (' + esc(u.vaiTroLabel) + ')</option>'; }).join('');
+      openModal('Phân công hồ sơ ' + maHoSo,
+        '<div class="field"><label>Người phụ trách *</label><select id="am-nguoiphutrach">' + options + '</select></div>' +
+        '<div class="grid cols-2">' +
+        '<div class="field"><label>Thời gian bắt đầu</label><input id="am-batdau" type="datetime-local"></div>' +
+        '<div class="field"><label>Thời hạn xử lý *</label><input id="am-thoihan" type="datetime-local"></div>' +
+        '</div>' +
+        '<button class="btn btn-primary" onclick="confirmAssign(\'' + maHoSo + '\')">Xác nhận phân công</button>');
+    });
+  }
+
+  function confirmAssign(maHoSo) {
+    var nguoiPhuTrach = document.getElementById('am-nguoiphutrach').value;
+    var batDau = document.getElementById('am-batdau').value;
+    var thoiHan = document.getElementById('am-thoihan').value;
+    if (!thoiHan) { toast('Vui lòng chọn thời hạn xử lý.', 'err'); return; }
+    api('assignHoSo', STATE.token, maHoSo, batDau, thoiHan).then(function (res) {
+      if (!res.ok) return;
+      toast('Đã phân công công việc ' + res.maCV, 'ok');
+      closeModal(); loadTiepNhan();
+    });
+  }
+
+  function openRejectModal(maHoSo) {
+    openModal('Từ chối hồ sơ ' + maHoSo,
+      '<div class="field"><label>Lý do từ chối *</label><textarea id="rm-lydo" rows="3"></textarea></div>' +
+      '<button class="btn btn-danger" onclick="confirmReject(\'' + maHoSo + '\')">Xác nhận từ chối</button>');
+  }
+
+  function confirmReject(maHoSo) {
+    var lyDo = document.getElementById('rm-lydo').value.trim();
+    if (!lyDo) { toast('Vui lòng nhập lý do.', 'err'); return; }
+    api('rejectHoSo', STATE.token, maHoSo, lyDo).then(function (res) {
+      if (!res.ok) return;
+      toast('Đã từ chối hồ sơ.', 'ok');
+      closeModal(); loadTiepNhan();
+    });
+  }
+</script>

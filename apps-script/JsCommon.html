@@ -1,0 +1,130 @@
+<script>
+  // ---------- Trạng thái phiên ----------
+  var STATE = { token: null, user: null };
+  var ROLE_RANK_JS = { NhanVien: 1, TruongNhom: 2, QuanLy: 3, Admin: 4 };
+  var TASK_STATUS_LABEL_JS = { CanLam: 'Cần làm', DangLam: 'Đang làm', DaNop: 'Đã nộp', TDVXacNhan: 'TĐV xác nhận', TamNgung: 'Tạm ngưng', HuyBo: 'Hủy bỏ' };
+  var TASK_STATUS_BADGE_JS = { CanLam: 'gray', DangLam: 'blue', DaNop: 'orange', TDVXacNhan: 'green', TamNgung: 'gray', HuyBo: 'red' };
+  var HOSO_STATUS_LABEL_JS = { ChoTiepNhan: 'Chờ tiếp nhận', DaPhanCong: 'Đã phân công', TuChoi: 'Từ chối' };
+  var HOSO_STATUS_BADGE_JS = { ChoTiepNhan: 'orange', DaPhanCong: 'green', TuChoi: 'red' };
+
+  function roleAtLeast(minRole) {
+    if (!STATE.user) return false;
+    return (ROLE_RANK_JS[STATE.user.vaiTro] || 0) >= (ROLE_RANK_JS[minRole] || 0);
+  }
+
+  function saveSession() {
+    try { localStorage.setItem('qlcv_token', STATE.token || ''); } catch (e) {}
+  }
+  function loadSessionToken() {
+    try { return localStorage.getItem('qlcv_token') || ''; } catch (e) { return ''; }
+  }
+  function clearSession() {
+    STATE.token = null; STATE.user = null;
+    try { localStorage.removeItem('qlcv_token'); } catch (e) {}
+  }
+
+  // ---------- Gọi server (Promise hoá google.script.run) ----------
+  function api(fnName) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function (resolve, reject) {
+      var runner = google.script.run
+        .withSuccessHandler(function (res) { resolve(res); })
+        .withFailureHandler(function (err) { reject(err); });
+      runner[fnName].apply(runner, args);
+    }).then(function (res) {
+      if (res && res.ok === false) { toast(res.message || 'Có lỗi xảy ra.', 'err'); }
+      return res;
+    }).catch(function (err) {
+      toast((err && err.message) || 'Lỗi kết nối máy chủ.', 'err');
+      return { ok: false, message: err && err.message };
+    });
+  }
+
+  // ---------- Toast ----------
+  function toast(msg, type) {
+    var wrap = document.getElementById('toast-wrap');
+    if (!wrap) { wrap = document.createElement('div'); wrap.id = 'toast-wrap'; wrap.className = 'toast-wrap'; document.body.appendChild(wrap); }
+    var el = document.createElement('div');
+    el.className = 'toast ' + (type === 'ok' ? 'ok' : 'err');
+    el.textContent = msg;
+    wrap.appendChild(el);
+    setTimeout(function () { el.remove(); }, 4200);
+  }
+
+  // ---------- Tiện ích chung ----------
+  function esc(s) { return (s === undefined || s === null) ? '' : String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  function badge(text, color) { return '<span class="badge badge-' + color + '">' + esc(text) + '</span>'; }
+  function taskStatusBadge(status) { return badge(TASK_STATUS_LABEL_JS[status] || status, TASK_STATUS_BADGE_JS[status] || 'gray'); }
+  function hoSoStatusBadge(status) { return badge(HOSO_STATUS_LABEL_JS[status] || status, HOSO_STATUS_BADGE_JS[status] || 'gray'); }
+
+  function fmtDateTime(v) {
+    if (!v) return '';
+    var d = new Date(v);
+    if (isNaN(d.getTime())) return String(v);
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function linksToArray(text) {
+    return String(text || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+
+  function renderLinksHtml(text) {
+    var arr = linksToArray(text);
+    if (!arr.length) return '<span class="muted">Không có</span>';
+    return arr.map(function (l) { return '<div><a href="' + esc(l) + '" target="_blank" rel="noopener">' + esc(l) + '</a></div>'; }).join('');
+  }
+
+  // ---------- Widget nhập nhiều link ----------
+  function initLinkEditor(containerEl) {
+    function addRow(value) {
+      var row = document.createElement('div');
+      row.className = 'link-row';
+      row.innerHTML = '<input type="url" placeholder="https://..." value="' + esc(value || '') + '">' +
+        '<button type="button" class="btn btn-sm">Xoá</button>';
+      row.querySelector('button').onclick = function () {
+        if (containerEl.querySelectorAll('.link-row').length > 1) row.remove();
+        else row.querySelector('input').value = '';
+      };
+      containerEl.insertBefore(row, containerEl.querySelector('.link-add-btn'));
+    }
+    containerEl.innerHTML = '';
+    var addBtn = document.createElement('button');
+    addBtn.type = 'button'; addBtn.className = 'btn btn-sm link-add-btn'; addBtn.textContent = '+ Thêm link';
+    addBtn.onclick = function () { addRow(''); };
+    containerEl.appendChild(addBtn);
+    addRow('');
+    containerEl.getLinks = function () {
+      return Array.prototype.slice.call(containerEl.querySelectorAll('.link-row input')).map(function (i) { return i.value.trim(); }).filter(Boolean);
+    };
+  }
+
+  // ---------- Modal dùng chung ----------
+  function openModal(title, bodyHtml, wide) {
+    closeModal();
+    var backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.id = 'generic-modal';
+    backdrop.onclick = function (e) { if (e.target === backdrop) closeModal(); };
+    backdrop.innerHTML = '<div class="modal' + (wide ? ' wide' : '') + '">' +
+      '<button class="modal-close" onclick="closeModal()">&times;</button>' +
+      '<h2>' + esc(title) + '</h2>' + bodyHtml + '</div>';
+    document.body.appendChild(backdrop);
+  }
+  function closeModal() {
+    var el = document.getElementById('generic-modal');
+    if (el) el.remove();
+  }
+
+  // ---------- Điều hướng tab ----------
+  function showView(name) {
+    document.querySelectorAll('.view').forEach(function (v) { v.classList.remove('active'); });
+    document.querySelectorAll('.nav-item').forEach(function (v) { v.classList.remove('active'); });
+    var view = document.getElementById('view-' + name);
+    var nav = document.getElementById('nav-' + name);
+    if (view) view.classList.add('active');
+    if (nav) nav.classList.add('active');
+    if (window['onShowView_' + name]) window['onShowView_' + name]();
+  }
+</script>

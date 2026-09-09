@@ -1,0 +1,101 @@
+<div class="view" id="view-tracuu">
+  <div class="card" style="max-width:760px;">
+    <h2>Tra cứu hồ sơ</h2>
+    <div class="grid cols-2">
+      <div class="field"><label>Mã hồ sơ</label><input id="tc-ma" placeholder="VD: HS-00001"></div>
+      <div class="field"><label>Mã xác nhận</label><input id="tc-xn" placeholder="6 chữ số"></div>
+    </div>
+    <button class="btn btn-primary" onclick="traCuu()">Tra cứu</button>
+  </div>
+
+  <div id="tc-result" style="display:none; max-width:760px;">
+    <div class="card">
+      <h2>Thông tin hồ sơ</h2>
+      <table>
+        <tr><th>Mã hồ sơ</th><td id="tc-r-ma"></td></tr>
+        <tr><th>Tiêu đề</th><td id="tc-r-tieude"></td></tr>
+        <tr><th>Trạng thái hồ sơ</th><td id="tc-r-trangthai"></td></tr>
+        <tr><th>Người xử lý</th><td id="tc-r-nguoixuly"></td></tr>
+        <tr><th>Lý do từ chối</th><td id="tc-r-lydo"></td></tr>
+      </table>
+    </div>
+
+    <div class="card" id="tc-cv-card" style="display:none;">
+      <h2>Tiến độ công việc</h2>
+      <table>
+        <tr><th>Trạng thái</th><td id="tc-cv-trangthai"></td></tr>
+        <tr><th>Người phụ trách</th><td id="tc-cv-nguoiphutrach"></td></tr>
+        <tr><th>Thời hạn</th><td id="tc-cv-thoihan"></td></tr>
+        <tr><th>Hoàn thành lúc</th><td id="tc-cv-hoanthanh"></td></tr>
+        <tr><th>Link kết quả</th><td id="tc-cv-linkketqua"></td></tr>
+      </table>
+
+      <h3 style="margin-top:16px;">Trao đổi</h3>
+      <div class="chat-box" id="tc-chat"></div>
+      <div class="field"><textarea id="tc-msg" rows="2" placeholder="Nhắn tin cho người phụ trách..."></textarea></div>
+      <button class="btn btn-primary btn-sm" onclick="traCuuGuiTin()">Gửi tin nhắn</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function onShowView_tracuu() {
+    document.getElementById('tc-result').style.display = 'none';
+  }
+
+  var TC_STATE = { maHoSo: '', maXacNhan: '' };
+
+  function traCuu() {
+    var ma = document.getElementById('tc-ma').value.trim();
+    var xn = document.getElementById('tc-xn').value.trim();
+    if (!ma || !xn) { toast('Vui lòng nhập mã hồ sơ và mã xác nhận.', 'err'); return; }
+    api('lookupHoSo', ma, xn).then(function (res) {
+      if (!res.ok) return;
+      TC_STATE.maHoSo = ma; TC_STATE.maXacNhan = xn;
+      renderTraCuu(res);
+    });
+  }
+
+  function renderTraCuu(res) {
+    var h = res.hoSo;
+    document.getElementById('tc-result').style.display = 'block';
+    document.getElementById('tc-r-ma').textContent = h.MaHoSo;
+    document.getElementById('tc-r-tieude').textContent = h.TieuDe;
+    document.getElementById('tc-r-trangthai').innerHTML = hoSoStatusBadge(h.TrangThai);
+    document.getElementById('tc-r-nguoixuly').textContent = h.NguoiXuLy || '—';
+    document.getElementById('tc-r-lydo').textContent = h.LyDoTuChoi || '—';
+
+    var cvCard = document.getElementById('tc-cv-card');
+    if (res.congViec) {
+      cvCard.style.display = 'block';
+      var cv = res.congViec;
+      document.getElementById('tc-cv-trangthai').innerHTML = taskStatusBadge(cv.TrangThai);
+      document.getElementById('tc-cv-nguoiphutrach').textContent = cv.NguoiPhuTrach;
+      document.getElementById('tc-cv-thoihan').textContent = fmtDateTime(cv.ThoiHan);
+      document.getElementById('tc-cv-hoanthanh').textContent = cv.ThoiGianHoanThanh ? fmtDateTime(cv.ThoiGianHoanThanh) : '—';
+      document.getElementById('tc-cv-linkketqua').innerHTML = cv.LinkKetQua ? renderLinksHtml(cv.LinkKetQua) : '—';
+      renderTraCuuChat(res.chat || []);
+    } else {
+      cvCard.style.display = 'none';
+    }
+  }
+
+  function renderTraCuuChat(chat) {
+    var box = document.getElementById('tc-chat');
+    if (!chat.length) { box.innerHTML = '<span class="muted">Chưa có trao đổi nào.</span>'; return; }
+    box.innerHTML = chat.map(function (m) {
+      return '<div class="chat-msg"><div class="meta">' + esc(m.NguoiGui) + ' · ' + fmtDateTime(m.ThoiGian) + '</div><div class="body">' + esc(m.NoiDung) + '</div></div>';
+    }).join('');
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function traCuuGuiTin() {
+    var msg = document.getElementById('tc-msg').value.trim();
+    if (!msg) { toast('Vui lòng nhập nội dung.', 'err'); return; }
+    api('sendTraCuuMessage', TC_STATE.maHoSo, TC_STATE.maXacNhan, msg).then(function (res) {
+      if (!res.ok) return;
+      document.getElementById('tc-msg').value = '';
+      api('lookupHoSo', TC_STATE.maHoSo, TC_STATE.maXacNhan).then(function (r) { if (r.ok) renderTraCuu(r); });
+    });
+  }
+</script>

@@ -1,0 +1,89 @@
+<div class="view" id="view-diem">
+  <div class="card" style="max-width:640px;">
+    <h2>Đề xuất điểm cộng/trừ</h2>
+    <div class="field"><label>Nhân sự đề xuất *</label><select id="dx-nhansu"></select></div>
+    <div class="field"><label>Mã điểm *</label><select id="dx-madiem" onchange="updateSoDiemPreview()"></select></div>
+    <div class="field"><label>Số điểm</label><input id="dx-sodiem" disabled></div>
+    <div class="field"><label>Nội dung</label><textarea id="dx-noidung" rows="3"></textarea></div>
+    <button class="btn btn-primary" onclick="submitDeXuatDiem()">Gửi phiếu đề xuất</button>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <h2 style="margin:0;">Danh sách phiếu điểm</h2>
+      <select id="dx-filter" style="max-width:200px;" onchange="loadDiemList()">
+        <option value="ChoDuyet">Chờ duyệt</option>
+        <option value="DaDuyet">Đã duyệt</option>
+        <option value="TuChoi">Từ chối</option>
+        <option value="">Tất cả</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nhân sự</th><th>Mã điểm</th><th>Điểm</th><th>Nội dung</th><th>Người đề xuất</th><th>Ngày đề xuất</th><th>Trạng thái</th><th></th></tr></thead>
+        <tbody id="dx-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  var DX_MADIEM_CACHE = [];
+
+  function onShowView_diem() {
+    Promise.all([api('listActiveUsers', STATE.token), api('listMaDiem', STATE.token)]).then(function (res) {
+      document.getElementById('dx-nhansu').innerHTML = res[0].items.map(function (u) { return '<option value="' + esc(u.username) + '">' + esc(u.hoTen) + '</option>'; }).join('');
+      DX_MADIEM_CACHE = res[1].items;
+      document.getElementById('dx-madiem').innerHTML = DX_MADIEM_CACHE.map(function (m) { return '<option value="' + esc(m.MaDiem) + '">' + esc(m.MaDiem) + ' — ' + esc(m.MoTa) + '</option>'; }).join('');
+      updateSoDiemPreview();
+    });
+    loadDiemList();
+  }
+
+  function updateSoDiemPreview() {
+    var ma = document.getElementById('dx-madiem').value;
+    var row = DX_MADIEM_CACHE.filter(function (m) { return m.MaDiem === ma; })[0];
+    document.getElementById('dx-sodiem').value = row ? row.SoDiem : '';
+  }
+
+  function submitDeXuatDiem() {
+    var payload = {
+      nhanSu: document.getElementById('dx-nhansu').value,
+      maDiem: document.getElementById('dx-madiem').value,
+      noiDung: document.getElementById('dx-noidung').value.trim()
+    };
+    api('proposeDiem', STATE.token, payload).then(function (res) {
+      if (!res.ok) return;
+      toast('Đã gửi phiếu đề xuất, chờ Quản lý duyệt.', 'ok');
+      document.getElementById('dx-noidung').value = '';
+      loadDiemList();
+    });
+  }
+
+  function loadDiemList() {
+    var filter = { trangThai: document.getElementById('dx-filter').value };
+    api('listDiemCongTru', STATE.token, filter).then(function (res) {
+      if (!res.ok) return;
+      var tbody = document.getElementById('dx-tbody');
+      if (!res.items.length) { tbody.innerHTML = '<tr><td colspan="8" class="muted">Không có phiếu điểm.</td></tr>'; return; }
+      var badgeMap = { ChoDuyet: 'orange', DaDuyet: 'green', TuChoi: 'red' };
+      var labelMap = { ChoDuyet: 'Chờ duyệt', DaDuyet: 'Đã duyệt', TuChoi: 'Từ chối' };
+      tbody.innerHTML = res.items.map(function (d) {
+        var actions = (roleAtLeast('QuanLy') && d.TrangThai === 'ChoDuyet')
+          ? '<div class="row-actions"><button class="btn btn-sm btn-success" onclick="duyetDiem(\'' + d.Id + '\',\'DaDuyet\')">Duyệt</button>' +
+            '<button class="btn btn-sm btn-danger" onclick="duyetDiem(\'' + d.Id + '\',\'TuChoi\')">Từ chối</button></div>' : '';
+        return '<tr><td>' + esc(d.NhanSu) + '</td><td>' + esc(d.MaDiem) + '</td><td>' + d.SoDiem + '</td><td>' + esc(d.NoiDung) + '</td>' +
+          '<td>' + esc(d.NguoiDeXuat) + '</td><td>' + fmtDateTime(d.NgayDeXuat) + '</td>' +
+          '<td>' + badge(labelMap[d.TrangThai] || d.TrangThai, badgeMap[d.TrangThai] || 'gray') + '</td><td>' + actions + '</td></tr>';
+      }).join('');
+    });
+  }
+
+  function duyetDiem(id, action) {
+    api('approveDiem', STATE.token, id, action).then(function (res) {
+      if (!res.ok) return;
+      toast(action === 'DaDuyet' ? 'Đã duyệt phiếu điểm.' : 'Đã từ chối phiếu điểm.', 'ok');
+      loadDiemList();
+    });
+  }
+</script>

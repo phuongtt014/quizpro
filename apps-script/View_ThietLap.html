@@ -1,0 +1,181 @@
+<div class="view" id="view-thietlap">
+  <div class="card">
+    <div class="row-actions" style="margin-bottom:16px;">
+      <button class="btn btn-sm" id="tl-tab-users" onclick="showThietLapTab('users')">👤 Người dùng</button>
+      <button class="btn btn-sm" id="tl-tab-donvi" onclick="showThietLapTab('donvi')">🏢 Đơn vị/phòng ban</button>
+      <button class="btn btn-sm" id="tl-tab-phanmuc" onclick="showThietLapTab('phanmuc')">🏷 Phân mục hồ sơ</button>
+      <button class="btn btn-sm" id="tl-tab-madiem" onclick="showThietLapTab('madiem')">🏅 Mã điểm cộng/trừ</button>
+    </div>
+
+    <div id="tl-panel-users" class="tl-panel">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h2 style="margin:0;">Người dùng</h2>
+        <button class="btn btn-sm btn-primary" onclick="openNewUserModal()">+ Tạo tài khoản</button>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Họ tên</th><th>Username</th><th>Email</th><th>Đơn vị</th><th>Vai trò</th><th>Trạng thái</th><th></th></tr></thead>
+        <tbody id="tl-users-tbody"></tbody>
+      </table></div>
+    </div>
+
+    <div id="tl-panel-donvi" class="tl-panel">
+      <h2>Đơn vị / phòng ban</h2>
+      <div class="row-actions" style="margin-bottom:10px;"><input id="tl-donvi-new" placeholder="Tên đơn vị mới" style="max-width:280px;"><button class="btn btn-sm" onclick="addDonViUI()">+ Thêm</button></div>
+      <table><tbody id="tl-donvi-tbody"></tbody></table>
+    </div>
+
+    <div id="tl-panel-phanmuc" class="tl-panel">
+      <h2>Phân mục hồ sơ</h2>
+      <div class="row-actions" style="margin-bottom:10px;"><input id="tl-phanmuc-new" placeholder="Tên phân mục mới" style="max-width:280px;"><button class="btn btn-sm" onclick="addPhanMucUI()">+ Thêm</button></div>
+      <table><tbody id="tl-phanmuc-tbody"></tbody></table>
+    </div>
+
+    <div id="tl-panel-madiem" class="tl-panel">
+      <h2>Mã điểm cộng/trừ</h2>
+      <div class="grid cols-3" style="max-width:560px; margin-bottom:10px;">
+        <input id="tl-madiem-ma" placeholder="Mã (VD: C1)">
+        <input id="tl-madiem-mota" placeholder="Mô tả">
+        <input id="tl-madiem-sodiem" type="number" placeholder="Số điểm (+/-)">
+      </div>
+      <button class="btn btn-sm" onclick="addMaDiemUI()">+ Thêm mã điểm</button>
+      <table style="margin-top:12px;"><thead><tr><th>Mã</th><th>Mô tả</th><th>Điểm</th><th></th></tr></thead><tbody id="tl-madiem-tbody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<style>.tl-panel{display:none;} .tl-panel.active{display:block;}</style>
+
+<script>
+  function onShowView_thietlap() { showThietLapTab('users'); }
+
+  function showThietLapTab(name) {
+    document.querySelectorAll('.tl-panel').forEach(function (p) { p.classList.remove('active'); });
+    document.getElementById('tl-panel-' + name).classList.add('active');
+    if (name === 'users') loadTlUsers();
+    if (name === 'donvi') loadTlDonVi();
+    if (name === 'phanmuc') loadTlPhanMuc();
+    if (name === 'madiem') loadTlMaDiem();
+  }
+
+  function loadTlUsers() {
+    api('listAllUsers', STATE.token).then(function (res) {
+      if (!res.ok) return;
+      api('listRoles').then(function (rolesRes) {
+        window.TL_ROLES = rolesRes.items;
+        document.getElementById('tl-users-tbody').innerHTML = res.items.map(function (u) {
+          var roleOpts = TL_ROLES.map(function (r) { return '<option value="' + r.value + '"' + (r.value === u.vaiTro ? ' selected' : '') + '>' + r.label + '</option>'; }).join('');
+          return '<tr><td>' + esc(u.hoTen) + '</td><td>' + esc(u.username) + '</td><td>' + esc(u.email) + '</td><td>' + esc(u.donVi) + '</td>' +
+            '<td><select onchange="changeUserRole(\'' + u.username + '\', this.value)">' + roleOpts + '</select></td>' +
+            '<td>' + badge(u.trangThai === 'Active' ? 'Hoạt động' : 'Đã khoá', u.trangThai === 'Active' ? 'green' : 'red') + '</td>' +
+            '<td class="row-actions">' +
+            '<button class="btn btn-sm" onclick="toggleUserStatus(\'' + u.username + '\', \'' + u.trangThai + '\')">' + (u.trangThai === 'Active' ? 'Khoá' : 'Mở khoá') + '</button>' +
+            '<button class="btn btn-sm" onclick="resetPwdUI(\'' + u.username + '\')">Reset mật khẩu</button></td></tr>';
+        }).join('');
+      });
+    });
+  }
+
+  function changeUserRole(username, vaiTro) {
+    api('updateUser', STATE.token, username, { vaiTro: vaiTro }).then(function (res) { if (res.ok) toast('Đã cập nhật vai trò.', 'ok'); });
+  }
+  function toggleUserStatus(username, cur) {
+    api('updateUser', STATE.token, username, { trangThai: cur === 'Active' ? 'Locked' : 'Active' }).then(function (res) {
+      if (!res.ok) return; toast('Đã cập nhật trạng thái.', 'ok'); loadTlUsers();
+    });
+  }
+  function resetPwdUI(username) {
+    openModal('Đặt lại mật khẩu — ' + username,
+      '<div class="field"><label>Mật khẩu mới (tối thiểu 6 ký tự, để trống = 123456)</label><input id="rp-pw"></div>' +
+      '<button class="btn btn-primary" onclick="confirmResetPwd(\'' + username + '\')">Xác nhận</button>');
+  }
+  function confirmResetPwd(username) {
+    api('resetPassword', STATE.token, username, document.getElementById('rp-pw').value).then(function (res) {
+      if (!res.ok) return;
+      toast('Mật khẩu mới: ' + res.matKhauMoi, 'ok'); closeModal();
+    });
+  }
+
+  function openNewUserModal() {
+    api('listRoles').then(function (rolesRes) {
+      var roleOpts = rolesRes.items.map(function (r) { return '<option value="' + r.value + '">' + r.label + '</option>'; }).join('');
+      openModal('Tạo tài khoản mới',
+        '<div class="grid cols-2">' +
+        '<div class="field"><label>Họ tên *</label><input id="nu-hoten"></div>' +
+        '<div class="field"><label>Username *</label><input id="nu-username"></div>' +
+        '<div class="field"><label>Email *</label><input id="nu-email"></div>' +
+        '<div class="field"><label>Số điện thoại</label><input id="nu-sdt"></div>' +
+        '<div class="field"><label>Đơn vị</label><input id="nu-donvi"></div>' +
+        '<div class="field"><label>Vai trò *</label><select id="nu-vaitro">' + roleOpts + '</select></div>' +
+        '</div>' +
+        '<div class="field"><label>Mật khẩu ban đầu (để trống = 123456)</label><input id="nu-password"></div>' +
+        '<button class="btn btn-primary" onclick="confirmNewUser()">Tạo tài khoản</button>');
+    });
+  }
+  function confirmNewUser() {
+    var payload = {
+      hoTen: document.getElementById('nu-hoten').value.trim(),
+      username: document.getElementById('nu-username').value.trim(),
+      email: document.getElementById('nu-email').value.trim(),
+      soDienThoai: document.getElementById('nu-sdt').value.trim(),
+      donVi: document.getElementById('nu-donvi').value.trim(),
+      vaiTro: document.getElementById('nu-vaitro').value,
+      password: document.getElementById('nu-password').value
+    };
+    if (!payload.hoTen || !payload.username || !payload.email) { toast('Vui lòng điền đầy đủ thông tin bắt buộc (*).', 'err'); return; }
+    api('createUser', STATE.token, payload).then(function (res) {
+      if (!res.ok) return;
+      toast('Đã tạo tài khoản. Mật khẩu: ' + res.matKhauMacDinh, 'ok');
+      closeModal(); loadTlUsers();
+    });
+  }
+
+  function loadTlDonVi() {
+    api('listDonVi', STATE.token).then(function (res) {
+      if (!res.ok) return;
+      document.getElementById('tl-donvi-tbody').innerHTML = res.items.map(function (d) {
+        return '<tr><td>' + esc(d.TenDonVi) + '</td><td class="text-right"><button class="btn btn-sm btn-danger" onclick="removeDonViUI(\'' + d.Id + '\')">Xoá</button></td></tr>';
+      }).join('');
+    });
+  }
+  function addDonViUI() {
+    var v = document.getElementById('tl-donvi-new').value.trim();
+    if (!v) return;
+    api('addDonVi', STATE.token, v).then(function (res) { if (res.ok) { document.getElementById('tl-donvi-new').value = ''; loadTlDonVi(); } });
+  }
+  function removeDonViUI(id) { api('removeDonVi', STATE.token, id).then(function (res) { if (res.ok) loadTlDonVi(); }); }
+
+  function loadTlPhanMuc() {
+    api('listPhanMuc', STATE.token).then(function (res) {
+      if (!res.ok) return;
+      document.getElementById('tl-phanmuc-tbody').innerHTML = res.items.map(function (d) {
+        return '<tr><td>' + esc(d.TenPhanMuc) + '</td><td class="text-right"><button class="btn btn-sm btn-danger" onclick="removePhanMucUI(\'' + d.Id + '\')">Xoá</button></td></tr>';
+      }).join('');
+    });
+  }
+  function addPhanMucUI() {
+    var v = document.getElementById('tl-phanmuc-new').value.trim();
+    if (!v) return;
+    api('addPhanMuc', STATE.token, v).then(function (res) { if (res.ok) { document.getElementById('tl-phanmuc-new').value = ''; loadTlPhanMuc(); } });
+  }
+  function removePhanMucUI(id) { api('removePhanMuc', STATE.token, id).then(function (res) { if (res.ok) loadTlPhanMuc(); }); }
+
+  function loadTlMaDiem() {
+    api('listMaDiem', STATE.token).then(function (res) {
+      if (!res.ok) return;
+      document.getElementById('tl-madiem-tbody').innerHTML = res.items.map(function (m) {
+        return '<tr><td>' + esc(m.MaDiem) + '</td><td>' + esc(m.MoTa) + '</td><td>' + m.SoDiem + '</td>' +
+          '<td class="text-right"><button class="btn btn-sm btn-danger" onclick="removeMaDiemUI(\'' + m.MaDiem + '\')">Xoá</button></td></tr>';
+      }).join('');
+    });
+  }
+  function addMaDiemUI() {
+    var payload = { maDiem: document.getElementById('tl-madiem-ma').value.trim(), moTa: document.getElementById('tl-madiem-mota').value.trim(), soDiem: document.getElementById('tl-madiem-sodiem').value };
+    if (!payload.maDiem || !payload.moTa || payload.soDiem === '') { toast('Vui lòng điền đầy đủ.', 'err'); return; }
+    api('addMaDiem', STATE.token, payload).then(function (res) {
+      if (!res.ok) return;
+      document.getElementById('tl-madiem-ma').value = ''; document.getElementById('tl-madiem-mota').value = ''; document.getElementById('tl-madiem-sodiem').value = '';
+      loadTlMaDiem();
+    });
+  }
+  function removeMaDiemUI(ma) { api('removeMaDiem', STATE.token, ma).then(function (res) { if (res.ok) loadTlMaDiem(); }); }
+</script>
