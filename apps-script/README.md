@@ -4,6 +4,14 @@ Web app nội bộ cho nhóm 15 người, dùng Google Sheet làm cơ sở dữ 
 Google Apps Script (HtmlService) làm giao diện. Đăng nhập bằng tài khoản
 Google (không cần màn hình đăng nhập riêng).
 
+**Kiến trúc**: server-rendered pages (`doGet`/`doPost`) + `<form>` HTML
+thuần — **không dùng `google.script.run`**. Lý do: một số mạng nội bộ
+(đặc biệt mạng trường học có lọc nội dung) chặn kênh RPC/AJAX ngầm mà
+`google.script.run` dùng, khiến trang treo vô thời hạn dù nội dung tĩnh
+vẫn tải bình thường. Với kiến trúc form thuần, mỗi thao tác gửi 1 request
+HTTP GET/POST chuẩn (giống mọi trang web thông thường) nên không bị chặn.
+Đánh đổi: trang sẽ **tải lại sau mỗi thao tác** thay vì cập nhật ngầm mượt.
+
 ## 1. Cấu trúc thư mục
 
 ```
@@ -18,10 +26,17 @@ apps-script/
 ├─ CongViecService.gs   # Nghiệp vụ Quản lý công việc + chat + đánh giá TĐV
 ├─ DiemService.gs       # Phiếu điểm cộng/trừ + luồng duyệt + Báo cáo
 ├─ SetupService.gs      # Tab Thiết lập (Admin) + khởi tạo dữ liệu mẫu
-├─ Code.gs              # doGet() + các hàm apiXxx gọi từ client
-├─ Index.html           # Giao diện SPA (7 tab)
-├─ Styles.html          # CSS
-└─ Client.html          # JavaScript phía client (google.script.run)
+├─ Render.gs            # Hàm dựng HTML dùng chung: nav, pill, form, redirect
+├─ PageForm.gs          # Trang "Gửi hồ sơ"
+├─ PageTiepNhan.gs      # Trang "Tiếp nhận"
+├─ PageTraCuu.gs        # Trang "Tra cứu"
+├─ PageCongViec.gs      # Trang "Công việc" (danh sách + chi tiết)
+├─ PageDiem.gs          # Trang "Điểm cộng/trừ"
+├─ PageBaoCao.gs        # Trang "Báo cáo"
+├─ PageThietLap.gs      # Trang "Thiết lập" (Admin)
+├─ Code.gs              # doGet()/doPost() - bộ định tuyến trung tâm
+├─ Layout.html          # Khung trang chung (nav + nội dung)
+└─ Styles.html          # CSS
 ```
 
 ## 2. Cách triển khai
