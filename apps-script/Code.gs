@@ -5,7 +5,7 @@
 // Tăng số này mỗi khi đổi code, để có thể nhìn thẳng trên giao diện (góc trên sidebar) xác nhận
 // trình duyệt đang thực sự chạy đúng bản mới nhất — tránh nhầm do quên "Deploy > New version"
 // hoặc do trình duyệt cache lại trang cũ.
-var APP_BUILD = '2026-09-10.8';
+var APP_BUILD = '2026-09-10.9';
 
 function doGet() {
   _resetRequestCache_();

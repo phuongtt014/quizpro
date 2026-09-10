@@ -303,8 +303,8 @@ function debugSheetInfo(token) {
       out.congViecError = String(e && e.message ? e.message : e);
     }
 
-    // Gọi TRỰC TIẾP đúng hàm mà tab Tiếp nhận gọi, ngay trong request này — để so sánh thẳng
-    // với hoSoRowCount/hoSoLast5 ở trên, loại trừ khả năng lỗi nằm ở phía client/nút bấm.
+    // Gọi TRỰC TIẾP đúng hàm mà tab Tiếp nhận/Người dùng gọi, ngay trong request này — để so
+    // sánh thẳng với hoSoRowCount/hoSoLast5 ở trên, loại trừ khả năng lỗi nằm ở phía client/nút bấm.
     try {
       out.currentUser = { username: user.Username, vaiTro: user.VaiTro };
       var tnAll = listHoSoTiepNhan(token, '');
@@ -313,6 +313,19 @@ function debugSheetInfo(token) {
       out.listHoSoTiepNhan_ChoTiepNhan = { ok: tnCho.ok, soLuong: tnCho.items ? tnCho.items.length : null, loi: tnCho.message || null };
     } catch (e) {
       out.listHoSoTiepNhanError = String(e && e.message ? e.message : e);
+    }
+
+    try {
+      var usersSheet = getSheet_(SHEETS.USERS);
+      var usersRawRows = sheetToObjects_(usersSheet);
+      out.usersRowCount = usersRawRows.length;
+      out.usersLast3Raw = usersRawRows.slice(-3).map(function (r) {
+        return { Id: String(r.Id || ''), HoTen: String(r.HoTen || ''), Username: String(r.Username || ''), VaiTro: String(r.VaiTro || ''), TrangThai: String(r.TrangThai || '') };
+      });
+      var auRes = listAllUsers(token);
+      out.listAllUsers_result = { ok: auRes.ok, soLuong: auRes.items ? auRes.items.length : null, loi: auRes.message || null };
+    } catch (e) {
+      out.listAllUsersError = String(e && e.message ? e.message : e);
     }
 
     out.serverTimeNow = new Date().toISOString();
