@@ -55,6 +55,29 @@ Reset mật khẩu), hoặc khoá bớt tài khoản không dùng.
 Dữ liệu mẫu cũng được tạo sẵn ở tab Thiết lập: 5 đơn vị/phòng ban, 5 phân mục hồ sơ, 6 mã điểm
 cộng/trừ (C1–C3 dương, T1–T3 âm) — **anh/chị chỉnh sửa lại cho đúng thực tế** của trường.
 
+## Đã tối ưu tốc độ (bản cập nhật sau triển khai)
+
+Thao tác "Tạo công việc" / tạo mới trong tab Thiết lập từng chậm vì mỗi request gọi dịch vụ
+Spreadsheet rất nhiều lần (mỗi lần ~100-400ms) và gửi email đồng bộ (`MailApp` có thể mất 1-3
+giây) ngay trong lúc xử lý. Đã cải thiện:
+
+- **Cache trong 1 lượt thực thi**: Spreadsheet, các Sheet và dữ liệu bảng đã đọc được cache lại
+  trong phạm vi 1 lần gọi từ client, tránh lấy lại/kiểm tra header nhiều lần cho cùng 1 sheet.
+- **Kiểm tra header rẻ hơn**: chỉ ghi header khi sheet thực sự trống, thay vì đọc + so sánh dữ
+  liệu mỗi lần truy cập sheet.
+- **Gửi email qua hàng đợi**: các hàm `mailXxx_` giờ chỉ ghi 1 dòng vào sheet `MailQueue` (rất
+  nhanh) và trả kết quả về ngay cho người dùng; 1 trigger chạy mỗi phút (`processMailQueue_`)
+  mới thực sự gọi `MailApp` để gửi. Email vẫn đến nơi, chỉ trễ tối đa ~1 phút thay vì chặn thao
+  tác tạo hồ sơ/công việc.
+- Bỏ các lần gọi `ensureAllSheets_()` thừa (chỉ thật sự cần chạy 1 lần khi tải trang ở `doGet`).
+- Giảm timeout khoá ghi (`LockService`) từ 30 giây xuống 10 giây để lỗi báo về nhanh hơn nếu có
+  tranh chấp ghi, thay vì treo lâu.
+
+⚠️ **Sau khi cập nhật code**: deploy lại (Deploy → Manage deployments → sửa deployment hiện có
+→ Version: New) và mở lại app — lần đầu hệ thống sẽ tự tạo trigger gửi mail định kỳ, có thể
+Google hỏi lại quyền truy cập (uỷ quyền thêm quyền tạo trigger), bấm **Cho phép**. Sheet mới
+`MailQueue` sẽ tự sinh, không cần tạo tay.
+
 ## Ghi chú kỹ thuật & giới hạn
 
 - **Xác thực**: hệ thống tự quản lý tài khoản (username/password, mật khẩu băm SHA-256 + salt
@@ -68,8 +91,9 @@ cộng/trừ (C1–C3 dương, T1–T3 âm) — **anh/chị chỉnh sửa lại 
   cộng/trừ ra **Điểm cuối cùng** của công việc đó. Điểm ở tab **Ghi nhận điểm cộng/trừ** là điểm
   **tích luỹ cá nhân riêng** (dùng cho bảng xếp hạng ở Báo cáo hiệu suất), độc lập với điểm của
   từng công việc cụ thể.
-- **Email**: dùng `MailApp` của tài khoản deploy script — Gmail cá nhân giới hạn ~100 email/ngày,
-  tài khoản Google Workspace (trường học) thường cao hơn nhiều, đủ dùng cho quy mô 15 người.
+- **Email**: dùng `MailApp` của tài khoản deploy script, gửi qua hàng đợi (`MailQueue` + trigger
+  mỗi phút, xem mục tối ưu tốc độ ở trên) — Gmail cá nhân giới hạn ~100 email/ngày, tài khoản
+  Google Workspace (trường học) thường cao hơn nhiều, đủ dùng cho quy mô 15 người.
 - **Tab Tra cứu**: các hàm `lookupHoSo`/`sendTraCuuMessage` ở backend **không yêu cầu đăng
   nhập** (đúng như thiết kế), nhưng giao diện hiện gộp chung 1 màn hình đăng nhập cho toàn bộ
   ứng dụng để đơn giản hoá — nếu sau này muốn tách tab Tra cứu thành trang công khai riêng
@@ -78,8 +102,8 @@ cộng/trừ (C1–C3 dương, T1–T3 âm) — **anh/chị chỉnh sửa lại 
 - **Xuất báo cáo PDF**: dùng `window.print()` của trình duyệt (chọn "Lưu thành PDF" ở hộp thoại
   in) — CSS đã ẩn sẵn sidebar/topbar/bộ lọc khi in.
 - Toàn bộ dữ liệu lưu trong các sheet ẩn dùng làm bảng: `Users, Sessions, HoSo, CongViec,
-  ChatLog, DiemCongTru, Settings_DonVi, Settings_PhanMuc, Settings_MaDiem, Counters`. Không nên
-  sửa tay các sheet này trực tiếp trừ khi biết rõ cấu trúc cột.
+  ChatLog, DiemCongTru, Settings_DonVi, Settings_PhanMuc, Settings_MaDiem, Counters, MailQueue`.
+  Không nên sửa tay các sheet này trực tiếp trừ khi biết rõ cấu trúc cột.
 
 ## Cấu trúc file
 

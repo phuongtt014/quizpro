@@ -19,7 +19,7 @@ function listChatByMaCV_(maCV) {
 /** Ghi 1 dòng chat + tự động gom link vào Tài liệu đính kèm của công việc. */
 function appendChatMessage_(maCV, nguoiGuiDisplay, nhanXung, noiDung) {
   var lock = LockService.getScriptLock();
-  lock.waitLock(30000);
+  lock.waitLock(10000);
   try {
     appendObject_(getSheet_(SHEETS.CHATLOG), SCHEMA[SHEETS.CHATLOG], {
       Id: genCode_('CL', 6), MaCV: maCV, NguoiGui: nguoiGuiDisplay, NhanXung: nhanXung,
@@ -81,7 +81,7 @@ function createCongViecDirect(token, payload) {
       return jsonErr_('Vui lòng điền đầy đủ Nội dung, Người phụ trách và Thời hạn.');
     }
     var lock = LockService.getScriptLock();
-    lock.waitLock(30000);
+    lock.waitLock(10000);
     var cv;
     try {
       cv = {
@@ -99,7 +99,7 @@ function createCongViecDirect(token, payload) {
       lock.releaseLock();
     }
     var nv = findUserByUsername_(payload.nguoiPhuTrach);
-    if (nv) sendMail_(nv.Email, 'Bạn được giao công việc mới ' + cv.MaCV, 'Bạn vừa được giao công việc <b>' + cv.NoiDung + '</b> (mã ' + cv.MaCV + '), thời hạn <b>' + cv.ThoiHan + '</b>.');
+    if (nv) queueMail_(nv.Email, 'Bạn được giao công việc mới ' + cv.MaCV, 'Bạn vừa được giao công việc <b>' + cv.NoiDung + '</b> (mã ' + cv.MaCV + '), thời hạn <b>' + cv.ThoiHan + '</b>.');
     return jsonOk_({ maCV: cv.MaCV });
   });
 }

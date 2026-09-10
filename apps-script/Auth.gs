@@ -31,7 +31,8 @@ function publicUser_(u) {
 
 function login(username, password) {
   return safeCall_(function () {
-    ensureAllSheets_();
+    // Không gọi ensureAllSheets_() ở đây: doGet() đã chạy nó khi tải trang, gọi lại mỗi lần
+    // đăng nhập chỉ tốn thêm ~10 lệnh gọi Spreadsheet không cần thiết.
     if (!username || !password) return jsonErr_('Vui lòng nhập đầy đủ tài khoản và mật khẩu.');
     var u = findUserByUsername_(username);
     if (!u) return jsonErr_('Tài khoản không tồn tại.');
@@ -42,7 +43,7 @@ function login(username, password) {
     var token = Utilities.getUuid();
     var expires = new Date(Date.now() + SESSION_TTL_MS).toISOString();
     var lock = LockService.getScriptLock();
-    lock.waitLock(30000);
+    lock.waitLock(10000);
     try {
       appendObject_(getSheet_(SHEETS.SESSIONS), SCHEMA[SHEETS.SESSIONS], { Token: token, Username: u.Username, HetHan: expires });
     } finally {
@@ -54,9 +55,7 @@ function login(username, password) {
 
 function logout(token) {
   return safeCall_(function () {
-    var sh = getSheet_(SHEETS.SESSIONS);
-    var idx = findRowIndexById_(sh, 'Token', token);
-    if (idx > 0) sh.deleteRow(idx);
+    deleteRowById_(getSheet_(SHEETS.SESSIONS), 'Token', token);
     return jsonOk_({});
   });
 }
@@ -79,7 +78,6 @@ function requireSession_(token) {
 /** entry point: client gọi để khôi phục phiên khi load lại trang. */
 function getCurrentUser(token) {
   return safeCall_(function () {
-    ensureAllSheets_();
     var u = requireSession_(token);
     return jsonOk_({ user: publicUser_(u) });
   });

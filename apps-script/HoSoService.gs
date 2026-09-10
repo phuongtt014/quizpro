@@ -19,7 +19,7 @@ function submitHoSo(token, payload) {
     }
     var links = (payload.taiLieuLinks || []).filter(Boolean).join('\n');
     var lock = LockService.getScriptLock();
-    lock.waitLock(30000);
+    lock.waitLock(10000);
     var hoSo;
     try {
       hoSo = {
@@ -50,7 +50,6 @@ function submitHoSo(token, payload) {
 /** entry point công khai: tra cứu bằng mã hồ sơ + mã xác nhận, không cần đăng nhập. */
 function lookupHoSo(maHoSo, maXacNhan) {
   return safeCall_(function () {
-    ensureAllSheets_();
     var hoSo = findHoSoByMa_(maHoSo);
     if (!hoSo || String(hoSo.MaXacNhan) !== String(maXacNhan)) {
       return jsonErr_('Không tìm thấy hồ sơ hoặc mã xác nhận không đúng.');
@@ -103,7 +102,7 @@ function assignHoSo(token, maHoSo, nguoiPhuTrach, thoiGianBatDau, thoiHan) {
     if (!nguoiPhuTrach || !thoiHan) return jsonErr_('Vui lòng chọn người phụ trách và thời hạn xử lý.');
 
     var lock = LockService.getScriptLock();
-    lock.waitLock(30000);
+    lock.waitLock(10000);
     var hoSo, congViec;
     try {
       var hoSoSheet = getSheet_(SHEETS.HOSO);
@@ -138,7 +137,7 @@ function assignHoSo(token, maHoSo, nguoiPhuTrach, thoiGianBatDau, thoiHan) {
     }
     mailHoSoPhanCong_(hoSo, congViec);
     var nv = findUserByUsername_(nguoiPhuTrach);
-    if (nv) sendMail_(nv.Email, 'Bạn được phân công công việc ' + congViec.MaCV, 'Bạn vừa được phân công xử lý công việc <b>' + congViec.NoiDung + '</b> (mã ' + congViec.MaCV + '), thời hạn <b>' + thoiHan + '</b>. Vui lòng vào tab Quản lý công việc để xử lý.');
+    if (nv) queueMail_(nv.Email, 'Bạn được phân công công việc ' + congViec.MaCV, 'Bạn vừa được phân công xử lý công việc <b>' + congViec.NoiDung + '</b> (mã ' + congViec.MaCV + '), thời hạn <b>' + thoiHan + '</b>. Vui lòng vào tab Quản lý công việc để xử lý.');
     return jsonOk_({ maCV: congViec.MaCV });
   });
 }

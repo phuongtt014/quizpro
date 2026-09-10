@@ -15,7 +15,8 @@ var SHEETS = {
   SET_DONVI: 'Settings_DonVi',
   SET_PHANMUC: 'Settings_PhanMuc',
   SET_MADIEM: 'Settings_MaDiem',
-  COUNTERS: 'Counters'
+  COUNTERS: 'Counters',
+  MAILQUEUE: 'MailQueue'
 };
 
 var SCHEMA = {};
@@ -29,6 +30,7 @@ SCHEMA[SHEETS.SET_DONVI] = ['Id', 'TenDonVi'];
 SCHEMA[SHEETS.SET_PHANMUC] = ['Id', 'TenPhanMuc'];
 SCHEMA[SHEETS.SET_MADIEM] = ['MaDiem', 'MoTa', 'SoDiem'];
 SCHEMA[SHEETS.COUNTERS] = ['Key', 'Value'];
+SCHEMA[SHEETS.MAILQUEUE] = ['Id', 'ToEmail', 'Subject', 'Body', 'TrangThai', 'NgayTao', 'NgayGui'];
 
 var ROLES = ['NhanVien', 'TruongNhom', 'QuanLy', 'Admin'];
 var ROLE_RANK = { NhanVien: 1, TruongNhom: 2, QuanLy: 3, Admin: 4 };
@@ -41,34 +43,62 @@ var TASK_STATUS_LABEL = {
 };
 var HOSO_STATUS_LABEL = { ChoTiepNhan: 'Chờ tiếp nhận', DaPhanCong: 'Đã phân công', TuChoi: 'Từ chối' };
 
+/*
+ * ---------- Cache trong phạm vi 1 lượt thực thi ----------
+ * Mỗi lệnh gọi tới dịch vụ Spreadsheet (kể cả chỉ để lấy tham chiếu sheet hay kiểm tra header)
+ * tốn khoảng 100-400ms. Cache Spreadsheet, các Sheet đã lấy và dữ liệu bảng đã đọc trong phạm vi
+ * 1 lần thực thi giúp giảm hẳn số lệnh gọi khi tạo mới công việc / mục thiết lập — đây là
+ * nguyên nhân chính gây chậm. Mỗi lần gọi từ client (google.script.run) là 1 lượt thực thi mới
+ * nên các biến cache dưới đây luôn khởi tạo lại "sạch", không lo dữ liệu cũ giữa các request.
+ */
+var _ssCache_ = null;
+var _sheetCache_ = {};
+var _tableCache_ = {};
+
 function getSS_() {
-  return SpreadsheetApp.getActiveSpreadsheet();
+  if (!_ssCache_) _ssCache_ = SpreadsheetApp.getActiveSpreadsheet();
+  return _ssCache_;
 }
 
 function getSheet_(name) {
+  if (_sheetCache_[name]) return _sheetCache_[name];
   var ss = getSS_();
   var sh = ss.getSheetByName(name);
   if (!sh) sh = ss.insertSheet(name);
   var headers = SCHEMA[name];
-  if (headers) {
-    var firstRow = sh.getRange(1, 1, 1, headers.length).getValues()[0];
-    if (firstRow.join('') !== headers.join('')) {
-      sh.getRange(1, 1, 1, headers.length).setValues([headers]);
-      sh.setFrozenRows(1);
-    }
+  // Chỉ ghi header khi sheet thực sự trống, tránh phải đọc dữ liệu (getValues) chỉ để so sánh.
+  if (headers && sh.getLastRow() === 0) {
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sh.setFrozenRows(1);
   }
+  _sheetCache_[name] = sh;
   return sh;
 }
 
-/** Đảm bảo toàn bộ sheet cần thiết tồn tại + seed dữ liệu mẫu lần đầu. Gọi ở đầu doGet. */
+function _invalidateTableCache_(name) {
+  delete _tableCache_[name];
+}
+
+/** entry point nội bộ: xoá 1 dòng theo id + tự invalidate cache đọc của sheet đó. */
+function deleteRowById_(sheet, idCol, idVal) {
+  var idx = findRowIndexById_(sheet, idCol, idVal);
+  if (idx > 0) {
+    sheet.deleteRow(idx);
+    _invalidateTableCache_(sheet.getName());
+  }
+  return idx > 0;
+}
+
+/** Đảm bảo toàn bộ sheet cần thiết tồn tại + seed dữ liệu mẫu lần đầu + có trigger gửi mail hàng đợi. Gọi ở đầu doGet. */
 function ensureAllSheets_() {
   Object.keys(SHEETS).forEach(function (k) { getSheet_(SHEETS[k]); });
   seedIfEmpty_();
+  ensureMailTrigger_();
 }
 
 function seedIfEmpty_() {
   var lock = LockService.getScriptLock();
-  lock.waitLock(30000);
+  lock.waitLock(10000);
   try {
     var usersSheet = getSheet_(SHEETS.USERS);
     if (usersSheet.getLastRow() < 2) {
@@ -125,23 +155,28 @@ function seedIfEmpty_() {
 /* ---------- CRUD helpers chung ---------- */
 
 function sheetToObjects_(sheet) {
+  var name = sheet.getName();
+  if (_tableCache_[name]) return _tableCache_[name];
   var values = sheet.getDataRange().getValues();
-  if (values.length < 2) return [];
-  var headers = values[0];
   var out = [];
-  for (var i = 1; i < values.length; i++) {
-    var row = values[i];
-    if (row.join('') === '') continue;
-    var obj = {};
-    headers.forEach(function (h, idx) { obj[h] = row[idx]; });
-    out.push(obj);
+  if (values.length >= 2) {
+    var headers = values[0];
+    for (var i = 1; i < values.length; i++) {
+      var row = values[i];
+      if (row.join('') === '') continue;
+      var obj = {};
+      headers.forEach(function (h, idx) { obj[h] = row[idx]; });
+      out.push(obj);
+    }
   }
+  _tableCache_[name] = out;
   return out;
 }
 
 function appendObject_(sheet, headers, obj) {
   var row = headers.map(function (h) { return obj[h] !== undefined ? obj[h] : ''; });
   sheet.appendRow(row);
+  _invalidateTableCache_(sheet.getName());
   return obj;
 }
 
@@ -164,6 +199,7 @@ function updateObjectById_(sheet, headers, idCol, idVal, patch) {
   Object.keys(patch).forEach(function (k) { obj[k] = patch[k]; });
   var newRow = headers.map(function (h) { return obj[h] !== undefined ? obj[h] : ''; });
   sheet.getRange(rowIdx, 1, 1, headers.length).setValues([newRow]);
+  _invalidateTableCache_(sheet.getName());
   return obj;
 }
 

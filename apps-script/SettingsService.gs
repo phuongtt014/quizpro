@@ -27,9 +27,7 @@ function removeDonVi(token, id) {
   return safeCall_(function () {
     var user = requireSession_(token);
     requireMinRole_(user, 'Admin');
-    var sh = getSheet_(SHEETS.SET_DONVI);
-    var idx = findRowIndexById_(sh, 'Id', id);
-    if (idx > 0) sh.deleteRow(idx);
+    deleteRowById_(getSheet_(SHEETS.SET_DONVI), 'Id', id);
     return jsonOk_({});
   });
 }
@@ -57,9 +55,7 @@ function removePhanMuc(token, id) {
   return safeCall_(function () {
     var user = requireSession_(token);
     requireMinRole_(user, 'Admin');
-    var sh = getSheet_(SHEETS.SET_PHANMUC);
-    var idx = findRowIndexById_(sh, 'Id', id);
-    if (idx > 0) sh.deleteRow(idx);
+    deleteRowById_(getSheet_(SHEETS.SET_PHANMUC), 'Id', id);
     return jsonOk_({});
   });
 }
@@ -93,9 +89,7 @@ function removeMaDiem(token, maDiem) {
   return safeCall_(function () {
     var user = requireSession_(token);
     requireMinRole_(user, 'Admin');
-    var sh = getSheet_(SHEETS.SET_MADIEM);
-    var idx = findRowIndexById_(sh, 'MaDiem', maDiem);
-    if (idx > 0) sh.deleteRow(idx);
+    deleteRowById_(getSheet_(SHEETS.SET_MADIEM), 'MaDiem', maDiem);
     return jsonOk_({});
   });
 }
