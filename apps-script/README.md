@@ -11,7 +11,15 @@ Web app quản lý công việc cho nhóm ~15 người, chạy trên nền tản
 5. **Tab Ghi nhận điểm cộng/trừ** — Nhập phiếu đề xuất → Quản lý duyệt → tính vào hệ thống.
 6. **Tab Báo cáo hiệu suất** — xếp hạng điểm, thống kê trạng thái/đúng-trễ hạn, biểu đồ theo
    đơn vị/phân mục, xuất PDF (in trực tiếp từ trình duyệt).
-7. **Tab Thiết lập** (chỉ Admin) — quản lý người dùng, đơn vị/phòng ban, phân mục hồ sơ, mã điểm.
+7. **Tab Thiết lập** (chỉ Admin) — thêm/**sửa**/xoá người dùng (kể cả thông tin họ tên, email,
+   SĐT, đơn vị), đơn vị/phòng ban, phân mục hồ sơ, mã điểm; kèm mục **Chẩn đoán** để tự kiểm
+   tra khi có sự cố dữ liệu.
+
+**Nhãn phiên bản**: góc trên sidebar luôn hiện dòng nhỏ `Build: YYYY-MM-DD.N` — dùng để xác
+nhận trình duyệt đang chạy ĐÚNG bản code mới nhất đã deploy (build hiện tại: xem hằng số
+`APP_BUILD` ở đầu `Code.gs`). Nếu báo lỗi gì mà build hiển thị không khớp với build mới nhất
+tôi cung cấp, nghĩa là chưa deploy đúng bản hoặc trình duyệt đang cache trang cũ — hãy deploy
+lại (New version) rồi Ctrl+F5.
 
 ## Vai trò & quyền truy cập theo tab
 
@@ -66,6 +74,13 @@ Reset mật khẩu), hoặc khoá bớt tài khoản không dùng.
 
 Dữ liệu mẫu cũng được tạo sẵn ở tab Thiết lập: 5 đơn vị/phòng ban, 5 phân mục hồ sơ, 6 mã điểm
 cộng/trừ (C1–C3 dương, T1–T3 âm) — **anh/chị chỉnh sửa lại cho đúng thực tế** của trường.
+
+**Sửa (không chỉ thêm/xoá)**: mỗi dòng ở cả 4 danh mục trong tab Thiết lập (Người dùng, Đơn
+vị/phòng ban, Phân mục hồ sơ, Mã điểm cộng/trừ) giờ có thêm nút **"Sửa"** riêng để chỉnh trực
+tiếp mà không cần xoá rồi thêm lại — Người dùng: sửa họ tên/email/SĐT/đơn vị (nút "Sửa thông
+tin"), đổi vai trò (dropdown), khoá/mở khoá, reset mật khẩu; Đơn vị/Phân mục: sửa tên; Mã điểm:
+sửa mô tả + số điểm (riêng chính mã điểm — VD `C1` — không cho đổi vì có thể đã bị dùng ở công
+việc/phiếu điểm cũ; muốn đổi mã thì xoá rồi thêm mã mới).
 
 ## Đã tối ưu tốc độ (bản cập nhật sau triển khai)
 
@@ -127,13 +142,30 @@ Nguyên nhân kép, đã khắc phục trong bản cập nhật này:
    ngay sau MỌI lần ghi (`appendObject_`, `updateObjectById_`, `deleteRowById_`, `getNextSeq_`)
    để đảm bảo dữ liệu luôn được chốt trước khi trả kết quả về client.
 
-**Công cụ chẩn đoán mới**: tab Thiết lập → mục **🔧 Chẩn đoán** (chỉ Admin thấy) → bấm "Kiểm tra
-ngay" để xem trực tiếp server đang đọc được bao nhiêu dòng và 5 hồ sơ mới nhất trong sheet
-`HoSo`/`CongViec` ngay tại thời điểm đó. Nếu sau khi deploy bản này mà vẫn còn báo không thấy hồ
-sơ mới, hãy dùng công cụ này ngay sau khi nộp thử 1 hồ sơ — nếu server đã "thấy" hồ sơ đó
-(xuất hiện trong `hoSoLast5`) mà tab Tra cứu/Tiếp nhận vẫn không hiển thị thì lỗi nằm ở phía
-giao diện (mã hồ sơ/mã xác nhận gõ sai, hoặc đang đăng nhập sai vai trò); nếu server cũng
-KHÔNG thấy thì cần gửi lại kết quả JSON đó để chẩn đoán tiếp.
+4. **(Mới nhất) Công cụ Chẩn đoán trả về `null`**: nếu bấm "Kiểm tra dữ liệu" mà kết quả hiện ra
+   đúng chữ `null` (không phải JSON, không có `ok:false`/thông báo lỗi nào), đây là dấu hiệu
+   `google.script.run` không thực sự nhận được phản hồi từ server — gần như chắc chắn KHÔNG
+   phải lỗi logic đọc Sheet (vì hàm `debugSheetInfo` giờ đã bọc try/catch riêng từng phần, không
+   thể tự crash toàn bộ), mà là 1 trong các nguyên nhân sau:
+   - **Chưa deploy đúng bản mới nhất** — nguyên nhân phổ biến nhất. Kiểm tra bằng nhãn
+     `Build: ...` ở góc trên sidebar (xem mục "Nhãn phiên bản" ở trên).
+   - **Trình duyệt đang cache trang HTML cũ** — Ctrl+F5 (hoặc mở cửa sổ ẩn danh) rồi thử lại.
+   - Mạng/firewall trường học chặn 1 phần giao tiếp của khung iframe mà Apps Script dùng.
+
+   Đã thêm hàm `ping()` (tab Thiết lập → Chẩn đoán → nút "1. Ping") — hàm này KHÔNG đụng tới
+   Sheet/đăng nhập, chỉ trả về ngay 1 chuỗi cố định. Nếu **ping cũng trả về `null`** thì chắc
+   chắn 100% là lỗi kết nối/deploy như trên, không liên quan gì tới code đọc Sheet của app; nếu
+   ping ra kết quả bình thường nhưng "Kiểm tra dữ liệu" vẫn `null` thì gửi lại tôi cả 2 kết quả
+   để chẩn đoán tiếp. Để có thông tin chắc chắn nhất, mở **Apps Script → mục Thực thi
+   (Executions)** ở thanh bên trái, xem log của lần gọi `debugSheetInfo`/`ping` gần nhất — log
+   này ghi lại chính xác những gì thực sự chạy trên server bất kể client nhận được gì.
+
+**Cách dùng công cụ chẩn đoán**: tab Thiết lập → mục **🔧 Chẩn đoán** (chỉ Admin thấy) → bấm "2.
+Kiểm tra dữ liệu" để xem trực tiếp server đang đọc được bao nhiêu dòng và 5 hồ sơ mới nhất
+trong sheet `HoSo`/`CongViec` ngay tại thời điểm đó. Dùng ngay sau khi nộp thử 1 hồ sơ — nếu
+server đã "thấy" hồ sơ đó (xuất hiện trong `hoSoLast5`) mà tab Tra cứu/Tiếp nhận vẫn không hiển
+thị thì lỗi nằm ở phía giao diện (mã hồ sơ/mã xác nhận gõ sai, hoặc đang đăng nhập sai vai trò);
+nếu server cũng KHÔNG thấy thì cần gửi lại kết quả JSON đó để chẩn đoán tiếp.
 
 ⚠️ **Sau khi cập nhật code**: deploy lại (Deploy → Manage deployments → sửa deployment hiện có
 → Version: New) rồi **tải lại hẳn trang** (Ctrl+F5, đừng dùng tab trình duyệt đang mở từ trước)

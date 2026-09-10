@@ -23,6 +23,17 @@ function addDonVi(token, tenDonVi) {
   });
 }
 
+/** entry point (Admin): sửa tên đơn vị. */
+function updateDonVi(token, id, tenDonVi) {
+  return safeCall_(function () {
+    var user = requireSession_(token);
+    requireMinRole_(user, 'Admin');
+    if (!tenDonVi || !tenDonVi.trim()) return jsonErr_('Tên đơn vị không được để trống.');
+    updateObjectById_(getSheet_(SHEETS.SET_DONVI), SCHEMA[SHEETS.SET_DONVI], 'Id', id, { TenDonVi: tenDonVi.trim() });
+    return jsonOk_({});
+  });
+}
+
 function removeDonVi(token, id) {
   return safeCall_(function () {
     var user = requireSession_(token);
@@ -47,6 +58,17 @@ function addPhanMuc(token, tenPhanMuc) {
     requireMinRole_(user, 'Admin');
     if (!tenPhanMuc || !tenPhanMuc.trim()) return jsonErr_('Tên phân mục không được để trống.');
     appendObject_(getSheet_(SHEETS.SET_PHANMUC), SCHEMA[SHEETS.SET_PHANMUC], { Id: genCode_('PM', 3), TenPhanMuc: tenPhanMuc.trim() });
+    return jsonOk_({});
+  });
+}
+
+/** entry point (Admin): sửa tên phân mục. */
+function updatePhanMuc(token, id, tenPhanMuc) {
+  return safeCall_(function () {
+    var user = requireSession_(token);
+    requireMinRole_(user, 'Admin');
+    if (!tenPhanMuc || !tenPhanMuc.trim()) return jsonErr_('Tên phân mục không được để trống.');
+    updateObjectById_(getSheet_(SHEETS.SET_PHANMUC), SCHEMA[SHEETS.SET_PHANMUC], 'Id', id, { TenPhanMuc: tenPhanMuc.trim() });
     return jsonOk_({});
   });
 }
@@ -80,6 +102,22 @@ function addMaDiem(token, payload) {
     if (existed) return jsonErr_('Mã điểm đã tồn tại.');
     appendObject_(getSheet_(SHEETS.SET_MADIEM), SCHEMA[SHEETS.SET_MADIEM], {
       MaDiem: payload.maDiem, MoTa: payload.moTa, SoDiem: Number(payload.soDiem)
+    });
+    return jsonOk_({});
+  });
+}
+
+/** entry point (Admin): sửa mô tả/số điểm của 1 mã điểm (không cho đổi chính mã điểm vì có thể
+ * đã bị tham chiếu ở công việc/phiếu điểm cũ — muốn đổi mã thì xoá rồi thêm mã mới). */
+function updateMaDiem(token, maDiem, payload) {
+  return safeCall_(function () {
+    var user = requireSession_(token);
+    requireMinRole_(user, 'Admin');
+    if (!payload || !payload.moTa || payload.soDiem === undefined || payload.soDiem === '') {
+      return jsonErr_('Vui lòng nhập đầy đủ Mô tả, Số điểm.');
+    }
+    updateObjectById_(getSheet_(SHEETS.SET_MADIEM), SCHEMA[SHEETS.SET_MADIEM], 'MaDiem', maDiem, {
+      MoTa: payload.moTa, SoDiem: Number(payload.soDiem)
     });
     return jsonOk_({});
   });
@@ -182,28 +220,61 @@ function listRoles() {
   return jsonOk_({ items: ROLES.map(function (r) { return { value: r, label: ROLE_LABEL[r] }; }) });
 }
 
+/**
+ * entry point CÔNG KHAI, KHÔNG đụng tới Sheet/Auth: kiểm tra kết nối client-server cơ bản.
+ * Nếu hàm này cũng trả về null/không phản hồi thì lỗi nằm ở tầng kết nối (mạng trường học,
+ * trình duyệt, hoặc deploy sai bản) — không liên quan gì tới logic đọc Sheet của app.
+ */
+function ping() {
+  return { ok: true, pong: true, time: new Date().toISOString(), appBuild: APP_BUILD };
+}
+
 /** entry point (Admin): xem trực tiếp vài dòng mới nhất của HoSo/CongViec đang đọc được từ
- * server — dùng để chẩn đoán khi báo "ghi vào Sheet nhưng tab khác không thấy". */
+ * server — dùng để chẩn đoán khi báo "ghi vào Sheet nhưng tab khác không thấy".
+ * Viết phòng thủ theo từng phần (try/catch riêng) + ép mọi giá trị đọc từ Sheet về String
+ * trước khi trả về — Google Sheets có thể tự chuyển các ô giống ngày/giờ thành kiểu Date,
+ * mà việc trả thẳng đối tượng Date qua google.script.run đôi khi làm hỏng cả phản hồi (client
+ * nhận về null dù server không hề báo lỗi gì). */
 function debugSheetInfo(token) {
   return safeCall_(function () {
     var user = requireSession_(token);
     requireMinRole_(user, 'Admin');
-    var ss = getSS_();
-    var hoSoSheet = getSheet_(SHEETS.HOSO);
-    var cvSheet = getSheet_(SHEETS.CONGVIEC);
-    var hoSoRows = sheetToObjects_(hoSoSheet);
-    var cvRows = sheetToObjects_(cvSheet);
-    return jsonOk_({
-      spreadsheetId: ss.getId(),
-      spreadsheetUrl: ss.getUrl(),
-      hoSoSheetName: hoSoSheet.getName(),
-      hoSoRowCount: hoSoRows.length,
-      hoSoLast5: hoSoRows.slice(-5).map(function (r) {
-        return { MaHoSo: r.MaHoSo, MaXacNhan: r.MaXacNhan, TrangThai: r.TrangThai, NgayTao: r.NgayTao };
-      }),
-      congViecSheetName: cvSheet.getName(),
-      congViecRowCount: cvRows.length,
-      serverTimeNow: nowStr_()
-    });
+    var out = {};
+
+    try {
+      var ss = getSS_();
+      out.spreadsheetId = String(ss.getId());
+      out.spreadsheetUrl = String(ss.getUrl());
+      out.allSheetNames = ss.getSheets().map(function (s) { return s.getName(); });
+    } catch (e) {
+      out.spreadsheetError = String(e && e.message ? e.message : e);
+    }
+
+    try {
+      var hoSoSheet = getSheet_(SHEETS.HOSO);
+      var hoSoRows = sheetToObjects_(hoSoSheet);
+      out.hoSoSheetName = String(hoSoSheet.getName());
+      out.hoSoRowCount = hoSoRows.length;
+      out.hoSoLast5 = hoSoRows.slice(-5).map(function (r) {
+        return {
+          MaHoSo: String(r.MaHoSo || ''), MaXacNhan: String(r.MaXacNhan || ''),
+          TrangThai: String(r.TrangThai || ''), NgayTao: String(r.NgayTao || '')
+        };
+      });
+    } catch (e) {
+      out.hoSoError = String(e && e.message ? e.message : e);
+    }
+
+    try {
+      var cvSheet = getSheet_(SHEETS.CONGVIEC);
+      var cvRows = sheetToObjects_(cvSheet);
+      out.congViecSheetName = String(cvSheet.getName());
+      out.congViecRowCount = cvRows.length;
+    } catch (e) {
+      out.congViecError = String(e && e.message ? e.message : e);
+    }
+
+    out.serverTimeNow = new Date().toISOString();
+    return jsonOk_(out);
   });
 }

@@ -44,9 +44,16 @@
 
     <div id="tl-panel-debug" class="tl-panel">
       <h2>Chẩn đoán dữ liệu</h2>
-      <p class="muted">Dùng khi nghi ngờ 1 tab không thấy dữ liệu mới — bấm nút dưới để xem chính
-        xác server đang đọc được gì từ sheet <code>HoSo</code>/<code>CongViec</code> ngay lúc này.</p>
-      <button class="btn btn-sm btn-primary" onclick="runDebugSheetInfo()">Kiểm tra ngay</button>
+      <p class="muted">Dùng khi nghi ngờ 1 tab không thấy dữ liệu mới. Bấm <b>"1. Ping"</b> trước
+        để chắc chắn kết nối client-server hoạt động bình thường (hàm này không đụng tới Sheet),
+        rồi bấm <b>"2. Kiểm tra dữ liệu"</b> để xem chính xác server đang đọc được gì từ sheet
+        <code>HoSo</code>/<code>CongViec</code> ngay lúc này. Nếu kết quả hiện ra chữ
+        <code>null</code> hoặc "LỖI", hãy mở Apps Script → mục <b>Thực thi (Executions)</b> để
+        xem log lỗi chi tiết, hoặc nhấn F12 trên trình duyệt → tab Console để xem lỗi JavaScript.</p>
+      <div class="row-actions">
+        <button class="btn btn-sm" onclick="runPing()">1. Ping</button>
+        <button class="btn btn-sm btn-primary" onclick="runDebugSheetInfo()">2. Kiểm tra dữ liệu</button>
+      </div>
       <pre id="tl-debug-out" style="margin-top:12px; background:#0f172a; color:#d1fae5; padding:14px; border-radius:8px; font-size:12px; overflow:auto; white-space:pre-wrap;"></pre>
     </div>
   </div>
@@ -66,18 +73,49 @@
     if (name === 'madiem') loadTlMaDiem();
   }
 
+  var TL_USERS_CACHE = {};
+
   function loadTlUsers() {
     api('listAllUsers', STATE.token).then(function (res) {
       if (!res.ok) return;
+      TL_USERS_CACHE = {};
+      res.items.forEach(function (u) { TL_USERS_CACHE[u.username] = u; });
       document.getElementById('tl-users-tbody').innerHTML = res.items.map(function (u) {
         var roleOpts = ROLES_LIST_JS.map(function (r) { return '<option value="' + r.value + '"' + (r.value === u.vaiTro ? ' selected' : '') + '>' + r.label + '</option>'; }).join('');
         return '<tr><td>' + esc(u.hoTen) + '</td><td>' + esc(u.username) + '</td><td>' + esc(u.email) + '</td><td>' + esc(u.donVi) + '</td>' +
           '<td><select onchange="changeUserRole(\'' + u.username + '\', this.value)">' + roleOpts + '</select></td>' +
           '<td>' + badge(u.trangThai === 'Active' ? 'Hoạt động' : 'Đã khoá', u.trangThai === 'Active' ? 'green' : 'red') + '</td>' +
           '<td class="row-actions">' +
+          '<button class="btn btn-sm" onclick="editUserInfoUI(\'' + u.username + '\')">Sửa thông tin</button>' +
           '<button class="btn btn-sm" onclick="toggleUserStatus(\'' + u.username + '\', \'' + u.trangThai + '\')">' + (u.trangThai === 'Active' ? 'Khoá' : 'Mở khoá') + '</button>' +
           '<button class="btn btn-sm" onclick="resetPwdUI(\'' + u.username + '\')">Reset mật khẩu</button></td></tr>';
       }).join('');
+    });
+  }
+
+  function editUserInfoUI(username) {
+    var u = TL_USERS_CACHE[username];
+    if (!u) return;
+    openModal('Sửa thông tin — ' + username,
+      '<div class="grid cols-2">' +
+      '<div class="field"><label>Họ tên</label><input id="eu-hoten" value="' + esc(u.hoTen) + '"></div>' +
+      '<div class="field"><label>Email</label><input id="eu-email" value="' + esc(u.email) + '"></div>' +
+      '<div class="field"><label>Số điện thoại</label><input id="eu-sdt" value="' + esc(u.soDienThoai || '') + '"></div>' +
+      '<div class="field"><label>Đơn vị</label><input id="eu-donvi" value="' + esc(u.donVi || '') + '"></div>' +
+      '</div>' +
+      '<button class="btn btn-primary" onclick="confirmEditUserInfo(\'' + username + '\')">Lưu</button>');
+  }
+  function confirmEditUserInfo(username) {
+    var patch = {
+      hoTen: document.getElementById('eu-hoten').value.trim(),
+      email: document.getElementById('eu-email').value.trim(),
+      soDienThoai: document.getElementById('eu-sdt').value.trim(),
+      donVi: document.getElementById('eu-donvi').value.trim()
+    };
+    if (!patch.hoTen || !patch.email) { toast('Họ tên và Email không được để trống.', 'err'); return; }
+    api('updateUser', STATE.token, username, patch).then(function (res) {
+      if (!res.ok) return;
+      toast('Đã cập nhật thông tin.', 'ok'); closeModal(); loadTlUsers();
     });
   }
 
@@ -133,11 +171,17 @@
     });
   }
 
+  var TL_DONVI_CACHE = {};
+
   function loadTlDonVi() {
     api('listDonVi', STATE.token).then(function (res) {
       if (!res.ok) return;
+      TL_DONVI_CACHE = {};
+      res.items.forEach(function (d) { TL_DONVI_CACHE[d.Id] = d; });
       document.getElementById('tl-donvi-tbody').innerHTML = res.items.map(function (d) {
-        return '<tr><td>' + esc(d.TenDonVi) + '</td><td class="text-right"><button class="btn btn-sm btn-danger" onclick="removeDonViUI(\'' + d.Id + '\')">Xoá</button></td></tr>';
+        return '<tr><td>' + esc(d.TenDonVi) + '</td><td class="text-right row-actions" style="justify-content:flex-end;">' +
+          '<button class="btn btn-sm" onclick="editDonViUI(\'' + d.Id + '\')">Sửa</button>' +
+          '<button class="btn btn-sm btn-danger" onclick="removeDonViUI(\'' + d.Id + '\')">Xoá</button></td></tr>';
       }).join('');
     });
   }
@@ -146,13 +190,34 @@
     if (!v) return;
     api('addDonVi', STATE.token, v).then(function (res) { if (res.ok) { document.getElementById('tl-donvi-new').value = ''; loadTlDonVi(); } });
   }
+  function editDonViUI(id) {
+    var d = TL_DONVI_CACHE[id];
+    if (!d) return;
+    openModal('Sửa đơn vị',
+      '<div class="field"><label>Tên đơn vị</label><input id="ed-ten" value="' + esc(d.TenDonVi) + '"></div>' +
+      '<button class="btn btn-primary" onclick="confirmEditDonVi(\'' + id + '\')">Lưu</button>');
+  }
+  function confirmEditDonVi(id) {
+    var v = document.getElementById('ed-ten').value.trim();
+    if (!v) { toast('Tên đơn vị không được để trống.', 'err'); return; }
+    api('updateDonVi', STATE.token, id, v).then(function (res) {
+      if (!res.ok) return;
+      toast('Đã cập nhật.', 'ok'); closeModal(); loadTlDonVi();
+    });
+  }
   function removeDonViUI(id) { api('removeDonVi', STATE.token, id).then(function (res) { if (res.ok) loadTlDonVi(); }); }
+
+  var TL_PHANMUC_CACHE = {};
 
   function loadTlPhanMuc() {
     api('listPhanMuc', STATE.token).then(function (res) {
       if (!res.ok) return;
+      TL_PHANMUC_CACHE = {};
+      res.items.forEach(function (d) { TL_PHANMUC_CACHE[d.Id] = d; });
       document.getElementById('tl-phanmuc-tbody').innerHTML = res.items.map(function (d) {
-        return '<tr><td>' + esc(d.TenPhanMuc) + '</td><td class="text-right"><button class="btn btn-sm btn-danger" onclick="removePhanMucUI(\'' + d.Id + '\')">Xoá</button></td></tr>';
+        return '<tr><td>' + esc(d.TenPhanMuc) + '</td><td class="text-right row-actions" style="justify-content:flex-end;">' +
+          '<button class="btn btn-sm" onclick="editPhanMucUI(\'' + d.Id + '\')">Sửa</button>' +
+          '<button class="btn btn-sm btn-danger" onclick="removePhanMucUI(\'' + d.Id + '\')">Xoá</button></td></tr>';
       }).join('');
     });
   }
@@ -161,14 +226,35 @@
     if (!v) return;
     api('addPhanMuc', STATE.token, v).then(function (res) { if (res.ok) { document.getElementById('tl-phanmuc-new').value = ''; loadTlPhanMuc(); } });
   }
+  function editPhanMucUI(id) {
+    var d = TL_PHANMUC_CACHE[id];
+    if (!d) return;
+    openModal('Sửa phân mục',
+      '<div class="field"><label>Tên phân mục</label><input id="epm-ten" value="' + esc(d.TenPhanMuc) + '"></div>' +
+      '<button class="btn btn-primary" onclick="confirmEditPhanMuc(\'' + id + '\')">Lưu</button>');
+  }
+  function confirmEditPhanMuc(id) {
+    var v = document.getElementById('epm-ten').value.trim();
+    if (!v) { toast('Tên phân mục không được để trống.', 'err'); return; }
+    api('updatePhanMuc', STATE.token, id, v).then(function (res) {
+      if (!res.ok) return;
+      toast('Đã cập nhật.', 'ok'); closeModal(); loadTlPhanMuc();
+    });
+  }
   function removePhanMucUI(id) { api('removePhanMuc', STATE.token, id).then(function (res) { if (res.ok) loadTlPhanMuc(); }); }
+
+  var TL_MADIEM_CACHE = {};
 
   function loadTlMaDiem() {
     api('listMaDiem', STATE.token).then(function (res) {
       if (!res.ok) return;
+      TL_MADIEM_CACHE = {};
+      res.items.forEach(function (m) { TL_MADIEM_CACHE[m.MaDiem] = m; });
       document.getElementById('tl-madiem-tbody').innerHTML = res.items.map(function (m) {
         return '<tr><td>' + esc(m.MaDiem) + '</td><td>' + esc(m.MoTa) + '</td><td>' + m.SoDiem + '</td>' +
-          '<td class="text-right"><button class="btn btn-sm btn-danger" onclick="removeMaDiemUI(\'' + m.MaDiem + '\')">Xoá</button></td></tr>';
+          '<td class="text-right row-actions" style="justify-content:flex-end;">' +
+          '<button class="btn btn-sm" onclick="editMaDiemUI(\'' + m.MaDiem + '\')">Sửa</button>' +
+          '<button class="btn btn-sm btn-danger" onclick="removeMaDiemUI(\'' + m.MaDiem + '\')">Xoá</button></td></tr>';
       }).join('');
     });
   }
@@ -181,13 +267,51 @@
       loadTlMaDiem();
     });
   }
+  function editMaDiemUI(ma) {
+    var m = TL_MADIEM_CACHE[ma];
+    if (!m) return;
+    openModal('Sửa mã điểm — ' + ma,
+      '<div class="field"><label>Mô tả</label><input id="emd-mota" value="' + esc(m.MoTa) + '"></div>' +
+      '<div class="field"><label>Số điểm (+/-)</label><input id="emd-sodiem" type="number" value="' + esc(m.SoDiem) + '"></div>' +
+      '<button class="btn btn-primary" onclick="confirmEditMaDiem(\'' + ma + '\')">Lưu</button>');
+  }
+  function confirmEditMaDiem(ma) {
+    var payload = { moTa: document.getElementById('emd-mota').value.trim(), soDiem: document.getElementById('emd-sodiem').value };
+    if (!payload.moTa || payload.soDiem === '') { toast('Vui lòng điền đầy đủ.', 'err'); return; }
+    api('updateMaDiem', STATE.token, ma, payload).then(function (res) {
+      if (!res.ok) return;
+      toast('Đã cập nhật.', 'ok'); closeModal(); loadTlMaDiem();
+    });
+  }
   function removeMaDiemUI(ma) { api('removeMaDiem', STATE.token, ma).then(function (res) { if (res.ok) loadTlMaDiem(); }); }
+
+  function runPing() {
+    var out = document.getElementById('tl-debug-out');
+    out.textContent = 'Đang ping...';
+    try {
+      api('ping').then(function (res) {
+        out.textContent = 'Kết quả Ping (không liên quan Sheet):\n' + JSON.stringify(res, null, 2) +
+          (res === null || res === undefined ? '\n\n⚠️ Ping cũng trả về rỗng — lỗi nằm ở kết nối/deploy, không phải logic đọc Sheet. Hãy kiểm tra lại đã "Deploy > New version" đúng bản mới nhất chưa, và tải lại trang bằng Ctrl+F5.' : '');
+      }).catch(function (err) {
+        out.textContent = 'LỖI kết nối khi ping: ' + (err && err.message ? err.message : String(err));
+      });
+    } catch (e) {
+      out.textContent = 'LỖI JavaScript phía trình duyệt: ' + e.message + '\n(Có thể trang đang chạy bản HTML cũ — hãy Ctrl+F5 tải lại trang.)';
+    }
+  }
 
   function runDebugSheetInfo() {
     var out = document.getElementById('tl-debug-out');
     out.textContent = 'Đang kiểm tra...';
-    api('debugSheetInfo', STATE.token).then(function (res) {
-      out.textContent = JSON.stringify(res, null, 2);
-    });
+    try {
+      api('debugSheetInfo', STATE.token).then(function (res) {
+        out.textContent = JSON.stringify(res, null, 2) +
+          (res === null || res === undefined ? '\n\n⚠️ Server trả về rỗng. Hãy bấm nút "1. Ping" ở trên trước để xác định lỗi nằm ở kết nối chung hay riêng hàm này, và mở Apps Script > Thực thi (Executions) để xem log lỗi thật.' : '');
+      }).catch(function (err) {
+        out.textContent = 'LỖI kết nối: ' + (err && err.message ? err.message : String(err));
+      });
+    } catch (e) {
+      out.textContent = 'LỖI JavaScript phía trình duyệt: ' + e.message + '\n(Có thể trang đang chạy bản HTML cũ — hãy Ctrl+F5 tải lại trang.)';
+    }
   }
 </script>
