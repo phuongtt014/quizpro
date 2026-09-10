@@ -229,6 +229,35 @@ function ping() {
   return { ok: true, pong: true, time: new Date().toISOString(), appBuild: APP_BUILD };
 }
 
+/**
+ * entry point (Admin) — bước 1 của bài test ghi-rồi-đọc-ngay: ghi 1 dòng đánh dấu riêng vào
+ * sheet Counters (không ảnh hưởng dữ liệu thật) và trả về mã đánh dấu đó. Dùng appendObject_
+ * (hàm CRUD dùng chung có gọi SpreadsheetApp.flush() — nếu DB.gs đang chạy là bản CŨ chưa có
+ * flush() thì bước 2 verify ngay sau đó có thể không đọc thấy).
+ */
+function debugWriteTest(token) {
+  return safeCall_(function () {
+    var user = requireSession_(token);
+    requireMinRole_(user, 'Admin');
+    var tag = 'DEBUGTEST-' + Utilities.getUuid().slice(0, 8);
+    appendObject_(getSheet_(SHEETS.COUNTERS), SCHEMA[SHEETS.COUNTERS], { Key: tag, Value: 1 });
+    return jsonOk_({ tag: tag });
+  });
+}
+
+/** entry point (Admin) — bước 2: đọc lại NGAY (ở 1 lượt thực thi HOÀN TOÀN MỚI, y như khi client
+ * bấm sang tab khác) xem có thấy dòng vừa ghi ở debugWriteTest không, rồi dọn dẹp dòng test đó. */
+function debugReadTest(token, tag) {
+  return safeCall_(function () {
+    var user = requireSession_(token);
+    requireMinRole_(user, 'Admin');
+    var rows = sheetToObjects_(getSheet_(SHEETS.COUNTERS));
+    var found = rows.some(function (r) { return r.Key === tag; });
+    deleteRowById_(getSheet_(SHEETS.COUNTERS), 'Key', tag);
+    return jsonOk_({ found: found });
+  });
+}
+
 /** entry point (Admin): xem trực tiếp vài dòng mới nhất của HoSo/CongViec đang đọc được từ
  * server — dùng để chẩn đoán khi báo "ghi vào Sheet nhưng tab khác không thấy".
  * Viết phòng thủ theo từng phần (try/catch riêng) + ép mọi giá trị đọc từ Sheet về String

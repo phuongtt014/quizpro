@@ -53,7 +53,12 @@
       <div class="row-actions">
         <button class="btn btn-sm" onclick="runPing()">1. Ping</button>
         <button class="btn btn-sm btn-primary" onclick="runDebugSheetInfo()">2. Kiểm tra dữ liệu</button>
+        <button class="btn btn-sm" onclick="runWriteReadTest()">3. Test ghi-đọc tức thời</button>
       </div>
+      <p class="muted" style="margin-top:8px;">Nút 3 ghi thử 1 dòng đánh dấu rồi <b>đọc lại ngay</b> ở
+        1 lượt gọi server hoàn toàn khác (mô phỏng đúng tình huống ghi hồ sơ rồi chuyển tab khác
+        xem ngay) — nếu báo "KHÔNG thấy" thì bản <code>DB.gs</code> đang chạy chưa có bản vá mới
+        nhất, cần dán lại đúng nội dung file này rồi deploy lại.</p>
       <pre id="tl-debug-out" style="margin-top:12px; background:#0f172a; color:#d1fae5; padding:14px; border-radius:8px; font-size:12px; overflow:auto; white-space:pre-wrap;"></pre>
     </div>
   </div>
@@ -313,5 +318,30 @@
     } catch (e) {
       out.textContent = 'LỖI JavaScript phía trình duyệt: ' + e.message + '\n(Có thể trang đang chạy bản HTML cũ — hãy Ctrl+F5 tải lại trang.)';
     }
+  }
+
+  function runWriteReadTest() {
+    var out = document.getElementById('tl-debug-out');
+    out.textContent = 'Bước 1/2: Đang ghi dòng test...';
+    api('debugWriteTest', STATE.token).then(function (writeRes) {
+      if (!writeRes.ok) { out.textContent = 'LỖI ở bước ghi: ' + JSON.stringify(writeRes, null, 2); return; }
+      out.textContent = 'Bước 1/2: Đã ghi xong mã "' + writeRes.tag + '". Bước 2/2: Đang đọc lại ngay (lượt gọi server mới)...';
+      api('debugReadTest', STATE.token, writeRes.tag).then(function (readRes) {
+        if (!readRes.ok) { out.textContent = 'LỖI ở bước đọc: ' + JSON.stringify(readRes, null, 2); return; }
+        if (readRes.found) {
+          out.textContent = '✅ ĐỌC THẤY NGAY — bản DB.gs đang chạy đã có SpreadsheetApp.flush(), ' +
+            'ghi-đọc hoạt động đúng. Nếu 1 tab cụ thể vẫn không hiện dữ liệu mới, lỗi nằm ở tab đó ' +
+            '(bộ lọc/quyền), không phải ở cơ chế ghi-đọc chung.\n\nChi tiết: ' + JSON.stringify(readRes, null, 2);
+        } else {
+          out.textContent = '❌ KHÔNG THẤY dòng vừa ghi ở lượt đọc ngay sau đó.\n\n' +
+            'Đây là bằng chứng rõ ràng: file DB.gs đang chạy trên Apps Script CHƯA có bản vá ' +
+            'SpreadsheetApp.flush() mới nhất (dù các file khác đã đúng bản). Hãy mở Apps Script ' +
+            'editor, xoá sạch nội dung file DB.gs hiện có, dán lại ĐÚNG TOÀN BỘ nội dung DB.gs mới ' +
+            'nhất mà tôi đã cung cấp, lưu lại, Deploy > New version, rồi Ctrl+F5 và chạy lại test này.';
+        }
+      });
+    }).catch(function (err) {
+      out.textContent = 'LỖI kết nối: ' + (err && err.message ? err.message : String(err));
+    });
   }
 </script>
