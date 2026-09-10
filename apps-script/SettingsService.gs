@@ -274,6 +274,18 @@ function debugSheetInfo(token) {
       out.congViecError = String(e && e.message ? e.message : e);
     }
 
+    // Gọi TRỰC TIẾP đúng hàm mà tab Tiếp nhận gọi, ngay trong request này — để so sánh thẳng
+    // với hoSoRowCount/hoSoLast5 ở trên, loại trừ khả năng lỗi nằm ở phía client/nút bấm.
+    try {
+      out.currentUser = { username: user.Username, vaiTro: user.VaiTro };
+      var tnAll = listHoSoTiepNhan(token, '');
+      out.listHoSoTiepNhan_TatCa = { ok: tnAll.ok, soLuong: tnAll.items ? tnAll.items.length : null, loi: tnAll.message || null };
+      var tnCho = listHoSoTiepNhan(token, 'ChoTiepNhan');
+      out.listHoSoTiepNhan_ChoTiepNhan = { ok: tnCho.ok, soLuong: tnCho.items ? tnCho.items.length : null, loi: tnCho.message || null };
+    } catch (e) {
+      out.listHoSoTiepNhanError = String(e && e.message ? e.message : e);
+    }
+
     out.serverTimeNow = new Date().toISOString();
     return jsonOk_(out);
   });
