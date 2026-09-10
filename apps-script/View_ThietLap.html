@@ -60,18 +60,15 @@
   function loadTlUsers() {
     api('listAllUsers', STATE.token).then(function (res) {
       if (!res.ok) return;
-      api('listRoles').then(function (rolesRes) {
-        window.TL_ROLES = rolesRes.items;
-        document.getElementById('tl-users-tbody').innerHTML = res.items.map(function (u) {
-          var roleOpts = TL_ROLES.map(function (r) { return '<option value="' + r.value + '"' + (r.value === u.vaiTro ? ' selected' : '') + '>' + r.label + '</option>'; }).join('');
-          return '<tr><td>' + esc(u.hoTen) + '</td><td>' + esc(u.username) + '</td><td>' + esc(u.email) + '</td><td>' + esc(u.donVi) + '</td>' +
-            '<td><select onchange="changeUserRole(\'' + u.username + '\', this.value)">' + roleOpts + '</select></td>' +
-            '<td>' + badge(u.trangThai === 'Active' ? 'Hoạt động' : 'Đã khoá', u.trangThai === 'Active' ? 'green' : 'red') + '</td>' +
-            '<td class="row-actions">' +
-            '<button class="btn btn-sm" onclick="toggleUserStatus(\'' + u.username + '\', \'' + u.trangThai + '\')">' + (u.trangThai === 'Active' ? 'Khoá' : 'Mở khoá') + '</button>' +
-            '<button class="btn btn-sm" onclick="resetPwdUI(\'' + u.username + '\')">Reset mật khẩu</button></td></tr>';
-        }).join('');
-      });
+      document.getElementById('tl-users-tbody').innerHTML = res.items.map(function (u) {
+        var roleOpts = ROLES_LIST_JS.map(function (r) { return '<option value="' + r.value + '"' + (r.value === u.vaiTro ? ' selected' : '') + '>' + r.label + '</option>'; }).join('');
+        return '<tr><td>' + esc(u.hoTen) + '</td><td>' + esc(u.username) + '</td><td>' + esc(u.email) + '</td><td>' + esc(u.donVi) + '</td>' +
+          '<td><select onchange="changeUserRole(\'' + u.username + '\', this.value)">' + roleOpts + '</select></td>' +
+          '<td>' + badge(u.trangThai === 'Active' ? 'Hoạt động' : 'Đã khoá', u.trangThai === 'Active' ? 'green' : 'red') + '</td>' +
+          '<td class="row-actions">' +
+          '<button class="btn btn-sm" onclick="toggleUserStatus(\'' + u.username + '\', \'' + u.trangThai + '\')">' + (u.trangThai === 'Active' ? 'Khoá' : 'Mở khoá') + '</button>' +
+          '<button class="btn btn-sm" onclick="resetPwdUI(\'' + u.username + '\')">Reset mật khẩu</button></td></tr>';
+      }).join('');
     });
   }
 
@@ -96,20 +93,18 @@
   }
 
   function openNewUserModal() {
-    api('listRoles').then(function (rolesRes) {
-      var roleOpts = rolesRes.items.map(function (r) { return '<option value="' + r.value + '">' + r.label + '</option>'; }).join('');
-      openModal('Tạo tài khoản mới',
-        '<div class="grid cols-2">' +
-        '<div class="field"><label>Họ tên *</label><input id="nu-hoten"></div>' +
-        '<div class="field"><label>Username *</label><input id="nu-username"></div>' +
-        '<div class="field"><label>Email *</label><input id="nu-email"></div>' +
-        '<div class="field"><label>Số điện thoại</label><input id="nu-sdt"></div>' +
-        '<div class="field"><label>Đơn vị</label><input id="nu-donvi"></div>' +
-        '<div class="field"><label>Vai trò *</label><select id="nu-vaitro">' + roleOpts + '</select></div>' +
-        '</div>' +
-        '<div class="field"><label>Mật khẩu ban đầu (để trống = 123456)</label><input id="nu-password"></div>' +
-        '<button class="btn btn-primary" onclick="confirmNewUser()">Tạo tài khoản</button>');
-    });
+    var roleOpts = ROLES_LIST_JS.map(function (r) { return '<option value="' + r.value + '">' + r.label + '</option>'; }).join('');
+    openModal('Tạo tài khoản mới',
+      '<div class="grid cols-2">' +
+      '<div class="field"><label>Họ tên *</label><input id="nu-hoten"></div>' +
+      '<div class="field"><label>Username *</label><input id="nu-username"></div>' +
+      '<div class="field"><label>Email *</label><input id="nu-email"></div>' +
+      '<div class="field"><label>Số điện thoại</label><input id="nu-sdt"></div>' +
+      '<div class="field"><label>Đơn vị</label><input id="nu-donvi"></div>' +
+      '<div class="field"><label>Vai trò *</label><select id="nu-vaitro">' + roleOpts + '</select></div>' +
+      '</div>' +
+      '<div class="field"><label>Mật khẩu ban đầu (để trống = 123456)</label><input id="nu-password"></div>' +
+      '<button class="btn btn-primary" onclick="confirmNewUser()">Tạo tài khoản</button>');
   }
   function confirmNewUser() {
     var payload = {

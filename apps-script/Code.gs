@@ -3,6 +3,7 @@
  */
 
 function doGet() {
+  _resetRequestCache_();
   ensureAllSheets_();
   return HtmlService.createTemplateFromFile('Index')
     .evaluate()

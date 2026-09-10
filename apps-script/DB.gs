@@ -43,6 +43,12 @@ var TASK_STATUS_LABEL = {
 };
 var HOSO_STATUS_LABEL = { ChoTiepNhan: 'Chờ tiếp nhận', DaPhanCong: 'Đã phân công', TuChoi: 'Từ chối' };
 
+/** Các cột dạng số-chuỗi (mã xác nhận, số điện thoại) dễ bị Google Sheets tự hiểu nhầm thành số
+ * và làm mất số 0 ở đầu (VD "012345" -> 12345) nếu không ép định dạng "Văn bản thuần". */
+var TEXT_FORMAT_COLUMNS = {};
+TEXT_FORMAT_COLUMNS[SHEETS.HOSO] = ['MaXacNhan', 'SoDienThoaiNguoiGui'];
+TEXT_FORMAT_COLUMNS[SHEETS.USERS] = ['SoDienThoai'];
+
 /*
  * ---------- Cache trong phạm vi 1 lượt thực thi ----------
  * Mỗi lệnh gọi tới dịch vụ Spreadsheet (kể cả chỉ để lấy tham chiếu sheet hay kiểm tra header)
@@ -54,6 +60,19 @@ var HOSO_STATUS_LABEL = { ChoTiepNhan: 'Chờ tiếp nhận', DaPhanCong: 'Đã 
 var _ssCache_ = null;
 var _sheetCache_ = {};
 var _tableCache_ = {};
+
+/**
+ * Reset toàn bộ cache — PHẢI gọi ở đầu mỗi lượt xử lý 1 lệnh gọi từ client (xem safeCall_ ở
+ * Utils.gs và doGet ở Code.gs). Apps Script đôi khi tái sử dụng cùng 1 tiến trình cho các lệnh
+ * gọi liên tiếp nên biến toàn cục có thể "sống sót" qua nhiều lượt — nếu không reset, 1 tab có
+ * thể đọc phải dữ liệu cache cũ từ trước khi 1 tab khác vừa ghi thêm dữ liệu mới (VD: vừa nộp hồ
+ * sơ xong, sang tab Tra cứu/Tiếp nhận lại không thấy).
+ */
+function _resetRequestCache_() {
+  _ssCache_ = null;
+  _sheetCache_ = {};
+  _tableCache_ = {};
+}
 
 function getSS_() {
   if (!_ssCache_) _ssCache_ = SpreadsheetApp.getActiveSpreadsheet();
@@ -94,6 +113,24 @@ function ensureAllSheets_() {
   Object.keys(SHEETS).forEach(function (k) { getSheet_(SHEETS[k]); });
   seedIfEmpty_();
   ensureMailTrigger_();
+  ensureTextColumns_();
+}
+
+/** Ép định dạng "Văn bản thuần" cho các cột trong TEXT_FORMAT_COLUMNS — chỉ chạy 1 lần thật sự
+ * (đánh dấu bằng Script Properties) để không tốn thêm lệnh gọi Spreadsheet ở các lần sau. */
+function ensureTextColumns_() {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('textColumnsReady') === '1') return;
+  Object.keys(TEXT_FORMAT_COLUMNS).forEach(function (sheetName) {
+    var sh = getSheet_(sheetName);
+    var headers = SCHEMA[sheetName];
+    TEXT_FORMAT_COLUMNS[sheetName].forEach(function (colName) {
+      var idx = headers.indexOf(colName);
+      if (idx < 0) return;
+      sh.getRange(2, idx + 1, 10000, 1).setNumberFormat('@');
+    });
+  });
+  props.setProperty('textColumnsReady', '1');
 }
 
 function seedIfEmpty_() {

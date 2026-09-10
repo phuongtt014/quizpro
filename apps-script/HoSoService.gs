@@ -10,13 +10,25 @@ function findHoSoByMa_(maHoSo) {
   return null;
 }
 
-/** entry point: nộp hồ sơ mới. Yêu cầu đã đăng nhập (token hợp lệ). */
+/**
+ * entry point CÔNG KHAI: nộp hồ sơ mới — KHÔNG bắt buộc đăng nhập (ai có link cũng nộp được).
+ * Nếu token hợp lệ (nhân viên đang đăng nhập nộp hộ) thì tự điền thêm thông tin người gửi còn
+ * thiếu từ tài khoản đó; nếu không có/token không hợp lệ thì bắt buộc payload phải tự cung cấp
+ * đủ họ tên + email.
+ */
 function submitHoSo(token, payload) {
   return safeCall_(function () {
-    var user = requireSession_(token);
+    var user = null;
+    if (token) {
+      try { user = requireSession_(token); } catch (e) { user = null; }
+    }
     if (!payload || !payload.tieuDe || !payload.phanMuc || !payload.noiDungChiTiet) {
       return jsonErr_('Vui lòng điền đầy đủ thông tin bắt buộc.');
     }
+    var hoTen = payload.hoTen || (user && user.HoTen) || '';
+    var email = payload.email || (user && user.Email) || '';
+    if (!hoTen || !email) return jsonErr_('Vui lòng điền đầy đủ Họ tên và Email người gửi.');
+
     var links = (payload.taiLieuLinks || []).filter(Boolean).join('\n');
     var lock = LockService.getScriptLock();
     lock.waitLock(10000);
@@ -25,15 +37,15 @@ function submitHoSo(token, payload) {
       hoSo = {
         MaHoSo: genCode_('HS', 5),
         MaXacNhan: genConfirmCode_(),
-        HoTenNguoiGui: payload.hoTen || user.HoTen,
-        EmailNguoiGui: payload.email || user.Email,
-        SoDienThoaiNguoiGui: payload.soDienThoai || user.SoDienThoai,
-        DonVi: payload.donVi || user.DonVi,
+        HoTenNguoiGui: hoTen,
+        EmailNguoiGui: email,
+        SoDienThoaiNguoiGui: payload.soDienThoai || (user && user.SoDienThoai) || '',
+        DonVi: payload.donVi || (user && user.DonVi) || '',
         TieuDe: payload.tieuDe,
         PhanMuc: payload.phanMuc,
         NoiDungChiTiet: payload.noiDungChiTiet,
         TaiLieuDinhKem: links,
-        NguoiGuiUsername: user.Username,
+        NguoiGuiUsername: user ? user.Username : '',
         TrangThai: 'ChoTiepNhan',
         LyDoTuChoi: '', NguoiXuLy: '', MaCV: '',
         NgayTao: nowStr_(), NgayCapNhat: nowStr_()

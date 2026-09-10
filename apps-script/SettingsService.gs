@@ -6,9 +6,9 @@
 
 /* ---------- Đơn vị / phòng ban ---------- */
 
+/** entry point CÔNG KHAI: danh sách đơn vị dùng cho dropdown ở Form nộp hồ sơ (không cần đăng nhập). */
 function listDonVi(token) {
   return safeCall_(function () {
-    requireSession_(token);
     return jsonOk_({ items: sheetToObjects_(getSheet_(SHEETS.SET_DONVI)) });
   });
 }
@@ -34,9 +34,9 @@ function removeDonVi(token, id) {
 
 /* ---------- Phân mục hồ sơ ---------- */
 
+/** entry point CÔNG KHAI: danh sách phân mục dùng cho dropdown ở Form nộp hồ sơ (không cần đăng nhập). */
 function listPhanMuc(token) {
   return safeCall_(function () {
-    requireSession_(token);
     return jsonOk_({ items: sheetToObjects_(getSheet_(SHEETS.SET_PHANMUC)) });
   });
 }

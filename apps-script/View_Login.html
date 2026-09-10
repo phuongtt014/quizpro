@@ -1,17 +1,12 @@
 <script>
-  function renderLoginScreen() {
-    var el = document.getElementById('login-screen');
-    el.style.display = 'block';
-    el.innerHTML =
-      '<div class="login-wrap"><div class="login-card">' +
-      '<h1>Quản lý công việc nhóm</h1>' +
-      '<p class="sub">Đăng nhập để tiếp tục</p>' +
+  function openLoginModal() {
+    openModal('Đăng nhập nhân viên',
       '<div class="field"><label>Tài khoản</label><input id="li-username" autofocus></div>' +
       '<div class="field"><label>Mật khẩu</label><input id="li-password" type="password"></div>' +
       '<button class="btn btn-primary" style="width:100%" onclick="doLogin()">Đăng nhập</button>' +
       '<div id="li-error" style="color:#dc2626;font-size:12.5px;margin-top:10px;"></div>' +
-      '<div class="login-hint">Tài khoản mẫu: <b>admin/quanly/truongnhom/nhanvien</b> — mật khẩu mặc định <b>123456</b>. Admin vào tab Thiết lập để tạo tài khoản thật cho 15 thành viên.</div>' +
-      '</div></div>';
+      '<div class="login-hint">Tài khoản mẫu: <b>admin/quanly/truongnhom/nhanvien</b> — mật khẩu mặc định <b>123456</b>.</div>');
+    document.getElementById('li-username').focus();
     document.getElementById('li-password').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
   }
 

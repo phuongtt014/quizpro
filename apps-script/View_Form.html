@@ -27,14 +27,16 @@
 <script>
   function onShowView_form() {
     document.getElementById('f-result').style.display = 'none';
-    document.getElementById('f-hoten').value = STATE.user.hoTen || '';
-    document.getElementById('f-email').value = STATE.user.email || '';
-    document.getElementById('f-sdt').value = STATE.user.soDienThoai || '';
+    document.getElementById('f-hoten').value = STATE.user ? (STATE.user.hoTen || '') : '';
+    document.getElementById('f-email').value = STATE.user ? (STATE.user.email || '') : '';
+    document.getElementById('f-sdt').value = STATE.user ? (STATE.user.soDienThoai || '') : '';
     document.getElementById('f-tieude').value = '';
     document.getElementById('f-noidung').value = '';
     initLinkEditor(document.getElementById('f-links'));
-    Promise.all([api('listDonVi', STATE.token), api('listPhanMuc', STATE.token)]).then(function (res) {
-      fillSelect('f-donvi', res[0].items, 'TenDonVi', 'TenDonVi', STATE.user.donVi);
+    // listDonVi/listPhanMuc là entry point công khai, không cần token — Form nộp hồ sơ dùng
+    // được cả khi chưa đăng nhập.
+    Promise.all([api('listDonVi'), api('listPhanMuc')]).then(function (res) {
+      fillSelect('f-donvi', res[0].items, 'TenDonVi', 'TenDonVi', STATE.user ? STATE.user.donVi : null);
       fillSelect('f-phanmuc', res[1].items, 'TenPhanMuc', 'TenPhanMuc');
     });
   }

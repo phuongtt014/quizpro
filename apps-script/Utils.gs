@@ -82,8 +82,15 @@ function jsonErr_(message) {
   return { ok: false, message: message };
 }
 
-/** Bọc 1 hàm server để luôn trả lỗi dạng {ok:false,message} thay vì ném exception thẳng ra client. */
+/**
+ * Bọc 1 hàm server để luôn trả lỗi dạng {ok:false,message} thay vì ném exception thẳng ra client.
+ * Luôn reset cache đầu request (_resetRequestCache_, xem DB.gs) trước khi chạy — đảm bảo mỗi lệnh
+ * gọi từ client luôn đọc dữ liệu MỚI NHẤT từ Sheet, không bao giờ trả dữ liệu cũ do cache của
+ * lệnh gọi trước còn sót lại (Apps Script đôi khi tái sử dụng cùng 1 tiến trình cho các lệnh gọi
+ * liên tiếp).
+ */
 function safeCall_(fn) {
+  _resetRequestCache_();
   try {
     return fn();
   } catch (e) {

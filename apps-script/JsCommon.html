@@ -2,6 +2,14 @@
   // ---------- Trạng thái phiên ----------
   var STATE = { token: null, user: null };
   var ROLE_RANK_JS = { NhanVien: 1, TruongNhom: 2, QuanLy: 3, Admin: 4 };
+  // Trùng với ROLES/ROLE_LABEL ở DB.gs — hardcode phía client để tab Thiết lập không phải tốn
+  // thêm 1 vòng gọi server (listRoles) chỉ để lấy danh sách tĩnh này.
+  var ROLES_LIST_JS = [
+    { value: 'NhanVien', label: 'Nhân viên' },
+    { value: 'TruongNhom', label: 'Trưởng nhóm' },
+    { value: 'QuanLy', label: 'Quản lý' },
+    { value: 'Admin', label: 'Admin hệ thống' }
+  ];
   var TASK_STATUS_LABEL_JS = { CanLam: 'Cần làm', DangLam: 'Đang làm', DaNop: 'Đã nộp', TDVXacNhan: 'TĐV xác nhận', TamNgung: 'Tạm ngưng', HuyBo: 'Hủy bỏ' };
   var TASK_STATUS_BADGE_JS = { CanLam: 'gray', DangLam: 'blue', DaNop: 'orange', TDVXacNhan: 'green', TamNgung: 'gray', HuyBo: 'red' };
   var HOSO_STATUS_LABEL_JS = { ChoTiepNhan: 'Chờ tiếp nhận', DaPhanCong: 'Đã phân công', TuChoi: 'Từ chối' };

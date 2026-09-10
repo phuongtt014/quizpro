@@ -55,14 +55,16 @@
   }
 
   function openNewCongViecModal() {
-    api('listActiveUsers', STATE.token).then(function (res) {
-      if (!res.ok) return;
-      var userOpts = res.items.map(function (u) { return '<option value="' + esc(u.username) + '">' + esc(u.hoTen) + '</option>'; }).join('');
+    // Gọi song song 2 API (thay vì lồng .then tuần tự) để giảm 1 vòng round-trip độ trễ.
+    Promise.all([api('listActiveUsers', STATE.token), api('listPhanMuc')]).then(function (res) {
+      if (!res[0].ok || !res[1].ok) return;
+      var userOpts = res[0].items.map(function (u) { return '<option value="' + esc(u.username) + '">' + esc(u.hoTen) + '</option>'; }).join('');
+      var phanLoaiOpts = res[1].items.map(function (p) { return '<option value="' + esc(p.TenPhanMuc) + '">' + esc(p.TenPhanMuc) + '</option>'; }).join('');
       openModal('Tạo công việc mới',
         '<div class="field"><label>Nội dung *</label><input id="nc-noidung"></div>' +
         '<div class="grid cols-2">' +
         '<div class="field"><label>Người phụ trách *</label><select id="nc-nguoiphutrach">' + userOpts + '</select></div>' +
-        '<div class="field"><label>Phân loại</label><select id="nc-phanloai"></select></div>' +
+        '<div class="field"><label>Phân loại</label><select id="nc-phanloai">' + phanLoaiOpts + '</select></div>' +
         '</div>' +
         '<div class="grid cols-2">' +
         '<div class="field"><label>Thời gian bắt đầu</label><input id="nc-batdau" type="datetime-local"></div>' +
@@ -71,9 +73,6 @@
         '<div class="field"><label>Mô tả</label><textarea id="nc-mota" rows="3"></textarea></div>' +
         '<div class="field"><label>Tài liệu đính kèm (link)</label><div id="nc-links"></div></div>' +
         '<button class="btn btn-primary" onclick="confirmNewCongViec()">Tạo công việc</button>');
-      api('listPhanMuc', STATE.token).then(function (r) {
-        document.getElementById('nc-phanloai').innerHTML = r.items.map(function (p) { return '<option value="' + esc(p.TenPhanMuc) + '">' + esc(p.TenPhanMuc) + '</option>'; }).join('');
-      });
       initLinkEditor(document.getElementById('nc-links'));
     });
   }

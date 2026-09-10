@@ -6,14 +6,12 @@
 </head>
 <body>
 
-  <div id="login-screen"></div>
-
-  <div id="app" style="display:none;">
+  <div id="app">
     <div id="sidebar">
       <div class="brand">Quản lý công việc nhóm
         <small>15 thành viên · Apps Script</small>
       </div>
-      <div class="nav-item" id="nav-form" onclick="showView('form')">📝 Nộp hồ sơ</div>
+      <div class="nav-item active" id="nav-form" onclick="showView('form')">📝 Nộp hồ sơ</div>
       <div class="nav-item" id="nav-tracuu" onclick="showView('tracuu')">🔍 Tra cứu</div>
       <div class="nav-item" id="nav-tiepnhan" onclick="showView('tiepnhan')">📥 Tiếp nhận</div>
       <div class="nav-item" id="nav-congviec" onclick="showView('congviec')">✅ Quản lý công việc</div>
@@ -21,15 +19,22 @@
       <div class="nav-item" id="nav-baocao" onclick="showView('baocao')">📊 Báo cáo hiệu suất</div>
       <div class="nav-item" id="nav-thietlap" onclick="showView('thietlap')">⚙️ Thiết lập</div>
       <div class="nav-spacer"></div>
-      <div class="nav-user">
-        Đăng nhập với<b id="nav-user-name">—</b>
-        <span id="nav-user-role"></span>
+
+      <div id="nav-guest-box">
+        <div style="padding:0 20px 10px; font-size:12px; color:#9fb0d0;">Nhân viên đăng nhập để xem Tiếp nhận, Quản lý công việc...</div>
+        <div style="padding:0 20px;"><button class="btn btn-sm btn-primary" style="width:100%" onclick="openLoginModal()">🔑 Đăng nhập</button></div>
       </div>
-      <div class="nav-logout"><button class="btn btn-sm" style="width:100%" onclick="doLogout()">Đăng xuất</button></div>
+      <div id="nav-user-box" style="display:none;">
+        <div class="nav-user">
+          Đăng nhập với<b id="nav-user-name">—</b>
+          <span id="nav-user-role"></span>
+        </div>
+        <div class="nav-logout"><button class="btn btn-sm" style="width:100%" onclick="doLogout()">Đăng xuất</button></div>
+      </div>
     </div>
 
     <div id="main">
-      <div id="topbar"><span id="topbar-title">Trang chủ</span></div>
+      <div id="topbar"><span id="topbar-title">Form nộp hồ sơ</span></div>
       <div id="content">
         <?!= include('View_Form'); ?>
         <?!= include('View_TraCuu'); ?>
@@ -57,36 +62,49 @@
       document.getElementById('topbar-title').textContent = VIEW_TITLES[name] || '';
     };
 
-    function applyRoleVisibility() {
+    // Nộp hồ sơ & Tra cứu luôn công khai (không cần đăng nhập). Các tab còn lại chỉ hiện khi đã
+    // đăng nhập, thêm phân quyền theo vai trò cho Tiếp nhận/Báo cáo/Thiết lập.
+    function applyNavVisibility() {
+      var loggedIn = !!STATE.user;
+      document.getElementById('nav-congviec').style.display = loggedIn ? '' : 'none';
+      document.getElementById('nav-diem').style.display = loggedIn ? '' : 'none';
       document.getElementById('nav-tiepnhan').style.display = roleAtLeast('TruongNhom') ? '' : 'none';
       document.getElementById('nav-baocao').style.display = roleAtLeast('TruongNhom') ? '' : 'none';
       document.getElementById('nav-thietlap').style.display = roleAtLeast('Admin') ? '' : 'none';
+      document.getElementById('nav-guest-box').style.display = loggedIn ? 'none' : '';
+      document.getElementById('nav-user-box').style.display = loggedIn ? '' : 'none';
+      if (loggedIn) {
+        document.getElementById('nav-user-name').textContent = STATE.user.hoTen;
+        document.getElementById('nav-user-role').textContent = STATE.user.vaiTroLabel;
+      }
     }
 
     function afterLogin() {
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('app').style.display = 'flex';
-      document.getElementById('nav-user-name').textContent = STATE.user.hoTen;
-      document.getElementById('nav-user-role').textContent = STATE.user.vaiTroLabel;
-      applyRoleVisibility();
-      showView('form');
-      if (typeof onLoginReady === 'function') onLoginReady();
+      applyNavVisibility();
+      closeModal();
+      toast('Đăng nhập thành công!', 'ok');
+      showView('congviec');
     }
 
     function doLogout() {
       api('logout', STATE.token).then(function () {
         clearSession();
-        location.reload();
+        applyNavVisibility();
+        showView('form');
+        toast('Đã đăng xuất.', 'ok');
       });
     }
 
     window.onload = function () {
+      applyNavVisibility();
+      showView('form');
       var token = loadSessionToken();
-      if (!token) { renderLoginScreen(); return; }
+      if (!token) return;
       STATE.token = token;
       api('getCurrentUser', token).then(function (res) {
-        if (res.ok) { STATE.user = res.user; saveSession(); afterLogin(); }
-        else { clearSession(); renderLoginScreen(); }
+        if (res.ok) { STATE.user = res.user; saveSession(); }
+        else { clearSession(); }
+        applyNavVisibility();
       });
     };
   </script>
