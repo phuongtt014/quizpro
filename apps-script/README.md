@@ -160,6 +160,18 @@ Nguyên nhân kép, đã khắc phục trong bản cập nhật này:
    (Executions)** ở thanh bên trái, xem log của lần gọi `debugSheetInfo`/`ping` gần nhất — log
    này ghi lại chính xác những gì thực sự chạy trên server bất kể client nhận được gì.
 
+5. **(Nguyên nhân gốc thật sự) Kiểu `Date` lọt qua `google.script.run`**: đây mới là nguyên nhân
+   chính khiến TẤT CẢ các tab danh sách (Tiếp nhận, Quản lý công việc, Điểm...) hiển thị trống
+   dù server đọc đúng dữ liệu — kể cả sau khi đã có `SpreadsheetApp.flush()`. Google Sheets có
+   thể tự nhận diện 1 ô dạng "2026-09-10 14:30:00" và âm thầm chuyển thành kiểu `Date` thật (dù
+   ghi vào bằng chuỗi). Gọi 1 hàm server TRỰC TIẾP trong cùng 1 lượt thực thi (như
+   `debugSheetInfo` gọi `listHoSoTiepNhan` để chẩn đoán) vẫn nhận đúng vì không phải mã hoá gì —
+   nhưng khi CLIENT THẬT gọi qua `google.script.run` (phải mã hoá dữ liệu để gửi qua khung
+   iframe), nếu trong kết quả có lẫn dù chỉ 1 giá trị kiểu `Date`, cả phản hồi có thể bị hỏng và
+   client nhận về `null` — im lặng, không có lỗi nào cả. Đã sửa tận gốc: `sheetToObjects_` và
+   `updateObjectById_` (2 hàm mọi service đều dùng để đọc/trả dữ liệu) giờ luôn ép mọi giá trị
+   `Date` về chuỗi ngay khi đọc từ Sheet, trước khi trả về bất kỳ đâu.
+
 **Cách dùng công cụ chẩn đoán**: tab Thiết lập → mục **🔧 Chẩn đoán** (chỉ Admin thấy) → bấm "2.
 Kiểm tra dữ liệu" để xem trực tiếp server đang đọc được bao nhiêu dòng và 5 hồ sơ mới nhất
 trong sheet `HoSo`/`CongViec` ngay tại thời điểm đó. Dùng ngay sau khi nộp thử 1 hồ sơ — nếu

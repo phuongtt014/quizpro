@@ -192,6 +192,24 @@ function seedIfEmpty_() {
 
 /* ---------- CRUD helpers chung ---------- */
 
+/**
+ * Google Sheets có thể tự nhận diện 1 ô có định dạng giống ngày/giờ (VD "2026-09-10 14:30:00")
+ * và tự chuyển sang kiểu Date thật, dù dữ liệu được ghi vào bằng chuỗi. Trả thẳng 1 đối tượng
+ * Date (hoặc mảng/object chứa Date lồng bên trong) qua google.script.run cho CLIENT THẬT (khác
+ * với gọi hàm trực tiếp trong cùng 1 lượt thực thi — như debugSheetInfo từng làm) có thể khiến
+ * toàn bộ phản hồi bị hỏng và client nhận về null dù server không hề báo lỗi gì. Đây là nguyên
+ * nhân gốc khiến các tab Tiếp nhận/Quản lý công việc/Điểm... "trắng" dù server đọc đúng dữ liệu
+ * (kiểm tra qua debugSheetInfo gọi hàm trực tiếp thì luôn đúng, vì không đi qua bước mã hoá
+ * mạng). Ép mọi giá trị Date về chuỗi NGAY khi đọc từ Sheet để không hàm nào phía sau còn phải
+ * xử lý kiểu Date nữa.
+ */
+function _dateToStr_(v) {
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, Session.getScriptTimeZone() || 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd HH:mm:ss');
+  }
+  return v;
+}
+
 function sheetToObjects_(sheet) {
   var name = sheet.getName();
   if (_tableCache_[name]) return _tableCache_[name];
@@ -203,7 +221,7 @@ function sheetToObjects_(sheet) {
       var row = values[i];
       if (row.join('') === '') continue;
       var obj = {};
-      headers.forEach(function (h, idx) { obj[h] = row[idx]; });
+      headers.forEach(function (h, idx) { obj[h] = _dateToStr_(row[idx]); });
       out.push(obj);
     }
   }
@@ -237,7 +255,7 @@ function updateObjectById_(sheet, headers, idCol, idVal, patch) {
   if (rowIdx < 0) throw new Error('Không tìm thấy dữ liệu với ' + idCol + ' = ' + idVal);
   var currentRow = sheet.getRange(rowIdx, 1, 1, headers.length).getValues()[0];
   var obj = {};
-  headers.forEach(function (h, i) { obj[h] = currentRow[i]; });
+  headers.forEach(function (h, i) { obj[h] = _dateToStr_(currentRow[i]); });
   Object.keys(patch).forEach(function (k) { obj[k] = patch[k]; });
   var newRow = headers.map(function (h) { return obj[h] !== undefined ? obj[h] : ''; });
   sheet.getRange(rowIdx, 1, 1, headers.length).setValues([newRow]);
