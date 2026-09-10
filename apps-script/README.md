@@ -119,9 +119,25 @@ Nguyên nhân kép, đã khắc phục trong bản cập nhật này:
    `MaXacNhan`, gõ lại thủ công đúng mã đã gửi trong email (thêm số 0 còn thiếu ở đầu, định dạng
    cột lúc này đã là văn bản thuần nên gõ lại sẽ giữ nguyên). Hồ sơ tạo **sau** khi cập nhật thì
    không còn gặp lỗi này.
+3. **(Bản cập nhật mới nhất) Thiếu `SpreadsheetApp.flush()` sau khi ghi**: đây mới là nguyên
+   nhân gốc rễ chính. Apps Script có thể gộp các lệnh ghi (`appendRow`/`setValues`) lại và
+   không "chốt" ngay xuống Sheet thật — nếu 1 request KHÁC (VD mở tab Tra cứu/Tiếp nhận ngay sau
+   khi vừa nộp hồ sơ) đọc dữ liệu trước khi phần ghi được chốt xong, nó vẫn thấy trạng thái CŨ,
+   dù bản thân người vừa nộp thấy dòng mới hiện ra trên Sheet. Đã thêm `SpreadsheetApp.flush()`
+   ngay sau MỌI lần ghi (`appendObject_`, `updateObjectById_`, `deleteRowById_`, `getNextSeq_`)
+   để đảm bảo dữ liệu luôn được chốt trước khi trả kết quả về client.
+
+**Công cụ chẩn đoán mới**: tab Thiết lập → mục **🔧 Chẩn đoán** (chỉ Admin thấy) → bấm "Kiểm tra
+ngay" để xem trực tiếp server đang đọc được bao nhiêu dòng và 5 hồ sơ mới nhất trong sheet
+`HoSo`/`CongViec` ngay tại thời điểm đó. Nếu sau khi deploy bản này mà vẫn còn báo không thấy hồ
+sơ mới, hãy dùng công cụ này ngay sau khi nộp thử 1 hồ sơ — nếu server đã "thấy" hồ sơ đó
+(xuất hiện trong `hoSoLast5`) mà tab Tra cứu/Tiếp nhận vẫn không hiển thị thì lỗi nằm ở phía
+giao diện (mã hồ sơ/mã xác nhận gõ sai, hoặc đang đăng nhập sai vai trò); nếu server cũng
+KHÔNG thấy thì cần gửi lại kết quả JSON đó để chẩn đoán tiếp.
 
 ⚠️ **Sau khi cập nhật code**: deploy lại (Deploy → Manage deployments → sửa deployment hiện có
-→ Version: New) và mở lại app — lần đầu hệ thống sẽ tự tạo trigger gửi mail định kỳ, có thể
+→ Version: New) rồi **tải lại hẳn trang** (Ctrl+F5, đừng dùng tab trình duyệt đang mở từ trước)
+trước khi test lại — mở lại app lần đầu hệ thống sẽ tự tạo trigger gửi mail định kỳ, có thể
 Google hỏi lại quyền truy cập (uỷ quyền thêm quyền tạo trigger), bấm **Cho phép**. Sheet mới
 `MailQueue` sẽ tự sinh, không cần tạo tay.
 

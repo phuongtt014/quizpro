@@ -103,6 +103,7 @@ function deleteRowById_(sheet, idCol, idVal) {
   var idx = findRowIndexById_(sheet, idCol, idVal);
   if (idx > 0) {
     sheet.deleteRow(idx);
+    SpreadsheetApp.flush();
     _invalidateTableCache_(sheet.getName());
   }
   return idx > 0;
@@ -213,6 +214,10 @@ function sheetToObjects_(sheet) {
 function appendObject_(sheet, headers, obj) {
   var row = headers.map(function (h) { return obj[h] !== undefined ? obj[h] : ''; });
   sheet.appendRow(row);
+  // flush() bắt buộc: Apps Script có thể gộp các thay đổi lại và chưa "chốt" ngay xuống
+  // Sheet thật — nếu không flush, 1 request KHÁC (VD tab Tra cứu/Tiếp nhận mở ngay sau đó)
+  // đọc dữ liệu có thể vẫn thấy trạng thái CŨ, dù trên giao diện Sheet đã hiển thị dòng mới.
+  SpreadsheetApp.flush();
   _invalidateTableCache_(sheet.getName());
   return obj;
 }
@@ -236,6 +241,7 @@ function updateObjectById_(sheet, headers, idCol, idVal, patch) {
   Object.keys(patch).forEach(function (k) { obj[k] = patch[k]; });
   var newRow = headers.map(function (h) { return obj[h] !== undefined ? obj[h] : ''; });
   sheet.getRange(rowIdx, 1, 1, headers.length).setValues([newRow]);
+  SpreadsheetApp.flush();
   _invalidateTableCache_(sheet.getName());
   return obj;
 }
@@ -247,9 +253,11 @@ function getNextSeq_(key) {
     if (values[i][0] === key) {
       var newVal = Number(values[i][1]) + 1;
       sh.getRange(i + 1, 2).setValue(newVal);
+      SpreadsheetApp.flush();
       return newVal;
     }
   }
   sh.appendRow([key, 1]);
+  SpreadsheetApp.flush();
   return 1;
 }

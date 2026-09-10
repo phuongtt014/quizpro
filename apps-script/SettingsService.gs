@@ -181,3 +181,29 @@ function resetPassword(token, username, newPassword) {
 function listRoles() {
   return jsonOk_({ items: ROLES.map(function (r) { return { value: r, label: ROLE_LABEL[r] }; }) });
 }
+
+/** entry point (Admin): xem trực tiếp vài dòng mới nhất của HoSo/CongViec đang đọc được từ
+ * server — dùng để chẩn đoán khi báo "ghi vào Sheet nhưng tab khác không thấy". */
+function debugSheetInfo(token) {
+  return safeCall_(function () {
+    var user = requireSession_(token);
+    requireMinRole_(user, 'Admin');
+    var ss = getSS_();
+    var hoSoSheet = getSheet_(SHEETS.HOSO);
+    var cvSheet = getSheet_(SHEETS.CONGVIEC);
+    var hoSoRows = sheetToObjects_(hoSoSheet);
+    var cvRows = sheetToObjects_(cvSheet);
+    return jsonOk_({
+      spreadsheetId: ss.getId(),
+      spreadsheetUrl: ss.getUrl(),
+      hoSoSheetName: hoSoSheet.getName(),
+      hoSoRowCount: hoSoRows.length,
+      hoSoLast5: hoSoRows.slice(-5).map(function (r) {
+        return { MaHoSo: r.MaHoSo, MaXacNhan: r.MaXacNhan, TrangThai: r.TrangThai, NgayTao: r.NgayTao };
+      }),
+      congViecSheetName: cvSheet.getName(),
+      congViecRowCount: cvRows.length,
+      serverTimeNow: nowStr_()
+    });
+  });
+}

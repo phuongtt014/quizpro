@@ -5,6 +5,7 @@
       <button class="btn btn-sm" id="tl-tab-donvi" onclick="showThietLapTab('donvi')">🏢 Đơn vị/phòng ban</button>
       <button class="btn btn-sm" id="tl-tab-phanmuc" onclick="showThietLapTab('phanmuc')">🏷 Phân mục hồ sơ</button>
       <button class="btn btn-sm" id="tl-tab-madiem" onclick="showThietLapTab('madiem')">🏅 Mã điểm cộng/trừ</button>
+      <button class="btn btn-sm" id="tl-tab-debug" onclick="showThietLapTab('debug')">🔧 Chẩn đoán</button>
     </div>
 
     <div id="tl-panel-users" class="tl-panel">
@@ -39,6 +40,14 @@
       </div>
       <button class="btn btn-sm" onclick="addMaDiemUI()">+ Thêm mã điểm</button>
       <table style="margin-top:12px;"><thead><tr><th>Mã</th><th>Mô tả</th><th>Điểm</th><th></th></tr></thead><tbody id="tl-madiem-tbody"></tbody></table>
+    </div>
+
+    <div id="tl-panel-debug" class="tl-panel">
+      <h2>Chẩn đoán dữ liệu</h2>
+      <p class="muted">Dùng khi nghi ngờ 1 tab không thấy dữ liệu mới — bấm nút dưới để xem chính
+        xác server đang đọc được gì từ sheet <code>HoSo</code>/<code>CongViec</code> ngay lúc này.</p>
+      <button class="btn btn-sm btn-primary" onclick="runDebugSheetInfo()">Kiểm tra ngay</button>
+      <pre id="tl-debug-out" style="margin-top:12px; background:#0f172a; color:#d1fae5; padding:14px; border-radius:8px; font-size:12px; overflow:auto; white-space:pre-wrap;"></pre>
     </div>
   </div>
 </div>
@@ -173,4 +182,12 @@
     });
   }
   function removeMaDiemUI(ma) { api('removeMaDiem', STATE.token, ma).then(function (res) { if (res.ok) loadTlMaDiem(); }); }
+
+  function runDebugSheetInfo() {
+    var out = document.getElementById('tl-debug-out');
+    out.textContent = 'Đang kiểm tra...';
+    api('debugSheetInfo', STATE.token).then(function (res) {
+      out.textContent = JSON.stringify(res, null, 2);
+    });
+  }
 </script>
