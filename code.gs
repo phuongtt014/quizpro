@@ -368,6 +368,98 @@ function getAllLibrary() {
   } catch(e) { return []; }
 }
 
+// Nhận diện loại tài liệu và xây dựng card link cho email
+function getDocMeta_(url) {
+  var u = (url||'').toLowerCase();
+  if (u.indexOf('docs.google.com/document') > -1 || u.indexOf('drive.google.com') > -1 && u.indexOf('/document') > -1) return {icon:'📝',color:'#1d4ed8',bg:'#dbeafe',type:'Google Docs'};
+  if (u.indexOf('docs.google.com/spreadsheets') > -1 || u.indexOf('spreadsheet') > -1) return {icon:'📊',color:'#15803d',bg:'#dcfce7',type:'Google Sheets'};
+  if (u.indexOf('docs.google.com/presentation') > -1 || u.indexOf('presentation') > -1) return {icon:'📑',color:'#d97706',bg:'#fef3c7',type:'Google Slides'};
+  if (u.indexOf('docs.google.com/forms') > -1) return {icon:'📋',color:'#7c3aed',bg:'#f3e8ff',type:'Google Forms'};
+  if (u.indexOf('drive.google.com') > -1) return {icon:'📁',color:'#0ea5e9',bg:'#e0f2fe',type:'Google Drive'};
+  if (u.indexOf('youtube.com') > -1 || u.indexOf('youtu.be') > -1) return {icon:'▶',color:'#dc2626',bg:'#fee2e2',type:'YouTube'};
+  if (u.match(/\.pdf($|\?)/)) return {icon:'📕',color:'#dc2626',bg:'#fee2e2',type:'PDF'};
+  if (u.match(/\.(doc|docx)($|\?)/)) return {icon:'📝',color:'#1d4ed8',bg:'#dbeafe',type:'Word'};
+  if (u.match(/\.(xls|xlsx|csv)($|\?)/)) return {icon:'📊',color:'#15803d',bg:'#dcfce7',type:'Excel'};
+  if (u.match(/\.(ppt|pptx)($|\?)/)) return {icon:'📑',color:'#d97706',bg:'#fef3c7',type:'PowerPoint'};
+  if (u.match(/\.(jpg|jpeg|png|gif|webp)($|\?)/)) return {icon:'🖼',color:'#7c3aed',bg:'#f3e8ff',type:'Hình ảnh'};
+  if (u.match(/\.(zip|rar|7z)($|\?)/)) return {icon:'📦',color:'#475569',bg:'#f1f5f9',type:'File nén'};
+  if (u.match(/\.(mp4|mov|avi)($|\?)/)) return {icon:'🎬',color:'#dc2626',bg:'#fee2e2',type:'Video'};
+  return {icon:'🔗',color:'#16a34a',bg:'#f0fdf4',type:'Liên kết'};
+}
+
+function getShortLabel_(url) {
+  var u = url || '';
+  var maps = [
+    {re:/docs\.google\.com\/document/,   lbl:'Google Docs'},
+    {re:/docs\.google\.com\/spreadsheets/,lbl:'Google Sheets'},
+    {re:/docs\.google\.com\/presentation/,lbl:'Google Slides'},
+    {re:/docs\.google\.com\/forms/,       lbl:'Google Forms'},
+    {re:/drive\.google\.com\/file/,       lbl:'Google Drive File'},
+    {re:/drive\.google\.com\/drive/,      lbl:'Google Drive Folder'},
+    {re:/youtube\.com\/watch/,            lbl:'YouTube Video'},
+    {re:/youtu\.be\//,                    lbl:'YouTube Video'},
+  ];
+  for (var m=0;m<maps.length;m++) { if (maps[m].re.test(u)) return maps[m].lbl; }
+  var clean = u.replace(/^https?:\/\//,'').replace(/^www\./,'');
+  return clean.length > 60 ? clean.substring(0,57)+'...' : clean;
+}
+
+// Dựng HTML email "Tài liệu đào tạo" dùng chung cho gửi tự động và gửi chọn lọc
+function buildTaiLieuEmailHtml_(courseName, body, links) {
+  var bodyHtml = String(body||'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/\n/g,'<br>');
+
+  var lArr = String(links||'').split(String.fromCharCode(10)).filter(function(l){ return l.trim(); });
+  var lHtml = lArr.map(function(l){
+    var lClean = l.trim();
+    var u = lClean.indexOf('http')===0 ? lClean : 'https://'+lClean;
+    var meta = getDocMeta_(u);
+    var label = getShortLabel_(u);
+    // Card dạng table (tương thích email client)
+    return '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:10px">'
+      +'<tr>'
+      +'<td style="background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px 14px">'
+      +'<table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>'
+      // Icon box
+      +'<td style="width:40px;vertical-align:middle">'
+      +'<div style="width:36px;height:36px;background:'+meta.bg+';border-radius:8px;text-align:center;line-height:36px;font-size:18px">'+meta.icon+'</div>'
+      +'</td>'
+      // Label + type
+      +'<td style="padding-left:12px;vertical-align:middle">'
+      +'<a href="'+u+'" target="_blank" style="display:block;font-size:14px;font-weight:700;color:'+meta.color+';text-decoration:none;margin-bottom:3px">'+label+'</a>'
+      +'<span style="font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.4px">'+meta.type+'</span>'
+      +'</td>'
+      // Arrow button
+      +'<td style="width:80px;text-align:right;vertical-align:middle">'
+      +'<a href="'+u+'" target="_blank" style="display:inline-block;background:'+meta.color+';color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none">Mở →</a>'
+      +'</td>'
+      +'</tr></table>'
+      +'</td></tr></table>';
+  }).join('');
+
+  return '<div style="font-family:Arial,sans-serif;background:#f8fafc;padding:20px;color:#334155">'
+    +'<div style="max-width:650px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0">'
+    // Header
+    +'<div style="background:#1a3a5c;color:#fff;padding:22px 28px">'
+    +'<div style="font-size:11px;font-weight:700;letter-spacing:1.2px;opacity:.7;margin-bottom:4px">TÀI LIỆU ĐÀO TẠO</div>'
+    +'<h2 style="margin:0;font-size:18px;font-weight:800">'+courseName.toUpperCase()+'</h2>'
+    +'</div>'
+    // Body
+    +'<div style="padding:24px 28px">'
+    +'<div style="font-size:14px;line-height:1.8;color:#334155;margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid #e2e8f0">'+bodyHtml+'</div>'
+    // Section tài liệu
+    +'<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">📎 DANH SÁCH TÀI LIỆU</div>'
+    + lHtml
+    +'</div>'
+    // Footer
+    +'<div style="background:#f8fafc;padding:14px 28px;text-align:center;font-size:12px;color:#94a3b8;border-top:1px solid #e2e8f0">'
+    +'<strong style="color:#1a3a5c">PHÒNG HÀNH CHÍNH – NHÂN SỰ</strong>'
+    +'</div></div></div>';
+}
+
 // Lưu tài liệu + gửi email (chỉ gửi cho người CÓ MẶT trong buổi học)
 function guiTaiLieu(courseId, courseName, links, body) {
   try {
@@ -409,100 +501,29 @@ function guiTaiLieu(courseId, courseName, links, body) {
 
     if (!emailList.trim()) return 'Đã lưu vào Thư viện. (Chưa có người có mặt hoặc email trong khóa học).';
 
-    // 4. Xử lý nội dung: đổi \n thành <br> để giữ xuống dòng trong email HTML
-    var bodyHtml = body
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/\n/g,'<br>');
-
-    // 5. Nhận diện loại tài liệu và xây dựng card link cho email
-    function getDocMeta_(url) {
-      var u = (url||'').toLowerCase();
-      if (u.indexOf('docs.google.com/document') > -1 || u.indexOf('drive.google.com') > -1 && u.indexOf('/document') > -1) return {icon:'📝',color:'#1d4ed8',bg:'#dbeafe',type:'Google Docs'};
-      if (u.indexOf('docs.google.com/spreadsheets') > -1 || u.indexOf('spreadsheet') > -1) return {icon:'📊',color:'#15803d',bg:'#dcfce7',type:'Google Sheets'};
-      if (u.indexOf('docs.google.com/presentation') > -1 || u.indexOf('presentation') > -1) return {icon:'📑',color:'#d97706',bg:'#fef3c7',type:'Google Slides'};
-      if (u.indexOf('docs.google.com/forms') > -1) return {icon:'📋',color:'#7c3aed',bg:'#f3e8ff',type:'Google Forms'};
-      if (u.indexOf('drive.google.com') > -1) return {icon:'📁',color:'#0ea5e9',bg:'#e0f2fe',type:'Google Drive'};
-      if (u.indexOf('youtube.com') > -1 || u.indexOf('youtu.be') > -1) return {icon:'▶',color:'#dc2626',bg:'#fee2e2',type:'YouTube'};
-      if (u.match(/\.pdf($|\?)/)) return {icon:'📕',color:'#dc2626',bg:'#fee2e2',type:'PDF'};
-      if (u.match(/\.(doc|docx)($|\?)/)) return {icon:'📝',color:'#1d4ed8',bg:'#dbeafe',type:'Word'};
-      if (u.match(/\.(xls|xlsx|csv)($|\?)/)) return {icon:'📊',color:'#15803d',bg:'#dcfce7',type:'Excel'};
-      if (u.match(/\.(ppt|pptx)($|\?)/)) return {icon:'📑',color:'#d97706',bg:'#fef3c7',type:'PowerPoint'};
-      if (u.match(/\.(jpg|jpeg|png|gif|webp)($|\?)/)) return {icon:'🖼',color:'#7c3aed',bg:'#f3e8ff',type:'Hình ảnh'};
-      if (u.match(/\.(zip|rar|7z)($|\?)/)) return {icon:'📦',color:'#475569',bg:'#f1f5f9',type:'File nén'};
-      if (u.match(/\.(mp4|mov|avi)($|\?)/)) return {icon:'🎬',color:'#dc2626',bg:'#fee2e2',type:'Video'};
-      return {icon:'🔗',color:'#16a34a',bg:'#f0fdf4',type:'Liên kết'};
-    }
-
-    function getShortLabel_(url) {
-      var u = url || '';
-      var maps = [
-        {re:/docs\.google\.com\/document/,   lbl:'Google Docs'},
-        {re:/docs\.google\.com\/spreadsheets/,lbl:'Google Sheets'},
-        {re:/docs\.google\.com\/presentation/,lbl:'Google Slides'},
-        {re:/docs\.google\.com\/forms/,       lbl:'Google Forms'},
-        {re:/drive\.google\.com\/file/,       lbl:'Google Drive File'},
-        {re:/drive\.google\.com\/drive/,      lbl:'Google Drive Folder'},
-        {re:/youtube\.com\/watch/,            lbl:'YouTube Video'},
-        {re:/youtu\.be\//,                    lbl:'YouTube Video'},
-      ];
-      for (var m=0;m<maps.length;m++) { if (maps[m].re.test(u)) return maps[m].lbl; }
-      var clean = u.replace(/^https?:\/\//,'').replace(/^www\./,'');
-      return clean.length > 60 ? clean.substring(0,57)+'...' : clean;
-    }
-
-    var lArr = links.split(String.fromCharCode(10)).filter(function(l){ return l.trim(); });
-    var lHtml = lArr.map(function(l){
-      var lClean = l.trim();
-      var u = lClean.indexOf('http')===0 ? lClean : 'https://'+lClean;
-      var meta = getDocMeta_(u);
-      var label = getShortLabel_(u);
-      // Card dạng table (tương thích email client)
-      return '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:10px">'
-        +'<tr>'
-        +'<td style="background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px 14px">'
-        +'<table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>'
-        // Icon box
-        +'<td style="width:40px;vertical-align:middle">'
-        +'<div style="width:36px;height:36px;background:'+meta.bg+';border-radius:8px;text-align:center;line-height:36px;font-size:18px">'+meta.icon+'</div>'
-        +'</td>'
-        // Label + type
-        +'<td style="padding-left:12px;vertical-align:middle">'
-        +'<a href="'+u+'" target="_blank" style="display:block;font-size:14px;font-weight:700;color:'+meta.color+';text-decoration:none;margin-bottom:3px">'+label+'</a>'
-        +'<span style="font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.4px">'+meta.type+'</span>'
-        +'</td>'
-        // Arrow button
-        +'<td style="width:80px;text-align:right;vertical-align:middle">'
-        +'<a href="'+u+'" target="_blank" style="display:inline-block;background:'+meta.color+';color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none">Mở →</a>'
-        +'</td>'
-        +'</tr></table>'
-        +'</td></tr></table>';
-    }).join('');
-
-    // 6. HTML email
-    var hb='<div style="font-family:Arial,sans-serif;background:#f8fafc;padding:20px;color:#334155">'
-      +'<div style="max-width:650px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0">'
-      // Header
-      +'<div style="background:#1a3a5c;color:#fff;padding:22px 28px">'
-      +'<div style="font-size:11px;font-weight:700;letter-spacing:1.2px;opacity:.7;margin-bottom:4px">TÀI LIỆU ĐÀO TẠO</div>'
-      +'<h2 style="margin:0;font-size:18px;font-weight:800">'+courseName.toUpperCase()+'</h2>'
-      +'</div>'
-      // Body
-      +'<div style="padding:24px 28px">'
-      +'<div style="font-size:14px;line-height:1.8;color:#334155;margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid #e2e8f0">'+bodyHtml+'</div>'
-      // Section tài liệu
-      +'<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">📎 DANH SÁCH TÀI LIỆU</div>'
-      + lHtml
-      +'</div>'
-      // Footer
-      +'<div style="background:#f8fafc;padding:14px 28px;text-align:center;font-size:12px;color:#94a3b8;border-top:1px solid #e2e8f0">'
-      +'<strong style="color:#1a3a5c">PHÒNG HÀNH CHÍNH – NHÂN SỰ</strong>'
-      +'</div></div></div>';
-
+    var hb = buildTaiLieuEmailHtml_(courseName, body, links);
     MailApp.sendEmail({to:emailList, subject:'[TÀI LIỆU] '+courseName.toUpperCase(), htmlBody:hb});
     shEmail().appendRow([new Date(),courseId,courseName,'Gửi Tài Liệu',nguon,hb,emailList]);
     return 'Đã lưu và gửi Email thành công! (' + nguon + ')';
+  } catch(e) { return 'Lỗi: '+e.message; }
+}
+
+// Gửi tài liệu ĐÃ LƯU trong Thư viện cho một danh sách email tự chọn (không cần gửi hết người tham gia)
+function guiTaiLieuChonEmail(rowIndex, emailsStr) {
+  try {
+    var row = shTV().getRange(rowIndex,1,1,4).getValues()[0];
+    var courseId = String(row[0]||''), courseName = String(row[1]||''), body = String(row[2]||''), links = String(row[3]||'');
+    if (!courseName) return 'Không tìm thấy tài liệu!';
+
+    var emails = String(emailsStr||'').split(',').map(function(e){return e.trim().toLowerCase();}).filter(function(e){return e.indexOf('@')>-1;});
+    var uniq = []; emails.forEach(function(e){ if (uniq.indexOf(e)===-1) uniq.push(e); });
+    if (!uniq.length) return 'Vui lòng chọn hoặc nhập ít nhất 1 email hợp lệ!';
+
+    var hb = buildTaiLieuEmailHtml_(courseName, body, links);
+    var emailList = uniq.join(',');
+    MailApp.sendEmail({to:emailList, subject:'[TÀI LIỆU] '+courseName.toUpperCase(), htmlBody:hb});
+    shEmail().appendRow([new Date(),courseId,courseName,'Gửi Tài Liệu','Gửi chọn lọc '+uniq.length+' người',hb,emailList]);
+    return 'Đã gửi tài liệu cho '+uniq.length+' người!';
   } catch(e) { return 'Lỗi: '+e.message; }
 }
 

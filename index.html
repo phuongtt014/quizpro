@@ -258,7 +258,7 @@ textarea.fc{resize:vertical}
         <div class="col-l">
           <div class="card"><div class="ch"><div class="ct"><i class="fas fa-archive"></i>Tài liệu đã lưu</div></div>
             <div class="sbar"><input class="sin" id="libQ" placeholder="Tìm..."><span class="bp b-nv" id="libCnt">0</span></div>
-            <div style="overflow-x:auto;max-height:460px;overflow-y:auto"><table class="tbl"><thead><tr><th>Khóa học</th><th>Cập nhật</th><th>Link tài liệu</th></tr></thead><tbody id="tLib"><tr class="tbl-empty"><td colspan="3">Đang tải...</td></tr></tbody></table></div>
+            <div style="overflow-x:auto;max-height:460px;overflow-y:auto"><table class="tbl"><thead><tr><th>Khóa học</th><th>Cập nhật</th><th>Link tài liệu</th><th>Thao tác</th></tr></thead><tbody id="tLib"><tr class="tbl-empty"><td colspan="4">Đang tải...</td></tr></tbody></table></div>
           </div>
         </div>
       </div>
@@ -397,6 +397,23 @@ textarea.fc{resize:vertical}
   <div class="modal-footer"><button class="btn-out" data-bs-dismiss="modal">Đóng</button><button class="btn-nv" id="btnSaveAddEmail">Lưu &amp; Gửi</button></div>
 </div></div></div>
 
+<div class="modal fade" id="mSendLib" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header mh"><h5 class="modal-title">Gửi Tài Liệu Cho Người Chọn Lọc</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <input type="hidden" id="sl_row">
+    <p style="font-weight:700;color:var(--nv);font-size:13px;margin-bottom:12px" id="sl_name"></p>
+    <div class="fg">
+      <label class="fl">Email người nhận (cách nhau dấu phẩy)</label>
+      <textarea id="sl_emails" class="fc" rows="3" placeholder="nguoi.a@company.com, nguoi.b@company.com"></textarea>
+      <div style="margin-top:6px;font-size:12px;color:var(--mu);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        Thêm nhanh theo phòng: <select id="sl_dept" class="fs" style="width:auto;padding:4px 8px;font-size:12px"></select>
+        <button type="button" class="btn-out" id="sl_addInvited" style="font-size:11px;padding:4px 10px">+ Người đã mời khóa này</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-footer"><button class="btn-out" data-bs-dismiss="modal">Hủy</button><button class="btn-nv" id="btnSendLibSel"><i class="fas fa-paper-plane"></i> Gửi</button></div>
+</div></div></div>
+
 <div class="modal fade" id="mCI" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content">
   <div class="modal-header mh"><h5 class="modal-title">Điểm Danh Thủ Công</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
   <div class="modal-body">
@@ -489,6 +506,7 @@ var currentUser=null;
 var _ciAllData=[];
 var _ciFilter='all';
 var _drawerAll=[];
+var _slCourseId='';
 var _drawerFormId='';
 var ROLES=['Khách','Nhân viên','Trưởng phòng','Admin'];
 var PERM_TABS=[{id:'dashboard',lbl:'Dashboard'},{id:'employees',lbl:'Nhân sự'},{id:'courses',lbl:'Lịch đào tạo'},{id:'library',lbl:'Thư viện'},{id:'scores',lbl:'Bảng điểm'},{id:'settings',lbl:'Thiết lập'}];
@@ -882,21 +900,67 @@ function saveMauThu(){
 // ============================================================
 function loadLib(){
   if(!gas())return;
-  sh('tLib','<tr class="tbl-empty"><td colspan="3">Đang tải...</td></tr>');
+  sh('tLib','<tr class="tbl-empty"><td colspan="4">Đang tải...</td></tr>');
   google.script.run.withSuccessHandler(function(r){G.libData=r||[];st('libCnt',G.libData.length+'');renderLibTbl(G.libData);}).withFailureHandler(function(e){err('Lỗi thư viện: '+e);}).getAllLibrary();
 }
 function renderLibTbl(list){
   var tb=g('tLib');tb.innerHTML='';
-  if(!list.length){tb.innerHTML='<tr class="tbl-empty"><td colspan="3">Chưa có tài liệu.</td></tr>';return;}
+  if(!list.length){tb.innerHTML='<tr class="tbl-empty"><td colspan="4">Chưa có tài liệu.</td></tr>';return;}
   list.forEach(function(d){
     var tr=document.createElement('tr');
     var td1=document.createElement('td');td1.innerHTML='<div style="font-weight:700;color:var(--nv);font-size:13px">'+hEsc(d.courseName)+'</div><div style="font-size:11px;color:var(--mu)">'+hEsc(d.courseId)+'</div>';
     var td2=document.createElement('td');td2.style.cssText='font-size:12px;color:var(--mu);white-space:nowrap';td2.textContent=d.lastUpdate;
     var td3=document.createElement('td');td3.style.minWidth='240px';renderDocLinks(td3,d.links);
-    tr.appendChild(td1);tr.appendChild(td2);tr.appendChild(td3);tb.appendChild(tr);
+    var td4=document.createElement('td');
+    var sb=document.createElement('button');sb.className='btn-out';sb.style.fontSize='12px';sb.innerHTML='<i class="fas fa-paper-plane"></i> Gửi chọn lọc';
+    (function(row){sb.addEventListener('click',function(){openSendLib(row);});})(d);
+    td4.appendChild(sb);
+    tr.appendChild(td1);tr.appendChild(td2);tr.appendChild(td3);tr.appendChild(td4);tb.appendChild(tr);
   });
 }
 function filterLib(){var q=(g('libQ').value||'').toLowerCase();renderLibTbl(q?G.libData.filter(function(d){return (d.courseName+d.courseId+d.links+d.body).toLowerCase().indexOf(q)>-1;}):G.libData);}
+
+// Gửi tài liệu đã lưu cho một danh sách email tự chọn (không bắt buộc gửi hết người tham gia)
+function openSendLib(row){
+  sv('sl_row',row.rowIndex);
+  g('sl_name').textContent='Khóa: '+row.courseName.toUpperCase()+' ('+row.courseId+')';
+  sv('sl_emails','');
+  _slCourseId=row.courseId;
+  var dept=g('sl_dept');
+  if(dept){dept.innerHTML='';var o=document.createElement('option');o.value='';o.textContent='-- Chọn phòng --';dept.appendChild(o);(G.cfg['Đơn vị phòng']||[]).forEach(function(v){var op=document.createElement('option');op.value=v;op.textContent=v;dept.appendChild(op);});}
+  if(!G.emps.length&&gas())google.script.run.withSuccessHandler(function(r){G.emps=r||[];}).getEmployees();
+  new bootstrap.Modal(g('mSendLib')).show();
+}
+function mergeIntoTextarea_(id,emails){
+  var ta=g(id);var cur=(ta.value||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
+  var merged=[];cur.concat(emails).forEach(function(x){if(merged.indexOf(x)===-1)merged.push(x);});
+  ta.value=merged.join(', ');
+}
+function addSlByDept(dept){
+  if(!dept)return;
+  function apply(){
+    var emails=G.emps.filter(function(e){return e.donVi===dept&&e.email;}).map(function(e){return e.email;});
+    if(!emails.length){toast('Không có email trong '+dept,'warning');return;}
+    mergeIntoTextarea_('sl_emails',emails);toast('Đã thêm '+emails.length+' email từ '+dept);
+  }
+  if(!G.emps.length){
+    if(!gas())return;
+    google.script.run.withSuccessHandler(function(r){G.emps=r||[];apply();}).withFailureHandler(function(e){err('Lỗi tải nhân sự: '+e);}).getEmployees();
+  } else { apply(); }
+}
+function addSlInvited(){
+  var c=G.courses.find(function(x){return x.id===_slCourseId;});
+  if(!c||!c.emails||!c.emails.trim()){toast('Khóa học này chưa có danh sách mời','warning');return;}
+  var emails=c.emails.split(',').map(function(s){return s.trim();}).filter(Boolean);
+  mergeIntoTextarea_('sl_emails',emails);toast('Đã thêm '+emails.length+' email đã mời');
+}
+function sendLibSelected(){
+  var row=g('sl_row').value;
+  var emails=(g('sl_emails').value||'').trim();
+  if(!emails){toast('Nhập hoặc chọn ít nhất 1 email','warning');return;}
+  showLoad(true,'Đang gửi...');
+  google.script.run.withSuccessHandler(function(msg){showLoad(false);toast(msg);bootstrap.Modal.getInstance(g('mSendLib')).hide();}).withFailureHandler(function(e){showLoad(false);err(e);}).guiTaiLieuChonEmail(row,emails);
+}
 function submitLib(){
   var sel=g('libKH');if(!sel||!sel.value){toast('Chọn khóa học','warning');return;}
   var opt=sel.options[sel.selectedIndex],cname=opt.getAttribute('data-n')||opt.textContent;
@@ -1069,6 +1133,9 @@ document.addEventListener('DOMContentLoaded', function(){
   // --- THƯ VIỆN ---
   g('btnSubmitLib').addEventListener('click', submitLib);
   g('libQ').addEventListener('input', filterLib);
+  g('sl_dept').addEventListener('change', function(){ addSlByDept(this.value); });
+  g('sl_addInvited').addEventListener('click', addSlInvited);
+  g('btnSendLibSel').addEventListener('click', sendLibSelected);
 
   // --- BẢNG ĐIỂM ---
   g('btnSubmitScore').addEventListener('click', submitScore);
