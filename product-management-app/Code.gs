@@ -746,6 +746,118 @@ function quetTrungId_(sheetName, idColName, idCol, labelNames, labelCols) {
   return lines.join('\n');
 }
 
+/**
+ * SỬA DỮ LIỆU (CÓ GHI ĐÈ) — CHẠY TAY MỘT LẦN. Dọn các ID_GiaoDich bị trùng ở Data_NhapXuat mà
+ * timGiaoDichTrungId() đã phát hiện. NÊN SAO LƯU SHEET (menu Tệp > Tạo bản sao trên Google
+ * Sheet) TRƯỚC KHI CHẠY HÀM NÀY.
+ *
+ * Với mỗi cặp ĐÚNG 2 dòng bị trùng ID_GiaoDich và có Tên hàng hóa KHÁC nhau (đủ để phân biệt
+ * chắc chắn dòng nào là dòng nào):
+ *  - Giữ nguyên ID ở dòng sheet xuất hiện trước.
+ *  - Sinh ID mới, duy nhất, cho dòng sheet xuất hiện sau.
+ *  - Tìm mọi dòng Xuất có LoNhapId = ID cũ VÀ Tên hàng hóa khớp đúng tên hàng của dòng vừa đổi
+ *    ID (chắc chắn đúng lô, vì hệ thống luôn xuất theo đúng tên hàng của lô đã chọn) — cập
+ *    nhật LoNhapId sang ID mới, để không làm sai số lượng tồn kho tính theo lô.
+ *  - Cập nhật các yêu cầu đang "Chờ duyệt" ở YeuCauSuaNhapKho/YeuCauSuaXuatHang đang trỏ ID cũ
+ *    (khớp theo Tên hàng lưu sẵn trong chính yêu cầu đó) sang ID mới tương ứng.
+ *
+ * Các nhóm trùng KHÔNG rơi vào trường hợp trên (nhiều hơn 2 dòng cùng ID, hoặc 2 dòng cùng Tên
+ * hàng hóa nên không thể phân biệt tự động) sẽ được BỎ QUA và liệt kê riêng để xử lý tay.
+ * Chọn hàm này ở thanh công cụ trình soạn thảo Apps Script rồi bấm Run, sau đó xem kết quả ở
+ * View > Logs. Không gọi từ client.
+ */
+function sanLaiIdGiaoDichTrung() {
+  const sh = getOrCreateTransactionSheet_();
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return 'Data_NhapXuat: không có dữ liệu.';
+
+  const range = sh.getRange(2, 1, lastRow - 1, TRANSACTION_HEADERS.length);
+  const values = range.getValues();
+
+  const byId = {};
+  values.forEach((row, i) => {
+    const id = row[0];
+    if (id === '' || id === null) return;
+    if (!byId[id]) byId[id] = [];
+    byId[id].push(i);
+  });
+
+  const idMap = {}; // "oldId|TenHangHoaDòngBịĐổi" -> newId — chỉ các dòng thực sự bị đổi ID
+  const applied = [];
+  const skipped = [];
+
+  Object.keys(byId).forEach(oldId => {
+    const idxs = byId[oldId];
+    if (idxs.length < 2) return;
+    if (idxs.length > 2) {
+      skipped.push('ID "' + oldId + '": có ' + idxs.length + ' dòng cùng trùng (nhiều hơn 2) — cần xử lý tay.');
+      return;
+    }
+    const [ia, ib] = idxs; // ia < ib vì values theo đúng thứ tự sheet
+    const nameA = values[ia][3], nameB = values[ib][3];
+    if (nameA === nameB) {
+      skipped.push('ID "' + oldId + '" (dòng sheet ' + (ia + 2) + ' & ' + (ib + 2) + '): cùng Tên hàng "' + nameA + '" — không thể phân biệt tự động, cần xử lý tay.');
+      return;
+    }
+    const newId = generateTransactionId_('fix' + (ib + 2));
+    values[ib][0] = newId;
+    idMap[oldId + '|' + nameB] = newId;
+    applied.push('ID "' + oldId + '" → dòng sheet ' + (ib + 2) + ' ("' + nameB + '") đổi thành "' + newId +
+      '" (dòng sheet ' + (ia + 2) + ' "' + nameA + '" giữ nguyên ID cũ).');
+  });
+
+  if (!applied.length) {
+    const msg = 'Không có cặp trùng nào đủ điều kiện tự sửa.' +
+      (skipped.length ? ('\n\nCần xử lý tay:\n' + skipped.map(s => '  • ' + s).join('\n')) : '\n\nKhông phát hiện ID nào bị trùng.');
+    Logger.log(msg);
+    return msg;
+  }
+
+  // Cập nhật LoNhapId ở các dòng Xuất đang trỏ tới lô vừa đổi ID — khớp theo Tên hàng để chắc
+  // chắn đúng lô (hệ thống luôn xuất theo đúng tên hàng của lô đã chọn).
+  let loNhapUpdated = 0;
+  values.forEach(row => {
+    const lo = row[18]; // LoNhapId — cột 19 (0-based 18)
+    if (!lo) return;
+    const key = lo + '|' + row[3]; // TenHangHoa — cột 4 (0-based 3)
+    if (idMap[key]) { row[18] = idMap[key]; loNhapUpdated++; }
+  });
+
+  range.setValues(values); // ghi đè một lần cho cả 2 loại thay đổi (ID_GiaoDich + LoNhapId)
+
+  // Cập nhật các yêu cầu sửa đang "Chờ duyệt" đang trỏ ID cũ (YeuCauSuaNhapKho/YeuCauSuaXuatHang
+  // dùng chung cấu trúc cột SUANHAPKHO_HEADERS) — khớp theo Tên hàng lưu sẵn trong yêu cầu.
+  let reqUpdated = 0;
+  [SHEET_SUANHAPKHO, SHEET_SUAXUATHANG].forEach(sheetName => {
+    const rsh = getSs_().getSheetByName(sheetName);
+    if (!rsh || rsh.getLastRow() < 2) return;
+    const rrange = rsh.getRange(2, 1, rsh.getLastRow() - 1, SUANHAPKHO_HEADERS.length);
+    const rvals = rrange.getValues();
+    let changed = false;
+    rvals.forEach(row => {
+      if (row[15] !== 'Chờ duyệt') return; // TrangThai — cột 16 (0-based 15)
+      const key = row[1] + '|' + row[4];   // ID_GiaoDich (cột 2) + TenHangHoa (cột 5)
+      if (idMap[key]) { row[1] = idMap[key]; changed = true; reqUpdated++; }
+    });
+    if (changed) rrange.setValues(rvals);
+  });
+
+  const lines = [
+    'Đã sửa ' + applied.length + ' cặp ID_GiaoDich bị trùng:',
+    ...applied.map(l => '  • ' + l),
+    '',
+    'Đã cập nhật LoNhapId ở ' + loNhapUpdated + ' dòng Xuất tham chiếu tới các lô vừa đổi ID.',
+    'Đã cập nhật ' + reqUpdated + ' yêu cầu sửa đang "Chờ duyệt" tham chiếu tới ID cũ.'
+  ];
+  if (skipped.length) {
+    lines.push('', 'CẦN XỬ LÝ TAY (không tự sửa được):');
+    skipped.forEach(s => lines.push('  • ' + s));
+  }
+  const summary = lines.join('\n');
+  Logger.log(summary);
+  return summary;
+}
+
 // ==================== SETUP: READ (mọi vai trò đã đăng nhập) ====================
 
 function getCategories() {
