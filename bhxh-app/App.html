@@ -124,6 +124,17 @@ function go(v) {
   ({ tongquan: vTongQuan, ky: vKy, nhanvien: vNhanVien, truythu: vTruyThu, baocao: vBaoCao, thietlap: vThietLap, nhatky: vNhatKy }[v])();
 }
 async function refreshKys() { S.kys = await api('apiListKy'); }
+// Các danh mục (Khoản trích đóng, Mã phân loại, Tỉ lệ Công đoàn, Phòng ban, Thông tin chung) chỉ tải lúc mở trang.
+// Nếu vừa sửa tay trên Google Sheet, bấm nút này để nạp lại mà không cần tải lại cả trang.
+async function refreshDanhMuc() {
+  act(async () => {
+    const d = await run('apiBootstrap');
+    Object.assign(S, d);
+    $('ctyName').textContent = S.info.tenCty ? ' · ' + S.info.tenCty : '';
+    toast('Đã làm mới danh mục (Khoản trích đóng, Mã phân loại, Tỉ lệ Công đoàn, Phòng ban, Thông tin chung).', 'ok');
+    go(S.view);
+  });
+}
 
 // =====================================================================
 // TỔNG QUAN

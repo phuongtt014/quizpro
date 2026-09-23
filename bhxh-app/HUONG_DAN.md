@@ -139,6 +139,7 @@ Người **Nhập liệu** chỉ nhập/xuất được hồ sơ mình quản l�
 
 ## 8. Lưu ý
 
+- **Sửa tay trên Google Sheet:** Nhân viên, Kỳ BHXH, Truy thu, và mọi tính toán/báo cáo luôn đọc dữ liệu **mới nhất** từ Sheet mỗi lần bạn mở màn hình đó hoặc bấm Tính — sửa tay xong là có tác dụng ngay. Riêng 5 danh mục **Khoản trích đóng, Mã phân loại, Tỉ lệ Công đoàn, Phòng ban, Thông tin chung** chỉ được tải **một lần lúc mở trang** để dùng cho dropdown; sửa tay trên Sheet sẽ không hiện ngay trên các màn hình đó. Bấm nút **"🔄 Làm mới dữ liệu"** ở góc trên (hoặc tải lại trang F5) để nạp lại.
 - Không đổi tên các tab và tiêu đề cột. Có thể thêm cột riêng ở cuối, app sẽ bỏ qua các cột đó.
 - Tab *Kết quả tính* do app ghi lại mỗi lần bấm Tính. Không sửa tay tab này.
 - Muốn mở lại một kỳ đã chốt trong trường hợp khẩn cấp: Admin sửa ô *Trạng thái* của kỳ đó trong tab **Kỳ BHXH** trên Sheet thành *Đang mở*, sau đó ghi chú lý do.
