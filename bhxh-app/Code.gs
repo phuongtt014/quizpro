@@ -364,10 +364,21 @@ function monthRange_(a, b) {
   while (k && k <= b && out.length < 600) { out.push(k); k = nextMonth_(k); }
   return out;
 }
+/** Đọc số từ chuỗi, chấp nhận cả kiểu "1,234.5" và kiểu Việt Nam "1.234,5" / "1.234.567" */
 function num_(v) {
   if (typeof v === 'number') return isFinite(v) ? v : 0;
   if (v === null || v === undefined || v === '') return 0;
-  const n = Number(String(v).replace(/\s/g, '').replace(/,/g, ''));
+  let s = String(v).replace(/\s/g, '').trim();
+  const lastDot = s.lastIndexOf('.'), lastComma = s.lastIndexOf(',');
+  if (lastDot >= 0 && lastComma >= 0) {
+    s = lastComma > lastDot ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  } else if (lastComma >= 0) {
+    const parts = s.split(',');
+    s = (parts.length === 2 && parts[1].length <= 2) ? s.replace(',', '.') : s.replace(/,/g, '');
+  } else if (lastDot >= 0 && s.split('.').length > 2) {
+    s = s.replace(/\./g, ''); // nhiều dấu chấm -> dấu nhóm nghìn kiểu VN, không phải thập phân
+  }
+  const n = Number(s);
   return isFinite(n) ? n : 0;
 }
 function fmtNum_(n) { return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
@@ -892,7 +903,7 @@ function saveOne_(t, ex, o, isNew, user) {
     update_(t, ex._row, o);
   }
 }
-function cleanNV_(o, user) {
+function cleanNV_(o, user, maplMapObj) {
   const r = {};
   NV_COLS.forEach(function (c) { r[c[0]] = o[c[0]] === undefined || o[c[0]] === null ? '' : o[c[0]]; });
   r.maNV = String(r.maNV).trim();
@@ -904,7 +915,8 @@ function cleanNV_(o, user) {
   r.congDoan = r.congDoan === CO ? CO : KHONG;
   r.emailQL = String(r.emailQL || '').toLowerCase().trim();
   if (user.role === ROLE.NHAP) r.emailQL = user.email;
-  if (r.maPL && !maplMap_()[r.maPL]) throw new Error('Mã phân loại "' + r.maPL + '" không tồn tại.');
+  const mm = maplMapObj || maplMap_();
+  if (r.maPL && !mm[r.maPL]) throw new Error('Mã phân loại "' + r.maPL + '" không tồn tại.');
   if (r.thangDung && r.ngayBHXH && normMonth_(r.thangDung) < r.ngayBHXH.slice(0, 7)) {
     throw new Error('Tháng dừng đóng không được trước tháng bắt đầu BHXH.');
   }
@@ -1246,21 +1258,244 @@ function makeFile_(doc, format) {
     sh.autoResizeColumns(1, width);
     sh.setColumnWidth(1, 60);
     SpreadsheetApp.flush();
-    const q = format === 'pdf'
-      ? 'format=pdf&size=A4&portrait=false&fitw=true&gridlines=false&printtitle=false&sheetnames=false&pagenum=CENTER&top_margin=0.4&bottom_margin=0.4&left_margin=0.3&right_margin=0.3'
-      : 'format=xlsx';
-    const resp = UrlFetchApp.fetch('https://docs.google.com/spreadsheets/d/' + tmp.getId() + '/export?' + q, {
-      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true
-    });
-    if (resp.getResponseCode() !== 200) throw new Error('Không xuất được file (mã lỗi ' + resp.getResponseCode() + ').');
-    return {
-      name: doc.fileName + (format === 'pdf' ? '.pdf' : '.xlsx'),
-      mime: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      data: Utilities.base64Encode(resp.getBlob().getBytes())
-    };
+    return exportSpreadsheet_(tmp.getId(), doc.fileName, format);
   } finally {
     DriveApp.getFileById(tmp.getId()).setTrashed(true);
   }
+}
+
+/** Xuất một Google Sheet tạm (id) ra xlsx/pdf/csv và trả về {name, mime, data(base64)} */
+function exportSpreadsheet_(id, baseName, format) {
+  const q = format === 'pdf'
+    ? 'format=pdf&size=A4&portrait=false&fitw=true&gridlines=false&printtitle=false&sheetnames=false&pagenum=CENTER&top_margin=0.4&bottom_margin=0.4&left_margin=0.3&right_margin=0.3'
+    : format === 'csv' ? 'format=csv&gid=0'
+    : 'format=xlsx';
+  const resp = UrlFetchApp.fetch('https://docs.google.com/spreadsheets/d/' + id + '/export?' + q, {
+    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true
+  });
+  if (resp.getResponseCode() !== 200) throw new Error('Không xuất được file (mã lỗi ' + resp.getResponseCode() + ').');
+  const ext = format === 'pdf' ? '.pdf' : format === 'csv' ? '.csv' : '.xlsx';
+  const mime = format === 'pdf' ? 'application/pdf' : format === 'csv' ? 'text/csv'
+    : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  return { name: baseName + ext, mime: mime, data: Utilities.base64Encode(resp.getBlob().getBytes()) };
+}
+
+// ---------------------------------------------------------------------
+// IMPORT / EXPORT / FILE MẪU – TAB NHÂN VIÊN
+// ---------------------------------------------------------------------
+function numberFormatsForCols_(cols) {
+  const out = [];
+  cols.forEach(function (c, i) {
+    if (c[2] === 'num' || c[2] === 'pct') out.push({ col: i + 1, fmt: '#,##0' });
+    else if (c[2] === 'date') out.push({ col: i + 1, fmt: 'dd/MM/yyyy' });
+  });
+  return out;
+}
+
+/** Tạo Sheet tạm từ lưới dữ liệu trong bộ nhớ, xuất ra file rồi xóa Sheet tạm. */
+function makeGridFile_(fileName, grid, headerRow, numberFormats, format) {
+  const width = Math.max.apply(null, grid.map(function (r) { return r.length; }).concat([1]));
+  const norm = grid.map(function (r) { const a = r.slice(); while (a.length < width) a.push(''); return a; });
+  const tmp = SpreadsheetApp.create(fileName);
+  try {
+    const sh = tmp.getSheets()[0];
+    sh.setName('Data');
+    if (sh.getMaxColumns() < width) sh.insertColumnsAfter(sh.getMaxColumns(), width - sh.getMaxColumns());
+    if (sh.getMaxRows() < norm.length) sh.insertRowsAfter(sh.getMaxRows(), norm.length - sh.getMaxRows());
+    const rg = sh.getRange(1, 1, norm.length, width);
+    rg.setNumberFormat('@'); // mặc định dạng văn bản để tránh Sheet tự suy diễn ngày/số sai
+    (numberFormats || []).forEach(function (nf) {
+      sh.getRange(headerRow + 1, nf.col, Math.max(norm.length - headerRow, 1), 1).setNumberFormat(nf.fmt);
+    });
+    rg.setValues(norm).setFontFamily('Arial').setFontSize(10);
+    if (headerRow) {
+      sh.getRange(headerRow, 1, 1, width).setFontWeight('bold').setBackground('#dbe5f1').setWrap(true);
+      sh.setFrozenRows(headerRow);
+    }
+    sh.autoResizeColumns(1, width);
+    SpreadsheetApp.flush();
+    return exportSpreadsheet_(tmp.getId(), fileName, format);
+  } finally {
+    DriveApp.getFileById(tmp.getId()).setTrashed(true);
+  }
+}
+
+/** File mẫu để nhập danh sách nhân viên */
+function apiTemplateNV(format) {
+  getUser_();
+  const header = T.NV.cols.map(function (c) { return c[1]; });
+  const pb0 = (load_(T.PB).rows[0] || {}).ten || 'Phòng Hành chính - Nhân sự';
+  const mau = [
+    { maNV: 'NV001', hoTen: 'Nguyễn Văn A', maBHXH: '0123456789', ngaySinh: '1990-05-20', phongBan: pb0,
+      chucDanh: 'Nhân viên', ngayVao: '2024-01-01', ngayBHXH: '2024-01-01', ngayNghi: '', thangDung: '', luongChinh: 8000000,
+      pcKN: 0, pcCV: 0, pcDH: 0, pcKhac: 0, luongDong: 8000000, maPL: 'CT', congDoan: CO, emailQL: '', ghiChu: 'Dòng ví dụ – xóa trước khi nhập' },
+    { maNV: 'NV002', hoTen: 'Trần Thị B', maBHXH: '0987654321', ngaySinh: '1995-11-02', phongBan: pb0,
+      chucDanh: 'Chuyên viên', ngayVao: '2023-03-15', ngayBHXH: '2023-03-15', ngayNghi: '', thangDung: '', luongChinh: 12000000,
+      pcKN: 0, pcCV: 500000, pcDH: 0, pcKhac: 0, luongDong: 12500000, maPL: 'CT', congDoan: KHONG, emailQL: '', ghiChu: 'Dòng ví dụ – xóa trước khi nhập' }
+  ];
+  const grid = [header].concat(mau.map(function (o) { return buildRow_(T.NV, header, o, null); }));
+  return makeGridFile_('Mau_DanhSachNhanVien', grid, 1, numberFormatsForCols_(T.NV.cols), format === 'csv' ? 'csv' : 'xlsx');
+}
+
+/** Xuất danh sách nhân viên hiện tại (hồ sơ gốc hoặc một kỳ) */
+function apiExportNV(ky, format) {
+  getUser_();
+  ky = normMonth_(ky);
+  const d = apiNhanVien(ky);
+  const header = T.NV.cols.map(function (c) { return c[1]; });
+  const rows = d.rows.map(function (r) { return buildRow_(T.NV, header, r, null); });
+  const grid = [header].concat(rows);
+  const fname = 'DanhSachNhanVien_' + (ky || 'HoSoGoc');
+  return makeGridFile_(fname, grid, 1, numberFormatsForCols_(T.NV.cols), format === 'csv' ? 'csv' : 'xlsx');
+}
+
+function normHeader_(s) { return String(s === null || s === undefined ? '' : s).trim().toLowerCase().replace(/\s+/g, ' '); }
+
+/** Tìm dòng tiêu đề thật trong file (bỏ qua các dòng tiêu đề công ty/ghi chú phía trên, nếu có) */
+function findHeaderRow_(grid) {
+  const req = ['Mã NV', 'Họ và tên'].map(normHeader_);
+  for (let r = 0; r < Math.min(grid.length, 15); r++) {
+    const norm = (grid[r] || []).map(normHeader_);
+    if (req.every(function (w) { return norm.indexOf(w) >= 0; })) return r;
+  }
+  return -1;
+}
+
+/** Chuyển lưới 2 chiều (có dòng tiêu đề) thành danh sách object theo cols của bảng t */
+function gridToObjects_(cols, grid) {
+  const hr = findHeaderRow_(grid);
+  if (hr < 0) {
+    return { objs: [], error: 'Không tìm thấy dòng tiêu đề (phải có đủ cột "Mã NV" và "Họ và tên"). '
+      + 'Hãy tải file mẫu (nút "Tải file mẫu") và giữ nguyên tên cột.' };
+  }
+  const norm = grid[hr].map(normHeader_);
+  const idx = {};
+  cols.forEach(function (c) { const i = norm.indexOf(normHeader_(c[1])); if (i >= 0) idx[c[0]] = i; });
+  const objs = [];
+  for (let r = hr + 1; r < grid.length; r++) {
+    const row = grid[r];
+    if (!row || row.every(function (x) { return x === '' || x === null || x === undefined; })) continue;
+    const o = { _line: r + 1 };
+    cols.forEach(function (c) { const i = idx[c[0]]; o[c[0]] = i !== undefined ? fromCell_(c[2], row[i]) : ''; });
+    objs.push(o);
+  }
+  return { objs: objs };
+}
+
+/** Đọc file người dùng tải lên (base64) thành lưới 2 chiều */
+function parseUploadedGrid_(fileB64, fileName) {
+  const ext = String(fileName || '').toLowerCase().split('.').pop();
+  let bytes;
+  try { bytes = Utilities.base64Decode(fileB64); } catch (e) { throw new Error('File tải lên bị lỗi, hãy chọn lại file.'); }
+  if (ext === 'csv') {
+    let text = Utilities.newBlob(bytes).getDataAsString('UTF-8');
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); // bỏ BOM nếu có
+    const firstLine = text.split('\n')[0] || '';
+    const delim = firstLine.split(';').length > firstLine.split(',').length ? ';' : ',';
+    return Utilities.parseCsv(text, delim);
+  }
+  if (ext === 'xlsx' || ext === 'xls') {
+    const mime = ext === 'xls' ? 'application/vnd.ms-excel' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    return convertXlsxToRows_(Utilities.newBlob(bytes, mime, fileName));
+  }
+  throw new Error('Chỉ hỗ trợ file .csv, .xlsx hoặc .xls.');
+}
+
+/** Chuyển file Excel thành lưới giá trị bằng cách tạo bản Google Sheet tạm thời (Drive API) */
+function convertXlsxToRows_(blob) {
+  let file;
+  try {
+    file = Drive.Files.create({ name: 'BHXH_import_tmp', mimeType: MimeType.GOOGLE_SHEETS }, blob);
+  } catch (e) {
+    throw new Error('Không đọc được file Excel. Trong Apps Script, vào mục "Dịch vụ" (Services, dấu ⊕ ở thanh bên) '
+      + 'và thêm "Drive API" (phiên bản v3), lưu lại rồi thử lại. Hoặc lưu file dưới dạng CSV (.csv) rồi tải lên. '
+      + 'Lỗi gốc: ' + e.message);
+  }
+  try {
+    const ss = SpreadsheetApp.openById(file.id);
+    return ss.getSheets()[0].getDataRange().getValues();
+  } finally {
+    try { Drive.Files.remove(file.id); } catch (e2) { /* bỏ qua lỗi dọn dẹp */ }
+  }
+}
+
+/**
+ * Nhập danh sách nhân viên từ file CSV/Excel.
+ * mode: 'themmoi' = thêm mới nhân viên chưa có, cập nhật nếu Mã NV đã tồn tại (bỏ qua dòng lỗi).
+ *       'thaythe' = thay thế hoàn toàn danh sách hiện tại (trong phạm vi được quản lý) bằng file – nếu có bất kỳ
+ *                   dòng lỗi thì KHÔNG thay đổi gì cả, để tránh mất dữ liệu.
+ */
+function apiImportNV(ky, mode, fileB64, fileName) {
+  const user = getUser_();
+  requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
+  ky = normMonth_(ky);
+  return withLock_(function () {
+    if (ky) requireOpen_(ky);
+    const grid = parseUploadedGrid_(fileB64, fileName);
+    const parsed = gridToObjects_(T.NV.cols, grid);
+    if (parsed.error) throw new Error(parsed.error);
+    if (!parsed.objs.length) throw new Error('File không có dòng dữ liệu nào.');
+
+    const kys = listKy_();
+    const latest = kys.length ? kys[0].ky : '';
+    const applyToMaster = !ky || ky >= latest;
+    const mm = maplMap_();
+
+    const dNV = load_(T.NV);
+    const dlRowsForKy = ky ? load_(T.DLKY).rows.filter(function (r) { return r.ky === ky; }) : [];
+    const nvByCode = {}; dNV.rows.forEach(function (r) { nvByCode[r.maNV] = r; });
+    const dlByCode = {}; dlRowsForKy.forEach(function (r) { dlByCode[r.maNV] = r; });
+
+    const errors = [];
+    const seen = {};
+    const cleaned = [];
+    parsed.objs.forEach(function (raw) {
+      const code = String(raw.maNV || '').trim();
+      try {
+        const existing = ky ? dlByCode[code] : nvByCode[code];
+        if (existing && !canSee_(user, existing)) throw new Error('Không có quyền sửa hồ sơ này (đã có người khác quản lý).');
+        const obj = cleanNV_(raw, user, mm);
+        if (seen[obj.maNV]) throw new Error('Trùng Mã NV với dòng ' + seen[obj.maNV] + ' trong file.');
+        seen[obj.maNV] = raw._line;
+        cleaned.push({ line: raw._line, code: obj.maNV, obj: obj, existing: existing });
+      } catch (e) {
+        errors.push({ line: raw._line, maNV: code, message: e.message });
+      }
+    });
+
+    if (mode === 'thaythe') {
+      if (errors.length) return { mode: mode, added: 0, updated: 0, deleted: 0, total: parsed.objs.length, errors: errors };
+      const delNV = user.role === ROLE.ADMIN ? dNV.rows : dNV.rows.filter(function (r) { return canSee_(user, r); });
+      const delDL = user.role === ROLE.ADMIN ? dlRowsForKy : dlRowsForKy.filter(function (r) { return canSee_(user, r); });
+      if (applyToMaster && delNV.length) deleteRows_(T.NV, delNV.map(function (r) { return r._row; }));
+      if (ky && delDL.length) deleteRows_(T.DLKY, delDL.map(function (r) { return r._row; }));
+      const toInsert = cleaned.map(function (c) { return c.obj; });
+      if (applyToMaster) append_(T.NV, toInsert);
+      if (ky) append_(T.DLKY, toInsert.map(function (o) { return Object.assign({ ky: ky }, o); }));
+      log_(user, 'Import NV (thay thế)', (ky ? 'Kỳ ' + monthDisp_(ky) : 'Hồ sơ gốc') + ' – ' + toInsert.length + ' NV từ file ' + fileName);
+      return { mode: mode, added: toInsert.length, updated: 0, deleted: delNV.length, total: parsed.objs.length, errors: [] };
+    }
+
+    // mode 'themmoi': thêm mới hoặc cập nhật, bỏ qua dòng lỗi
+    let added = 0, updated = 0;
+    const newMaster = [], newDL = [];
+    cleaned.forEach(function (c) {
+      if (applyToMaster) {
+        const exM = nvByCode[c.code];
+        if (exM) { update_(T.NV, exM._row, c.obj); updated++; } else { newMaster.push(c.obj); added++; }
+      }
+      if (ky) {
+        const exD = dlByCode[c.code];
+        if (exD) { update_(T.DLKY, exD._row, c.obj); if (!applyToMaster) updated++; }
+        else { newDL.push(Object.assign({ ky: ky }, c.obj)); if (!applyToMaster) added++; }
+      }
+    });
+    if (newMaster.length) append_(T.NV, newMaster);
+    if (newDL.length) append_(T.DLKY, newDL);
+    log_(user, 'Import NV (thêm/cập nhật)', (ky ? 'Kỳ ' + monthDisp_(ky) : 'Hồ sơ gốc') + ' – ' + added + ' thêm, ' + updated
+      + ' cập nhật từ file ' + fileName + (errors.length ? ', ' + errors.length + ' dòng lỗi bị bỏ qua' : ''));
+    return { mode: mode, added: added, updated: updated, deleted: 0, total: parsed.objs.length, errors: errors };
+  });
 }
 
 // ---------------------------------------------------------------------

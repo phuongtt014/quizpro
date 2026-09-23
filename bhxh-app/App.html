@@ -235,7 +235,16 @@ async function vNhanVien() {
       <select id="nvF" onchange="renderNV()"><option value="">Tất cả</option><option value="dung">Đã nhập tháng dừng đóng</option>
         <option value="thieu">Thiếu mã PL / ngày BHXH</option></select>
       <span class="spacer"></span><span id="nvAdd"></span>
-    </div><div id="nvNote" class="small muted" style="margin-top:8px"></div></div>
+    </div>
+    <div class="row no-print" style="margin-top:10px">
+      <span class="small muted">Excel/CSV:</span>
+      <button class="btn sm" onclick="nvTemplate('xlsx')">⬇ File mẫu (Excel)</button>
+      <button class="btn sm" onclick="nvTemplate('csv')">⬇ File mẫu (CSV)</button>
+      <button class="btn sm" onclick="nvExport('xlsx')">⬇ Xuất Excel</button>
+      <button class="btn sm" onclick="nvExport('csv')">⬇ Xuất CSV</button>
+      <span id="nvImportBtn"></span>
+    </div>
+    <div id="nvNote" class="small muted" style="margin-top:8px"></div></div>
     <div id="nvTbl" class="card muted">Đang tải…</div>`;
   loadNV();
 }
@@ -243,10 +252,76 @@ async function loadNV() {
   try { S.nvData = await run('apiNhanVien', S.nvKy); } catch (e) { $('nvTbl').innerHTML = ''; return; }
   const d = S.nvData;
   $('nvAdd').innerHTML = d.editable ? '<button class="btn pri" onclick="nvForm(null)">＋ Thêm nhân viên</button>' : '';
+  $('nvImportBtn').innerHTML = d.editable ? '<button class="btn sm pri" onclick="nvImportForm()">⬆ Nhập từ file</button>' : '';
   $('nvNote').innerHTML = d.ky
     ? `Đang xem dữ liệu <b>kỳ ${fmtM(d.ky)}</b> ${kyBadge(d.trangThai)}. ${d.editable ? 'Sửa ở kỳ mới nhất sẽ đồng thời cập nhật hồ sơ gốc.' : 'Kỳ đã chốt – chỉ xem.'}`
     : 'Đang xem <b>hồ sơ gốc</b> (tab Danh sách nhân viên). Kỳ đầu tiên sẽ được tạo từ danh sách này.';
   renderNV();
+}
+
+// ---- Import / Xuất / File mẫu ----
+function nvTemplate(format) {
+  act(async () => { download(await run('apiTemplateNV', format)); toast('Đã tải file mẫu.', 'ok'); });
+}
+function nvExport(format) {
+  act(async () => { download(await run('apiExportNV', S.nvKy, format)); toast('Đã xuất file.', 'ok'); });
+}
+function nvImportForm() {
+  const body = `<div class="alert info">File cần có tối thiểu 2 cột <b>Mã NV</b> và <b>Họ và tên</b>, đặt tên cột giống file mẫu
+      (có thể thêm/bớt các cột khác, thứ tự cột tùy ý). Bấm <b>"⬇ File mẫu"</b> ở trên nếu chưa có file.</div>
+    <form id="impF" onsubmit="return false"><div class="form">
+      <label class="full">Chọn file (.csv, .xlsx, .xls)<input type="file" id="impFile" accept=".csv,.xlsx,.xls"></label>
+      <label class="full">Cách nhập<select id="impMode" onchange="impModeChange()">
+        <option value="themmoi">Thêm nhân viên mới; nếu Mã NV đã có trong danh sách thì cập nhật thông tin</option>
+        <option value="thaythe">Thay thế hoàn toàn danh sách hiện tại bằng nội dung file</option>
+      </select></label>
+    </div></form>
+    <div id="impWarn" class="alert warn" style="display:none;margin-top:10px">
+      <b>Thay thế hoàn toàn</b> sẽ xóa toàn bộ nhân viên đang có (trong phạm vi bạn quản lý) rồi thay bằng danh sách trong file.
+      Nếu file có bất kỳ dòng lỗi nào, ứng dụng sẽ KHÔNG xóa hay thay đổi gì cả.</div>`;
+  openModal('Nhập danh sách nhân viên từ file – ' + (S.nvData.ky ? 'kỳ ' + fmtM(S.nvData.ky) : 'hồ sơ gốc'), body,
+    `<button class="btn" onclick="closeModal()">Hủy</button><button class="btn pri" onclick="nvImportSubmit()">Nhập file</button>`);
+}
+function impModeChange() { $('impWarn').style.display = $('impMode').value === 'thaythe' ? 'block' : 'none'; }
+function readFileB64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',').pop());
+    r.onerror = () => reject(new Error('Không đọc được file.'));
+    r.readAsDataURL(file);
+  });
+}
+async function nvImportSubmit() {
+  const f = $('impFile').files[0];
+  if (!f) return toast('Chưa chọn file.', 'err');
+  const mode = $('impMode').value;
+  if (mode === 'thaythe' && !confirm('Thay thế hoàn toàn danh sách hiện tại bằng nội dung file này?')) return;
+  act(async () => {
+    const b64 = await readFileB64(f);
+    const r = await run('apiImportNV', S.nvData.ky, mode, b64, f.name);
+    closeModal();
+    nvImportResult(r);
+    loadNV();
+  });
+}
+function nvImportResult(r) {
+  let h = `<div class="stats">
+    <div class="stat"><div class="lbl">Tổng dòng trong file</div><div class="val">${r.total}</div></div>
+    <div class="stat"><div class="lbl">Thêm mới</div><div class="val">${r.added}</div></div>
+    <div class="stat"><div class="lbl">Cập nhật</div><div class="val">${r.updated}</div></div>
+    ${r.deleted ? `<div class="stat"><div class="lbl">Đã xóa (thay thế)</div><div class="val">${r.deleted}</div></div>` : ''}
+  </div>`;
+  if (r.errors && r.errors.length) {
+    h += `<div class="alert ${r.mode === 'thaythe' ? 'bad' : 'warn'}">${r.mode === 'thaythe'
+      ? 'Không có gì được thay đổi vì file có dòng lỗi. Hãy sửa các dòng dưới đây rồi nhập lại.'
+      : r.errors.length + ' dòng bị bỏ qua vì lỗi:'}</div>
+      <div class="tbl-wrap" style="max-height:260px"><table><thead><tr><th>Dòng</th><th>Mã NV</th><th>Lỗi</th></tr></thead><tbody>
+      ${r.errors.map((e) => `<tr><td>${e.line}</td><td>${esc(e.maNV)}</td><td class="warn-txt">${esc(e.message)}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  } else {
+    h += '<div class="alert info">Nhập file thành công, không có lỗi.</div>';
+  }
+  openModal('Kết quả nhập file', h, '<button class="btn pri" onclick="closeModal()">Đóng</button>');
 }
 function renderNV() {
   const d = S.nvData; if (!d) return;

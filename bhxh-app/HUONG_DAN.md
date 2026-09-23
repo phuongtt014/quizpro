@@ -21,8 +21,9 @@ Mỗi công ty dùng **một file Google Sheet riêng**.
    - Mở file `Code.gs` có sẵn, xóa hết nội dung, rồi dán nội dung file **Code.gs**.
    - Bấm **＋ → HTML**, đặt tên **`Index`** (không gõ đuôi .html), dán nội dung **Index.html**.
    - Làm tương tự cho **`Styles`** và **`App`**.
-   - Vào **⚙ Cài đặt dự án**, tick **"Hiển thị tệp kê khai appsscript.json trong trình chỉnh sửa"**. Quay lại **Trình chỉnh sửa**, mở `appsscript.json` và dán nội dung file **appsscript.json**.
+   - Vào **⚙ Cài đặt dự án**, tick **"Hiển thị tệp kê khai appsscript.json trong trình chỉnh sửa"**. Quay lại **Trình chỉnh sửa**, mở `appsscript.json` và dán nội dung file **appsscript.json** (file này có khai báo dịch vụ **Drive API** – cần để đọc file Excel khi nhập danh sách nhân viên).
    - Bấm **💾 Lưu**.
+   - Kiểm tra: ở thanh bên trái có mục **Dịch vụ** (Services) — nếu chưa thấy **Drive API** trong danh sách, bấm dấu **+**, chọn **Drive API**, phiên bản **v3**, bấm **Thêm**.
 4. Quay lại Google Sheet và **tải lại trang (F5)**. Menu **BHXH** sẽ xuất hiện.
 5. Bấm **BHXH → 1. Khởi tạo / cập nhật cấu trúc**, rồi cấp quyền khi Google hỏi (Nâng cao → Đi tới…).
    App sẽ tự tạo các tab sau:
@@ -101,7 +102,27 @@ Admin có thể đổi *Email NV quản lý hồ sơ* của bất kỳ NV nào �
 - **Lương tối thiểu vùng:** NV có lương đóng thấp hơn mức ở *Thông tin chung* sẽ bị **cảnh báo**. App không tự sửa số.
 - **Truy thu/thoái thu** = Σ các tháng [tiền theo lương mới − tiền theo lương cũ], dùng tỉ lệ và mức trần của **chính tháng đó**. Số âm là thoái thu.
 
-## 6. Lưu ý
+## 6. Nhập / xuất Excel, CSV ở tab Nhân viên
+
+Màn hình **Nhân viên** có 4 nút:
+
+| Nút | Chức năng |
+|---|---|
+| ⬇ File mẫu (Excel/CSV) | Tải file trống có sẵn tiêu đề cột đúng chuẩn và 2 dòng ví dụ, để điền dữ liệu rồi nhập lại |
+| ⬇ Xuất Excel/CSV | Xuất danh sách đang xem (hồ sơ gốc hoặc một kỳ, trong phạm vi bạn được quản lý) ra file |
+| ⬆ Nhập từ file | Tải file .csv/.xlsx/.xls đã điền lên để thêm/cập nhật hoặc thay thế danh sách |
+
+**Quy tắc file:** dòng tiêu đề phải có ít nhất 2 cột **"Mã NV"** và **"Họ và tên"**, đặt tên giống file mẫu (có thể thêm/bớt cột khác, thứ tự cột tùy ý). Ngày dạng `dd/mm/yyyy`, tháng dạng `mm/yyyy`.
+
+**Hai cách nhập:**
+- **Thêm mới / cập nhật:** dòng có Mã NV chưa có thì thêm nhân viên mới; Mã NV đã có thì cập nhật lại thông tin. Dòng nào lỗi sẽ bị **bỏ qua** và báo cụ thể, các dòng còn lại vẫn được nhập.
+- **Thay thế hoàn toàn:** xóa toàn bộ danh sách đang xem (trong phạm vi bạn quản lý) và thay bằng đúng nội dung file. Nếu file có **bất kỳ dòng lỗi nào**, ứng dụng sẽ **không thay đổi gì** để tránh mất dữ liệu — sửa lỗi rồi nhập lại.
+
+Người **Nhập liệu** chỉ nhập/xuất được hồ sơ mình quản lý (theo *Email NV quản lý hồ sơ*); nhân viên mới do họ nhập sẽ tự gán email của họ. **Admin** không bị giới hạn này. Không nhập được vào kỳ đã chốt.
+
+**Nếu nhập file Excel (.xlsx) báo lỗi:** vào Apps Script, mục **Dịch vụ** (thanh bên trái) → bấm **+** → thêm **Drive API** (phiên bản v3) → Lưu. Hoặc lưu file dưới dạng **CSV** rồi nhập lại — CSV luôn hoạt động mà không cần bước này.
+
+## 7. Lưu ý
 
 - Không đổi tên các tab và tiêu đề cột. Có thể thêm cột riêng ở cuối, app sẽ bỏ qua các cột đó.
 - Tab *Kết quả tính* do app ghi lại mỗi lần bấm Tính. Không sửa tay tab này.
