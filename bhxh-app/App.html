@@ -5,7 +5,7 @@
 const S = {
   user: null, info: {}, kys: [], khoan: [], mapl: [], phongBan: [], lists: {}, today: '',
   view: 'tongquan', nvKy: null, nvData: null, ttKy: null, ttData: null,
-  rpTab: 'chitiet', rpKy: null, rpNam: null, rpData: null, setTab: 'info', pq: []
+  rpTab: 'chitiet', rpKy: null, rpNam: null, rpData: null, setTab: 'info', pq: [], impTab: 'paste'
 };
 const $ = (id) => document.getElementById(id);
 const V = () => $('view');
@@ -267,20 +267,26 @@ function nvExport(format) {
   act(async () => { download(await run('apiExportNV', S.nvKy, format)); toast('Đã xuất file.', 'ok'); });
 }
 function nvImportForm() {
-  const body = `<div class="alert info">File cần có tối thiểu 2 cột <b>Mã NV</b> và <b>Họ và tên</b>, đặt tên cột giống file mẫu
-      (có thể thêm/bớt các cột khác, thứ tự cột tùy ý). Bấm <b>"⬇ File mẫu"</b> ở trên nếu chưa có file.</div>
+  const tabBtn = (k, t) => `<button class="${S.impTab === k ? 'active' : ''}" onclick="S.impTab='${k}';nvImportForm()">${t}</button>`;
+  const body = `<div class="alert info">Dữ liệu cần có tối thiểu 2 cột <b>Mã NV</b> và <b>Họ và tên</b>, đặt tên cột giống file mẫu
+      (có thể thêm/bớt các cột khác, thứ tự cột tùy ý). Bấm <b>"⬇ File mẫu"</b> ở trên nếu chưa có.</div>
+    <div class="tabs" style="margin-bottom:12px">${tabBtn('paste', 'Dán trực tiếp')}${tabBtn('file', 'Chọn file')}</div>
     <form id="impF" onsubmit="return false"><div class="form">
-      <label class="full">Chọn file (.csv, .xlsx, .xls)<input type="file" id="impFile" accept=".csv,.xlsx,.xls"></label>
+      ${S.impTab === 'file'
+        ? '<label class="full">Chọn file (.csv, .xlsx, .xls)<input type="file" id="impFile" accept=".csv,.xlsx,.xls"></label>'
+        : '<label class="full">Dán dữ liệu (sao chép từ Excel/Google Sheet rồi dán vào đây, hoặc dán nội dung CSV)'
+          + '<textarea id="impPaste" rows="10" style="width:100%;font-family:monospace;font-size:12px" placeholder="Mã NV\tHọ và tên\tMức lương chính…"></textarea></label>'}
       <label class="full">Cách nhập<select id="impMode" onchange="impModeChange()">
         <option value="themmoi">Thêm nhân viên mới; nếu Mã NV đã có trong danh sách thì cập nhật thông tin</option>
-        <option value="thaythe">Thay thế hoàn toàn danh sách hiện tại bằng nội dung file</option>
+        <option value="thaythe">Thay thế hoàn toàn danh sách hiện tại bằng dữ liệu này</option>
       </select></label>
     </div></form>
     <div id="impWarn" class="alert warn" style="display:none;margin-top:10px">
-      <b>Thay thế hoàn toàn</b> sẽ xóa toàn bộ nhân viên đang có (trong phạm vi bạn quản lý) rồi thay bằng danh sách trong file.
-      Nếu file có bất kỳ dòng lỗi nào, ứng dụng sẽ KHÔNG xóa hay thay đổi gì cả.</div>`;
-  openModal('Nhập danh sách nhân viên từ file – ' + (S.nvData.ky ? 'kỳ ' + fmtM(S.nvData.ky) : 'hồ sơ gốc'), body,
-    `<button class="btn" onclick="closeModal()">Hủy</button><button class="btn pri" onclick="nvImportSubmit()">Nhập file</button>`);
+      <b>Thay thế hoàn toàn</b> sẽ xóa toàn bộ nhân viên đang có (trong phạm vi bạn quản lý) rồi thay bằng dữ liệu này.
+      Nếu có bất kỳ dòng lỗi nào, ứng dụng sẽ KHÔNG xóa hay thay đổi gì cả.</div>`;
+  openModal('Nhập danh sách nhân viên – ' + (S.nvData.ky ? 'kỳ ' + fmtM(S.nvData.ky) : 'hồ sơ gốc'), body,
+    `<button class="btn" onclick="closeModal()">Hủy</button><button class="btn pri" onclick="nvImportSubmit()">Nhập</button>`);
+  setTimeout(impModeChange, 0);
 }
 function impModeChange() { $('impWarn').style.display = $('impMode').value === 'thaythe' ? 'block' : 'none'; }
 function readFileB64(file) {
@@ -292,17 +298,25 @@ function readFileB64(file) {
   });
 }
 async function nvImportSubmit() {
-  const f = $('impFile').files[0];
-  if (!f) return toast('Chưa chọn file.', 'err');
   const mode = $('impMode').value;
-  if (mode === 'thaythe' && !confirm('Thay thế hoàn toàn danh sách hiện tại bằng nội dung file này?')) return;
-  act(async () => {
-    const b64 = await readFileB64(f);
-    const r = await run('apiImportNV', S.nvData.ky, mode, b64, f.name);
-    closeModal();
-    nvImportResult(r);
-    loadNV();
-  });
+  const label = mode === 'thaythe' ? 'Thay thế hoàn toàn danh sách hiện tại bằng dữ liệu này?' : '';
+  if (label && !confirm(label)) return;
+  if (S.impTab === 'file') {
+    const f = $('impFile').files[0];
+    if (!f) return toast('Chưa chọn file.', 'err');
+    act(async () => {
+      const b64 = await readFileB64(f);
+      const r = await run('apiImportNV', S.nvData.ky, mode, b64, f.name);
+      closeModal(); nvImportResult(r); loadNV();
+    });
+  } else {
+    const text = $('impPaste').value;
+    if (!text.trim()) return toast('Chưa dán dữ liệu.', 'err');
+    act(async () => {
+      const r = await run('apiImportNVText', S.nvData.ky, mode, text);
+      closeModal(); nvImportResult(r); loadNV();
+    });
+  }
 }
 function nvImportResult(r) {
   let h = `<div class="stats">

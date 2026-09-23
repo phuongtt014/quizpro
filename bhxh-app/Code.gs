@@ -1387,18 +1387,24 @@ function parseUploadedGrid_(fileB64, fileName) {
   const ext = String(fileName || '').toLowerCase().split('.').pop();
   let bytes;
   try { bytes = Utilities.base64Decode(fileB64); } catch (e) { throw new Error('File tải lên bị lỗi, hãy chọn lại file.'); }
-  if (ext === 'csv') {
-    let text = Utilities.newBlob(bytes).getDataAsString('UTF-8');
-    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); // bỏ BOM nếu có
-    const firstLine = text.split('\n')[0] || '';
-    const delim = firstLine.split(';').length > firstLine.split(',').length ? ';' : ',';
-    return Utilities.parseCsv(text, delim);
+  if (ext === 'csv' || ext === 'txt') {
+    return parseTextGrid_(Utilities.newBlob(bytes).getDataAsString('UTF-8'));
   }
   if (ext === 'xlsx' || ext === 'xls') {
     const mime = ext === 'xls' ? 'application/vnd.ms-excel' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     return convertXlsxToRows_(Utilities.newBlob(bytes, mime, fileName));
   }
   throw new Error('Chỉ hỗ trợ file .csv, .xlsx hoặc .xls.');
+}
+
+/** Chuyển văn bản dán trực tiếp (CSV/TSV) thành lưới giá trị, tự nhận diện dấu phân cách (tab/;/,) */
+function parseTextGrid_(text) {
+  text = String(text === null || text === undefined ? '' : text);
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); // bỏ BOM nếu có
+  const firstLine = text.split('\n')[0] || '';
+  const counts = { '\t': firstLine.split('\t').length, ';': firstLine.split(';').length, ',': firstLine.split(',').length };
+  const delim = Object.keys(counts).reduce(function (a, b) { return counts[b] > counts[a] ? b : a; }, ',');
+  return Utilities.parseCsv(text, delim);
 }
 
 /** Chuyển file Excel thành lưới giá trị bằng cách tạo bản Google Sheet tạm thời (Drive API) */
@@ -1426,12 +1432,21 @@ function convertXlsxToRows_(blob) {
  *                   dòng lỗi thì KHÔNG thay đổi gì cả, để tránh mất dữ liệu.
  */
 function apiImportNV(ky, mode, fileB64, fileName) {
+  return importNVGrid_(ky, mode, parseUploadedGrid_(fileB64, fileName), fileName);
+}
+
+/** Nhập danh sách nhân viên từ văn bản dán trực tiếp (CSV/TSV) – không cần chọn file. */
+function apiImportNVText(ky, mode, text) {
+  if (!String(text || '').trim()) throw new Error('Chưa dán dữ liệu.');
+  return importNVGrid_(ky, mode, parseTextGrid_(text), 'dán trực tiếp');
+}
+
+function importNVGrid_(ky, mode, grid, source) {
   const user = getUser_();
   requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
   ky = normMonth_(ky);
   return withLock_(function () {
     if (ky) requireOpen_(ky);
-    const grid = parseUploadedGrid_(fileB64, fileName);
     const parsed = gridToObjects_(T.NV.cols, grid);
     if (parsed.error) throw new Error(parsed.error);
     if (!parsed.objs.length) throw new Error('File không có dòng dữ liệu nào.');
@@ -1472,7 +1487,7 @@ function apiImportNV(ky, mode, fileB64, fileName) {
       const toInsert = cleaned.map(function (c) { return c.obj; });
       if (applyToMaster) append_(T.NV, toInsert);
       if (ky) append_(T.DLKY, toInsert.map(function (o) { return Object.assign({ ky: ky }, o); }));
-      log_(user, 'Import NV (thay thế)', (ky ? 'Kỳ ' + monthDisp_(ky) : 'Hồ sơ gốc') + ' – ' + toInsert.length + ' NV từ file ' + fileName);
+      log_(user, 'Import NV (thay thế)', (ky ? 'Kỳ ' + monthDisp_(ky) : 'Hồ sơ gốc') + ' – ' + toInsert.length + ' NV từ ' + source);
       return { mode: mode, added: toInsert.length, updated: 0, deleted: delNV.length, total: parsed.objs.length, errors: [] };
     }
 
@@ -1493,7 +1508,7 @@ function apiImportNV(ky, mode, fileB64, fileName) {
     if (newMaster.length) append_(T.NV, newMaster);
     if (newDL.length) append_(T.DLKY, newDL);
     log_(user, 'Import NV (thêm/cập nhật)', (ky ? 'Kỳ ' + monthDisp_(ky) : 'Hồ sơ gốc') + ' – ' + added + ' thêm, ' + updated
-      + ' cập nhật từ file ' + fileName + (errors.length ? ', ' + errors.length + ' dòng lỗi bị bỏ qua' : ''));
+      + ' cập nhật từ ' + source + (errors.length ? ', ' + errors.length + ' dòng lỗi bị bỏ qua' : ''));
     return { mode: mode, added: added, updated: updated, deleted: 0, total: parsed.objs.length, errors: errors };
   });
 }

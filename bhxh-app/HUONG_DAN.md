@@ -110,9 +110,13 @@ Màn hình **Nhân viên** có 4 nút:
 |---|---|
 | ⬇ File mẫu (Excel/CSV) | Tải file trống có sẵn tiêu đề cột đúng chuẩn và 2 dòng ví dụ, để điền dữ liệu rồi nhập lại |
 | ⬇ Xuất Excel/CSV | Xuất danh sách đang xem (hồ sơ gốc hoặc một kỳ, trong phạm vi bạn được quản lý) ra file |
-| ⬆ Nhập từ file | Tải file .csv/.xlsx/.xls đã điền lên để thêm/cập nhật hoặc thay thế danh sách |
+| ⬆ Nhập từ file | Mở hộp nhập, có 2 tab: **"Dán trực tiếp"** và **"Chọn file"** |
 
-**Quy tắc file:** dòng tiêu đề phải có ít nhất 2 cột **"Mã NV"** và **"Họ và tên"**, đặt tên giống file mẫu (có thể thêm/bớt cột khác, thứ tự cột tùy ý). Ngày dạng `dd/mm/yyyy`, tháng dạng `mm/yyyy`.
+**Dán trực tiếp** (không cần lưu file): mở file mẫu hoặc bảng tính đang có, chọn và **sao chép (Ctrl+C)** vùng dữ liệu kể cả dòng tiêu đề, rồi **dán (Ctrl+V)** vào ô văn bản trong hộp nhập. Ứng dụng tự nhận diện dấu phân cách (tab khi dán từ Excel/Google Sheet, hoặc dấu phẩy/chấm phẩy nếu dán văn bản CSV).
+
+**Chọn file:** tải lên file .csv/.xlsx/.xls đã điền.
+
+**Quy tắc dữ liệu:** dòng tiêu đề phải có ít nhất 2 cột **"Mã NV"** và **"Họ và tên"**, đặt tên giống file mẫu (có thể thêm/bớt cột khác, thứ tự cột tùy ý). Ngày dạng `dd/mm/yyyy`, tháng dạng `mm/yyyy`.
 
 **Hai cách nhập:**
 - **Thêm mới / cập nhật:** dòng có Mã NV chưa có thì thêm nhân viên mới; Mã NV đã có thì cập nhật lại thông tin. Dòng nào lỗi sẽ bị **bỏ qua** và báo cụ thể, các dòng còn lại vẫn được nhập.
