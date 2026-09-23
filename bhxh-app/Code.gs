@@ -190,7 +190,7 @@ function menuTinhLuongDong() {
 // KHỞI TẠO CẤU TRÚC
 // ---------------------------------------------------------------------
 function khoiTaoCauTruc() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = activeSS_();
   ss.setSpreadsheetTimeZone('Asia/Ho_Chi_Minh');
   const me = (Session.getEffectiveUser().getEmail() || '').toLowerCase();
 
@@ -278,7 +278,18 @@ function khoiTaoCauTruc() {
   v(T.PQ, 'Vai trò', LISTS.role);
   v(T.PQ, 'Trạng thái', LISTS.pqTrangThai);
 
-  SpreadsheetApp.getActive().toast('Đã khởi tạo cấu trúc. Hãy kiểm tra các tab Thông tin chung, Khoản trích đóng, Mã phân loại.', 'BHXH', 8);
+  try { ss.toast('Đã khởi tạo cấu trúc. Hãy kiểm tra các tab Thông tin chung, Khoản trích đóng, Mã phân loại.', 'BHXH', 8); } catch (e) { /* không có giao diện Sheet */ }
+  return 'OK';
+}
+
+/** Lấy file Sheet chứa script; báo lỗi rõ ràng nếu script không gắn với Sheet */
+function activeSS_() {
+  const ss = SpreadsheetApp.getActive();
+  if (!ss) {
+    throw new Error('Script chưa gắn với Google Sheet. Hãy mở Google Sheet → Tiện ích mở rộng → Apps Script '
+      + 'và dán code vào đó (không tạo project riêng tại script.google.com).');
+  }
+  return ss;
 }
 
 function ensureSheet_(t) {
@@ -377,7 +388,7 @@ function withLock_(fn) {
 // LỚP TRUY CẬP BẢNG (SHEET)
 // ---------------------------------------------------------------------
 function getSheet_(t) {
-  const sh = SpreadsheetApp.getActive().getSheetByName(t.name);
+  const sh = activeSS_().getSheetByName(t.name);
   if (!sh) throw new Error('Không tìm thấy tab "' + t.name + '". Hãy chạy menu BHXH > Khởi tạo / cập nhật cấu trúc.');
   return sh;
 }
@@ -709,6 +720,11 @@ function writeKQ_(ky, out, codes) {
 // API: KHỞI ĐỘNG
 // ---------------------------------------------------------------------
 function apiBootstrap() {
+  // Lần đầu chủ sở hữu mở web app mà chưa có cấu trúc -> tự khởi tạo
+  const ss = activeSS_();
+  const me = (Session.getActiveUser().getEmail() || '').toLowerCase();
+  const owner = (Session.getEffectiveUser().getEmail() || '').toLowerCase();
+  if (!ss.getSheetByName(T.PQ.name) && me && me === owner) khoiTaoCauTruc();
   const user = getUser_();
   return {
     user: user,
