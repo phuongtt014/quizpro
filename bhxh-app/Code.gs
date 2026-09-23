@@ -1074,15 +1074,31 @@ function apiBaoCaoChiTiet(ky) {
   const k = getKy_(ky);
   const kq = loadKQAll_();
   const rows = kq.rows.filter(function (r) { return r.ky === ky && canSee_(user, r); });
-  const ten = khoanTen_(load_(T.KHOAN).rows);
+  const khoanRows = load_(T.KHOAN).rows;
+  const ten = khoanTen_(khoanRows);
+  const cdSet = congDoanCodes_(khoanRows);
   const tong = {};
   rows.forEach(function (r) { Object.keys(r.items).forEach(function (c) { tong[c] = (tong[c] || 0) + Math.abs(r.items[c]); }); });
-  const codes = kq.codes.filter(function (c) { return tong[c]; }).map(function (c) {
+  const allCodes = kq.codes.filter(function (c) { return tong[c]; }).map(function (c) {
     return ten[c] || { ma: c, ten: c, doiTuong: c.slice(-2) === 'DN' ? DT_DN : DT_NLD };
   });
+  // Tách riêng các khoản "Thuộc quỹ Công đoàn" (đoàn phí NLĐ, kinh phí công đoàn DN) ra sau cùng
+  const codes = allCodes.filter(function (c) { return !cdSet[c.ma]; });
+  const codesCD = allCodes.filter(function (c) { return cdSet[c.ma]; });
   codes.sort(function (a, b) { return (a.doiTuong === DT_DN) - (b.doiTuong === DT_DN); });
+  codesCD.sort(function (a, b) { return (a.doiTuong === DT_DN) - (b.doiTuong === DT_DN); });
+  rows.forEach(function (r) {
+    let cdNLD = 0, cdDN = 0;
+    codesCD.forEach(function (c) {
+      const v = r.items[c.ma] || 0;
+      if (c.doiTuong === DT_DN) cdDN += v; else cdNLD += v;
+    });
+    r.cdNLD = cdNLD; r.cdDN = cdDN;
+    r.tongNLDChinh = r.tongNLD - cdNLD; // Tổng BHXH NLĐ không gồm đoàn phí công đoàn
+    r.tongDNChinh = r.tongDN - cdDN; // Tổng BHXH DN không gồm kinh phí công đoàn
+  });
   const tt = load_(T.TT).rows.filter(function (r) { return r.ky === ky && canSee_(user, r); });
-  return { info: getInfo_(), ky: ky, kyInfo: k, codes: codes, rows: rows, truyThu: tt };
+  return { info: getInfo_(), ky: ky, kyInfo: k, codes: codes, codesCD: codesCD, rows: rows, truyThu: tt };
 }
 
 function apiBienDong(ky) {
@@ -1171,43 +1187,34 @@ function congDoanCodes_(khoanRows) {
   return set;
 }
 
-/** Bảng phân tách quỹ Công đoàn theo kỳ trong năm: giữ lại cơ sở / nộp Công đoàn Việt Nam */
-function apiCongDoan(nam) {
+/** Bảng phân tách quỹ Công đoàn chi tiết theo từng nhân viên/phòng ban trong một kỳ */
+function apiCongDoanChiTiet(ky) {
   const user = getUser_();
-  nam = String(nam);
-  const info = getInfo_();
-  const tlRows = load_(T.TLCD).rows;
+  ky = normMonth_(ky);
+  const k = getKy_(ky);
   const khoanRows = load_(T.KHOAN).rows;
   const cdCodes = congDoanCodes_(khoanRows);
   const ten = khoanTen_(khoanRows);
-  const all = listKy_();
-  const years = [];
-  all.forEach(function (k) { const y = k.ky.slice(0, 4); if (years.indexOf(y) < 0) years.push(y); });
-  const kys = all.filter(function (k) { return k.ky.slice(0, 4) === nam; }).reverse();
-  const kq = loadKQAll_().rows.filter(function (r) { return r.ky.slice(0, 4) === nam && r.dong === CO && canSee_(user, r); });
-  const months = kys.map(function (k) {
-    let nld = 0, dn = 0;
-    kq.filter(function (r) { return r.ky === k.ky; }).forEach(function (r) {
-      Object.keys(r.items).forEach(function (c) {
-        if (!cdCodes[c]) return;
-        if ((ten[c] || {}).doiTuong === DT_DN) dn += r.items[c]; else nld += r.items[c];
-      });
+  const tlRows = load_(T.TLCD).rows;
+  const tl = tyLeGiuLaiHieuLuc_(tlRows, ky);
+  const kq = loadKQAll_().rows.filter(function (r) { return r.ky === ky && canSee_(user, r); });
+  const rows = kq.filter(function (r) { return r.dong === CO; }).map(function (r) {
+    let cdNLD = 0, cdDN = 0;
+    Object.keys(r.items).forEach(function (c) {
+      if (!cdCodes[c]) return;
+      if ((ten[c] || {}).doiTuong === DT_DN) cdDN += r.items[c]; else cdNLD += r.items[c];
     });
-    const tong = nld + dn;
-    const tl = tyLeGiuLaiHieuLuc_(tlRows, k.ky);
-    const giuLaiNLD = Math.round(nld * tl.nld / 100);
-    const giuLaiDN = Math.round(dn * tl.dn / 100);
+    const giuLaiNLD = Math.round(cdNLD * tl.nld / 100);
+    const giuLaiDN = Math.round(cdDN * tl.dn / 100);
     return {
-      ky: k.ky, trangThai: k.trangThai, daTinh: !!k.ngayTinh, nld: nld, dn: dn, tong: tong,
-      tyLeNLD: tl.nld, tyLeDN: tl.dn,
-      giuLaiNLD: giuLaiNLD, giuLaiDN: giuLaiDN, giuLai: giuLaiNLD + giuLaiDN,
-      nopNLD: nld - giuLaiNLD, nopDN: dn - giuLaiDN, nop: (nld - giuLaiNLD) + (dn - giuLaiDN)
+      maNV: r.maNV, hoTen: r.hoTen, maBHXH: r.maBHXH, phongBan: r.phongBan, chucDanh: r.chucDanh, maPL: r.maPL,
+      luongDong: r.luongDong, cdNLD: cdNLD, giuLaiNLD: giuLaiNLD, nopNLD: cdNLD - giuLaiNLD,
+      cdDN: cdDN, giuLaiDN: giuLaiDN, nopDN: cdDN - giuLaiDN
     };
   });
-  const hienTai = tyLeGiuLaiHieuLuc_(tlRows, Utilities.formatDate(new Date(), tz_(), 'yyyy-MM'));
   return {
-    info: info, nam: nam, years: years, tyLeNLD: hienTai.nld, tyLeDN: hienTai.dn,
-    coCauHinh: Object.keys(cdCodes).length > 0, coTyLe: tlRows.length > 0, months: months, lichSuTyLe: tlRows
+    info: getInfo_(), ky: ky, kyInfo: k, tyLeNLD: tl.nld, tyLeDN: tl.dn,
+    coCauHinh: Object.keys(cdCodes).length > 0, coTyLe: tlRows.length > 0, rows: rows
   };
 }
 
@@ -1222,14 +1229,24 @@ function apiXuat(loai, thamSo, format) {
 function buildDoc_(loai, p) {
   if (loai === 'chitiet') {
     const d = apiBaoCaoChiTiet(p);
+    const codesNLD = d.codes.filter(function (c) { return c.doiTuong !== DT_DN; });
+    const codesDN = d.codes.filter(function (c) { return c.doiTuong === DT_DN; });
     const header = ['STT', 'Mã NV', 'Họ và tên', 'Mã số BHXH', 'Đơn vị_Phòng ban', 'Mã PL', 'Lương đóng BHXH']
-      .concat(d.codes.map(function (c) { return c.ten + ' (' + c.ma + ')'; }))
+      .concat(codesNLD.map(function (c) { return c.ten + ' (' + c.ma + ')'; }))
+      .concat(['Tổng BHXH NLĐ (không gồm Đoàn phí CĐ)'])
+      .concat(codesDN.map(function (c) { return c.ten + ' (' + c.ma + ')'; }))
+      .concat(['Tổng BHXH DN (không gồm KPCĐ)'])
+      .concat(d.codesCD.map(function (c) { return c.ten + ' (' + c.ma + ')'; }))
       .concat(['Tổng NLĐ', 'Tổng DN', 'Tổng cộng', 'Ghi chú']);
     const dong = d.rows.filter(function (r) { return r.dong === CO; })
       .sort(function (a, b) { return (a.phongBan + a.maNV) < (b.phongBan + b.maNV) ? -1 : 1; });
     const rows = dong.map(function (r, i) {
       return [i + 1, r.maNV, r.hoTen, r.maBHXH, r.phongBan, r.maPL, r.luongDong]
-        .concat(d.codes.map(function (c) { return r.items[c.ma] || 0; }))
+        .concat(codesNLD.map(function (c) { return r.items[c.ma] || 0; }))
+        .concat([r.tongNLDChinh])
+        .concat(codesDN.map(function (c) { return r.items[c.ma] || 0; }))
+        .concat([r.tongDNChinh])
+        .concat(d.codesCD.map(function (c) { return r.items[c.ma] || 0; }))
         .concat([r.tongNLD, r.tongDN, r.tongCong, r.canhBao]);
     });
     const sum = function (col) { return rows.reduce(function (s, r) { return s + (Number(r[col]) || 0); }, 0); };
@@ -1288,19 +1305,20 @@ function buildDoc_(loai, p) {
     };
   }
   if (loai === 'congdoan') {
-    const d = apiCongDoan(p);
-    const header = ['Kỳ',
-      'Đoàn phí NLĐ (thu)', 'Tỉ lệ giữ lại NLĐ (%)', 'Giữ lại cơ sở (NLĐ)', 'Nộp Công đoàn VN (NLĐ)',
-      'Kinh phí DN (thu)', 'Tỉ lệ giữ lại DN (%)', 'Giữ lại cơ sở (DN)', 'Nộp Công đoàn VN (DN)',
-      'Tổng giữ lại cơ sở', 'Tổng nộp Công đoàn VN'];
-    const rows = d.months.map(function (m) {
-      return [monthDisp_(m.ky), m.nld, m.tyLeNLD, m.giuLaiNLD, m.nopNLD, m.dn, m.tyLeDN, m.giuLaiDN, m.nopDN, m.giuLai, m.nop];
-    });
+    const d = apiCongDoanChiTiet(p);
+    const header = ['STT', 'Mã NV', 'Họ và tên', 'Mã số BHXH', 'Đơn vị_Phòng ban', 'Mã PL', 'Lương đóng BHXH',
+      'Đoàn phí công đoàn (NLĐ)', 'Tỉ lệ giữ lại NLĐ (%)', 'Giữ lại cơ sở (NLĐ)', 'Nộp Công đoàn VN (NLĐ)',
+      'Kinh phí công đoàn (DN)', 'Tỉ lệ giữ lại DN (%)', 'Giữ lại cơ sở (DN)', 'Nộp Công đoàn VN (DN)'];
+    const rows = d.rows.slice().sort(function (a, b) { return (a.phongBan + a.maNV) < (b.phongBan + b.maNV) ? -1 : 1; })
+      .map(function (r, i) {
+        return [i + 1, r.maNV, r.hoTen, r.maBHXH, r.phongBan, r.maPL, r.luongDong,
+          r.cdNLD, d.tyLeNLD, r.giuLaiNLD, r.nopNLD, r.cdDN, d.tyLeDN, r.giuLaiDN, r.nopDN];
+      });
     const s = function (i) { return rows.reduce(function (a, r) { return a + r[i]; }, 0); };
-    const total = ['CẢ NĂM', s(1), '', s(3), s(4), s(5), '', s(7), s(8), s(9), s(10)];
+    const total = ['', '', 'TỔNG CỘNG', '', '', '', s(6), s(7), '', s(9), s(10), s(11), '', s(13), s(14)];
     return {
-      info: d.info, title: 'BẢNG PHÂN TÁCH QUỸ CÔNG ĐOÀN NĂM ' + d.nam, fileName: 'CongDoan_' + d.nam,
-      sections: [{ title: '', header: header, rows: rows, total: total, numCols: [1, 3, 4, 5, 7, 8, 9, 10] }]
+      info: d.info, title: 'BẢNG PHÂN TÁCH QUỸ CÔNG ĐOÀN – KỲ ' + monthDisp_(d.ky), fileName: 'CongDoan_' + d.ky,
+      sections: [{ title: '', header: header, rows: rows, total: total, numCols: [6, 7, 9, 10, 11, 13, 14] }]
     };
   }
   throw new Error('Loại báo cáo không hợp lệ.');

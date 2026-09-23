@@ -98,7 +98,7 @@ Admin có thể đổi *Email NV quản lý hồ sơ* của bất kỳ NV nào �
   - *Mức lương đóng tối đa*: tiền = min(Lương đóng, Mức tối đa) × Tỉ lệ.
   - *Mức đóng tối đa*: tiền = min(Lương đóng × Tỉ lệ, Mức tối đa).
   - *Không áp dụng*: tiền = Lương đóng × Tỉ lệ.
-- **Công đoàn:** khoản có *Chỉ áp dụng đoàn viên công đoàn = Có* (ví dụ đoàn phí) chỉ tính cho NV có *Tham gia công đoàn = Có*. Kinh phí công đoàn (DN) tính cho tất cả NV thuộc mã phân loại có khoản đó.
+- **Công đoàn:** khoản có *Chỉ áp dụng đoàn viên công đoàn = Có* (ví dụ đoàn phí) chỉ tính cho NV có *Tham gia công đoàn = Có*. Kinh phí công đoàn (DN) tính cho tất cả NV thuộc mã phân loại có khoản đó. Ở *Báo cáo → Bảng tính chi tiết*, các khoản đánh dấu *Thuộc quỹ Công đoàn* được tách ra cột riêng ở cuối bảng; cột *Tổng BHXH NLĐ*/*Tổng BHXH DN* không gồm các khoản này, còn *Tổng NLĐ*/*Tổng DN*/*Tổng cộng* vẫn là tổng đầy đủ.
 - **Làm tròn:** từng khoản của từng NV làm tròn đến 1 đồng. Tổng bằng cộng các số đã làm tròn.
 - **Lương tối thiểu vùng:** NV có lương đóng thấp hơn mức ở *Thông tin chung* sẽ bị **cảnh báo**. App không tự sửa số.
 - **Truy thu/thoái thu** = Σ các tháng [tiền theo lương mới − tiền theo lương cũ], dùng tỉ lệ và mức trần của **chính tháng đó**. Số âm là thoái thu.
@@ -135,9 +135,17 @@ Người **Nhập liệu** chỉ nhập/xuất được hồ sơ mình quản l�
 1. Vào **Thiết lập → Khoản trích đóng**, sửa khoản **Đoàn phí công đoàn (NLĐ)** và **Kinh phí công đoàn (DN)** (hoặc khoản tương đương do bạn đặt), chọn **"Thuộc quỹ Công đoàn" = Có**. Đây là dấu hiệu để ứng dụng biết khoản nào tính vào quỹ Công đoàn – không phụ thuộc tên/mã khoản.
 2. Vào **Thiết lập → Tỉ lệ Công đoàn**, thêm **hai** tỉ lệ giữ lại riêng: một cho **Đoàn phí công đoàn (NLĐ)**, một cho **Kinh phí công đoàn (DN)**, cùng **Ngày hiệu lực**. Tỉ lệ nộp Công đoàn Việt Nam của mỗi bên tự tính = 100% − tỉ lệ giữ lại tương ứng.
    - Giống tab Khoản trích đóng: mỗi khi tỉ lệ thay đổi, bấm **"＋ Thêm phiên bản"** để thêm dòng mới với ngày hiệu lực mới, **không sửa dòng cũ**. Mỗi kỳ tự dùng đúng tỉ lệ có hiệu lực tại tháng đó (dòng có ngày hiệu lực gần nhất nhưng ≤ cuối tháng), nên kỳ cũ luôn giữ đúng tỉ lệ tại thời điểm đó dù sau này tỉ lệ có đổi.
-3. Vào **Báo cáo → Công đoàn**, chọn năm để xem 3 bảng: **Đoàn phí NLĐ** (thu, tỉ lệ giữ lại, giữ lại cơ sở, nộp Công đoàn VN), **Kinh phí công đoàn DN** (tương tự), và **Tổng hợp cả 2 nguồn**. Có thể xuất Excel/PDF (file gồm đầy đủ số liệu tách riêng NLĐ/DN).
+3. Vào **Báo cáo → Công đoàn**, chọn **kỳ** để xem bảng chi tiết theo từng nhân viên, nhóm theo phòng ban (giống cấu trúc *Bảng tính chi tiết*): Lương đóng, Đoàn phí NLĐ (thu/giữ lại/nộp), Kinh phí công đoàn DN (thu/giữ lại/nộp), tổng giữ lại và tổng nộp Công đoàn Việt Nam. Có thể tìm theo mã NV/họ tên, lọc theo mã PL, và xuất Excel/PDF.
 
-## 8. Lưu ý
+## 8. Tìm kiếm và lọc ở Bảng tính chi tiết / Công đoàn
+
+Hai màn hình này có thêm:
+- **Ô tìm kiếm**: gõ mã NV hoặc họ tên để lọc nhanh (không phân biệt hoa/thường).
+- **Lọc theo Mã PL**: chỉ xem nhân viên thuộc một mã phân loại.
+
+Dòng tổng/cộng theo phòng ban và tổng cộng cuối bảng tự tính lại theo đúng những dòng đang hiển thị sau khi lọc.
+
+## 9. Lưu ý
 
 - **Sửa tay trên Google Sheet:** Nhân viên, Kỳ BHXH, Truy thu, và mọi tính toán/báo cáo luôn đọc dữ liệu **mới nhất** từ Sheet mỗi lần bạn mở màn hình đó hoặc bấm Tính — sửa tay xong là có tác dụng ngay. Riêng 5 danh mục **Khoản trích đóng, Mã phân loại, Tỉ lệ Công đoàn, Phòng ban, Thông tin chung** chỉ được tải **một lần lúc mở trang** để dùng cho dropdown; sửa tay trên Sheet sẽ không hiện ngay trên các màn hình đó. Bấm nút **"🔄 Làm mới dữ liệu"** ở góc trên (hoặc tải lại trang F5) để nạp lại.
 - Không đổi tên các tab và tiêu đề cột. Có thể thêm cột riêng ở cuối, app sẽ bỏ qua các cột đó.

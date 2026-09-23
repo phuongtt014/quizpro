@@ -531,22 +531,32 @@ function vBaoCao() {
   if (!S.kys.length) { $('rpBar').innerHTML = 'Chưa có kỳ BHXH nào.'; return; }
   const exp = (loai, p) => `<button class="btn" onclick="xuat('${loai}','${p}','xlsx')">⬇ Excel</button>
     <button class="btn" onclick="xuat('${loai}','${p}','pdf')">⬇ PDF</button>`;
-  if (S.rpTab === 'tonghop' || S.rpTab === 'congdoan') {
+  if (S.rpTab === 'tonghop') {
     const years = [...new Set(S.kys.map((k) => k.ky.slice(0, 4)))];
     $('rpBar').innerHTML = `<div class="row"><select onchange="S.rpNam=this.value;vBaoCao()">${opt(years, S.rpNam)}</select>
-      <span class="spacer"></span>${exp(S.rpTab, S.rpNam)}</div>`;
-    S.rpTab === 'tonghop' ? rpTongHop() : rpCongDoan();
+      <span class="spacer"></span>${exp('tonghop', S.rpNam)}</div>`;
+    rpTongHop();
   } else {
+    const showFilter = S.rpTab === 'chitiet' || S.rpTab === 'congdoan';
     $('rpBar').innerHTML = `<div class="row"><select onchange="S.rpKy=this.value;vBaoCao()">${kyOpts(S.rpKy)}</select>
-      ${S.rpTab === 'chitiet' ? '<label class="small"><input type="checkbox" id="rpAll" onchange="renderChiTiet()"> Hiện cả NV không đóng</label>' : ''}
+      ${showFilter ? `<input id="rpQ" placeholder="Tìm mã NV, họ tên…" style="min-width:220px" oninput="rpRefilter()">
+        <select id="rpPL" onchange="rpRefilter()">${opt(S.mapl.map((m) => m.ma), '', 'Tất cả mã PL')}</select>` : ''}
+      ${S.rpTab === 'chitiet' ? '<label class="small"><input type="checkbox" id="rpAll" onchange="rpRefilter()"> Hiện cả NV không đóng</label>' : ''}
       <span class="spacer"></span>${exp(S.rpTab, S.rpKy)}</div>`;
-    S.rpTab === 'chitiet' ? rpChiTiet() : rpBienDong();
+    ({ chitiet: rpChiTiet, biendong: rpBienDong, congdoan: rpCongDoan }[S.rpTab])();
   }
+}
+function rpRefilter() {
+  if (S.rpTab === 'chitiet') renderChiTiet();
+  else if (S.rpTab === 'congdoan') renderCongDoan();
 }
 async function rpCongDoan() {
   $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>';
-  let d;
-  try { d = await run('apiCongDoan', S.rpNam); } catch (e) { $('rpBody').innerHTML = ''; return; }
+  try { S.rpCD = await run('apiCongDoanChiTiet', S.rpKy); } catch (e) { $('rpBody').innerHTML = ''; return; }
+  renderCongDoan();
+}
+function renderCongDoan() {
+  const d = S.rpCD; if (!d) return;
   if (!d.coCauHinh) {
     $('rpBody').innerHTML = `<div class="alert warn">Chưa có khoản trích đóng nào được đánh dấu <b>"Thuộc quỹ Công đoàn"</b>.
       Vào <b>Thiết lập → Khoản trích đóng</b>, sửa khoản đoàn phí (NLĐ) và kinh phí công đoàn (DN), chọn "Thuộc quỹ Công đoàn = Có".</div>`;
@@ -556,40 +566,50 @@ async function rpCongDoan() {
     $('rpBody').innerHTML = `<div class="alert warn">Chưa thiết lập tỉ lệ giữ lại Công đoàn cơ sở. Vào <b>Thiết lập → Tỉ lệ Công đoàn</b> để thêm.</div>`;
     return;
   }
-  const s = (f) => d.months.reduce((a, m) => a + (Number(f(m)) || 0), 0);
-  let h = `<div class="alert info">Tỉ lệ giữ lại hiện tại: Đoàn phí NLĐ <b>${d.tyLeNLD}%</b>, Kinh phí công đoàn DN <b>${d.tyLeDN}%</b>.
-    Mỗi kỳ dưới đây dùng đúng tỉ lệ có hiệu lực tại tháng đó – xem hoặc đổi ở <b>Thiết lập → Tỉ lệ Công đoàn</b>.</div>
+  if (!d.rows.length) {
+    $('rpBody').innerHTML = `<div class="alert warn">Kỳ ${fmtM(d.ky)} chưa được tính (hoặc bạn chưa được giao hồ sơ nào). Vào <b>Kỳ BHXH</b> bấm <b>Tính</b>.</div>`;
+    return;
+  }
+  const q = ($('rpQ') ? $('rpQ').value : '').toLowerCase().trim();
+  const pl = $('rpPL') ? $('rpPL').value : '';
+  const rows = d.rows.filter((r) => (!q || [r.maNV, r.hoTen, r.maBHXH].join(' ').toLowerCase().includes(q)) && (!pl || r.maPL === pl))
+    .sort((a, b) => (a.phongBan + a.maNV).localeCompare(b.phongBan + b.maNV, 'vi'));
+  const sum = (arr, f) => arr.reduce((s, r) => s + (Number(f(r)) || 0), 0);
+  let h = `<div class="alert info">Tỉ lệ giữ lại cơ sở dùng cho kỳ ${fmtM(d.ky)}: Đoàn phí NLĐ <b>${fmtPct(d.tyLeNLD)}%</b>, Kinh phí công đoàn DN <b>${fmtPct(d.tyLeDN)}%</b>.
+    Đổi ở <b>Thiết lập → Tỉ lệ Công đoàn</b>.</div>
     <div class="stats">
-    <div class="stat"><div class="lbl">Tổng thu Công đoàn cả năm</div><div class="val">${fmt(s((m) => m.tong))}</div></div>
-    <div class="stat"><div class="lbl">Giữ lại cơ sở</div><div class="val">${fmt(s((m) => m.giuLai))}</div></div>
-    <div class="stat"><div class="lbl">Nộp Công đoàn Việt Nam</div><div class="val">${fmt(s((m) => m.nop))}</div></div>
-    </div>
-    <div class="card"><h3>Đoàn phí công đoàn (NLĐ)</h3><div class="tbl-wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th>
-    <th class="num">Thu Đoàn phí</th><th class="num">Tỉ lệ giữ lại</th><th class="num">Giữ lại cơ sở</th><th class="num">Nộp Công đoàn VN</th></tr></thead><tbody>
-    ${d.months.map((m) => `<tr><td><b>${fmtM(m.ky)}</b></td><td>${kyBadge(m.trangThai)} ${m.daTinh ? '' : '<span class="badge warn">Chưa tính</span>'}</td>
-      <td class="num">${fmt(m.nld)}</td><td class="num">${fmtPct(m.tyLeNLD)}%</td>
-      <td class="num">${fmt(m.giuLaiNLD)}</td><td class="num"><b>${fmt(m.nopNLD)}</b></td></tr>`).join('')
-      || '<tr><td colspan="6" class="muted">Chưa có kỳ nào trong năm.</td></tr>'}
-    <tr class="total"><td colspan="2">CẢ NĂM</td><td class="num">${fmt(s((m) => m.nld))}</td><td></td>
-      <td class="num">${fmt(s((m) => m.giuLaiNLD))}</td><td class="num">${fmt(s((m) => m.nopNLD))}</td></tr>
-    </tbody></table></div></div>
-    <div class="card"><h3>Kinh phí công đoàn (DN)</h3><div class="tbl-wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th>
-    <th class="num">Thu Kinh phí</th><th class="num">Tỉ lệ giữ lại</th><th class="num">Giữ lại cơ sở</th><th class="num">Nộp Công đoàn VN</th></tr></thead><tbody>
-    ${d.months.map((m) => `<tr><td><b>${fmtM(m.ky)}</b></td><td>${kyBadge(m.trangThai)} ${m.daTinh ? '' : '<span class="badge warn">Chưa tính</span>'}</td>
-      <td class="num">${fmt(m.dn)}</td><td class="num">${fmtPct(m.tyLeDN)}%</td>
-      <td class="num">${fmt(m.giuLaiDN)}</td><td class="num"><b>${fmt(m.nopDN)}</b></td></tr>`).join('')
-      || '<tr><td colspan="6" class="muted">Chưa có kỳ nào trong năm.</td></tr>'}
-    <tr class="total"><td colspan="2">CẢ NĂM</td><td class="num">${fmt(s((m) => m.dn))}</td><td></td>
-      <td class="num">${fmt(s((m) => m.giuLaiDN))}</td><td class="num">${fmt(s((m) => m.nopDN))}</td></tr>
-    </tbody></table></div></div>
-    <div class="card"><h3>Tổng hợp cả 2 nguồn</h3><div class="tbl-wrap"><table><thead><tr><th>Kỳ</th><th class="num">Tổng thu</th>
-    <th class="num">Tổng giữ lại cơ sở</th><th class="num">Tổng nộp Công đoàn VN</th></tr></thead><tbody>
-    ${d.months.map((m) => `<tr><td><b>${fmtM(m.ky)}</b></td><td class="num">${fmt(m.tong)}</td>
-      <td class="num">${fmt(m.giuLai)}</td><td class="num"><b>${fmt(m.nop)}</b></td></tr>`).join('')
-      || '<tr><td colspan="4" class="muted">Chưa có kỳ nào trong năm.</td></tr>'}
-    <tr class="total"><td>CẢ NĂM</td><td class="num">${fmt(s((m) => m.tong))}</td>
-      <td class="num">${fmt(s((m) => m.giuLai))}</td><td class="num">${fmt(s((m) => m.nop))}</td></tr>
-    </tbody></table></div></div>`;
+    <div class="stat"><div class="lbl">NV hiển thị</div><div class="val">${rows.length}<span class="muted small"> / ${d.rows.length}</span></div></div>
+    <div class="stat"><div class="lbl">Đoàn phí NLĐ (thu)</div><div class="val">${fmt(sum(d.rows, (r) => r.cdNLD))}</div></div>
+    <div class="stat"><div class="lbl">Kinh phí công đoàn DN (thu)</div><div class="val">${fmt(sum(d.rows, (r) => r.cdDN))}</div></div>
+    <div class="stat"><div class="lbl">Giữ lại cơ sở</div><div class="val">${fmt(sum(d.rows, (r) => r.giuLaiNLD + r.giuLaiDN))}</div></div>
+    <div class="stat"><div class="lbl">Nộp Công đoàn Việt Nam</div><div class="val">${fmt(sum(d.rows, (r) => r.nopNLD + r.nopDN))}</div></div>
+    </div>`;
+  const totalCols = 14;
+  const head = `<tr><th>STT</th><th>Mã NV</th><th>Họ và tên</th><th>Mã số BHXH</th><th>Mã PL</th><th class="num">Lương đóng</th>
+    <th class="num">Đoàn phí NLĐ</th><th class="num">Giữ lại (NLĐ)</th><th class="num">Nộp CĐVN (NLĐ)</th>
+    <th class="num">Kinh phí DN</th><th class="num">Giữ lại (DN)</th><th class="num">Nộp CĐVN (DN)</th>
+    <th class="num">Tổng giữ lại</th><th class="num">Tổng nộp CĐVN</th></tr>`;
+  const cellsRow = (r) => `<td class="num">${fmt(r.luongDong)}</td>
+    <td class="num">${r.cdNLD ? fmt(r.cdNLD) : ''}</td><td class="num">${r.cdNLD ? fmt(r.giuLaiNLD) : ''}</td><td class="num">${r.cdNLD ? fmt(r.nopNLD) : ''}</td>
+    <td class="num">${r.cdDN ? fmt(r.cdDN) : ''}</td><td class="num">${r.cdDN ? fmt(r.giuLaiDN) : ''}</td><td class="num">${r.cdDN ? fmt(r.nopDN) : ''}</td>
+    <td class="num">${fmt(r.giuLaiNLD + r.giuLaiDN)}</td><td class="num"><b>${fmt(r.nopNLD + r.nopDN)}</b></td>`;
+  const cellsSum = (arr) => `<td class="num">${fmt(sum(arr, (r) => r.luongDong))}</td>
+    <td class="num">${fmt(sum(arr, (r) => r.cdNLD))}</td><td class="num">${fmt(sum(arr, (r) => r.giuLaiNLD))}</td><td class="num">${fmt(sum(arr, (r) => r.nopNLD))}</td>
+    <td class="num">${fmt(sum(arr, (r) => r.cdDN))}</td><td class="num">${fmt(sum(arr, (r) => r.giuLaiDN))}</td><td class="num">${fmt(sum(arr, (r) => r.nopDN))}</td>
+    <td class="num">${fmt(sum(arr, (r) => r.giuLaiNLD + r.giuLaiDN))}</td><td class="num">${fmt(sum(arr, (r) => r.nopNLD + r.nopDN))}</td>`;
+  let body = '', stt = 0;
+  const groups = {};
+  rows.forEach((r) => { (groups[r.phongBan || '(Chưa có phòng ban)'] = groups[r.phongBan || '(Chưa có phòng ban)'] || []).push(r); });
+  Object.keys(groups).forEach((g) => {
+    body += `<tr class="group"><td colspan="${totalCols}">${esc(g)} (${groups[g].length})</td></tr>`;
+    groups[g].forEach((r) => {
+      stt++;
+      body += `<tr><td>${stt}</td><td>${esc(r.maNV)}</td><td>${esc(r.hoTen)}</td><td>${esc(r.maBHXH)}</td><td>${esc(r.maPL)}</td>${cellsRow(r)}</tr>`;
+    });
+    body += `<tr class="sub"><td colspan="5">Cộng ${esc(g)}</td>${cellsSum(groups[g])}</tr>`;
+  });
+  body += `<tr class="total"><td colspan="5">TỔNG CỘNG</td>${cellsSum(rows)}</tr>`;
+  h += `<div class="card"><div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div></div>`;
   $('rpBody').innerHTML = h;
 }
 async function rpChiTiet() {
@@ -604,46 +624,65 @@ function renderChiTiet() {
     return;
   }
   const all = $('rpAll') && $('rpAll').checked;
-  const rows = d.rows.filter((r) => all || r.dong === 'Có')
+  const q = ($('rpQ') ? $('rpQ').value : '').toLowerCase().trim();
+  const pl = $('rpPL') ? $('rpPL').value : '';
+  const rows = d.rows.filter((r) => (all || r.dong === 'Có')
+    && (!q || [r.maNV, r.hoTen, r.maBHXH].join(' ').toLowerCase().includes(q))
+    && (!pl || r.maPL === pl))
     .sort((a, b) => (a.phongBan + a.maNV).localeCompare(b.phongBan + b.maNV, 'vi'));
-  const codes = d.codes;
+  const codesNLD = d.codes.filter((c) => c.doiTuong !== 'DN');
+  const codesDN = d.codes.filter((c) => c.doiTuong === 'DN');
+  const codesCD = d.codesCD;
   const dong = d.rows.filter((r) => r.dong === 'Có');
   const sum = (arr, f) => arr.reduce((s, r) => s + (Number(f(r)) || 0), 0);
   const ttN = sum(d.truyThu, (r) => r.tienNLD), ttD = sum(d.truyThu, (r) => r.tienDN);
   const tN = sum(dong, (r) => r.tongNLD), tD = sum(dong, (r) => r.tongDN);
   let h = `<div class="stats">
     <div class="stat"><div class="lbl">Kỳ</div><div class="val">${fmtM(d.ky)}</div><div>${kyBadge(d.kyInfo.trangThai)}</div></div>
-    <div class="stat"><div class="lbl">NV đóng</div><div class="val">${dong.length}</div></div>
+    <div class="stat"><div class="lbl">NV hiển thị</div><div class="val">${rows.filter((r) => r.dong === 'Có').length}<span class="muted small"> / ${dong.length}</span></div></div>
     <div class="stat"><div class="lbl">Quỹ lương đóng</div><div class="val">${fmt(sum(dong, (r) => r.luongDong))}</div></div>
-    <div class="stat"><div class="lbl">NLĐ đóng</div><div class="val">${fmt(tN)}</div></div>
-    <div class="stat"><div class="lbl">DN đóng</div><div class="val">${fmt(tD)}</div></div>
+    <div class="stat"><div class="lbl">BHXH NLĐ (không gồm Đoàn phí)</div><div class="val">${fmt(sum(dong, (r) => r.tongNLDChinh))}</div></div>
+    <div class="stat"><div class="lbl">BHXH DN (không gồm KPCĐ)</div><div class="val">${fmt(sum(dong, (r) => r.tongDNChinh))}</div></div>
+    <div class="stat"><div class="lbl">Đoàn phí + Kinh phí Công đoàn</div><div class="val">${fmt(sum(dong, (r) => r.cdNLD + r.cdDN))}</div></div>
     <div class="stat"><div class="lbl">Truy thu (NLĐ + DN)</div><div class="val">${fmt(ttN + ttD)}</div></div>
     <div class="stat"><div class="lbl">Tổng phải nộp</div><div class="val">${fmt(tN + tD + ttN + ttD)}</div></div></div>`;
   const cb = d.rows.filter((r) => r.canhBao).length;
   if (cb) h += `<div class="alert warn">${cb} NV có cảnh báo (xem cột Cảnh báo${all ? '' : '; tick "Hiện cả NV không đóng" để thấy NV không đóng'}).</div>`;
+  const totalCols = 12 + codesNLD.length + codesDN.length + codesCD.length;
   const head = `<tr><th>STT</th><th>Mã NV</th><th>Họ và tên</th><th>Mã số BHXH</th><th>Mã PL</th><th class="num">Lương đóng</th>
-    ${codes.map((c) => `<th class="num" title="${esc(c.ten)}">${esc(c.ma)}<br><span class="muted small">${esc(c.doiTuong)}</span></th>`).join('')}
+    ${codesNLD.map((c) => `<th class="num" title="${esc(c.ten)}">${esc(c.ma)}</th>`).join('')}
+    <th class="num">Tổng BHXH NLĐ</th>
+    ${codesDN.map((c) => `<th class="num" title="${esc(c.ten)}">${esc(c.ma)}</th>`).join('')}
+    <th class="num">Tổng BHXH DN</th>
+    ${codesCD.map((c) => `<th class="num" title="${esc(c.ten)}">${esc(c.ma)}<br><span class="muted small">Công đoàn</span></th>`).join('')}
     <th class="num">Tổng NLĐ</th><th class="num">Tổng DN</th><th class="num">Tổng cộng</th><th>Cảnh báo</th></tr>`;
-  const line = (cls, label, arr) => `<tr class="${cls}"><td colspan="5">${label}</td><td class="num">${fmt(sum(arr.filter((r) => r.dong === 'Có'), (r) => r.luongDong))}</td>
-    ${codes.map((c) => `<td class="num">${fmt(sum(arr, (r) => r.items[c.ma]))}</td>`).join('')}
-    <td class="num">${fmt(sum(arr, (r) => r.tongNLD))}</td><td class="num">${fmt(sum(arr, (r) => r.tongDN))}</td>
-    <td class="num">${fmt(sum(arr, (r) => r.tongCong))}</td><td></td></tr>`;
+  const cellsRow = (r) => `<td class="num">${fmt(r.luongDong)}</td>
+    ${codesNLD.map((c) => `<td class="num">${r.items[c.ma] ? fmt(r.items[c.ma]) : ''}</td>`).join('')}
+    <td class="num">${fmt(r.tongNLDChinh)}</td>
+    ${codesDN.map((c) => `<td class="num">${r.items[c.ma] ? fmt(r.items[c.ma]) : ''}</td>`).join('')}
+    <td class="num">${fmt(r.tongDNChinh)}</td>
+    ${codesCD.map((c) => `<td class="num">${r.items[c.ma] ? fmt(r.items[c.ma]) : ''}</td>`).join('')}
+    <td class="num">${fmt(r.tongNLD)}</td><td class="num">${fmt(r.tongDN)}</td><td class="num"><b>${fmt(r.tongCong)}</b></td>`;
+  const cellsSum = (arr) => `<td class="num">${fmt(sum(arr.filter((r) => r.dong === 'Có'), (r) => r.luongDong))}</td>
+    ${codesNLD.map((c) => `<td class="num">${fmt(sum(arr, (r) => r.items[c.ma]))}</td>`).join('')}
+    <td class="num">${fmt(sum(arr, (r) => r.tongNLDChinh))}</td>
+    ${codesDN.map((c) => `<td class="num">${fmt(sum(arr, (r) => r.items[c.ma]))}</td>`).join('')}
+    <td class="num">${fmt(sum(arr, (r) => r.tongDNChinh))}</td>
+    ${codesCD.map((c) => `<td class="num">${fmt(sum(arr, (r) => r.items[c.ma]))}</td>`).join('')}
+    <td class="num">${fmt(sum(arr, (r) => r.tongNLD))}</td><td class="num">${fmt(sum(arr, (r) => r.tongDN))}</td><td class="num">${fmt(sum(arr, (r) => r.tongCong))}</td>`;
   let body = '', stt = 0;
   const groups = {};
   rows.forEach((r) => { (groups[r.phongBan || '(Chưa có phòng ban)'] = groups[r.phongBan || '(Chưa có phòng ban)'] || []).push(r); });
   Object.keys(groups).forEach((g) => {
-    body += `<tr class="group"><td colspan="${codes.length + 10}">${esc(g)} (${groups[g].length})</td></tr>`;
+    body += `<tr class="group"><td colspan="${totalCols}">${esc(g)} (${groups[g].length})</td></tr>`;
     groups[g].forEach((r) => {
       stt++;
       body += `<tr class="${r.dong === 'Có' ? '' : 'off'}"><td>${stt}</td><td>${esc(r.maNV)}</td><td>${esc(r.hoTen)}</td><td>${esc(r.maBHXH)}</td>
-        <td>${esc(r.maPL)}</td><td class="num">${fmt(r.luongDong)}</td>
-        ${codes.map((c) => `<td class="num">${r.items[c.ma] ? fmt(r.items[c.ma]) : ''}</td>`).join('')}
-        <td class="num">${fmt(r.tongNLD)}</td><td class="num">${fmt(r.tongDN)}</td><td class="num"><b>${fmt(r.tongCong)}</b></td>
-        <td class="warn-txt">${esc(r.canhBao)}</td></tr>`;
+        <td>${esc(r.maPL)}</td>${cellsRow(r)}<td class="warn-txt">${esc(r.canhBao)}</td></tr>`;
     });
-    body += line('sub', 'Cộng ' + esc(g), groups[g]);
+    body += `<tr class="sub"><td colspan="5">Cộng ${esc(g)}</td>${cellsSum(groups[g])}<td></td></tr>`;
   });
-  body += line('total', 'TỔNG CỘNG', rows);
+  body += `<tr class="total"><td colspan="5">TỔNG CỘNG</td>${cellsSum(rows)}<td></td></tr>`;
   h += `<div class="card"><div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div></div>`;
   if (d.truyThu.length) {
     h += `<div class="card"><h3>Truy thu / Thoái thu trong kỳ</h3><div class="tbl-wrap"><table><thead><tr><th>Mã NV</th><th>Họ và tên</th>
