@@ -41,6 +41,7 @@ Mỗi công ty dùng **một file Google Sheet riêng**.
    | Truy thu - Thoái thu | Các khoản điều chỉnh cho tháng cũ |
    | Phân quyền | Email và vai trò người dùng |
    | Nhật ký | Lịch sử thao tác |
+   | Tỉ lệ Công đoàn | Tỉ lệ giữ lại Công đoàn cơ sở theo thời điểm (lưu lịch sử nhiều dòng) |
 
    > ⚠️ Các khoản trích, mã phân loại và mức lương trong phần khởi tạo **chỉ là số liệu mẫu**. Hãy **kiểm tra lại theo quy định hiện hành** trước khi dùng.
 
@@ -132,10 +133,9 @@ Người **Nhập liệu** chỉ nhập/xuất được hồ sơ mình quản l�
 ## 7. Phân tách quỹ Công đoàn theo kỳ
 
 1. Vào **Thiết lập → Khoản trích đóng**, sửa khoản **Đoàn phí công đoàn (NLĐ)** và **Kinh phí công đoàn (DN)** (hoặc khoản tương đương do bạn đặt), chọn **"Thuộc quỹ Công đoàn" = Có**. Đây là dấu hiệu để ứng dụng biết khoản nào tính vào quỹ Công đoàn – không phụ thuộc tên/mã khoản.
-2. Vào **Thiết lập → Thông tin chung**, nhập **"Tỉ lệ Công đoàn cơ sở được giữ lại (%)"**. Tỉ lệ nộp Công đoàn Việt Nam tự tính = 100% − tỉ lệ này.
-3. Vào **Báo cáo → Công đoàn**, chọn năm để xem bảng: Đoàn phí NLĐ, Kinh phí công đoàn DN, Tổng thu, Giữ lại cơ sở, Nộp Công đoàn Việt Nam theo từng kỳ và cả năm. Có thể xuất Excel/PDF.
-
-Lưu ý: tỉ lệ giữ lại dùng **giá trị hiện tại** tại lúc xem báo cáo, áp dụng cho mọi kỳ hiển thị (không lưu lịch sử theo thời điểm như tỉ lệ ở tab Khoản trích đóng). Nếu tỉ lệ giữ lại từng thay đổi giữa các kỳ, số liệu các kỳ cũ trong báo cáo sẽ tính lại theo tỉ lệ mới nhất.
+2. Vào **Thiết lập → Tỉ lệ Công đoàn**, thêm tỉ lệ Công đoàn cơ sở được giữ lại (%) cùng **Ngày hiệu lực**. Tỉ lệ nộp Công đoàn Việt Nam tự tính = 100% − tỉ lệ này.
+   - Giống tab Khoản trích đóng: mỗi khi tỉ lệ thay đổi, bấm **"＋ Thêm phiên bản"** để thêm dòng mới với ngày hiệu lực mới, **không sửa dòng cũ**. Mỗi kỳ tự dùng đúng tỉ lệ có hiệu lực tại tháng đó (dòng có ngày hiệu lực gần nhất nhưng ≤ cuối tháng), nên kỳ cũ luôn giữ đúng tỉ lệ tại thời điểm đó dù sau này tỉ lệ có đổi.
+3. Vào **Báo cáo → Công đoàn**, chọn năm để xem bảng: Đoàn phí NLĐ, Kinh phí công đoàn DN, Tổng thu, **Tỉ lệ giữ lại** (theo từng kỳ), Giữ lại cơ sở, Nộp Công đoàn Việt Nam. Có thể xuất Excel/PDF.
 
 ## 8. Lưu ý
 
