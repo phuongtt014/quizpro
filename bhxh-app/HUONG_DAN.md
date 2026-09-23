@@ -98,7 +98,7 @@ Admin có thể đổi *Email NV quản lý hồ sơ* của bất kỳ NV nào �
   - *Mức lương đóng tối đa*: tiền = min(Lương đóng, Mức tối đa) × Tỉ lệ.
   - *Mức đóng tối đa*: tiền = min(Lương đóng × Tỉ lệ, Mức tối đa).
   - *Không áp dụng*: tiền = Lương đóng × Tỉ lệ.
-- **Công đoàn:** khoản có *Chỉ áp dụng đoàn viên công đoàn = Có* (ví dụ đoàn phí) chỉ tính cho NV có *Tham gia công đoàn = Có*. Kinh phí công đoàn (DN) tính cho tất cả NV thuộc mã phân loại có khoản đó. Ở *Báo cáo → Bảng tính chi tiết*, các khoản đánh dấu *Thuộc quỹ Công đoàn* được tách ra cột riêng ở cuối bảng; cột *Tổng BHXH NLĐ*/*Tổng BHXH DN* không gồm các khoản này, còn *Tổng NLĐ*/*Tổng DN*/*Tổng cộng* vẫn là tổng đầy đủ.
+- **Công đoàn:** khoản có *Chỉ áp dụng đoàn viên công đoàn = Có* (ví dụ đoàn phí) chỉ tính cho NV có *Tham gia công đoàn = Có*. Kinh phí công đoàn (DN) tính cho tất cả NV thuộc mã phân loại có khoản đó. Ở *Báo cáo → Bảng tính chi tiết*, các khoản đánh dấu *Thuộc quỹ Công đoàn* được tách ra cột riêng ở cuối bảng; cột *Tổng BHXH NLĐ*/*Tổng BHXH DN* và *Tổng nộp BHXH* (= hai cột đó cộng lại) không gồm các khoản này, còn *Tổng NLĐ*/*Tổng DN*/*Tổng cộng* vẫn là tổng đầy đủ (gồm cả Công đoàn).
 - **Làm tròn:** từng khoản của từng NV làm tròn đến 1 đồng. Tổng bằng cộng các số đã làm tròn.
 - **Lương tối thiểu vùng:** NV có lương đóng thấp hơn mức ở *Thông tin chung* sẽ bị **cảnh báo**. App không tự sửa số.
 - **Truy thu/thoái thu** = Σ các tháng [tiền theo lương mới − tiền theo lương cũ], dùng tỉ lệ và mức trần của **chính tháng đó**. Số âm là thoái thu.

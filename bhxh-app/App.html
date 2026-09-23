@@ -437,6 +437,7 @@ function nvSum() {
 }
 function nvSave(isNew) {
   const o = formData('nvF1');
+  ['luongChinh', 'pcKN', 'pcCV', 'pcDH', 'pcKhac'].forEach((k) => { o[k] = Number(String(o[k] || '').replace(/[^\d-]/g, '')) || 0; });
   act(async () => { await run('apiSaveNV', S.nvData.ky, o, isNew); closeModal(); toast('Đã lưu nhân viên ' + o.maNV, 'ok'); loadNV(); });
 }
 function nvDel(maNV) {
@@ -509,6 +510,7 @@ function ttPick() {
 }
 function ttSave() {
   const o = formData('ttF1');
+  ['luongCu', 'luongMoi'].forEach((k) => { o[k] = Number(String(o[k] || '').replace(/[^\d-]/g, '')) || 0; });
   act(async () => {
     const r = await run('apiSaveTruyThu', S.ttData.ky, o);
     closeModal(); toast(`Đã lưu: NLĐ ${fmt(r.tienNLD)}, DN ${fmt(r.tienDN)}`, 'ok'); loadTT();
@@ -648,26 +650,26 @@ function renderChiTiet() {
     <div class="stat"><div class="lbl">Tổng phải nộp</div><div class="val">${fmt(tN + tD + ttN + ttD)}</div></div></div>`;
   const cb = d.rows.filter((r) => r.canhBao).length;
   if (cb) h += `<div class="alert warn">${cb} NV có cảnh báo (xem cột Cảnh báo${all ? '' : '; tick "Hiện cả NV không đóng" để thấy NV không đóng'}).</div>`;
-  const totalCols = 12 + codesNLD.length + codesDN.length + codesCD.length;
+  const totalCols = 13 + codesNLD.length + codesDN.length + codesCD.length;
   const head = `<tr><th>STT</th><th>Mã NV</th><th>Họ và tên</th><th>Mã số BHXH</th><th>Mã PL</th><th class="num">Lương đóng</th>
     ${codesNLD.map((c) => `<th class="num" title="${esc(c.ten)}">${esc(c.ma)}</th>`).join('')}
     <th class="num">Tổng BHXH NLĐ</th>
     ${codesDN.map((c) => `<th class="num" title="${esc(c.ten)}">${esc(c.ma)}</th>`).join('')}
-    <th class="num">Tổng BHXH DN</th>
+    <th class="num">Tổng BHXH DN</th><th class="num">Tổng nộp BHXH</th>
     ${codesCD.map((c) => `<th class="num" title="${esc(c.ten)}">${esc(c.ma)}<br><span class="muted small">Công đoàn</span></th>`).join('')}
     <th class="num">Tổng NLĐ</th><th class="num">Tổng DN</th><th class="num">Tổng cộng</th><th>Cảnh báo</th></tr>`;
   const cellsRow = (r) => `<td class="num">${fmt(r.luongDong)}</td>
     ${codesNLD.map((c) => `<td class="num">${r.items[c.ma] ? fmt(r.items[c.ma]) : ''}</td>`).join('')}
     <td class="num">${fmt(r.tongNLDChinh)}</td>
     ${codesDN.map((c) => `<td class="num">${r.items[c.ma] ? fmt(r.items[c.ma]) : ''}</td>`).join('')}
-    <td class="num">${fmt(r.tongDNChinh)}</td>
+    <td class="num">${fmt(r.tongDNChinh)}</td><td class="num"><b>${fmt(r.tongNopBHXH)}</b></td>
     ${codesCD.map((c) => `<td class="num">${r.items[c.ma] ? fmt(r.items[c.ma]) : ''}</td>`).join('')}
     <td class="num">${fmt(r.tongNLD)}</td><td class="num">${fmt(r.tongDN)}</td><td class="num"><b>${fmt(r.tongCong)}</b></td>`;
   const cellsSum = (arr) => `<td class="num">${fmt(sum(arr.filter((r) => r.dong === 'Có'), (r) => r.luongDong))}</td>
     ${codesNLD.map((c) => `<td class="num">${fmt(sum(arr, (r) => r.items[c.ma]))}</td>`).join('')}
     <td class="num">${fmt(sum(arr, (r) => r.tongNLDChinh))}</td>
     ${codesDN.map((c) => `<td class="num">${fmt(sum(arr, (r) => r.items[c.ma]))}</td>`).join('')}
-    <td class="num">${fmt(sum(arr, (r) => r.tongDNChinh))}</td>
+    <td class="num">${fmt(sum(arr, (r) => r.tongDNChinh))}</td><td class="num">${fmt(sum(arr, (r) => r.tongNopBHXH))}</td>
     ${codesCD.map((c) => `<td class="num">${fmt(sum(arr, (r) => r.items[c.ma]))}</td>`).join('')}
     <td class="num">${fmt(sum(arr, (r) => r.tongNLD))}</td><td class="num">${fmt(sum(arr, (r) => r.tongDN))}</td><td class="num">${fmt(sum(arr, (r) => r.tongCong))}</td>`;
   let body = '', stt = 0;
@@ -875,6 +877,7 @@ function khoanSave() {
   const o = formData('khF');
   o.doiTuong = f.doiTuong.value;
   o._row = o._row ? Number(o._row) : '';
+  o.mucToiDa = Number(String(o.mucToiDa || '').replace(/[^\d-]/g, '')) || 0;
   act(async () => { S.khoan = await run('apiSaveKhoan', o); closeModal(); toast('Đã lưu khoản trích.', 'ok'); setKhoan(); });
 }
 function khoanDel(row) {

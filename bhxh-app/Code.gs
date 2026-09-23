@@ -379,6 +379,7 @@ function monthRange_(a, b) {
   return out;
 }
 /** Đọc số từ chuỗi, chấp nhận cả kiểu "1,234.5" và kiểu Việt Nam "1.234,5" / "1.234.567" */
+/** Đọc số thập phân (dùng cho tỉ lệ %), chấp nhận cả kiểu "8.5" và kiểu Việt Nam "8,5" / "1.234,5". */
 function num_(v) {
   if (typeof v === 'number') return isFinite(v) ? v : 0;
   if (v === null || v === undefined || v === '') return 0;
@@ -395,13 +396,23 @@ function num_(v) {
   const n = Number(s);
   return isFinite(n) ? n : 0;
 }
+/**
+ * Đọc số tiền (luôn là số nguyên đồng trong app này, không có phần thập phân) – bỏ hết dấu chấm/phẩy/khoảng trắng
+ * bất kể là dấu nhóm nghìn kiểu nào. Dùng cho lương, phụ cấp, mức tối đa… để không nhầm "253.000" thành 253.
+ */
+function moneyNum_(v) {
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  if (v === null || v === undefined || v === '') return 0;
+  const n = Number(String(v).replace(/[^\d-]/g, ''));
+  return isFinite(n) ? n : 0;
+}
 function fmtNum_(n) { return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
 function fmtOf_(type) {
   return { text: '@', month: '@', date: 'dd/MM/yyyy', num: '#,##0', pct: '0.####' }[type] || '@';
 }
 function luongDong_(o) {
-  const s = num_(o.luongChinh) + num_(o.pcKN) + num_(o.pcCV) + num_(o.pcDH) + num_(o.pcKhac);
-  return s > 0 ? s : num_(o.luongDong);
+  const s = moneyNum_(o.luongChinh) + moneyNum_(o.pcKN) + moneyNum_(o.pcCV) + moneyNum_(o.pcDH) + moneyNum_(o.pcKhac);
+  return s > 0 ? s : moneyNum_(o.luongDong);
 }
 function withLock_(fn) {
   const lock = LockService.getScriptLock();
@@ -425,7 +436,8 @@ function fromCell_(type, v) {
   switch (type) {
     case 'date': return normDate_(v);
     case 'month': return normMonth_(v);
-    case 'num': case 'pct': return num_(v);
+    case 'num': return moneyNum_(v);
+    case 'pct': return num_(v);
     default:
       if (v instanceof Date) return Utilities.formatDate(v, tz_(), 'dd/MM/yyyy HH:mm:ss');
       return String(v === null || v === undefined ? '' : v).trim();
@@ -436,7 +448,8 @@ function toCell_(type, v) {
   switch (type) {
     case 'date': { const s = normDate_(v); return s ? isoToDate_(s) : ''; }
     case 'month': { const s = normMonth_(v); return s ? monthDisp_(s) : ''; }
-    case 'num': case 'pct': return v === '' ? '' : num_(v);
+    case 'num': return v === '' ? '' : moneyNum_(v);
+    case 'pct': return v === '' ? '' : num_(v);
     default: return String(v);
   }
 }
@@ -544,7 +557,7 @@ function getInfo_() {
   if (!sh || sh.getLastRow() < 2) return o;
   sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues().forEach(function (r) {
     const f = INFO_FIELDS.find(function (x) { return x[1] === String(r[0]).trim(); });
-    if (f) o[f[0]] = INFO_NUM_FIELDS.indexOf(f[0]) >= 0 ? num_(r[1]) : String(r[1]).trim();
+    if (f) o[f[0]] = INFO_NUM_FIELDS.indexOf(f[0]) >= 0 ? moneyNum_(r[1]) : String(r[1]).trim();
   });
   return o;
 }
@@ -631,7 +644,7 @@ function khoanTen_(rows) {
 // ---------------------------------------------------------------------
 function tienKhoan_(k, luong, tiLe) {
   let base = luong;
-  const max = num_(k.mucToiDa);
+  const max = moneyNum_(k.mucToiDa);
   if (k.loaiTran === TRAN_LUONG && max > 0) base = Math.min(luong, max);
   let amt = base * tiLe / 100;
   if (k.loaiTran === TRAN_DONG && max > 0) amt = Math.min(amt, max);
@@ -679,8 +692,8 @@ function tinhTruyThu_(r, ctxFn, maplMap) {
   let nld = 0, dn = 0;
   months.forEach(function (m) {
     const km = ctxFn(m);
-    const a = tinhTheoPL_(num_(r.luongMoi), pl, km, r.congDoan);
-    const b = tinhTheoPL_(num_(r.luongCu), pl, km, r.congDoan);
+    const a = tinhTheoPL_(moneyNum_(r.luongMoi), pl, km, r.congDoan);
+    const b = tinhTheoPL_(moneyNum_(r.luongCu), pl, km, r.congDoan);
     const codes = {};
     Object.keys(a.items).concat(Object.keys(b.items)).forEach(function (c) { codes[c] = 1; });
     Object.keys(codes).forEach(function (c) { sum[c] = (sum[c] || 0) + (a.items[c] || 0) - (b.items[c] || 0); });
@@ -713,7 +726,7 @@ function loadKQAll_() {
     const o = {};
     T.KQ.cols.forEach(function (c) { const i = header.indexOf(c[1]); o[c[0]] = i >= 0 ? fromCell_(c[2], v[i]) : ''; });
     o.items = {};
-    codes.forEach(function (c) { const n = num_(v[header.indexOf(c)]); if (n) o.items[c] = n; });
+    codes.forEach(function (c) { const n = moneyNum_(v[header.indexOf(c)]); if (n) o.items[c] = n; });
     rows.push(o);
   });
   return { codes: codes, rows: rows };
@@ -837,7 +850,7 @@ function tinhKy_(ky, user) {
   const codes = allCodes_(ctx.khoanRows);
   let tongNLD = 0, tongDN = 0, soDong = 0, soCB = 0;
   const out = nvs.map(function (nv) {
-    const r = tinhNV_(nv, ky, kmap, maplMap, num_(info.luongToiThieu));
+    const r = tinhNV_(nv, ky, kmap, maplMap, moneyNum_(info.luongToiThieu));
     if (r.dong) { soDong++; tongNLD += r.nld; tongDN += r.dn; }
     if (r.canhBao.length) soCB++;
     return {
@@ -939,7 +952,7 @@ function cleanNV_(o, user, maplMapObj) {
   r.hoTen = String(r.hoTen).trim();
   if (!r.maNV) throw new Error('Chưa nhập Mã NV.');
   if (!r.hoTen) throw new Error('Chưa nhập Họ và tên.');
-  ['luongChinh', 'pcKN', 'pcCV', 'pcDH', 'pcKhac'].forEach(function (k) { r[k] = num_(r[k]); });
+  ['luongChinh', 'pcKN', 'pcCV', 'pcDH', 'pcKhac'].forEach(function (k) { r[k] = moneyNum_(r[k]); });
   r.luongDong = luongDong_(r);
   r.congDoan = r.congDoan === CO ? CO : KHONG;
   r.emailQL = String(r.emailQL || '').toLowerCase().trim();
@@ -1001,7 +1014,7 @@ function apiSaveTruyThu(ky, o) {
     const maplMap = maplMap_();
     const rec = {
       ky: ky, maNV: nv.maNV, hoTen: nv.hoTen, tuThang: tu, denThang: den,
-      luongCu: num_(o.luongCu), luongMoi: num_(o.luongMoi),
+      luongCu: moneyNum_(o.luongCu), luongMoi: moneyNum_(o.luongMoi),
       maPL: o.maPL || nv.maPL, congDoan: o.congDoan === CO ? CO : (o.congDoan === KHONG ? KHONG : nv.congDoan),
       ghiChu: o.ghiChu || '', emailQL: nv.emailQL
     };
@@ -1096,6 +1109,7 @@ function apiBaoCaoChiTiet(ky) {
     r.cdNLD = cdNLD; r.cdDN = cdDN;
     r.tongNLDChinh = r.tongNLD - cdNLD; // Tổng BHXH NLĐ không gồm đoàn phí công đoàn
     r.tongDNChinh = r.tongDN - cdDN; // Tổng BHXH DN không gồm kinh phí công đoàn
+    r.tongNopBHXH = r.tongNLDChinh + r.tongDNChinh; // Tổng nộp BHXH (NLĐ + DN, không gồm Công đoàn)
   });
   const tt = load_(T.TT).rows.filter(function (r) { return r.ky === ky && canSee_(user, r); });
   return { info: getInfo_(), ky: ky, kyInfo: k, codes: codes, codesCD: codesCD, rows: rows, truyThu: tt };
@@ -1235,7 +1249,7 @@ function buildDoc_(loai, p) {
       .concat(codesNLD.map(function (c) { return c.ten + ' (' + c.ma + ')'; }))
       .concat(['Tổng BHXH NLĐ (không gồm Đoàn phí CĐ)'])
       .concat(codesDN.map(function (c) { return c.ten + ' (' + c.ma + ')'; }))
-      .concat(['Tổng BHXH DN (không gồm KPCĐ)'])
+      .concat(['Tổng BHXH DN (không gồm KPCĐ)', 'Tổng nộp BHXH (NLĐ + DN)'])
       .concat(d.codesCD.map(function (c) { return c.ten + ' (' + c.ma + ')'; }))
       .concat(['Tổng NLĐ', 'Tổng DN', 'Tổng cộng', 'Ghi chú']);
     const dong = d.rows.filter(function (r) { return r.dong === CO; })
@@ -1245,7 +1259,7 @@ function buildDoc_(loai, p) {
         .concat(codesNLD.map(function (c) { return r.items[c.ma] || 0; }))
         .concat([r.tongNLDChinh])
         .concat(codesDN.map(function (c) { return r.items[c.ma] || 0; }))
-        .concat([r.tongDNChinh])
+        .concat([r.tongDNChinh, r.tongNopBHXH])
         .concat(d.codesCD.map(function (c) { return r.items[c.ma] || 0; }))
         .concat([r.tongNLD, r.tongDN, r.tongCong, r.canhBao]);
     });
@@ -1719,7 +1733,7 @@ function apiSaveInfo(o) {
     if (i < 0) { row = sh.getLastRow() + 1; sh.getRange(row, 1).setValue(f[1]); labels.push(f[1]); }
     else row = i + 2;
     const isNum = INFO_NUM_FIELDS.indexOf(f[0]) >= 0;
-    sh.getRange(row, 2).setNumberFormat(isNum ? INFO_NUM_FMT[f[0]] : '@').setValue(isNum ? num_(o[f[0]]) : String(o[f[0]]));
+    sh.getRange(row, 2).setNumberFormat(isNum ? INFO_NUM_FMT[f[0]] : '@').setValue(isNum ? moneyNum_(o[f[0]]) : String(o[f[0]]));
   });
   log_(user, 'Sửa thông tin chung', '');
   return getInfo_();
@@ -1747,7 +1761,7 @@ function apiSaveKhoan(o) {
   requireRole_(user, [ROLE.ADMIN]);
   const r = {
     ten: String(o.ten || '').trim(), ma: String(o.ma || '').trim().toUpperCase(), doiTuong: o.doiTuong,
-    tiLe: num_(o.tiLe), loaiTran: o.loaiTran || TRAN_KHONG, mucToiDa: num_(o.mucToiDa),
+    tiLe: num_(o.tiLe), loaiTran: o.loaiTran || TRAN_KHONG, mucToiDa: moneyNum_(o.mucToiDa),
     ngayHL: normDate_(o.ngayHL), trangThai: o.trangThai || TT_AD, chiDoanVien: o.chiDoanVien === CO ? CO : KHONG,
     thuocCD: o.thuocCD === CO ? CO : KHONG, ghiChu: o.ghiChu || ''
   };
