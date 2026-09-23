@@ -140,7 +140,8 @@ const T = {
     ['chiTiet', 'Chi tiết', 'text']] },
   TLCD: { name: 'Tỉ lệ Công đoàn', cols: [
     ['id', 'ID', 'text'],
-    ['tyLeGiuLai', 'Tỉ lệ Công đoàn cơ sở giữ lại (%)', 'pct'],
+    ['tyLeGiuLaiNLD', 'Tỉ lệ giữ lại - Đoàn phí (NLĐ) (%)', 'pct'],
+    ['tyLeGiuLaiDN', 'Tỉ lệ giữ lại - Kinh phí công đoàn (DN) (%)', 'pct'],
     ['ngayHL', 'Ngày hiệu lực', 'date'],
     ['ghiChu', 'Ghi chú', 'text']] }
 };
@@ -257,7 +258,8 @@ function khoiTaoCauTruc() {
     append_(T.PQ, [{ email: me, hoTen: 'Chủ sở hữu', vaiTro: ROLE.ADMIN, trangThai: PQ_HD, ghiChu: 'Tạo khi khởi tạo' }]);
   }
   if (created.TLCD) {
-    append_(T.TLCD, [{ id: 'TL1', tyLeGiuLai: 40, ngayHL: '2026-01-01', ghiChu: 'Số liệu mẫu – kiểm tra lại quy định của Công đoàn cấp trên' }]);
+    append_(T.TLCD, [{ id: 'TL1', tyLeGiuLaiNLD: 40, tyLeGiuLaiDN: 40, ngayHL: '2026-01-01',
+      ghiChu: 'Số liệu mẫu – kiểm tra lại quy định của Công đoàn cấp trên' }]);
   }
 
   // Dropdown (data validation)
@@ -603,7 +605,10 @@ function tyLeGiuLaiHieuLuc_(rows, ky) {
     if (d > end) return;
     if (!best || d >= (best.ngayHL || '0000-00-00')) best = r;
   });
-  return best ? num_(best.tyLeGiuLai) : 0;
+  return {
+    nld: best ? Math.max(0, Math.min(100, num_(best.tyLeGiuLaiNLD))) : 0,
+    dn: best ? Math.max(0, Math.min(100, num_(best.tyLeGiuLaiDN))) : 0
+  };
 }
 function allCodes_(rows) {
   const nld = [], dn = [];
@@ -1189,14 +1194,19 @@ function apiCongDoan(nam) {
       });
     });
     const tong = nld + dn;
-    const giuLai = Math.max(0, Math.min(100, tyLeGiuLaiHieuLuc_(tlRows, k.ky)));
-    const giuLaiTien = Math.round(tong * giuLai / 100);
-    return { ky: k.ky, trangThai: k.trangThai, daTinh: !!k.ngayTinh, nld: nld, dn: dn, tong: tong,
-      tyLeGiuLai: giuLai, giuLai: giuLaiTien, nop: tong - giuLaiTien };
+    const tl = tyLeGiuLaiHieuLuc_(tlRows, k.ky);
+    const giuLaiNLD = Math.round(nld * tl.nld / 100);
+    const giuLaiDN = Math.round(dn * tl.dn / 100);
+    return {
+      ky: k.ky, trangThai: k.trangThai, daTinh: !!k.ngayTinh, nld: nld, dn: dn, tong: tong,
+      tyLeNLD: tl.nld, tyLeDN: tl.dn,
+      giuLaiNLD: giuLaiNLD, giuLaiDN: giuLaiDN, giuLai: giuLaiNLD + giuLaiDN,
+      nopNLD: nld - giuLaiNLD, nopDN: dn - giuLaiDN, nop: (nld - giuLaiNLD) + (dn - giuLaiDN)
+    };
   });
   const hienTai = tyLeGiuLaiHieuLuc_(tlRows, Utilities.formatDate(new Date(), tz_(), 'yyyy-MM'));
   return {
-    info: info, nam: nam, years: years, tyLeGiuLai: hienTai,
+    info: info, nam: nam, years: years, tyLeNLD: hienTai.nld, tyLeDN: hienTai.dn,
     coCauHinh: Object.keys(cdCodes).length > 0, coTyLe: tlRows.length > 0, months: months, lichSuTyLe: tlRows
   };
 }
@@ -1279,14 +1289,18 @@ function buildDoc_(loai, p) {
   }
   if (loai === 'congdoan') {
     const d = apiCongDoan(p);
-    const header = ['Kỳ', 'Đoàn phí NLĐ', 'Kinh phí công đoàn DN', 'Tổng thu Công đoàn',
-      'Tỉ lệ giữ lại cơ sở (%)', 'Giữ lại cơ sở', 'Nộp Công đoàn Việt Nam'];
-    const rows = d.months.map(function (m) { return [monthDisp_(m.ky), m.nld, m.dn, m.tong, m.tyLeGiuLai, m.giuLai, m.nop]; });
+    const header = ['Kỳ',
+      'Đoàn phí NLĐ (thu)', 'Tỉ lệ giữ lại NLĐ (%)', 'Giữ lại cơ sở (NLĐ)', 'Nộp Công đoàn VN (NLĐ)',
+      'Kinh phí DN (thu)', 'Tỉ lệ giữ lại DN (%)', 'Giữ lại cơ sở (DN)', 'Nộp Công đoàn VN (DN)',
+      'Tổng giữ lại cơ sở', 'Tổng nộp Công đoàn VN'];
+    const rows = d.months.map(function (m) {
+      return [monthDisp_(m.ky), m.nld, m.tyLeNLD, m.giuLaiNLD, m.nopNLD, m.dn, m.tyLeDN, m.giuLaiDN, m.nopDN, m.giuLai, m.nop];
+    });
     const s = function (i) { return rows.reduce(function (a, r) { return a + r[i]; }, 0); };
-    const total = ['CẢ NĂM', s(1), s(2), s(3), '', s(5), s(6)];
+    const total = ['CẢ NĂM', s(1), '', s(3), s(4), s(5), '', s(7), s(8), s(9), s(10)];
     return {
       info: d.info, title: 'BẢNG PHÂN TÁCH QUỸ CÔNG ĐOÀN NĂM ' + d.nam, fileName: 'CongDoan_' + d.nam,
-      sections: [{ title: '', header: header, rows: rows, total: total, numCols: [1, 2, 3, 5, 6] }]
+      sections: [{ title: '', header: header, rows: rows, total: total, numCols: [1, 3, 4, 5, 7, 8, 9, 10] }]
     };
   }
   throw new Error('Loại báo cáo không hợp lệ.');
@@ -1760,8 +1774,9 @@ function apiListTyLeCD() { getUser_(); return load_(T.TLCD).rows; }
 function apiSaveTyLeCD(o) {
   const user = getUser_();
   requireRole_(user, [ROLE.ADMIN]);
-  const r = { tyLeGiuLai: num_(o.tyLeGiuLai), ngayHL: normDate_(o.ngayHL), ghiChu: o.ghiChu || '' };
-  if (r.tyLeGiuLai < 0 || r.tyLeGiuLai > 100) throw new Error('Tỉ lệ giữ lại phải trong khoảng 0 – 100.');
+  const r = { tyLeGiuLaiNLD: num_(o.tyLeGiuLaiNLD), tyLeGiuLaiDN: num_(o.tyLeGiuLaiDN), ngayHL: normDate_(o.ngayHL), ghiChu: o.ghiChu || '' };
+  if (r.tyLeGiuLaiNLD < 0 || r.tyLeGiuLaiNLD > 100) throw new Error('Tỉ lệ giữ lại Đoàn phí (NLĐ) phải trong khoảng 0 – 100.');
+  if (r.tyLeGiuLaiDN < 0 || r.tyLeGiuLaiDN > 100) throw new Error('Tỉ lệ giữ lại Kinh phí công đoàn (DN) phải trong khoảng 0 – 100.');
   if (!r.ngayHL) throw new Error('Chưa nhập Ngày hiệu lực.');
   return withLock_(function () {
     const d = load_(T.TLCD);
@@ -1777,7 +1792,7 @@ function apiSaveTyLeCD(o) {
       r.id = 'TL' + Date.now();
       append_(T.TLCD, [r]);
     }
-    log_(user, 'Lưu tỉ lệ Công đoàn', r.tyLeGiuLai + '% giữ lại từ ' + dateDisp_(r.ngayHL));
+    log_(user, 'Lưu tỉ lệ Công đoàn', 'NLĐ ' + r.tyLeGiuLaiNLD + '%, DN ' + r.tyLeGiuLaiDN + '% giữ lại từ ' + dateDisp_(r.ngayHL));
     return load_(T.TLCD).rows;
   });
 }
@@ -1789,7 +1804,7 @@ function apiDeleteTyLeCD(row) {
     const ex = load_(T.TLCD).rows.find(function (x) { return x._row === Number(row); });
     if (!ex) throw new Error('Không tìm thấy dòng.');
     deleteRows_(T.TLCD, [ex._row]);
-    log_(user, 'Xóa tỉ lệ Công đoàn', ex.tyLeGiuLai + '% hiệu lực ' + dateDisp_(ex.ngayHL));
+    log_(user, 'Xóa tỉ lệ Công đoàn', 'NLĐ ' + ex.tyLeGiuLaiNLD + '%, DN ' + ex.tyLeGiuLaiDN + '% hiệu lực ' + dateDisp_(ex.ngayHL));
     return load_(T.TLCD).rows;
   });
 }

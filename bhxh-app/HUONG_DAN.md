@@ -133,9 +133,9 @@ Người **Nhập liệu** chỉ nhập/xuất được hồ sơ mình quản l�
 ## 7. Phân tách quỹ Công đoàn theo kỳ
 
 1. Vào **Thiết lập → Khoản trích đóng**, sửa khoản **Đoàn phí công đoàn (NLĐ)** và **Kinh phí công đoàn (DN)** (hoặc khoản tương đương do bạn đặt), chọn **"Thuộc quỹ Công đoàn" = Có**. Đây là dấu hiệu để ứng dụng biết khoản nào tính vào quỹ Công đoàn – không phụ thuộc tên/mã khoản.
-2. Vào **Thiết lập → Tỉ lệ Công đoàn**, thêm tỉ lệ Công đoàn cơ sở được giữ lại (%) cùng **Ngày hiệu lực**. Tỉ lệ nộp Công đoàn Việt Nam tự tính = 100% − tỉ lệ này.
+2. Vào **Thiết lập → Tỉ lệ Công đoàn**, thêm **hai** tỉ lệ giữ lại riêng: một cho **Đoàn phí công đoàn (NLĐ)**, một cho **Kinh phí công đoàn (DN)**, cùng **Ngày hiệu lực**. Tỉ lệ nộp Công đoàn Việt Nam của mỗi bên tự tính = 100% − tỉ lệ giữ lại tương ứng.
    - Giống tab Khoản trích đóng: mỗi khi tỉ lệ thay đổi, bấm **"＋ Thêm phiên bản"** để thêm dòng mới với ngày hiệu lực mới, **không sửa dòng cũ**. Mỗi kỳ tự dùng đúng tỉ lệ có hiệu lực tại tháng đó (dòng có ngày hiệu lực gần nhất nhưng ≤ cuối tháng), nên kỳ cũ luôn giữ đúng tỉ lệ tại thời điểm đó dù sau này tỉ lệ có đổi.
-3. Vào **Báo cáo → Công đoàn**, chọn năm để xem bảng: Đoàn phí NLĐ, Kinh phí công đoàn DN, Tổng thu, **Tỉ lệ giữ lại** (theo từng kỳ), Giữ lại cơ sở, Nộp Công đoàn Việt Nam. Có thể xuất Excel/PDF.
+3. Vào **Báo cáo → Công đoàn**, chọn năm để xem 3 bảng: **Đoàn phí NLĐ** (thu, tỉ lệ giữ lại, giữ lại cơ sở, nộp Công đoàn VN), **Kinh phí công đoàn DN** (tương tự), và **Tổng hợp cả 2 nguồn**. Có thể xuất Excel/PDF (file gồm đầy đủ số liệu tách riêng NLĐ/DN).
 
 ## 8. Lưu ý
 

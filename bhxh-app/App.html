@@ -546,21 +546,38 @@ async function rpCongDoan() {
     return;
   }
   const s = (f) => d.months.reduce((a, m) => a + (Number(f(m)) || 0), 0);
-  let h = `<div class="alert info">Tỉ lệ giữ lại cho Công đoàn cơ sở hiện tại: <b>${d.tyLeGiuLai}%</b> (nộp Công đoàn Việt Nam: <b>${100 - d.tyLeGiuLai}%</b>).
+  let h = `<div class="alert info">Tỉ lệ giữ lại hiện tại: Đoàn phí NLĐ <b>${d.tyLeNLD}%</b>, Kinh phí công đoàn DN <b>${d.tyLeDN}%</b>.
     Mỗi kỳ dưới đây dùng đúng tỉ lệ có hiệu lực tại tháng đó – xem hoặc đổi ở <b>Thiết lập → Tỉ lệ Công đoàn</b>.</div>
     <div class="stats">
     <div class="stat"><div class="lbl">Tổng thu Công đoàn cả năm</div><div class="val">${fmt(s((m) => m.tong))}</div></div>
     <div class="stat"><div class="lbl">Giữ lại cơ sở</div><div class="val">${fmt(s((m) => m.giuLai))}</div></div>
     <div class="stat"><div class="lbl">Nộp Công đoàn Việt Nam</div><div class="val">${fmt(s((m) => m.nop))}</div></div>
     </div>
-    <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th class="num">Đoàn phí NLĐ</th>
-    <th class="num">Kinh phí công đoàn DN</th><th class="num">Tổng thu</th><th class="num">Tỉ lệ giữ lại</th><th class="num">Giữ lại cơ sở</th><th class="num">Nộp Công đoàn VN</th></tr></thead><tbody>
+    <div class="card"><h3>Đoàn phí công đoàn (NLĐ)</h3><div class="tbl-wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th>
+    <th class="num">Thu Đoàn phí</th><th class="num">Tỉ lệ giữ lại</th><th class="num">Giữ lại cơ sở</th><th class="num">Nộp Công đoàn VN</th></tr></thead><tbody>
     ${d.months.map((m) => `<tr><td><b>${fmtM(m.ky)}</b></td><td>${kyBadge(m.trangThai)} ${m.daTinh ? '' : '<span class="badge warn">Chưa tính</span>'}</td>
-      <td class="num">${fmt(m.nld)}</td><td class="num">${fmt(m.dn)}</td><td class="num">${fmt(m.tong)}</td><td class="num">${fmtPct(m.tyLeGiuLai)}%</td>
+      <td class="num">${fmt(m.nld)}</td><td class="num">${fmtPct(m.tyLeNLD)}%</td>
+      <td class="num">${fmt(m.giuLaiNLD)}</td><td class="num"><b>${fmt(m.nopNLD)}</b></td></tr>`).join('')
+      || '<tr><td colspan="6" class="muted">Chưa có kỳ nào trong năm.</td></tr>'}
+    <tr class="total"><td colspan="2">CẢ NĂM</td><td class="num">${fmt(s((m) => m.nld))}</td><td></td>
+      <td class="num">${fmt(s((m) => m.giuLaiNLD))}</td><td class="num">${fmt(s((m) => m.nopNLD))}</td></tr>
+    </tbody></table></div></div>
+    <div class="card"><h3>Kinh phí công đoàn (DN)</h3><div class="tbl-wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th>
+    <th class="num">Thu Kinh phí</th><th class="num">Tỉ lệ giữ lại</th><th class="num">Giữ lại cơ sở</th><th class="num">Nộp Công đoàn VN</th></tr></thead><tbody>
+    ${d.months.map((m) => `<tr><td><b>${fmtM(m.ky)}</b></td><td>${kyBadge(m.trangThai)} ${m.daTinh ? '' : '<span class="badge warn">Chưa tính</span>'}</td>
+      <td class="num">${fmt(m.dn)}</td><td class="num">${fmtPct(m.tyLeDN)}%</td>
+      <td class="num">${fmt(m.giuLaiDN)}</td><td class="num"><b>${fmt(m.nopDN)}</b></td></tr>`).join('')
+      || '<tr><td colspan="6" class="muted">Chưa có kỳ nào trong năm.</td></tr>'}
+    <tr class="total"><td colspan="2">CẢ NĂM</td><td class="num">${fmt(s((m) => m.dn))}</td><td></td>
+      <td class="num">${fmt(s((m) => m.giuLaiDN))}</td><td class="num">${fmt(s((m) => m.nopDN))}</td></tr>
+    </tbody></table></div></div>
+    <div class="card"><h3>Tổng hợp cả 2 nguồn</h3><div class="tbl-wrap"><table><thead><tr><th>Kỳ</th><th class="num">Tổng thu</th>
+    <th class="num">Tổng giữ lại cơ sở</th><th class="num">Tổng nộp Công đoàn VN</th></tr></thead><tbody>
+    ${d.months.map((m) => `<tr><td><b>${fmtM(m.ky)}</b></td><td class="num">${fmt(m.tong)}</td>
       <td class="num">${fmt(m.giuLai)}</td><td class="num"><b>${fmt(m.nop)}</b></td></tr>`).join('')
-      || '<tr><td colspan="8" class="muted">Chưa có kỳ nào trong năm.</td></tr>'}
-    <tr class="total"><td colspan="2">CẢ NĂM</td><td class="num">${fmt(s((m) => m.nld))}</td><td class="num">${fmt(s((m) => m.dn))}</td>
-      <td class="num">${fmt(s((m) => m.tong))}</td><td></td><td class="num">${fmt(s((m) => m.giuLai))}</td><td class="num">${fmt(s((m) => m.nop))}</td></tr>
+      || '<tr><td colspan="4" class="muted">Chưa có kỳ nào trong năm.</td></tr>'}
+    <tr class="total"><td>CẢ NĂM</td><td class="num">${fmt(s((m) => m.tong))}</td>
+      <td class="num">${fmt(s((m) => m.giuLai))}</td><td class="num">${fmt(s((m) => m.nop))}</td></tr>
     </tbody></table></div></div>`;
   $('rpBody').innerHTML = h;
 }
@@ -695,21 +712,25 @@ function setTLCD() {
   const end = S.today + '-31';
   const hienTai = rows.find((r) => (r.ngayHL || '') <= end);
   let h = `<div class="card"><div class="row between" style="margin-bottom:10px"><div class="small muted">
-    Tỉ lệ Công đoàn cơ sở được giữ lại, dùng cho bảng phân tách ở <b>Báo cáo → Công đoàn</b>. Mỗi khi tỉ lệ thay đổi, hãy thêm một dòng mới với
-    Ngày hiệu lực mới – app tự dùng đúng tỉ lệ theo từng kỳ, các kỳ cũ không bị ảnh hưởng. Tỉ lệ nộp Công đoàn Việt Nam = 100% − tỉ lệ này.</div>
+    Tỉ lệ Công đoàn cơ sở được giữ lại, đặt <b>riêng cho Đoàn phí (NLĐ)</b> và <b>Kinh phí công đoàn (DN)</b>, dùng cho bảng phân tách ở
+    <b>Báo cáo → Công đoàn</b>. Mỗi khi tỉ lệ thay đổi, hãy thêm một dòng mới với Ngày hiệu lực mới – app tự dùng đúng tỉ lệ theo từng kỳ,
+    các kỳ cũ không bị ảnh hưởng. Tỉ lệ nộp Công đoàn Việt Nam = 100% − tỉ lệ giữ lại tương ứng.</div>
     ${admin ? '<button class="btn pri" onclick="tlcdForm(null)">＋ Thêm phiên bản</button>' : ''}</div>
-    <div class="tbl-wrap"><table><thead><tr><th>Tỉ lệ giữ lại cơ sở (%)</th><th>Tỉ lệ nộp Công đoàn VN (%)</th><th>Ngày hiệu lực</th><th>Ghi chú</th><th></th></tr></thead><tbody>
-    ${rows.map((r) => `<tr><td><b>${fmtPct(r.tyLeGiuLai)}</b> ${r === hienTai ? '<span class="badge open">Hiện hành</span>' : ''}</td>
-      <td>${fmtPct(100 - r.tyLeGiuLai)}</td><td>${fmtD(r.ngayHL)}</td><td class="small">${esc(r.ghiChu)}</td>
+    <div class="tbl-wrap"><table><thead><tr><th>Giữ lại – Đoàn phí NLĐ (%)</th><th>Nộp CĐVN – NLĐ (%)</th>
+      <th>Giữ lại – Kinh phí DN (%)</th><th>Nộp CĐVN – DN (%)</th><th>Ngày hiệu lực</th><th>Ghi chú</th><th></th></tr></thead><tbody>
+    ${rows.map((r) => `<tr><td><b>${fmtPct(r.tyLeGiuLaiNLD)}</b> ${r === hienTai ? '<span class="badge open">Hiện hành</span>' : ''}</td>
+      <td>${fmtPct(100 - r.tyLeGiuLaiNLD)}</td><td><b>${fmtPct(r.tyLeGiuLaiDN)}</b></td><td>${fmtPct(100 - r.tyLeGiuLaiDN)}</td>
+      <td>${fmtD(r.ngayHL)}</td><td class="small">${esc(r.ghiChu)}</td>
       <td>${admin ? `<div class="row"><button class="btn sm" onclick="tlcdForm(${r._row})">Sửa</button>
         <button class="btn sm danger" onclick="tlcdDel(${r._row})">Xóa</button></div>` : ''}</td></tr>`).join('')
-      || '<tr><td colspan="5" class="muted">Chưa có dữ liệu.</td></tr>'}</tbody></table></div></div>`;
+      || '<tr><td colspan="7" class="muted">Chưa có dữ liệu.</td></tr>'}</tbody></table></div></div>`;
   $('setBody').innerHTML = h;
 }
 function tlcdForm(row) {
   const r = row ? S.tlcd.find((x) => x._row === row) : {};
   const body = `<form id="tlF" onsubmit="return false"><input type="hidden" name="_row" value="${row || ''}"><div class="form">
-    <label><span class="req">Tỉ lệ Công đoàn cơ sở giữ lại (%)</span><input name="tyLeGiuLai" type="number" min="0" max="100" step="any" value="${r.tyLeGiuLai ?? ''}"></label>
+    <label><span class="req">Tỉ lệ giữ lại – Đoàn phí công đoàn (NLĐ) (%)</span><input name="tyLeGiuLaiNLD" type="number" min="0" max="100" step="any" value="${r.tyLeGiuLaiNLD ?? ''}"></label>
+    <label><span class="req">Tỉ lệ giữ lại – Kinh phí công đoàn (DN) (%)</span><input name="tyLeGiuLaiDN" type="number" min="0" max="100" step="any" value="${r.tyLeGiuLaiDN ?? ''}"></label>
     <label><span class="req">Ngày hiệu lực</span><input name="ngayHL" type="date" value="${esc(r.ngayHL || '')}"></label>
     <label class="full">Ghi chú<input name="ghiChu" value="${esc(r.ghiChu || '')}"></label></div></form>`;
   openModal(row ? 'Sửa tỉ lệ Công đoàn' : 'Thêm phiên bản tỉ lệ Công đoàn', body,
