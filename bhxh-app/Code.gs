@@ -72,6 +72,7 @@ const T = {
     ['ngayHL', 'Ngày hiệu lực', 'date'],
     ['trangThai', 'Trạng thái', 'text'],
     ['chiDoanVien', 'Chỉ áp dụng đoàn viên công đoàn', 'text'],
+    ['thuocCD', 'Thuộc quỹ Công đoàn', 'text'],
     ['ghiChu', 'Ghi chú', 'text']] },
   MAPL: { name: 'Mã phân loại', cols: [
     ['ma', 'Mã phân loại', 'text'],
@@ -147,8 +148,11 @@ const INFO_FIELDS = [
   ['diaChi', 'Địa chỉ'],
   ['vung', 'Vùng lương tối thiểu'],
   ['luongToiThieu', 'Mức lương tối thiểu vùng'],
-  ['luongCoSo', 'Mức lương cơ sở']
+  ['luongCoSo', 'Mức lương cơ sở'],
+  ['tyLeGiuLaiCD', 'Tỉ lệ Công đoàn cơ sở được giữ lại (%)']
 ];
+const INFO_NUM_FIELDS = ['luongToiThieu', 'luongCoSo', 'tyLeGiuLaiCD'];
+const INFO_NUM_FMT = { luongToiThieu: '#,##0', luongCoSo: '#,##0', tyLeGiuLaiCD: '0.####' };
 
 // ---------------------------------------------------------------------
 // WEB APP & MENU
@@ -202,10 +206,13 @@ function khoiTaoCauTruc() {
     info.getRange(1, 1, vals.length, 2).setValues(vals);
     info.getRange('B2:B' + vals.length).setNumberFormat('@');
     info.getRange('B7:B8').setNumberFormat('#,##0');
+    info.getRange('B9').setNumberFormat('0.####');
     info.getRange('B6').setValue('Vùng I');
     info.getRange('B7').setValue(4960000);
     info.getRange('B8').setValue(2340000);
+    info.getRange('B9').setValue(40);
     info.getRange('C7').setValue('Số liệu mẫu – kiểm tra lại theo quy định hiện hành');
+    info.getRange('C9').setValue('Số liệu mẫu – kiểm tra lại quy định của Công đoàn cấp trên. Tỉ lệ nộp Công đoàn VN = 100% − tỉ lệ này.');
     styleHeader_(info, 2);
     info.setColumnWidth(1, 220); info.setColumnWidth(2, 360);
   }
@@ -220,19 +227,19 @@ function khoiTaoCauTruc() {
     const hl = '2026-01-01', note = 'Số liệu mẫu – kiểm tra lại theo quy định hiện hành';
     const c1 = 46800000, c2 = 99200000;
     const sample = [
-      ['Bảo hiểm xã hội (NLĐ)', 'BHXH_NLD', DT_NLD, 8, TRAN_LUONG, c1, KHONG],
-      ['Bảo hiểm y tế (NLĐ)', 'BHYT_NLD', DT_NLD, 1.5, TRAN_LUONG, c1, KHONG],
-      ['Bảo hiểm thất nghiệp (NLĐ)', 'BHTN_NLD', DT_NLD, 1, TRAN_LUONG, c2, KHONG],
-      ['Đoàn phí công đoàn (NLĐ)', 'DPCD_NLD', DT_NLD, 1, TRAN_DONG, 234000, CO],
-      ['Bảo hiểm xã hội (DN)', 'BHXH_DN', DT_DN, 17, TRAN_LUONG, c1, KHONG],
-      ['BH tai nạn lao động - BNN (DN)', 'BHTNLD_DN', DT_DN, 0.5, TRAN_LUONG, c1, KHONG],
-      ['Bảo hiểm y tế (DN)', 'BHYT_DN', DT_DN, 3, TRAN_LUONG, c1, KHONG],
-      ['Bảo hiểm thất nghiệp (DN)', 'BHTN_DN', DT_DN, 1, TRAN_LUONG, c2, KHONG],
-      ['Kinh phí công đoàn (DN)', 'KPCD_DN', DT_DN, 2, TRAN_LUONG, c1, KHONG]
+      ['Bảo hiểm xã hội (NLĐ)', 'BHXH_NLD', DT_NLD, 8, TRAN_LUONG, c1, KHONG, KHONG],
+      ['Bảo hiểm y tế (NLĐ)', 'BHYT_NLD', DT_NLD, 1.5, TRAN_LUONG, c1, KHONG, KHONG],
+      ['Bảo hiểm thất nghiệp (NLĐ)', 'BHTN_NLD', DT_NLD, 1, TRAN_LUONG, c2, KHONG, KHONG],
+      ['Đoàn phí công đoàn (NLĐ)', 'DPCD_NLD', DT_NLD, 1, TRAN_DONG, 234000, CO, CO],
+      ['Bảo hiểm xã hội (DN)', 'BHXH_DN', DT_DN, 17, TRAN_LUONG, c1, KHONG, KHONG],
+      ['BH tai nạn lao động - BNN (DN)', 'BHTNLD_DN', DT_DN, 0.5, TRAN_LUONG, c1, KHONG, KHONG],
+      ['Bảo hiểm y tế (DN)', 'BHYT_DN', DT_DN, 3, TRAN_LUONG, c1, KHONG, KHONG],
+      ['Bảo hiểm thất nghiệp (DN)', 'BHTN_DN', DT_DN, 1, TRAN_LUONG, c2, KHONG, KHONG],
+      ['Kinh phí công đoàn (DN)', 'KPCD_DN', DT_DN, 2, TRAN_LUONG, c1, KHONG, CO]
     ];
     append_(T.KHOAN, sample.map(function (s, i) {
       return { id: 'K' + (i + 1), ten: s[0], ma: s[1], doiTuong: s[2], tiLe: s[3], loaiTran: s[4], mucToiDa: s[5],
-        ngayHL: hl, trangThai: TT_AD, chiDoanVien: s[6], ghiChu: note };
+        ngayHL: hl, trangThai: TT_AD, chiDoanVien: s[6], thuocCD: s[7], ghiChu: note };
     }));
   }
   if (created.MAPL) {
@@ -268,6 +275,7 @@ function khoiTaoCauTruc() {
   v(T.KHOAN, 'Mức trần', LISTS.loaiTran);
   v(T.KHOAN, 'Trạng thái', LISTS.trangThai);
   v(T.KHOAN, 'Chỉ áp dụng đoàn viên công đoàn', LISTS.coKhong);
+  v(T.KHOAN, 'Thuộc quỹ Công đoàn', LISTS.coKhong);
   v(T.MAPL, 'Trạng thái', LISTS.trangThai);
   [T.NV, T.DLKY].forEach(function (t) {
     v(t, 'Tham gia công đoàn', LISTS.coKhong);
@@ -530,7 +538,7 @@ function getInfo_() {
   if (!sh || sh.getLastRow() < 2) return o;
   sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues().forEach(function (r) {
     const f = INFO_FIELDS.find(function (x) { return x[1] === String(r[0]).trim(); });
-    if (f) o[f[0]] = (f[0] === 'luongToiThieu' || f[0] === 'luongCoSo') ? num_(r[1]) : String(r[1]).trim();
+    if (f) o[f[0]] = INFO_NUM_FIELDS.indexOf(f[0]) >= 0 ? num_(r[1]) : String(r[1]).trim();
   });
   return o;
 }
@@ -1135,6 +1143,45 @@ function apiTongHop(nam) {
   return { info: getInfo_(), nam: nam, years: years, months: months, codes: codes };
 }
 
+/** Các mã khoản trích được đánh dấu "Thuộc quỹ Công đoàn" (ở bất kỳ phiên bản nào) */
+function congDoanCodes_(khoanRows) {
+  const set = {};
+  khoanRows.forEach(function (r) { if (r.thuocCD === CO) set[r.ma] = true; });
+  return set;
+}
+
+/** Bảng phân tách quỹ Công đoàn theo kỳ trong năm: giữ lại cơ sở / nộp Công đoàn Việt Nam */
+function apiCongDoan(nam) {
+  const user = getUser_();
+  nam = String(nam);
+  const info = getInfo_();
+  const giuLai = Math.max(0, Math.min(100, num_(info.tyLeGiuLaiCD)));
+  const khoanRows = load_(T.KHOAN).rows;
+  const cdCodes = congDoanCodes_(khoanRows);
+  const ten = khoanTen_(khoanRows);
+  const all = listKy_();
+  const years = [];
+  all.forEach(function (k) { const y = k.ky.slice(0, 4); if (years.indexOf(y) < 0) years.push(y); });
+  const kys = all.filter(function (k) { return k.ky.slice(0, 4) === nam; }).reverse();
+  const kq = loadKQAll_().rows.filter(function (r) { return r.ky.slice(0, 4) === nam && r.dong === CO && canSee_(user, r); });
+  const months = kys.map(function (k) {
+    let nld = 0, dn = 0;
+    kq.filter(function (r) { return r.ky === k.ky; }).forEach(function (r) {
+      Object.keys(r.items).forEach(function (c) {
+        if (!cdCodes[c]) return;
+        if ((ten[c] || {}).doiTuong === DT_DN) dn += r.items[c]; else nld += r.items[c];
+      });
+    });
+    const tong = nld + dn;
+    const giuLaiTien = Math.round(tong * giuLai / 100);
+    return { ky: k.ky, trangThai: k.trangThai, daTinh: !!k.ngayTinh, nld: nld, dn: dn, tong: tong, giuLai: giuLaiTien, nop: tong - giuLaiTien };
+  });
+  return {
+    info: info, nam: nam, years: years, tyLeGiuLai: giuLai,
+    coCauHinh: Object.keys(cdCodes).length > 0, months: months
+  };
+}
+
 // ---------------------------------------------------------------------
 // API: XUẤT EXCEL / PDF
 // ---------------------------------------------------------------------
@@ -1211,8 +1258,21 @@ function buildDoc_(loai, p) {
       ]
     };
   }
+  if (loai === 'congdoan') {
+    const d = apiCongDoan(p);
+    const header = ['Kỳ', 'Đoàn phí NLĐ', 'Kinh phí công đoàn DN', 'Tổng thu Công đoàn',
+      'Giữ lại cơ sở (' + fmtPctPlain_(d.tyLeGiuLai) + '%)', 'Nộp Công đoàn Việt Nam (' + fmtPctPlain_(100 - d.tyLeGiuLai) + '%)'];
+    const rows = d.months.map(function (m) { return [monthDisp_(m.ky), m.nld, m.dn, m.tong, m.giuLai, m.nop]; });
+    const s = function (i) { return rows.reduce(function (a, r) { return a + r[i]; }, 0); };
+    const total = ['CẢ NĂM', s(1), s(2), s(3), s(4), s(5)];
+    return {
+      info: d.info, title: 'BẢNG PHÂN TÁCH QUỸ CÔNG ĐOÀN NĂM ' + d.nam, fileName: 'CongDoan_' + d.nam,
+      sections: [{ title: '', header: header, rows: rows, total: total, numCols: [1, 2, 3, 4, 5] }]
+    };
+  }
   throw new Error('Loại báo cáo không hợp lệ.');
 }
+function fmtPctPlain_(n) { return (Math.round(n * 100) / 100).toString(); }
 
 function makeFile_(doc, format) {
   const width = Math.max.apply(null, doc.sections.map(function (s) { return s.header.length; }).concat([4]));
@@ -1352,8 +1412,8 @@ function apiExportNV(ky, format) {
 function normHeader_(s) { return String(s === null || s === undefined ? '' : s).trim().toLowerCase().replace(/\s+/g, ' '); }
 
 /** Tìm dòng tiêu đề thật trong file (bỏ qua các dòng tiêu đề công ty/ghi chú phía trên, nếu có) */
-function findHeaderRow_(grid) {
-  const req = ['Mã NV', 'Họ và tên'].map(normHeader_);
+function findHeaderRow_(grid, requiredTitles) {
+  const req = (requiredTitles || ['Mã NV', 'Họ và tên']).map(normHeader_);
   for (let r = 0; r < Math.min(grid.length, 15); r++) {
     const norm = (grid[r] || []).map(normHeader_);
     if (req.every(function (w) { return norm.indexOf(w) >= 0; })) return r;
@@ -1361,25 +1421,32 @@ function findHeaderRow_(grid) {
   return -1;
 }
 
-/** Chuyển lưới 2 chiều (có dòng tiêu đề) thành danh sách object theo cols của bảng t */
-function gridToObjects_(cols, grid) {
-  const hr = findHeaderRow_(grid);
+/**
+ * Chuyển lưới 2 chiều (có dòng tiêu đề) thành danh sách object theo cols của bảng t.
+ * Chỉ những cột có tên trùng với tiêu đề trong file mới được gán giá trị (khóa để undefined nếu không có trong file) –
+ * nhờ đó chế độ "cập nhật 1 phần" giữ nguyên các cột không có trong file khi ghi (buildRow_ chỉ đổi cột được gán).
+ */
+function gridToObjects_(cols, grid, requiredTitles) {
+  const hr = findHeaderRow_(grid, requiredTitles);
   if (hr < 0) {
-    return { objs: [], error: 'Không tìm thấy dòng tiêu đề (phải có đủ cột "Mã NV" và "Họ và tên"). '
+    return { objs: [], error: 'Không tìm thấy dòng tiêu đề (phải có đủ cột ' + (requiredTitles || ['Mã NV', 'Họ và tên']).map(function (x) { return '"' + x + '"'; }).join(' và ') + '). '
       + 'Hãy tải file mẫu (nút "Tải file mẫu") và giữ nguyên tên cột.' };
   }
   const norm = grid[hr].map(normHeader_);
-  const idx = {};
-  cols.forEach(function (c) { const i = norm.indexOf(normHeader_(c[1])); if (i >= 0) idx[c[0]] = i; });
+  const idx = {}, type = {}, matched = [];
+  cols.forEach(function (c) {
+    const i = norm.indexOf(normHeader_(c[1]));
+    if (i >= 0) { idx[c[0]] = i; type[c[0]] = c[2]; matched.push(c[0]); }
+  });
   const objs = [];
   for (let r = hr + 1; r < grid.length; r++) {
     const row = grid[r];
     if (!row || row.every(function (x) { return x === '' || x === null || x === undefined; })) continue;
     const o = { _line: r + 1 };
-    cols.forEach(function (c) { const i = idx[c[0]]; o[c[0]] = i !== undefined ? fromCell_(c[2], row[i]) : ''; });
+    matched.forEach(function (k) { o[k] = fromCell_(type[k], row[idx[k]]); });
     objs.push(o);
   }
-  return { objs: objs };
+  return { objs: objs, matched: matched };
 }
 
 /** Đọc file người dùng tải lên (base64) thành lưới 2 chiều */
@@ -1430,26 +1497,29 @@ function convertXlsxToRows_(blob) {
  * mode: 'themmoi' = thêm mới nhân viên chưa có, cập nhật nếu Mã NV đã tồn tại (bỏ qua dòng lỗi).
  *       'thaythe' = thay thế hoàn toàn danh sách hiện tại (trong phạm vi được quản lý) bằng file – nếu có bất kỳ
  *                   dòng lỗi thì KHÔNG thay đổi gì cả, để tránh mất dữ liệu.
+ *       'motphan' = chỉ cập nhật các cột có trong file cho NV đã tồn tại (giữ nguyên các cột khác, không tạo mới).
+ * onlyEmpty: chỉ dùng cho mode 'motphan' – true = chỉ điền vào ô còn trống, không ghi đè dữ liệu đã có.
  */
-function apiImportNV(ky, mode, fileB64, fileName) {
-  return importNVGrid_(ky, mode, parseUploadedGrid_(fileB64, fileName), fileName);
+function apiImportNV(ky, mode, fileB64, fileName, onlyEmpty) {
+  return importNVGrid_(ky, mode, parseUploadedGrid_(fileB64, fileName), fileName, onlyEmpty);
 }
 
 /** Nhập danh sách nhân viên từ văn bản dán trực tiếp (CSV/TSV) – không cần chọn file. */
-function apiImportNVText(ky, mode, text) {
+function apiImportNVText(ky, mode, text, onlyEmpty) {
   if (!String(text || '').trim()) throw new Error('Chưa dán dữ liệu.');
-  return importNVGrid_(ky, mode, parseTextGrid_(text), 'dán trực tiếp');
+  return importNVGrid_(ky, mode, parseTextGrid_(text), 'dán trực tiếp', onlyEmpty);
 }
 
-function importNVGrid_(ky, mode, grid, source) {
+function importNVGrid_(ky, mode, grid, source, onlyEmpty) {
   const user = getUser_();
   requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
   ky = normMonth_(ky);
   return withLock_(function () {
     if (ky) requireOpen_(ky);
-    const parsed = gridToObjects_(T.NV.cols, grid);
+    const parsed = gridToObjects_(T.NV.cols, grid, mode === 'motphan' ? ['Mã NV'] : ['Mã NV', 'Họ và tên']);
     if (parsed.error) throw new Error(parsed.error);
-    if (!parsed.objs.length) throw new Error('File không có dòng dữ liệu nào.');
+    if (!parsed.objs.length) throw new Error('Không có dòng dữ liệu nào.');
+    if (mode === 'motphan') return importPartialNV_(user, ky, parsed, source, onlyEmpty);
 
     const kys = listKy_();
     const latest = kys.length ? kys[0].ky : '';
@@ -1513,6 +1583,76 @@ function importNVGrid_(ky, mode, grid, source) {
   });
 }
 
+/**
+ * Chế độ "cập nhật 1 phần": chỉ ghi vào các cột có trong file, giữ nguyên các cột khác; không tạo NV mới.
+ * onlyEmpty = true: chỉ điền vào ô hiện đang trống (chuỗi rỗng, hoặc 0 với các cột số), không ghi đè dữ liệu đã có.
+ */
+function importPartialNV_(user, ky, parsed, source, onlyEmpty) {
+  const matched = parsed.matched.filter(function (k) { return k !== 'maNV'; });
+  if (!matched.length) throw new Error('File chỉ có cột Mã NV, không có cột nào khác để cập nhật.');
+  const kys = listKy_();
+  const latest = kys.length ? kys[0].ky : '';
+  const applyToMaster = !ky || ky >= latest;
+  const mm = maplMap_();
+  const dNV = load_(T.NV);
+  const dlRowsForKy = ky ? load_(T.DLKY).rows.filter(function (r) { return r.ky === ky; }) : [];
+  const nvByCode = {}; dNV.rows.forEach(function (r) { nvByCode[r.maNV] = r; });
+  const dlByCode = {}; dlRowsForKy.forEach(function (r) { dlByCode[r.maNV] = r; });
+
+  let updated = 0, skipped = 0;
+  const errors = [];
+  parsed.objs.forEach(function (raw) {
+    const code = String(raw.maNV || '').trim();
+    try {
+      if (!code) throw new Error('Thiếu Mã NV.');
+      const target = ky ? dlByCode[code] : nvByCode[code];
+      if (!target) throw new Error('Không tìm thấy Mã NV này (chế độ cập nhật 1 phần không tạo NV mới).');
+      if (!canSee_(user, target)) throw new Error('Không có quyền sửa hồ sơ này (đã có người khác quản lý).');
+      const patch = mergeNVPartial_(target, raw, matched, user, mm, onlyEmpty);
+      if (!patch) { skipped++; return; }
+      if (ky) { const exD = dlByCode[code]; if (exD) update_(T.DLKY, exD._row, patch); }
+      if (applyToMaster) { const exM = nvByCode[code]; if (exM) update_(T.NV, exM._row, patch); }
+      updated++;
+    } catch (e) {
+      errors.push({ line: raw._line, maNV: code, message: e.message });
+    }
+  });
+  log_(user, 'Import NV (cập nhật 1 phần)', (ky ? 'Kỳ ' + monthDisp_(ky) : 'Hồ sơ gốc') + ' – ' + updated + ' cập nhật, '
+    + skipped + ' không đổi, cột: ' + matched.join(', ') + ' từ ' + source);
+  return { mode: 'motphan', added: 0, updated: updated, deleted: 0, skipped: skipped, total: parsed.objs.length, errors: errors, cols: matched };
+}
+
+/** Tính patch (chỉ các trường cần đổi) khi cập nhật 1 phần cho một NV; trả về null nếu không có gì thay đổi. */
+function mergeNVPartial_(existing, raw, matchedKeys, user, mm, onlyEmpty) {
+  const patch = {};
+  matchedKeys.forEach(function (k) {
+    const v = raw[k];
+    if (onlyEmpty) {
+      const cur = existing[k];
+      const empty = (typeof cur === 'number') ? cur === 0 : !cur;
+      if (!empty) return; // đã có dữ liệu, giữ nguyên
+    }
+    patch[k] = v;
+  });
+  if (!Object.keys(patch).length) return null;
+  if (patch.congDoan !== undefined) patch.congDoan = patch.congDoan === CO ? CO : KHONG;
+  if (patch.emailQL !== undefined) {
+    patch.emailQL = String(patch.emailQL || '').toLowerCase().trim();
+    if (user.role === ROLE.NHAP) patch.emailQL = user.email;
+  }
+  if (patch.maPL !== undefined && patch.maPL && !mm[patch.maPL]) throw new Error('Mã phân loại "' + patch.maPL + '" không tồn tại.');
+  if (['luongChinh', 'pcKN', 'pcCV', 'pcDH', 'pcKhac'].some(function (k) { return patch[k] !== undefined; })) {
+    const merged = Object.assign({}, existing, patch);
+    patch.luongDong = luongDong_(merged);
+  }
+  const thangDung = patch.thangDung !== undefined ? patch.thangDung : existing.thangDung;
+  const ngayBHXH = patch.ngayBHXH !== undefined ? patch.ngayBHXH : existing.ngayBHXH;
+  if ((patch.thangDung !== undefined || patch.ngayBHXH !== undefined) && thangDung && ngayBHXH && normMonth_(thangDung) < ngayBHXH.slice(0, 7)) {
+    throw new Error('Tháng dừng đóng không được trước tháng bắt đầu BHXH.');
+  }
+  return patch;
+}
+
 // ---------------------------------------------------------------------
 // API: THIẾT LẬP (Admin)
 // ---------------------------------------------------------------------
@@ -1529,8 +1669,8 @@ function apiSaveInfo(o) {
     let row;
     if (i < 0) { row = sh.getLastRow() + 1; sh.getRange(row, 1).setValue(f[1]); labels.push(f[1]); }
     else row = i + 2;
-    const isNum = f[0] === 'luongToiThieu' || f[0] === 'luongCoSo';
-    sh.getRange(row, 2).setNumberFormat(isNum ? '#,##0' : '@').setValue(isNum ? num_(o[f[0]]) : String(o[f[0]]));
+    const isNum = INFO_NUM_FIELDS.indexOf(f[0]) >= 0;
+    sh.getRange(row, 2).setNumberFormat(isNum ? INFO_NUM_FMT[f[0]] : '@').setValue(isNum ? num_(o[f[0]]) : String(o[f[0]]));
   });
   log_(user, 'Sửa thông tin chung', '');
   return getInfo_();
@@ -1560,7 +1700,7 @@ function apiSaveKhoan(o) {
     ten: String(o.ten || '').trim(), ma: String(o.ma || '').trim().toUpperCase(), doiTuong: o.doiTuong,
     tiLe: num_(o.tiLe), loaiTran: o.loaiTran || TRAN_KHONG, mucToiDa: num_(o.mucToiDa),
     ngayHL: normDate_(o.ngayHL), trangThai: o.trangThai || TT_AD, chiDoanVien: o.chiDoanVien === CO ? CO : KHONG,
-    ghiChu: o.ghiChu || ''
+    thuocCD: o.thuocCD === CO ? CO : KHONG, ghiChu: o.ghiChu || ''
   };
   if (!r.ten || !r.ma) throw new Error('Chưa nhập Tên khoản hoặc Mã nhận diện.');
   if (!/^[A-Z0-9_]+$/.test(r.ma)) throw new Error('Mã nhận diện chỉ gồm chữ không dấu, số và dấu gạch dưới (VD: BHXH_NLD).');

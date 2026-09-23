@@ -118,15 +118,26 @@ Màn hình **Nhân viên** có 4 nút:
 
 **Quy tắc dữ liệu:** dòng tiêu đề phải có ít nhất 2 cột **"Mã NV"** và **"Họ và tên"**, đặt tên giống file mẫu (có thể thêm/bớt cột khác, thứ tự cột tùy ý). Ngày dạng `dd/mm/yyyy`, tháng dạng `mm/yyyy`.
 
-**Hai cách nhập:**
-- **Thêm mới / cập nhật:** dòng có Mã NV chưa có thì thêm nhân viên mới; Mã NV đã có thì cập nhật lại thông tin. Dòng nào lỗi sẽ bị **bỏ qua** và báo cụ thể, các dòng còn lại vẫn được nhập.
+**Ba cách nhập:**
+- **Thêm mới / cập nhật:** dòng có Mã NV chưa có thì thêm nhân viên mới; Mã NV đã có thì cập nhật **toàn bộ** thông tin (cột không có trong file bị coi là rỗng). Dòng nào lỗi sẽ bị **bỏ qua** và báo cụ thể, các dòng còn lại vẫn được nhập.
+- **Chỉ cập nhật các cột có trong dữ liệu:** dùng khi bạn chỉ muốn bổ sung hoặc sửa một vài trường (ví dụ chỉ có 2 cột "Mã NV" và "Email NV quản lý hồ sơ") mà **không đổi các cột khác**. Không tạo nhân viên mới – Mã NV phải đã tồn tại. Tick thêm **"Chỉ điền vào ô còn trống"** nếu chỉ muốn bổ sung dữ liệu đang thiếu, không ghi đè lên dữ liệu đã có.
 - **Thay thế hoàn toàn:** xóa toàn bộ danh sách đang xem (trong phạm vi bạn quản lý) và thay bằng đúng nội dung file. Nếu file có **bất kỳ dòng lỗi nào**, ứng dụng sẽ **không thay đổi gì** để tránh mất dữ liệu — sửa lỗi rồi nhập lại.
 
 Người **Nhập liệu** chỉ nhập/xuất được hồ sơ mình quản lý (theo *Email NV quản lý hồ sơ*); nhân viên mới do họ nhập sẽ tự gán email của họ. **Admin** không bị giới hạn này. Không nhập được vào kỳ đã chốt.
 
 **Nếu nhập file Excel (.xlsx) báo lỗi:** vào Apps Script, mục **Dịch vụ** (thanh bên trái) → bấm **+** → thêm **Drive API** (phiên bản v3) → Lưu. Hoặc lưu file dưới dạng **CSV** rồi nhập lại — CSV luôn hoạt động mà không cần bước này.
 
-## 7. Lưu ý
+**Các trường số tiền** (Mức lương chính, PC…, Mức tối đa, Lương đóng cũ/mới ở Truy thu) hiển thị có phân tách hàng ngàn khi nhập trên web app (gõ số, ứng dụng tự thêm dấu chấm).
+
+## 7. Phân tách quỹ Công đoàn theo kỳ
+
+1. Vào **Thiết lập → Khoản trích đóng**, sửa khoản **Đoàn phí công đoàn (NLĐ)** và **Kinh phí công đoàn (DN)** (hoặc khoản tương đương do bạn đặt), chọn **"Thuộc quỹ Công đoàn" = Có**. Đây là dấu hiệu để ứng dụng biết khoản nào tính vào quỹ Công đoàn – không phụ thuộc tên/mã khoản.
+2. Vào **Thiết lập → Thông tin chung**, nhập **"Tỉ lệ Công đoàn cơ sở được giữ lại (%)"**. Tỉ lệ nộp Công đoàn Việt Nam tự tính = 100% − tỉ lệ này.
+3. Vào **Báo cáo → Công đoàn**, chọn năm để xem bảng: Đoàn phí NLĐ, Kinh phí công đoàn DN, Tổng thu, Giữ lại cơ sở, Nộp Công đoàn Việt Nam theo từng kỳ và cả năm. Có thể xuất Excel/PDF.
+
+Lưu ý: tỉ lệ giữ lại dùng **giá trị hiện tại** tại lúc xem báo cáo, áp dụng cho mọi kỳ hiển thị (không lưu lịch sử theo thời điểm như tỉ lệ ở tab Khoản trích đóng). Nếu tỉ lệ giữ lại từng thay đổi giữa các kỳ, số liệu các kỳ cũ trong báo cáo sẽ tính lại theo tỉ lệ mới nhất.
+
+## 8. Lưu ý
 
 - Không đổi tên các tab và tiêu đề cột. Có thể thêm cột riêng ở cuối, app sẽ bỏ qua các cột đó.
 - Tab *Kết quả tính* do app ghi lại mỗi lần bấm Tính. Không sửa tay tab này.

@@ -19,6 +19,16 @@ function fmt(n) { return (Math.round(Number(n) || 0)).toLocaleString('vi-VN'); }
 function fmtPct(n) { return (Number(n) || 0).toLocaleString('vi-VN', { maximumFractionDigits: 4 }); }
 function fmtD(iso) { return iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : ''; }
 function fmtM(k) { return k ? k.slice(5, 7) + '/' + k.slice(0, 4) : ''; }
+// Ô nhập số tiền: hiển thị có phân tách hàng ngàn, gõ tới đâu định dạng lại tới đó
+function moneyVal(v) { const n = Number(v) || 0; return n ? fmt(n) : ''; }
+function onMoneyInput(el) {
+  const pos = el.selectionStart, before = el.value.length;
+  const digits = el.value.replace(/[^\d]/g, '');
+  el.value = digits ? fmt(Number(digits)) : '';
+  const diff = el.value.length - before;
+  try { el.setSelectionRange(Math.max(0, pos + diff), Math.max(0, pos + diff)); } catch (e) { /* bỏ qua trên input type khác */ }
+}
+function moneyNum(el) { return Number(String(el.value || '').replace(/[^\d]/g, '')) || 0; }
 function nextMonth(k) {
   let y = +k.slice(0, 4), m = +k.slice(5, 7) + 1;
   if (m > 12) { m = 1; y++; }
@@ -277,10 +287,14 @@ function nvImportForm() {
         : '<label class="full">Dán dữ liệu (sao chép từ Excel/Google Sheet rồi dán vào đây, hoặc dán nội dung CSV)'
           + '<textarea id="impPaste" rows="10" style="width:100%;font-family:monospace;font-size:12px" placeholder="Mã NV\tHọ và tên\tMức lương chính…"></textarea></label>'}
       <label class="full">Cách nhập<select id="impMode" onchange="impModeChange()">
-        <option value="themmoi">Thêm nhân viên mới; nếu Mã NV đã có trong danh sách thì cập nhật thông tin</option>
+        <option value="themmoi">Thêm nhân viên mới; nếu Mã NV đã có trong danh sách thì cập nhật toàn bộ thông tin</option>
+        <option value="motphan">Chỉ cập nhật các cột có trong dữ liệu (giữ nguyên các cột khác) – không tạo NV mới</option>
         <option value="thaythe">Thay thế hoàn toàn danh sách hiện tại bằng dữ liệu này</option>
       </select></label>
     </div></form>
+    <div id="impPartialOpt" style="display:none;margin-top:6px">
+      <label class="small"><input type="checkbox" id="impOnlyEmpty"> Chỉ điền vào ô còn trống, không ghi đè dữ liệu đã có</label>
+    </div>
     <div id="impWarn" class="alert warn" style="display:none;margin-top:10px">
       <b>Thay thế hoàn toàn</b> sẽ xóa toàn bộ nhân viên đang có (trong phạm vi bạn quản lý) rồi thay bằng dữ liệu này.
       Nếu có bất kỳ dòng lỗi nào, ứng dụng sẽ KHÔNG xóa hay thay đổi gì cả.</div>`;
@@ -288,7 +302,11 @@ function nvImportForm() {
     `<button class="btn" onclick="closeModal()">Hủy</button><button class="btn pri" onclick="nvImportSubmit()">Nhập</button>`);
   setTimeout(impModeChange, 0);
 }
-function impModeChange() { $('impWarn').style.display = $('impMode').value === 'thaythe' ? 'block' : 'none'; }
+function impModeChange() {
+  const mode = $('impMode').value;
+  $('impWarn').style.display = mode === 'thaythe' ? 'block' : 'none';
+  $('impPartialOpt').style.display = mode === 'motphan' ? 'block' : 'none';
+}
 function readFileB64(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -299,6 +317,7 @@ function readFileB64(file) {
 }
 async function nvImportSubmit() {
   const mode = $('impMode').value;
+  const onlyEmpty = mode === 'motphan' && $('impOnlyEmpty').checked;
   const label = mode === 'thaythe' ? 'Thay thế hoàn toàn danh sách hiện tại bằng dữ liệu này?' : '';
   if (label && !confirm(label)) return;
   if (S.impTab === 'file') {
@@ -306,14 +325,14 @@ async function nvImportSubmit() {
     if (!f) return toast('Chưa chọn file.', 'err');
     act(async () => {
       const b64 = await readFileB64(f);
-      const r = await run('apiImportNV', S.nvData.ky, mode, b64, f.name);
+      const r = await run('apiImportNV', S.nvData.ky, mode, b64, f.name, onlyEmpty);
       closeModal(); nvImportResult(r); loadNV();
     });
   } else {
     const text = $('impPaste').value;
     if (!text.trim()) return toast('Chưa dán dữ liệu.', 'err');
     act(async () => {
-      const r = await run('apiImportNVText', S.nvData.ky, mode, text);
+      const r = await run('apiImportNVText', S.nvData.ky, mode, text, onlyEmpty);
       closeModal(); nvImportResult(r); loadNV();
     });
   }
@@ -321,10 +340,12 @@ async function nvImportSubmit() {
 function nvImportResult(r) {
   let h = `<div class="stats">
     <div class="stat"><div class="lbl">Tổng dòng trong file</div><div class="val">${r.total}</div></div>
-    <div class="stat"><div class="lbl">Thêm mới</div><div class="val">${r.added}</div></div>
-    <div class="stat"><div class="lbl">Cập nhật</div><div class="val">${r.updated}</div></div>
+    <div class="stat"><div class="lbl">${r.mode === 'motphan' ? 'Đã cập nhật' : 'Thêm mới'}</div><div class="val">${r.mode === 'motphan' ? r.updated : r.added}</div></div>
+    ${r.mode !== 'motphan' ? `<div class="stat"><div class="lbl">Cập nhật</div><div class="val">${r.updated}</div></div>` : ''}
     ${r.deleted ? `<div class="stat"><div class="lbl">Đã xóa (thay thế)</div><div class="val">${r.deleted}</div></div>` : ''}
-  </div>`;
+    ${r.skipped ? `<div class="stat"><div class="lbl">Không đổi (đã có dữ liệu)</div><div class="val">${r.skipped}</div></div>` : ''}
+  </div>
+  ${r.cols ? `<div class="small muted" style="margin-bottom:10px">Cột đã cập nhật: ${r.cols.join(', ')}</div>` : ''}`;
   if (r.errors && r.errors.length) {
     h += `<div class="alert ${r.mode === 'thaythe' ? 'bad' : 'warn'}">${r.mode === 'thaythe'
       ? 'Không có gì được thay đổi vì file có dòng lỗi. Hãy sửa các dòng dưới đây rồi nhập lại.'
@@ -370,6 +391,8 @@ function nvForm(maNV) {
   const plList = S.mapl.filter((m) => m.trangThai !== 'Ngừng áp dụng' || m.ma === r.maPL).map((m) => m.ma);
   const inp = (name, label, type, extra) => `<label class="${extra && extra.includes('req') ? '' : ''}"><span class="${extra && extra.includes('req') ? 'req' : ''}">${label}</span>
     <input name="${name}" type="${type || 'text'}" value="${esc(r[name] === 0 && type === 'number' ? '' : (r[name] ?? ''))}" ${dis} ${extra && extra.includes('ro') ? 'readonly' : ''} ${type === 'number' ? 'min="0" step="1" oninput="nvSum()"' : ''}></label>`;
+  const money = (name, label, extra) => `<label class="${extra && extra.includes('req') ? '' : ''}"><span class="${extra && extra.includes('req') ? 'req' : ''}">${label}</span>
+    <input name="${name}" type="text" inputmode="numeric" value="${moneyVal(r[name])}" ${dis} oninput="onMoneyInput(this);nvSum()"></label>`;
   const body = `<form id="nvF1" onsubmit="return false"><div class="form">
     ${inp('maNV', 'Mã NV', 'text', maNV ? 'req ro' : 'req')}
     ${inp('hoTen', 'Họ và tên', 'text', 'req')}
@@ -381,11 +404,11 @@ function nvForm(maNV) {
     ${inp('ngayBHXH', 'Ngày bắt đầu BHXH', 'date')}
     ${inp('ngayNghi', 'Ngày nghỉ việc', 'date')}
     ${inp('thangDung', 'Tháng dừng đóng (tháng đầu tiên KHÔNG đóng)', 'month')}
-    ${inp('luongChinh', 'Mức lương chính', 'number')}
-    ${inp('pcKN', 'PC Kiêm nhiệm', 'number')}
-    ${inp('pcCV', 'PC Chức vụ', 'number')}
-    ${inp('pcDH', 'PC Độc hại', 'number')}
-    ${inp('pcKhac', 'PC Khác', 'number')}
+    ${money('luongChinh', 'Mức lương chính')}
+    ${money('pcKN', 'PC Kiêm nhiệm')}
+    ${money('pcCV', 'PC Chức vụ')}
+    ${money('pcDH', 'PC Độc hại')}
+    ${money('pcKhac', 'PC Khác')}
     <label>Lương đóng BHXH (tự tính)<input id="nvLD" readonly value="${fmt(r.luongDong)}"></label>
     <label><span class="req">Mã phân loại</span><select name="maPL" ${dis}>${opt(plList, r.maPL || '', '— Chọn —')}</select></label>
     <label>Tham gia công đoàn<select name="congDoan" ${dis}>${opt(['Có', 'Không'], r.congDoan || 'Không')}</select></label>
@@ -398,7 +421,8 @@ function nvForm(maNV) {
 }
 function nvSum() {
   const o = formData('nvF1');
-  $('nvLD').value = fmt(['luongChinh', 'pcKN', 'pcCV', 'pcDH', 'pcKhac'].reduce((s, k) => s + (Number(o[k]) || 0), 0));
+  const num = (s) => Number(String(s || '').replace(/[^\d]/g, '')) || 0;
+  $('nvLD').value = fmt(['luongChinh', 'pcKN', 'pcCV', 'pcDH', 'pcKhac'].reduce((s, k) => s + num(o[k]), 0));
 }
 function nvSave(isNew) {
   const o = formData('nvF1');
@@ -457,8 +481,8 @@ function ttForm(id) {
       <datalist id="ttNVs">${nvOpts}</datalist></label>
     <label><span class="req">Từ tháng</span><input type="month" name="tuThang" value="${esc(r.tuThang || '')}"></label>
     <label><span class="req">Đến tháng</span><input type="month" name="denThang" value="${esc(r.denThang || '')}"></label>
-    <label>Lương đóng cũ (đã đóng)<input type="number" min="0" name="luongCu" value="${r.luongCu ?? ''}"></label>
-    <label>Lương đóng mới (đúng)<input type="number" min="0" name="luongMoi" value="${r.luongMoi ?? ''}"></label>
+    <label>Lương đóng cũ (đã đóng)<input type="text" inputmode="numeric" name="luongCu" value="${moneyVal(r.luongCu)}" oninput="onMoneyInput(this)"></label>
+    <label>Lương đóng mới (đúng)<input type="text" inputmode="numeric" name="luongMoi" value="${moneyVal(r.luongMoi)}" oninput="onMoneyInput(this)"></label>
     <label>Mã phân loại<select name="maPL">${opt(S.mapl.map((m) => m.ma), r.maPL || '', '— Theo NV —')}</select></label>
     <label>Tham gia công đoàn<select name="congDoan">${opt(['Có', 'Không'], r.congDoan || '', '— Theo NV —')}</select></label>
     <label class="full">Ghi chú / lý do<input name="ghiChu" value="${esc(r.ghiChu || '')}"></label>
@@ -470,7 +494,7 @@ function ttPick() {
   const f = $('ttF1'), n = S.ttData.nvs.find((x) => x.maNV === f.maNV.value);
   if (!n) return;
   f.maPL.value = n.maPL || ''; f.congDoan.value = n.congDoan || '';
-  if (!f.luongMoi.value) f.luongMoi.value = n.luongDong || '';
+  if (!f.luongMoi.value) f.luongMoi.value = moneyVal(n.luongDong);
 }
 function ttSave() {
   const o = formData('ttF1');
@@ -491,22 +515,50 @@ function vBaoCao() {
   if (!S.rpKy) S.rpKy = latestKy();
   if (!S.rpNam) S.rpNam = (latestKy() || S.today).slice(0, 4);
   const tab = (k, t) => `<button class="${S.rpTab === k ? 'active' : ''}" onclick="S.rpTab='${k}';vBaoCao()">${t}</button>`;
-  V().innerHTML = `<h2>Báo cáo</h2><div class="tabs">${tab('chitiet', 'Bảng tính chi tiết')}${tab('biendong', 'Biến động tăng/giảm')}${tab('tonghop', 'Tổng hợp năm')}</div>
+  V().innerHTML = `<h2>Báo cáo</h2><div class="tabs">${tab('chitiet', 'Bảng tính chi tiết')}${tab('biendong', 'Biến động tăng/giảm')}${tab('tonghop', 'Tổng hợp năm')}${tab('congdoan', 'Công đoàn')}</div>
     <div id="rpBar" class="card no-print"></div><div id="rpBody"></div>`;
   if (!S.kys.length) { $('rpBar').innerHTML = 'Chưa có kỳ BHXH nào.'; return; }
   const exp = (loai, p) => `<button class="btn" onclick="xuat('${loai}','${p}','xlsx')">⬇ Excel</button>
     <button class="btn" onclick="xuat('${loai}','${p}','pdf')">⬇ PDF</button>`;
-  if (S.rpTab === 'tonghop') {
+  if (S.rpTab === 'tonghop' || S.rpTab === 'congdoan') {
     const years = [...new Set(S.kys.map((k) => k.ky.slice(0, 4)))];
     $('rpBar').innerHTML = `<div class="row"><select onchange="S.rpNam=this.value;vBaoCao()">${opt(years, S.rpNam)}</select>
-      <span class="spacer"></span>${exp('tonghop', S.rpNam)}</div>`;
-    rpTongHop();
+      <span class="spacer"></span>${exp(S.rpTab, S.rpNam)}</div>`;
+    S.rpTab === 'tonghop' ? rpTongHop() : rpCongDoan();
   } else {
     $('rpBar').innerHTML = `<div class="row"><select onchange="S.rpKy=this.value;vBaoCao()">${kyOpts(S.rpKy)}</select>
       ${S.rpTab === 'chitiet' ? '<label class="small"><input type="checkbox" id="rpAll" onchange="renderChiTiet()"> Hiện cả NV không đóng</label>' : ''}
       <span class="spacer"></span>${exp(S.rpTab, S.rpKy)}</div>`;
     S.rpTab === 'chitiet' ? rpChiTiet() : rpBienDong();
   }
+}
+async function rpCongDoan() {
+  $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>';
+  let d;
+  try { d = await run('apiCongDoan', S.rpNam); } catch (e) { $('rpBody').innerHTML = ''; return; }
+  if (!d.coCauHinh) {
+    $('rpBody').innerHTML = `<div class="alert warn">Chưa có khoản trích đóng nào được đánh dấu <b>"Thuộc quỹ Công đoàn"</b>.
+      Vào <b>Thiết lập → Khoản trích đóng</b>, sửa khoản đoàn phí (NLĐ) và kinh phí công đoàn (DN), chọn "Thuộc quỹ Công đoàn = Có".</div>`;
+    return;
+  }
+  const s = (f) => d.months.reduce((a, m) => a + (Number(f(m)) || 0), 0);
+  let h = `<div class="alert info">Tỉ lệ giữ lại cho Công đoàn cơ sở hiện tại: <b>${d.tyLeGiuLai}%</b>
+    (nộp Công đoàn Việt Nam: <b>${100 - d.tyLeGiuLai}%</b>) – đổi ở <b>Thiết lập → Thông tin chung</b>. Áp dụng cho mọi kỳ tại thời điểm xem báo cáo.</div>
+    <div class="stats">
+    <div class="stat"><div class="lbl">Tổng thu Công đoàn cả năm</div><div class="val">${fmt(s((m) => m.tong))}</div></div>
+    <div class="stat"><div class="lbl">Giữ lại cơ sở</div><div class="val">${fmt(s((m) => m.giuLai))}</div></div>
+    <div class="stat"><div class="lbl">Nộp Công đoàn Việt Nam</div><div class="val">${fmt(s((m) => m.nop))}</div></div>
+    </div>
+    <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th class="num">Đoàn phí NLĐ</th>
+    <th class="num">Kinh phí công đoàn DN</th><th class="num">Tổng thu</th><th class="num">Giữ lại cơ sở</th><th class="num">Nộp Công đoàn VN</th></tr></thead><tbody>
+    ${d.months.map((m) => `<tr><td><b>${fmtM(m.ky)}</b></td><td>${kyBadge(m.trangThai)} ${m.daTinh ? '' : '<span class="badge warn">Chưa tính</span>'}</td>
+      <td class="num">${fmt(m.nld)}</td><td class="num">${fmt(m.dn)}</td><td class="num">${fmt(m.tong)}</td>
+      <td class="num">${fmt(m.giuLai)}</td><td class="num"><b>${fmt(m.nop)}</b></td></tr>`).join('')
+      || '<tr><td colspan="7" class="muted">Chưa có kỳ nào trong năm.</td></tr>'}
+    <tr class="total"><td colspan="2">CẢ NĂM</td><td class="num">${fmt(s((m) => m.nld))}</td><td class="num">${fmt(s((m) => m.dn))}</td>
+      <td class="num">${fmt(s((m) => m.tong))}</td><td class="num">${fmt(s((m) => m.giuLai))}</td><td class="num">${fmt(s((m) => m.nop))}</td></tr>
+    </tbody></table></div></div>`;
+  $('rpBody').innerHTML = h;
 }
 async function rpChiTiet() {
   $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>';
@@ -640,7 +692,11 @@ function setInfo() {
     ${f('maCty', 'Mã công ty')}${f('tenCty', 'Tên công ty')}${f('mst', 'Mã số thuế')}
     <label class="full">Địa chỉ<input name="diaChi" value="${esc(i.diaChi || '')}" ${dis}></label>
     ${f('vung', 'Vùng lương tối thiểu')}${f('luongToiThieu', 'Mức lương tối thiểu vùng (để cảnh báo)', 'number')}
-    ${f('luongCoSo', 'Mức lương cơ sở (tham khảo)', 'number')}</div></form>
+    ${f('luongCoSo', 'Mức lương cơ sở (tham khảo)', 'number')}
+    <label>Tỉ lệ Công đoàn cơ sở được giữ lại (%)<input name="tyLeGiuLaiCD" type="number" min="0" max="100" step="any"
+      value="${i.tyLeGiuLaiCD ?? ''}" ${dis} oninput="$('cdNop').value=(100-(Number(this.value)||0))"></label>
+    <label>Tỉ lệ nộp Công đoàn Việt Nam (%) – tự tính<input readonly value="${100 - (Number(i.tyLeGiuLaiCD) || 0)}" id="cdNop"></label>
+    </div></form>
     ${isRole('Admin') ? '<div class="row" style="margin-top:14px"><button class="btn pri" onclick="saveInfo()">Lưu</button></div>' : ''}</div>`;
 }
 function saveInfo() {
@@ -672,13 +728,13 @@ function setKhoan() {
     <br><b>Mức lương đóng tối đa</b>: lương vượt mức thì lấy mức này × tỉ lệ. <b>Mức đóng tối đa</b>: số tiền (lương × tỉ lệ) vượt mức thì lấy mức này.</div>
     ${admin ? '<button class="btn pri" onclick="khoanForm(null,\'new\')">＋ Thêm khoản</button>' : ''}</div>
     <div class="tbl-wrap"><table><thead><tr><th>Mã nhận diện</th><th>Tên khoản</th><th>Đối tượng</th><th class="num">Tỉ lệ (%)</th><th>Mức trần</th>
-    <th class="num">Mức tối đa</th><th>Ngày hiệu lực</th><th>Trạng thái</th><th>Chỉ đoàn viên CĐ</th><th>Ghi chú</th><th></th></tr></thead><tbody>`;
+    <th class="num">Mức tối đa</th><th>Ngày hiệu lực</th><th>Trạng thái</th><th>Chỉ đoàn viên CĐ</th><th>Thuộc quỹ CĐ</th><th>Ghi chú</th><th></th></tr></thead><tbody>`;
   rows.forEach((k) => {
     const cur = hieuLucHienTai(k.ma) === k;
     h += `<tr class="${k.trangThai === 'Ngừng áp dụng' ? 'off' : ''}"><td><b>${esc(k.ma)}</b> ${cur ? '<span class="badge open">Hiện hành</span>' : ''}</td>
       <td>${esc(k.ten)}</td><td>${esc(k.doiTuong)}</td><td class="num">${fmtPct(k.tiLe)}</td><td>${esc(k.loaiTran)}</td>
       <td class="num">${k.loaiTran === 'Không áp dụng' ? '' : fmt(k.mucToiDa)}</td><td>${fmtD(k.ngayHL)}</td><td>${esc(k.trangThai)}</td>
-      <td>${esc(k.chiDoanVien)}</td><td class="small">${esc(k.ghiChu)}</td>
+      <td>${esc(k.chiDoanVien)}</td><td>${k.thuocCD === 'Có' ? '<span class="badge info">Có</span>' : ''}</td><td class="small">${esc(k.ghiChu)}</td>
       <td>${admin ? `<div class="row"><button class="btn sm" onclick="khoanForm(${k._row},'edit')">Sửa</button>
         <button class="btn sm" onclick="khoanForm(${k._row},'version')" title="Tạo phiên bản mới với ngày hiệu lực mới">Phiên bản mới</button>
         <button class="btn sm danger" onclick="khoanDel(${k._row})">Xóa</button></div>` : ''}</td></tr>`;
@@ -696,12 +752,15 @@ function khoanForm(row, mode) {
     <label><span class="req">Đối tượng áp dụng</span><select name="doiTuong" ${lockMa ? 'disabled' : ''}>${opt(L.doiTuong, k.doiTuong)}</select></label>
     <label><span class="req">Tỉ lệ trích đóng mặc định (%)</span><input name="tiLe" type="number" step="any" value="${k.tiLe ?? ''}"></label>
     <label>Mức trần<select name="loaiTran">${opt(L.loaiTran, k.loaiTran)}</select></label>
-    <label>Mức tối đa (đồng)<input name="mucToiDa" type="number" min="0" value="${k.mucToiDa || ''}"></label>
+    <label>Mức tối đa (đồng)<input name="mucToiDa" type="text" inputmode="numeric" value="${moneyVal(k.mucToiDa)}" oninput="onMoneyInput(this)"></label>
     <label><span class="req">Ngày hiệu lực</span><input name="ngayHL" type="date" value="${esc(k.ngayHL || '')}"></label>
     <label>Trạng thái<select name="trangThai">${opt(L.trangThai, k.trangThai)}</select></label>
     <label>Chỉ áp dụng đoàn viên công đoàn<select name="chiDoanVien">${opt(L.coKhong, k.chiDoanVien || 'Không')}</select></label>
+    <label>Thuộc quỹ Công đoàn<select name="thuocCD">${opt(L.coKhong, k.thuocCD || 'Không')}</select></label>
     <label class="full">Ghi chú<input name="ghiChu" value="${esc(k.ghiChu || '')}"></label></div></form>
-    ${mode === 'version' ? '<div class="alert info" style="margin-top:12px">Phiên bản mới giữ nguyên phiên bản cũ để tính lại các tháng trước (truy thu). Để ngừng khoản từ một ngày, tạo phiên bản mới với Trạng thái "Ngừng áp dụng".</div>' : ''}`;
+    <div class="alert info" style="margin-top:12px">${mode === 'version'
+      ? 'Phiên bản mới giữ nguyên phiên bản cũ để tính lại các tháng trước (truy thu). Để ngừng khoản từ một ngày, tạo phiên bản mới với Trạng thái "Ngừng áp dụng".<br>'
+      : ''}"Thuộc quỹ Công đoàn": tick cho khoản đoàn phí (NLĐ) và kinh phí công đoàn (DN) – dùng để tính bảng phân tách Công đoàn ở mục Báo cáo.</div>`;
   openModal(mode === 'new' ? 'Thêm khoản trích đóng' : mode === 'version' ? 'Phiên bản mới – ' + k.ma : 'Sửa khoản ' + k.ma, body,
     `<button class="btn" onclick="closeModal()">Hủy</button><button class="btn pri" onclick="khoanSave()">Lưu</button>`);
 }
