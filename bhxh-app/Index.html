@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <title>Quản lý BHXH</title>
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Quản lý BHXH<small id="ctyName"></small></div>
+    <nav id="nav"></nav>
+    <div class="userbox" id="userBox"></div>
+  </header>
+
+  <main id="view"><div class="card">Đang tải dữ liệu…</div></main>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head"><h3 id="modalTitle"></h3><button class="icon" onclick="closeModal()" title="Đóng">✕</button></div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+  <div id="busy"><div class="spinner"></div></div>
+  <div id="toast"></div>
+
+  <?!= include('App'); ?>
+</body>
+</html>

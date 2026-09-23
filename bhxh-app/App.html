@@ -1,0 +1,733 @@
+<script>
+/* =====================================================================
+   GIAO DIỆN WEB APP BHXH (chạy trên trình duyệt)
+   ===================================================================== */
+const S = {
+  user: null, info: {}, kys: [], khoan: [], mapl: [], phongBan: [], lists: {}, today: '',
+  view: 'tongquan', nvKy: null, nvData: null, ttKy: null, ttData: null,
+  rpTab: 'chitiet', rpKy: null, rpNam: null, rpData: null, setTab: 'info', pq: []
+};
+const $ = (id) => document.getElementById(id);
+const V = () => $('view');
+
+// ---------- Tiện ích ----------
+function esc(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function fmt(n) { return (Math.round(Number(n) || 0)).toLocaleString('vi-VN'); }
+function fmtPct(n) { return (Number(n) || 0).toLocaleString('vi-VN', { maximumFractionDigits: 4 }); }
+function fmtD(iso) { return iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : ''; }
+function fmtM(k) { return k ? k.slice(5, 7) + '/' + k.slice(0, 4) : ''; }
+function nextMonth(k) {
+  let y = +k.slice(0, 4), m = +k.slice(5, 7) + 1;
+  if (m > 12) { m = 1; y++; }
+  return y + '-' + String(m).padStart(2, '0');
+}
+function opt(list, sel, blank) {
+  let h = blank !== undefined ? `<option value="">${esc(blank)}</option>` : '';
+  const arr = list.slice();
+  if (sel && arr.indexOf(sel) < 0) arr.push(sel);
+  arr.forEach((v) => { h += `<option value="${esc(v)}" ${v === sel ? 'selected' : ''}>${esc(v)}</option>`; });
+  return h;
+}
+function kyOpts(sel, withMaster) {
+  let h = withMaster ? `<option value="" ${sel === '' ? 'selected' : ''}>Hồ sơ gốc (tab Danh sách nhân viên)</option>` : '';
+  S.kys.forEach((k) => {
+    h += `<option value="${k.ky}" ${k.ky === sel ? 'selected' : ''}>Kỳ ${fmtM(k.ky)} – ${esc(k.trangThai)}</option>`;
+  });
+  return h;
+}
+function kyBadge(t) { return `<span class="badge ${t === 'Đã chốt' ? 'closed' : 'open'}">${esc(t)}</span>`; }
+function isRole(...r) { return S.user && r.includes(S.user.role); }
+function latestKy() { return S.kys.length ? S.kys[0].ky : ''; }
+function latestOpenKy() { const k = S.kys.find((x) => x.trangThai !== 'Đã chốt'); return k ? k.ky : latestKy(); }
+
+function api(fn, ...args) {
+  return new Promise((resolve, reject) => {
+    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](...args);
+  });
+}
+let busyCount = 0;
+function busy(on) { busyCount += on ? 1 : -1; $('busy').classList.toggle('on', busyCount > 0); }
+async function run(fn, ...args) {
+  busy(true);
+  try { return await api(fn, ...args); }
+  catch (e) { toast((e && e.message) || String(e), 'err'); throw e; }
+  finally { busy(false); }
+}
+function act(fn) { return fn().catch(() => {}); }
+function toast(msg, type) {
+  const d = document.createElement('div');
+  d.className = 'toast ' + (type || '');
+  d.textContent = msg;
+  $('toast').appendChild(d);
+  setTimeout(() => d.remove(), type === 'err' ? 8000 : 4000);
+}
+function openModal(title, body, foot) {
+  $('modalTitle').textContent = title;
+  $('modalBody').innerHTML = `<div class="modal-body">${body}</div>` + (foot ? `<div class="modal-foot">${foot}</div>` : '');
+  $('modal').classList.remove('hidden');
+}
+function closeModal() { $('modal').classList.add('hidden'); }
+function formData(id) {
+  const o = {};
+  $(id).querySelectorAll('[name]').forEach((el) => { o[el.name] = el.type === 'checkbox' ? el.checked : el.value; });
+  return o;
+}
+function download(res) {
+  const bin = atob(res.data);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const url = URL.createObjectURL(new Blob([bytes], { type: res.mime }));
+  const a = document.createElement('a');
+  a.href = url; a.download = res.name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+function xuat(loai, thamSo, format) {
+  act(async () => { download(await run('apiXuat', loai, thamSo, format)); toast('Đã xuất file.', 'ok'); });
+}
+
+// ---------- Khởi động ----------
+const NAV = [
+  ['tongquan', 'Tổng quan'], ['ky', 'Kỳ BHXH'], ['nhanvien', 'Nhân viên'], ['truythu', 'Truy thu'],
+  ['baocao', 'Báo cáo'], ['thietlap', 'Thiết lập'], ['nhatky', 'Nhật ký', ['Admin']]
+];
+async function boot() {
+  try {
+    const d = await api('apiBootstrap');
+    Object.assign(S, d);
+    $('ctyName').textContent = S.info.tenCty ? ' · ' + S.info.tenCty : '';
+    $('userBox').innerHTML = `<b>${esc(S.user.hoTen)}</b>${esc(S.user.email)} · ${esc(S.user.role)}`;
+    $('nav').innerHTML = NAV.filter((n) => !n[2] || n[2].includes(S.user.role))
+      .map((n) => `<button data-v="${n[0]}" onclick="go('${n[0]}')">${n[1]}</button>`).join('');
+    go('tongquan');
+  } catch (e) {
+    V().innerHTML = `<div class="alert bad"><b>Không thể mở ứng dụng.</b><br>${esc(e.message || e)}</div>`;
+  }
+}
+function go(v) {
+  S.view = v;
+  document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('active', b.dataset.v === v));
+  closeModal();
+  ({ tongquan: vTongQuan, ky: vKy, nhanvien: vNhanVien, truythu: vTruyThu, baocao: vBaoCao, thietlap: vThietLap, nhatky: vNhatKy }[v])();
+}
+async function refreshKys() { S.kys = await api('apiListKy'); }
+
+// =====================================================================
+// TỔNG QUAN
+// =====================================================================
+async function vTongQuan() {
+  V().innerHTML = '<h2>Tổng quan</h2><div class="card muted">Đang tải…</div>';
+  let list;
+  try { list = await run('apiTongQuan'); } catch (e) { return; }
+  const last = list[0];
+  let h = '<h2>Tổng quan</h2>';
+  if (!last) {
+    h += `<div class="alert info"><b>Chưa có kỳ BHXH nào.</b> Các bước bắt đầu:
+      <ol class="steps"><li>Kiểm tra <b>Thiết lập</b>: Thông tin chung, Khoản trích đóng, Mã phân loại, Phòng ban.</li>
+      <li>Nhập danh sách nhân viên vào <b>Nhân viên → Hồ sơ gốc</b> (hoặc dán trực tiếp vào tab "Danh sách nhân viên" trên Google Sheet).</li>
+      <li>Admin vào <b>Kỳ BHXH</b> tạo kỳ đầu tiên, rồi bấm <b>Tính</b>.</li></ol></div>`;
+  } else {
+    h += `<div class="row between" style="margin-bottom:10px"><div>Kỳ mới nhất: <b>${fmtM(last.ky)}</b> ${kyBadge(last.trangThai)}
+      ${last.daTinh ? `<span class="muted small">· tính lúc ${esc(last.ngayTinh)}</span>` : '<span class="badge warn">Chưa tính</span>'}</div>
+      <button class="btn" onclick="S.rpKy='${last.ky}';S.rpTab='chitiet';go('baocao')">Xem bảng tính</button></div>
+      <div class="stats">
+        <div class="stat"><div class="lbl">NV đóng BHXH</div><div class="val">${fmt(last.soDong)}<span class="muted small"> / ${fmt(last.soNV)}</span></div></div>
+        <div class="stat"><div class="lbl">Quỹ lương đóng</div><div class="val">${fmt(last.quyLuong)}</div></div>
+        <div class="stat"><div class="lbl">NLĐ đóng</div><div class="val">${fmt(last.nld)}</div></div>
+        <div class="stat"><div class="lbl">DN đóng</div><div class="val">${fmt(last.dn)}</div></div>
+        <div class="stat"><div class="lbl">Truy thu / thoái thu</div><div class="val">${fmt(last.ttNLD + last.ttDN)}</div></div>
+        <div class="stat"><div class="lbl">Tổng phải nộp</div><div class="val">${fmt(last.tong)}</div></div>
+        <div class="stat"><div class="lbl">NV có cảnh báo</div><div class="val" style="color:${last.soCanhBao ? 'var(--bad)' : 'inherit'}">${fmt(last.soCanhBao)}</div></div>
+      </div>
+      <div class="card"><h3>Các kỳ gần đây</h3><div class="tbl-wrap"><table><thead><tr>
+        <th>Kỳ</th><th>Trạng thái</th><th class="num">NV đóng</th><th class="num">Quỹ lương</th><th class="num">NLĐ</th>
+        <th class="num">DN</th><th class="num">Truy thu</th><th class="num">Tổng phải nộp</th></tr></thead><tbody>
+        ${list.map((k) => `<tr><td><b>${fmtM(k.ky)}</b></td><td>${kyBadge(k.trangThai)} ${k.daTinh ? '' : '<span class="badge warn">Chưa tính</span>'}</td>
+          <td class="num">${fmt(k.soDong)}</td><td class="num">${fmt(k.quyLuong)}</td><td class="num">${fmt(k.nld)}</td>
+          <td class="num">${fmt(k.dn)}</td><td class="num">${fmt(k.ttNLD + k.ttDN)}</td><td class="num"><b>${fmt(k.tong)}</b></td></tr>`).join('')}
+      </tbody></table></div></div>`;
+  }
+  h += `<div class="card"><h3>Quy trình hằng tháng</h3><ol class="steps">
+    <li><b>Admin</b> tạo kỳ mới (danh sách NV + lương được sao chép từ kỳ trước).</li>
+    <li><b>Nhập liệu</b> cập nhật biến động trong kỳ: NV mới, nghỉ việc (nhập <i>Tháng dừng đóng</i>), điều chỉnh lương, đổi mã phân loại.</li>
+    <li>Phát sinh cho các tháng đã chốt → nhập ở <b>Truy thu</b>.</li>
+    <li>Bấm <b>Tính</b>, kiểm tra cảnh báo và báo cáo biến động.</li>
+    <li><b>Admin</b> chốt kỳ → kỳ bị khóa, xuất báo cáo Excel/PDF.</li></ol></div>`;
+  V().innerHTML = h;
+}
+
+// =====================================================================
+// KỲ BHXH
+// =====================================================================
+async function vKy() {
+  try { busy(true); await refreshKys(); } catch (e) { toast(e.message, 'err'); } finally { busy(false); }
+  const def = S.kys.length ? nextMonth(S.kys[0].ky) : S.today;
+  let h = '<h2>Kỳ BHXH</h2>';
+  if (isRole('Admin')) {
+    h += `<div class="card"><h3>Tạo kỳ mới</h3><div class="row">
+      <input type="month" id="newKy" value="${def}">
+      <button class="btn pri" onclick="taoKy()">＋ Tạo kỳ</button>
+      <span class="muted small">${S.kys.length ? 'Dữ liệu NV sẽ sao chép từ kỳ ' + fmtM(S.kys[0].ky) + ' (bỏ NV đã dừng đóng) và bổ sung NV mới trong hồ sơ gốc.'
+        : 'Kỳ đầu tiên lấy dữ liệu từ tab "Danh sách nhân viên" (hồ sơ gốc).'}</span></div></div>`;
+  }
+  h += `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th>Tạo</th><th>Lần tính gần nhất</th>
+    <th>Chốt</th><th></th></tr></thead><tbody>`;
+  if (!S.kys.length) h += '<tr><td colspan="6" class="muted">Chưa có kỳ nào.</td></tr>';
+  S.kys.forEach((k) => {
+    const open = k.trangThai !== 'Đã chốt';
+    h += `<tr><td><b>${fmtM(k.ky)}</b></td><td>${kyBadge(k.trangThai)}</td>
+      <td class="small">${esc(k.ngayTao)}<br><span class="muted">${esc(k.nguoiTao)}</span></td>
+      <td class="small">${k.ngayTinh ? esc(k.ngayTinh) + '<br><span class="muted">' + esc(k.nguoiTinh) + '</span>' : '<span class="badge warn">Chưa tính</span>'}</td>
+      <td class="small">${k.ngayChot ? esc(k.ngayChot) + '<br><span class="muted">' + esc(k.nguoiChot) + '</span>' : ''}</td>
+      <td><div class="row">
+        ${open && isRole('Admin', 'Nhập liệu') ? `<button class="btn sm pri" onclick="tinhKy('${k.ky}')">Tính</button>` : ''}
+        ${open && isRole('Admin') ? `<button class="btn sm ok" onclick="chotKy('${k.ky}')">Chốt kỳ</button>` : ''}
+        <button class="btn sm" onclick="S.nvKy='${k.ky}';go('nhanvien')">Nhân viên</button>
+        <button class="btn sm" onclick="S.rpKy='${k.ky}';S.rpTab='chitiet';go('baocao')">Bảng tính</button>
+        <button class="btn sm" onclick="S.rpKy='${k.ky}';S.rpTab='biendong';go('baocao')">Biến động</button>
+      </div></td></tr>`;
+  });
+  h += '</tbody></table></div></div>';
+  V().innerHTML = h;
+}
+function taoKy() {
+  const ky = $('newKy').value;
+  if (!ky) return toast('Chọn tháng cho kỳ mới.', 'err');
+  if (!confirm('Tạo kỳ ' + fmtM(ky) + '?')) return;
+  act(async () => {
+    const r = await run('apiTaoKy', ky);
+    toast(`Đã tạo kỳ ${fmtM(r.ky)}: ${r.soNV} NV (nguồn: ${r.nguon}${r.themTuHoSo ? ', thêm ' + r.themTuHoSo + ' NV từ hồ sơ gốc' : ''}).`, 'ok');
+    vKy();
+  });
+}
+function ketQuaTinh(r, title) {
+  openModal(title, `<div class="stats">
+      <div class="stat"><div class="lbl">NV đóng / tổng</div><div class="val">${fmt(r.soDong)} / ${fmt(r.soNV)}</div></div>
+      <div class="stat"><div class="lbl">NLĐ đóng</div><div class="val">${fmt(r.tongNLD)}</div></div>
+      <div class="stat"><div class="lbl">DN đóng</div><div class="val">${fmt(r.tongDN)}</div></div>
+      <div class="stat"><div class="lbl">Truy thu NLĐ + DN</div><div class="val">${fmt(r.ttNLD + r.ttDN)}</div></div>
+      <div class="stat"><div class="lbl">Tổng phải nộp</div><div class="val">${fmt(r.tongNLD + r.tongDN + r.ttNLD + r.ttDN)}</div></div>
+    </div>${r.soCanhBao ? `<div class="alert warn">Có <b>${r.soCanhBao}</b> NV có cảnh báo – xem cột Cảnh báo trong Bảng tính chi tiết.</div>` : ''}`,
+    `<button class="btn" onclick="closeModal()">Đóng</button>
+     <button class="btn pri" onclick="S.rpKy='${r.ky}';S.rpTab='chitiet';go('baocao')">Xem bảng tính</button>`);
+}
+function tinhKy(ky) {
+  act(async () => { const r = await run('apiTinhKy', ky); await refreshKys(); vKy(); ketQuaTinh(r, 'Kết quả tính kỳ ' + fmtM(ky)); });
+}
+function chotKy(ky) {
+  if (!confirm(`Chốt kỳ ${fmtM(ky)}?\n\nApp sẽ tính lại lần cuối rồi KHÓA kỳ. Sau khi chốt không thể sửa; phát sinh cho tháng này phải nhập Truy thu/Thoái thu ở kỳ sau.`)) return;
+  act(async () => { const r = await run('apiChotKy', ky); await refreshKys(); vKy(); ketQuaTinh(r, 'Đã chốt kỳ ' + fmtM(ky)); });
+}
+
+// =====================================================================
+// NHÂN VIÊN
+// =====================================================================
+async function vNhanVien() {
+  if (S.nvKy === null) S.nvKy = latestKy();
+  V().innerHTML = `<h2>Nhân viên</h2>
+    <div class="card no-print"><div class="row">
+      <select id="nvKy" onchange="S.nvKy=this.value;loadNV()">${kyOpts(S.nvKy, true)}</select>
+      <input id="nvQ" placeholder="Tìm mã NV, họ tên, mã BHXH…" oninput="renderNV()" style="min-width:240px">
+      <select id="nvPB" onchange="renderNV()">${opt(S.phongBan, '', 'Tất cả phòng ban')}</select>
+      <select id="nvF" onchange="renderNV()"><option value="">Tất cả</option><option value="dung">Đã nhập tháng dừng đóng</option>
+        <option value="thieu">Thiếu mã PL / ngày BHXH</option></select>
+      <span class="spacer"></span><span id="nvAdd"></span>
+    </div><div id="nvNote" class="small muted" style="margin-top:8px"></div></div>
+    <div id="nvTbl" class="card muted">Đang tải…</div>`;
+  loadNV();
+}
+async function loadNV() {
+  try { S.nvData = await run('apiNhanVien', S.nvKy); } catch (e) { $('nvTbl').innerHTML = ''; return; }
+  const d = S.nvData;
+  $('nvAdd').innerHTML = d.editable ? '<button class="btn pri" onclick="nvForm(null)">＋ Thêm nhân viên</button>' : '';
+  $('nvNote').innerHTML = d.ky
+    ? `Đang xem dữ liệu <b>kỳ ${fmtM(d.ky)}</b> ${kyBadge(d.trangThai)}. ${d.editable ? 'Sửa ở kỳ mới nhất sẽ đồng thời cập nhật hồ sơ gốc.' : 'Kỳ đã chốt – chỉ xem.'}`
+    : 'Đang xem <b>hồ sơ gốc</b> (tab Danh sách nhân viên). Kỳ đầu tiên sẽ được tạo từ danh sách này.';
+  renderNV();
+}
+function renderNV() {
+  const d = S.nvData; if (!d) return;
+  const q = ($('nvQ').value || '').toLowerCase().trim(), pb = $('nvPB').value, f = $('nvF').value;
+  const rows = d.rows.filter((r) => (!q || [r.maNV, r.hoTen, r.maBHXH].join(' ').toLowerCase().includes(q))
+    && (!pb || r.phongBan === pb)
+    && (!f || (f === 'dung' ? !!r.thangDung : (!r.maPL || !r.ngayBHXH))))
+    .sort((a, b) => (a.phongBan + a.maNV).localeCompare(b.phongBan + b.maNV, 'vi'));
+  const tong = rows.reduce((s, r) => s + (Number(r.luongDong) || 0), 0);
+  let h = `<div class="row between" style="margin-bottom:8px"><span><b>${rows.length}</b> / ${d.rows.length} nhân viên</span>
+    <span class="muted">Tổng lương đóng: <b>${fmt(tong)}</b></span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Mã NV</th><th>Họ và tên</th><th>Mã số BHXH</th><th>Phòng ban</th><th>Chức danh</th>
+    <th>Bắt đầu BHXH</th><th>Tháng dừng</th><th class="num">Lương đóng</th><th>Mã PL</th><th>CĐ</th><th>Email quản lý</th><th></th></tr></thead><tbody>`;
+  if (!rows.length) h += '<tr><td colspan="12" class="muted">Không có dữ liệu.</td></tr>';
+  rows.forEach((r) => {
+    const stop = r.thangDung && (!d.ky || r.thangDung <= d.ky);
+    h += `<tr class="${stop ? 'off' : ''}"><td>${esc(r.maNV)}</td><td><b>${esc(r.hoTen)}</b></td><td>${esc(r.maBHXH)}</td>
+      <td>${esc(r.phongBan)}</td><td>${esc(r.chucDanh)}</td><td>${fmtD(r.ngayBHXH) || '<span class="warn-txt">Thiếu</span>'}</td>
+      <td>${fmtM(r.thangDung)}</td><td class="num">${fmt(r.luongDong)}</td><td>${esc(r.maPL) || '<span class="warn-txt">Thiếu</span>'}</td>
+      <td>${esc(r.congDoan)}</td><td class="small">${esc(r.emailQL)}</td>
+      <td><div class="row"><button class="btn sm" onclick="nvForm('${esc(r.maNV)}')">${d.editable ? 'Sửa' : 'Xem'}</button>
+      ${d.editable && isRole('Admin') ? `<button class="btn sm danger" onclick="nvDel('${esc(r.maNV)}')">Xóa</button>` : ''}</div></td></tr>`;
+  });
+  $('nvTbl').className = 'card';
+  $('nvTbl').innerHTML = h + '</tbody></table></div>';
+}
+function nvForm(maNV) {
+  const d = S.nvData;
+  const r = maNV ? d.rows.find((x) => x.maNV === maNV) : { congDoan: 'Không', emailQL: S.user.role === 'Nhập liệu' ? S.user.email : '' };
+  const ro = !d.editable;
+  const dis = ro ? 'disabled' : '';
+  const plList = S.mapl.filter((m) => m.trangThai !== 'Ngừng áp dụng' || m.ma === r.maPL).map((m) => m.ma);
+  const inp = (name, label, type, extra) => `<label class="${extra && extra.includes('req') ? '' : ''}"><span class="${extra && extra.includes('req') ? 'req' : ''}">${label}</span>
+    <input name="${name}" type="${type || 'text'}" value="${esc(r[name] === 0 && type === 'number' ? '' : (r[name] ?? ''))}" ${dis} ${extra && extra.includes('ro') ? 'readonly' : ''} ${type === 'number' ? 'min="0" step="1" oninput="nvSum()"' : ''}></label>`;
+  const body = `<form id="nvF1" onsubmit="return false"><div class="form">
+    ${inp('maNV', 'Mã NV', 'text', maNV ? 'req ro' : 'req')}
+    ${inp('hoTen', 'Họ và tên', 'text', 'req')}
+    ${inp('maBHXH', 'Mã số BHXH')}
+    ${inp('ngaySinh', 'Ngày sinh', 'date')}
+    <label>Đơn vị_Phòng ban<select name="phongBan" ${dis}>${opt(S.phongBan, r.phongBan || '', '— Chọn —')}</select></label>
+    ${inp('chucDanh', 'Chức danh')}
+    ${inp('ngayVao', 'Ngày vào làm', 'date')}
+    ${inp('ngayBHXH', 'Ngày bắt đầu BHXH', 'date')}
+    ${inp('ngayNghi', 'Ngày nghỉ việc', 'date')}
+    ${inp('thangDung', 'Tháng dừng đóng (tháng đầu tiên KHÔNG đóng)', 'month')}
+    ${inp('luongChinh', 'Mức lương chính', 'number')}
+    ${inp('pcKN', 'PC Kiêm nhiệm', 'number')}
+    ${inp('pcCV', 'PC Chức vụ', 'number')}
+    ${inp('pcDH', 'PC Độc hại', 'number')}
+    ${inp('pcKhac', 'PC Khác', 'number')}
+    <label>Lương đóng BHXH (tự tính)<input id="nvLD" readonly value="${fmt(r.luongDong)}"></label>
+    <label><span class="req">Mã phân loại</span><select name="maPL" ${dis}>${opt(plList, r.maPL || '', '— Chọn —')}</select></label>
+    <label>Tham gia công đoàn<select name="congDoan" ${dis}>${opt(['Có', 'Không'], r.congDoan || 'Không')}</select></label>
+    <label>Email NV quản lý hồ sơ<input name="emailQL" type="email" value="${esc(r.emailQL || '')}" ${dis} ${isRole('Admin') ? '' : 'readonly'}></label>
+    <label class="full">Ghi chú<input name="ghiChu" value="${esc(r.ghiChu || '')}" ${dis}></label>
+  </div></form>`;
+  const foot = ro ? '<button class="btn" onclick="closeModal()">Đóng</button>'
+    : `<button class="btn" onclick="closeModal()">Hủy</button><button class="btn pri" onclick="nvSave(${maNV ? 'false' : 'true'})">Lưu</button>`;
+  openModal(maNV ? 'Nhân viên ' + maNV : 'Thêm nhân viên', body, foot);
+}
+function nvSum() {
+  const o = formData('nvF1');
+  $('nvLD').value = fmt(['luongChinh', 'pcKN', 'pcCV', 'pcDH', 'pcKhac'].reduce((s, k) => s + (Number(o[k]) || 0), 0));
+}
+function nvSave(isNew) {
+  const o = formData('nvF1');
+  act(async () => { await run('apiSaveNV', S.nvData.ky, o, isNew); closeModal(); toast('Đã lưu nhân viên ' + o.maNV, 'ok'); loadNV(); });
+}
+function nvDel(maNV) {
+  const where = S.nvData.ky ? 'khỏi kỳ ' + fmtM(S.nvData.ky) : 'khỏi hồ sơ gốc';
+  if (!confirm(`Xóa NV ${maNV} ${where}?\n\nLưu ý: NV nghỉ việc nên nhập "Tháng dừng đóng" thay vì xóa, để báo cáo biến động ghi nhận giảm.`)) return;
+  act(async () => { await run('apiDeleteNV', S.nvData.ky, maNV); toast('Đã xóa.', 'ok'); loadNV(); });
+}
+
+// =====================================================================
+// TRUY THU / THOÁI THU
+// =====================================================================
+async function vTruyThu() {
+  if (!S.kys.length) { V().innerHTML = '<h2>Truy thu – Thoái thu</h2><div class="alert info">Chưa có kỳ BHXH nào.</div>'; return; }
+  if (!S.ttKy) S.ttKy = latestOpenKy();
+  V().innerHTML = `<h2>Truy thu – Thoái thu</h2>
+    <div class="card no-print"><div class="row"><select onchange="S.ttKy=this.value;loadTT()">${kyOpts(S.ttKy)}</select>
+    <span class="spacer"></span><span id="ttAdd"></span></div>
+    <div class="small muted" style="margin-top:8px">Dùng cho phát sinh của các tháng đã qua (đã chốt): truy đóng, điều chỉnh lương hồi tố, thoái thu.
+    Số tiền = Σ theo từng tháng [tiền tính theo lương mới − tiền tính theo lương cũ], áp dụng tỉ lệ & mức trần của chính tháng đó.
+    Truy đóng cho tháng chưa đóng: để Lương cũ = 0.</div></div>
+    <div id="ttTbl" class="card muted">Đang tải…</div>`;
+  loadTT();
+}
+async function loadTT() {
+  try { S.ttData = await run('apiTruyThu', S.ttKy); } catch (e) { $('ttTbl').innerHTML = ''; return; }
+  const d = S.ttData;
+  $('ttAdd').innerHTML = d.editable ? '<button class="btn pri" onclick="ttForm(null)">＋ Thêm dòng</button>' : kyBadge(d.trangThai);
+  let sN = 0, sD = 0;
+  let h = `<div class="tbl-wrap"><table><thead><tr><th>Loại</th><th>Mã NV</th><th>Họ và tên</th><th>Từ – Đến</th><th class="num">Số tháng</th>
+    <th class="num">Lương cũ</th><th class="num">Lương mới</th><th>Mã PL</th><th class="num">Chênh lệch NLĐ</th><th class="num">Chênh lệch DN</th>
+    <th>Chi tiết</th><th>Ghi chú</th><th></th></tr></thead><tbody>`;
+  if (!d.rows.length) h += '<tr><td colspan="13" class="muted">Chưa có dòng truy thu/thoái thu trong kỳ này.</td></tr>';
+  d.rows.forEach((r) => {
+    sN += r.tienNLD; sD += r.tienDN;
+    const tt = r.tienNLD + r.tienDN >= 0;
+    h += `<tr><td><span class="badge ${tt ? 'info' : 'warn'}">${tt ? 'Truy thu' : 'Thoái thu'}</span></td><td>${esc(r.maNV)}</td><td>${esc(r.hoTen)}</td>
+      <td>${fmtM(r.tuThang)} – ${fmtM(r.denThang)}</td><td class="num">${r.soThang}</td><td class="num">${fmt(r.luongCu)}</td>
+      <td class="num">${fmt(r.luongMoi)}</td><td>${esc(r.maPL)}</td><td class="num">${fmt(r.tienNLD)}</td><td class="num">${fmt(r.tienDN)}</td>
+      <td class="small">${esc(r.chiTiet)}</td><td class="small">${esc(r.ghiChu)}</td>
+      <td>${d.editable ? `<div class="row"><button class="btn sm" onclick="ttForm('${r.id}')">Sửa</button>
+        <button class="btn sm danger" onclick="ttDel('${r.id}')">Xóa</button></div>` : ''}</td></tr>`;
+  });
+  if (d.rows.length) h += `<tr class="total"><td colspan="8">TỔNG</td><td class="num">${fmt(sN)}</td><td class="num">${fmt(sD)}</td><td colspan="3"></td></tr>`;
+  $('ttTbl').className = 'card';
+  $('ttTbl').innerHTML = h + '</tbody></table></div>';
+}
+function ttForm(id) {
+  const d = S.ttData;
+  const r = id ? d.rows.find((x) => x.id === id) : {};
+  const nvOpts = d.nvs.map((n) => `<option value="${esc(n.maNV)}">${esc(n.maNV)} – ${esc(n.hoTen)}</option>`).join('');
+  const body = `<form id="ttF1" onsubmit="return false"><input type="hidden" name="id" value="${esc(r.id || '')}"><div class="form">
+    <label class="full"><span class="req">Nhân viên (gõ mã hoặc tên)</span><input name="maNV" list="ttNVs" value="${esc(r.maNV || '')}" onchange="ttPick()" ${id ? 'readonly' : ''}>
+      <datalist id="ttNVs">${nvOpts}</datalist></label>
+    <label><span class="req">Từ tháng</span><input type="month" name="tuThang" value="${esc(r.tuThang || '')}"></label>
+    <label><span class="req">Đến tháng</span><input type="month" name="denThang" value="${esc(r.denThang || '')}"></label>
+    <label>Lương đóng cũ (đã đóng)<input type="number" min="0" name="luongCu" value="${r.luongCu ?? ''}"></label>
+    <label>Lương đóng mới (đúng)<input type="number" min="0" name="luongMoi" value="${r.luongMoi ?? ''}"></label>
+    <label>Mã phân loại<select name="maPL">${opt(S.mapl.map((m) => m.ma), r.maPL || '', '— Theo NV —')}</select></label>
+    <label>Tham gia công đoàn<select name="congDoan">${opt(['Có', 'Không'], r.congDoan || '', '— Theo NV —')}</select></label>
+    <label class="full">Ghi chú / lý do<input name="ghiChu" value="${esc(r.ghiChu || '')}"></label>
+  </div></form>`;
+  openModal(id ? 'Sửa truy thu/thoái thu' : 'Thêm truy thu/thoái thu – kỳ ' + fmtM(d.ky), body,
+    `<button class="btn" onclick="closeModal()">Hủy</button><button class="btn pri" onclick="ttSave()">Lưu & tính</button>`);
+}
+function ttPick() {
+  const f = $('ttF1'), n = S.ttData.nvs.find((x) => x.maNV === f.maNV.value);
+  if (!n) return;
+  f.maPL.value = n.maPL || ''; f.congDoan.value = n.congDoan || '';
+  if (!f.luongMoi.value) f.luongMoi.value = n.luongDong || '';
+}
+function ttSave() {
+  const o = formData('ttF1');
+  act(async () => {
+    const r = await run('apiSaveTruyThu', S.ttData.ky, o);
+    closeModal(); toast(`Đã lưu: NLĐ ${fmt(r.tienNLD)}, DN ${fmt(r.tienDN)}`, 'ok'); loadTT();
+  });
+}
+function ttDel(id) {
+  if (!confirm('Xóa dòng truy thu/thoái thu này?')) return;
+  act(async () => { await run('apiDeleteTruyThu', S.ttData.ky, id); toast('Đã xóa.', 'ok'); loadTT(); });
+}
+
+// =====================================================================
+// BÁO CÁO
+// =====================================================================
+function vBaoCao() {
+  if (!S.rpKy) S.rpKy = latestKy();
+  if (!S.rpNam) S.rpNam = (latestKy() || S.today).slice(0, 4);
+  const tab = (k, t) => `<button class="${S.rpTab === k ? 'active' : ''}" onclick="S.rpTab='${k}';vBaoCao()">${t}</button>`;
+  V().innerHTML = `<h2>Báo cáo</h2><div class="tabs">${tab('chitiet', 'Bảng tính chi tiết')}${tab('biendong', 'Biến động tăng/giảm')}${tab('tonghop', 'Tổng hợp năm')}</div>
+    <div id="rpBar" class="card no-print"></div><div id="rpBody"></div>`;
+  if (!S.kys.length) { $('rpBar').innerHTML = 'Chưa có kỳ BHXH nào.'; return; }
+  const exp = (loai, p) => `<button class="btn" onclick="xuat('${loai}','${p}','xlsx')">⬇ Excel</button>
+    <button class="btn" onclick="xuat('${loai}','${p}','pdf')">⬇ PDF</button>`;
+  if (S.rpTab === 'tonghop') {
+    const years = [...new Set(S.kys.map((k) => k.ky.slice(0, 4)))];
+    $('rpBar').innerHTML = `<div class="row"><select onchange="S.rpNam=this.value;vBaoCao()">${opt(years, S.rpNam)}</select>
+      <span class="spacer"></span>${exp('tonghop', S.rpNam)}</div>`;
+    rpTongHop();
+  } else {
+    $('rpBar').innerHTML = `<div class="row"><select onchange="S.rpKy=this.value;vBaoCao()">${kyOpts(S.rpKy)}</select>
+      ${S.rpTab === 'chitiet' ? '<label class="small"><input type="checkbox" id="rpAll" onchange="renderChiTiet()"> Hiện cả NV không đóng</label>' : ''}
+      <span class="spacer"></span>${exp(S.rpTab, S.rpKy)}</div>`;
+    S.rpTab === 'chitiet' ? rpChiTiet() : rpBienDong();
+  }
+}
+async function rpChiTiet() {
+  $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>';
+  try { S.rpData = await run('apiBaoCaoChiTiet', S.rpKy); } catch (e) { $('rpBody').innerHTML = ''; return; }
+  renderChiTiet();
+}
+function renderChiTiet() {
+  const d = S.rpData; if (!d) return;
+  if (!d.rows.length) {
+    $('rpBody').innerHTML = `<div class="alert warn">Kỳ ${fmtM(d.ky)} chưa được tính (hoặc bạn chưa được giao hồ sơ nào). Vào <b>Kỳ BHXH</b> bấm <b>Tính</b>.</div>`;
+    return;
+  }
+  const all = $('rpAll') && $('rpAll').checked;
+  const rows = d.rows.filter((r) => all || r.dong === 'Có')
+    .sort((a, b) => (a.phongBan + a.maNV).localeCompare(b.phongBan + b.maNV, 'vi'));
+  const codes = d.codes;
+  const dong = d.rows.filter((r) => r.dong === 'Có');
+  const sum = (arr, f) => arr.reduce((s, r) => s + (Number(f(r)) || 0), 0);
+  const ttN = sum(d.truyThu, (r) => r.tienNLD), ttD = sum(d.truyThu, (r) => r.tienDN);
+  const tN = sum(dong, (r) => r.tongNLD), tD = sum(dong, (r) => r.tongDN);
+  let h = `<div class="stats">
+    <div class="stat"><div class="lbl">Kỳ</div><div class="val">${fmtM(d.ky)}</div><div>${kyBadge(d.kyInfo.trangThai)}</div></div>
+    <div class="stat"><div class="lbl">NV đóng</div><div class="val">${dong.length}</div></div>
+    <div class="stat"><div class="lbl">Quỹ lương đóng</div><div class="val">${fmt(sum(dong, (r) => r.luongDong))}</div></div>
+    <div class="stat"><div class="lbl">NLĐ đóng</div><div class="val">${fmt(tN)}</div></div>
+    <div class="stat"><div class="lbl">DN đóng</div><div class="val">${fmt(tD)}</div></div>
+    <div class="stat"><div class="lbl">Truy thu (NLĐ + DN)</div><div class="val">${fmt(ttN + ttD)}</div></div>
+    <div class="stat"><div class="lbl">Tổng phải nộp</div><div class="val">${fmt(tN + tD + ttN + ttD)}</div></div></div>`;
+  const cb = d.rows.filter((r) => r.canhBao).length;
+  if (cb) h += `<div class="alert warn">${cb} NV có cảnh báo (xem cột Cảnh báo${all ? '' : '; tick "Hiện cả NV không đóng" để thấy NV không đóng'}).</div>`;
+  const head = `<tr><th>STT</th><th>Mã NV</th><th>Họ và tên</th><th>Mã số BHXH</th><th>Mã PL</th><th class="num">Lương đóng</th>
+    ${codes.map((c) => `<th class="num" title="${esc(c.ten)}">${esc(c.ma)}<br><span class="muted small">${esc(c.doiTuong)}</span></th>`).join('')}
+    <th class="num">Tổng NLĐ</th><th class="num">Tổng DN</th><th class="num">Tổng cộng</th><th>Cảnh báo</th></tr>`;
+  const line = (cls, label, arr) => `<tr class="${cls}"><td colspan="5">${label}</td><td class="num">${fmt(sum(arr.filter((r) => r.dong === 'Có'), (r) => r.luongDong))}</td>
+    ${codes.map((c) => `<td class="num">${fmt(sum(arr, (r) => r.items[c.ma]))}</td>`).join('')}
+    <td class="num">${fmt(sum(arr, (r) => r.tongNLD))}</td><td class="num">${fmt(sum(arr, (r) => r.tongDN))}</td>
+    <td class="num">${fmt(sum(arr, (r) => r.tongCong))}</td><td></td></tr>`;
+  let body = '', stt = 0;
+  const groups = {};
+  rows.forEach((r) => { (groups[r.phongBan || '(Chưa có phòng ban)'] = groups[r.phongBan || '(Chưa có phòng ban)'] || []).push(r); });
+  Object.keys(groups).forEach((g) => {
+    body += `<tr class="group"><td colspan="${codes.length + 10}">${esc(g)} (${groups[g].length})</td></tr>`;
+    groups[g].forEach((r) => {
+      stt++;
+      body += `<tr class="${r.dong === 'Có' ? '' : 'off'}"><td>${stt}</td><td>${esc(r.maNV)}</td><td>${esc(r.hoTen)}</td><td>${esc(r.maBHXH)}</td>
+        <td>${esc(r.maPL)}</td><td class="num">${fmt(r.luongDong)}</td>
+        ${codes.map((c) => `<td class="num">${r.items[c.ma] ? fmt(r.items[c.ma]) : ''}</td>`).join('')}
+        <td class="num">${fmt(r.tongNLD)}</td><td class="num">${fmt(r.tongDN)}</td><td class="num"><b>${fmt(r.tongCong)}</b></td>
+        <td class="warn-txt">${esc(r.canhBao)}</td></tr>`;
+    });
+    body += line('sub', 'Cộng ' + esc(g), groups[g]);
+  });
+  body += line('total', 'TỔNG CỘNG', rows);
+  h += `<div class="card"><div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div></div>`;
+  if (d.truyThu.length) {
+    h += `<div class="card"><h3>Truy thu / Thoái thu trong kỳ</h3><div class="tbl-wrap"><table><thead><tr><th>Mã NV</th><th>Họ và tên</th>
+      <th>Từ – Đến</th><th class="num">Lương cũ</th><th class="num">Lương mới</th><th class="num">NLĐ</th><th class="num">DN</th><th>Chi tiết</th></tr></thead><tbody>
+      ${d.truyThu.map((t) => `<tr><td>${esc(t.maNV)}</td><td>${esc(t.hoTen)}</td><td>${fmtM(t.tuThang)} – ${fmtM(t.denThang)}</td>
+        <td class="num">${fmt(t.luongCu)}</td><td class="num">${fmt(t.luongMoi)}</td><td class="num">${fmt(t.tienNLD)}</td>
+        <td class="num">${fmt(t.tienDN)}</td><td class="small">${esc(t.chiTiet)}</td></tr>`).join('')}
+      <tr class="total"><td colspan="5">TỔNG</td><td class="num">${fmt(ttN)}</td><td class="num">${fmt(ttD)}</td><td></td></tr></tbody></table></div></div>`;
+  }
+  $('rpBody').innerHTML = h;
+}
+async function rpBienDong() {
+  $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>';
+  let d;
+  try { d = await run('apiBienDong', S.rpKy); } catch (e) { $('rpBody').innerHTML = ''; return; }
+  const cnt = {};
+  d.rows.forEach((r) => { cnt[r.loai] = (cnt[r.loai] || 0) + 1; });
+  const cls = (l) => (l.startsWith('Tăng') || l === 'Truy thu') ? 'open' : (l === 'Giảm' || l === 'Thoái thu') ? 'bad' : 'info';
+  let h = d.prev ? `<div class="alert info">So sánh kỳ <b>${fmtM(d.ky)}</b> với kỳ <b>${fmtM(d.prev)}</b>.</div>`
+    : '<div class="alert warn">Đây là kỳ đầu tiên – không có kỳ trước để so sánh tăng/giảm.</div>';
+  h += `<div class="row" style="margin-bottom:10px">${Object.keys(cnt).map((k) => `<span class="badge ${cls(k)}">${esc(k)}: ${cnt[k]}</span>`).join(' ') || '<span class="muted">Không có biến động.</span>'}</div>`;
+  h += `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>STT</th><th>Loại biến động</th><th>Mã NV</th><th>Họ và tên</th><th>Mã số BHXH</th>
+    <th>Chức danh</th><th>Phòng ban</th><th class="num">Lương cũ</th><th class="num">Lương mới</th><th>Mã PL cũ → mới</th><th>Từ tháng</th><th>Đến tháng</th><th>Ghi chú</th></tr></thead><tbody>
+    ${d.rows.map((r, i) => `<tr><td>${i + 1}</td><td><span class="badge ${cls(r.loai)}">${esc(r.loai)}</span></td><td>${esc(r.maNV)}</td><td>${esc(r.hoTen)}</td>
+      <td>${esc(r.maBHXH)}</td><td>${esc(r.chucDanh)}</td><td>${esc(r.phongBan)}</td>
+      <td class="num">${r.luongCu === '' ? '' : fmt(r.luongCu)}</td><td class="num">${r.luongMoi === '' ? '' : fmt(r.luongMoi)}</td>
+      <td>${esc(r.maPLCu)}${r.maPLCu && r.maPLMoi && r.maPLCu !== r.maPLMoi ? ' → ' + esc(r.maPLMoi) : ''}</td>
+      <td>${fmtM(r.tuThang)}</td><td>${fmtM(r.denThang)}</td><td class="small">${esc(r.ghiChu)}</td></tr>`).join('')
+      || '<tr><td colspan="13" class="muted">Không có dữ liệu.</td></tr>'}
+    </tbody></table></div></div>`;
+  $('rpBody').innerHTML = h;
+}
+async function rpTongHop() {
+  $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>';
+  let d;
+  try { d = await run('apiTongHop', S.rpNam); } catch (e) { $('rpBody').innerHTML = ''; return; }
+  const s = (f) => d.months.reduce((a, m) => a + (Number(f(m)) || 0), 0);
+  let h = `<div class="stats">
+    <div class="stat"><div class="lbl">Số kỳ trong năm ${d.nam}</div><div class="val">${d.months.length}</div></div>
+    <div class="stat"><div class="lbl">NLĐ đóng cả năm</div><div class="val">${fmt(s((m) => m.nld))}</div></div>
+    <div class="stat"><div class="lbl">DN đóng cả năm</div><div class="val">${fmt(s((m) => m.dn))}</div></div>
+    <div class="stat"><div class="lbl">Truy thu cả năm</div><div class="val">${fmt(s((m) => m.ttNLD + m.ttDN))}</div></div>
+    <div class="stat"><div class="lbl">Tổng phải nộp cả năm</div><div class="val">${fmt(s((m) => m.tong))}</div></div></div>
+    <div class="card"><h3>Tổng hợp theo tháng</h3><div class="tbl-wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th class="num">NV đóng</th>
+    <th class="num">Quỹ lương đóng</th><th class="num">NLĐ</th><th class="num">DN</th><th class="num">Truy thu NLĐ</th><th class="num">Truy thu DN</th>
+    <th class="num">Tổng phải nộp</th></tr></thead><tbody>
+    ${d.months.map((m) => `<tr><td><b>${fmtM(m.ky)}</b></td><td>${kyBadge(m.trangThai)} ${m.daTinh ? '' : '<span class="badge warn">Chưa tính</span>'}</td>
+      <td class="num">${fmt(m.soDong)}</td><td class="num">${fmt(m.quyLuong)}</td><td class="num">${fmt(m.nld)}</td><td class="num">${fmt(m.dn)}</td>
+      <td class="num">${fmt(m.ttNLD)}</td><td class="num">${fmt(m.ttDN)}</td><td class="num"><b>${fmt(m.tong)}</b></td></tr>`).join('')}
+    <tr class="total"><td colspan="3">CẢ NĂM</td><td class="num">${fmt(s((m) => m.quyLuong))}</td><td class="num">${fmt(s((m) => m.nld))}</td>
+      <td class="num">${fmt(s((m) => m.dn))}</td><td class="num">${fmt(s((m) => m.ttNLD))}</td><td class="num">${fmt(s((m) => m.ttDN))}</td>
+      <td class="num">${fmt(s((m) => m.tong))}</td></tr></tbody></table></div></div>`;
+  if (d.codes.length) {
+    h += `<div class="card"><h3>Chi tiết theo khoản trích <span class="muted small">(không gồm truy thu)</span></h3><div class="tbl-wrap"><table><thead><tr>
+      <th>Khoản</th><th>Đối tượng</th>${d.months.map((m) => `<th class="num">${fmtM(m.ky)}</th>`).join('')}<th class="num">Cả năm</th></tr></thead><tbody>
+      ${d.codes.map((c) => { const v = d.months.map((m) => m.items[c.ma] || 0);
+        return `<tr><td><b>${esc(c.ma)}</b><br><span class="small muted">${esc(c.ten)}</span></td><td>${esc(c.doiTuong)}</td>
+        ${v.map((x) => `<td class="num">${fmt(x)}</td>`).join('')}<td class="num"><b>${fmt(v.reduce((a, b) => a + b, 0))}</b></td></tr>`; }).join('')}
+      </tbody></table></div></div>`;
+  }
+  $('rpBody').innerHTML = h;
+}
+
+// =====================================================================
+// THIẾT LẬP
+// =====================================================================
+function vThietLap() {
+  const tabs = [['info', 'Thông tin chung'], ['pb', 'Phòng ban'], ['khoan', 'Khoản trích đóng'], ['mapl', 'Mã phân loại']];
+  if (isRole('Admin')) tabs.push(['pq', 'Phân quyền']);
+  V().innerHTML = `<h2>Thiết lập</h2><div class="tabs">${tabs.map((t) => `<button class="${S.setTab === t[0] ? 'active' : ''}" onclick="S.setTab='${t[0]}';vThietLap()">${t[1]}</button>`).join('')}</div>
+    ${isRole('Admin') ? '' : '<div class="alert info">Bạn đang ở chế độ chỉ xem. Chỉ Admin được thay đổi thiết lập.</div>'}<div id="setBody"></div>`;
+  ({ info: setInfo, pb: setPB, khoan: setKhoan, mapl: setMaPL, pq: setPQ }[S.setTab])();
+}
+function setInfo() {
+  const i = S.info, dis = isRole('Admin') ? '' : 'disabled';
+  const f = (k, l, t) => `<label>${l}<input name="${k}" type="${t || 'text'}" value="${esc(i[k] ?? '')}" ${dis}></label>`;
+  $('setBody').innerHTML = `<div class="card"><form id="infoF" onsubmit="return false"><div class="form">
+    ${f('maCty', 'Mã công ty')}${f('tenCty', 'Tên công ty')}${f('mst', 'Mã số thuế')}
+    <label class="full">Địa chỉ<input name="diaChi" value="${esc(i.diaChi || '')}" ${dis}></label>
+    ${f('vung', 'Vùng lương tối thiểu')}${f('luongToiThieu', 'Mức lương tối thiểu vùng (để cảnh báo)', 'number')}
+    ${f('luongCoSo', 'Mức lương cơ sở (tham khảo)', 'number')}</div></form>
+    ${isRole('Admin') ? '<div class="row" style="margin-top:14px"><button class="btn pri" onclick="saveInfo()">Lưu</button></div>' : ''}</div>`;
+}
+function saveInfo() {
+  act(async () => {
+    S.info = await run('apiSaveInfo', formData('infoF'));
+    $('ctyName').textContent = S.info.tenCty ? ' · ' + S.info.tenCty : '';
+    toast('Đã lưu thông tin chung.', 'ok');
+  });
+}
+function setPB() {
+  const dis = isRole('Admin') ? '' : 'disabled';
+  $('setBody').innerHTML = `<div class="card"><p class="muted small">Mỗi dòng một Đơn vị/Phòng ban. Danh sách này dùng cho dropdown ở hồ sơ nhân viên.</p>
+    <textarea id="pbTxt" rows="14" style="width:100%" ${dis}>${esc(S.phongBan.join('\n'))}</textarea>
+    ${isRole('Admin') ? '<div class="row" style="margin-top:10px"><button class="btn pri" onclick="savePB()">Lưu</button></div>' : ''}</div>`;
+}
+function savePB() {
+  act(async () => { S.phongBan = await run('apiSavePhongBan', $('pbTxt').value.split('\n')); toast('Đã lưu phòng ban.', 'ok'); setPB(); });
+}
+function hieuLucHienTai(ma) {
+  const end = S.today + '-31';
+  return S.khoan.filter((k) => k.ma === ma && (k.ngayHL || '') <= end)
+    .sort((a, b) => ((a.ngayHL || '') < (b.ngayHL || '') ? 1 : -1))[0];
+}
+function setKhoan() {
+  const admin = isRole('Admin');
+  const rows = S.khoan.slice().sort((a, b) => (a.doiTuong + a.ma).localeCompare(b.doiTuong + b.ma) || ((a.ngayHL || '') < (b.ngayHL || '') ? 1 : -1));
+  let h = `<div class="card"><div class="row between" style="margin-bottom:10px"><div class="small muted">
+    Mỗi khoản có thể có nhiều dòng (phiên bản) cùng Mã nhận diện với Ngày hiệu lực khác nhau. Mỗi tháng app tự dùng phiên bản có ngày hiệu lực gần nhất ≤ cuối tháng.
+    <br><b>Mức lương đóng tối đa</b>: lương vượt mức thì lấy mức này × tỉ lệ. <b>Mức đóng tối đa</b>: số tiền (lương × tỉ lệ) vượt mức thì lấy mức này.</div>
+    ${admin ? '<button class="btn pri" onclick="khoanForm(null,\'new\')">＋ Thêm khoản</button>' : ''}</div>
+    <div class="tbl-wrap"><table><thead><tr><th>Mã nhận diện</th><th>Tên khoản</th><th>Đối tượng</th><th class="num">Tỉ lệ (%)</th><th>Mức trần</th>
+    <th class="num">Mức tối đa</th><th>Ngày hiệu lực</th><th>Trạng thái</th><th>Chỉ đoàn viên CĐ</th><th>Ghi chú</th><th></th></tr></thead><tbody>`;
+  rows.forEach((k) => {
+    const cur = hieuLucHienTai(k.ma) === k;
+    h += `<tr class="${k.trangThai === 'Ngừng áp dụng' ? 'off' : ''}"><td><b>${esc(k.ma)}</b> ${cur ? '<span class="badge open">Hiện hành</span>' : ''}</td>
+      <td>${esc(k.ten)}</td><td>${esc(k.doiTuong)}</td><td class="num">${fmtPct(k.tiLe)}</td><td>${esc(k.loaiTran)}</td>
+      <td class="num">${k.loaiTran === 'Không áp dụng' ? '' : fmt(k.mucToiDa)}</td><td>${fmtD(k.ngayHL)}</td><td>${esc(k.trangThai)}</td>
+      <td>${esc(k.chiDoanVien)}</td><td class="small">${esc(k.ghiChu)}</td>
+      <td>${admin ? `<div class="row"><button class="btn sm" onclick="khoanForm(${k._row},'edit')">Sửa</button>
+        <button class="btn sm" onclick="khoanForm(${k._row},'version')" title="Tạo phiên bản mới với ngày hiệu lực mới">Phiên bản mới</button>
+        <button class="btn sm danger" onclick="khoanDel(${k._row})">Xóa</button></div>` : ''}</td></tr>`;
+  });
+  $('setBody').innerHTML = h + '</tbody></table></div></div>';
+}
+function khoanForm(row, mode) {
+  const k = row ? Object.assign({}, S.khoan.find((x) => x._row === row)) : { doiTuong: 'NLĐ', loaiTran: 'Không áp dụng', trangThai: 'Đang áp dụng', chiDoanVien: 'Không' };
+  if (mode === 'version') { delete k._row; k.ngayHL = ''; }
+  const L = S.lists;
+  const lockMa = mode !== 'new';
+  const body = `<form id="khF" onsubmit="return false"><input type="hidden" name="_row" value="${mode === 'edit' ? row : ''}"><div class="form">
+    <label><span class="req">Tên khoản trích đóng</span><input name="ten" value="${esc(k.ten || '')}"></label>
+    <label><span class="req">Mã nhận diện</span><input name="ma" value="${esc(k.ma || '')}" ${lockMa ? 'readonly' : ''} placeholder="VD: BHXH_NLD"></label>
+    <label><span class="req">Đối tượng áp dụng</span><select name="doiTuong" ${lockMa ? 'disabled' : ''}>${opt(L.doiTuong, k.doiTuong)}</select></label>
+    <label><span class="req">Tỉ lệ trích đóng mặc định (%)</span><input name="tiLe" type="number" step="any" value="${k.tiLe ?? ''}"></label>
+    <label>Mức trần<select name="loaiTran">${opt(L.loaiTran, k.loaiTran)}</select></label>
+    <label>Mức tối đa (đồng)<input name="mucToiDa" type="number" min="0" value="${k.mucToiDa || ''}"></label>
+    <label><span class="req">Ngày hiệu lực</span><input name="ngayHL" type="date" value="${esc(k.ngayHL || '')}"></label>
+    <label>Trạng thái<select name="trangThai">${opt(L.trangThai, k.trangThai)}</select></label>
+    <label>Chỉ áp dụng đoàn viên công đoàn<select name="chiDoanVien">${opt(L.coKhong, k.chiDoanVien || 'Không')}</select></label>
+    <label class="full">Ghi chú<input name="ghiChu" value="${esc(k.ghiChu || '')}"></label></div></form>
+    ${mode === 'version' ? '<div class="alert info" style="margin-top:12px">Phiên bản mới giữ nguyên phiên bản cũ để tính lại các tháng trước (truy thu). Để ngừng khoản từ một ngày, tạo phiên bản mới với Trạng thái "Ngừng áp dụng".</div>' : ''}`;
+  openModal(mode === 'new' ? 'Thêm khoản trích đóng' : mode === 'version' ? 'Phiên bản mới – ' + k.ma : 'Sửa khoản ' + k.ma, body,
+    `<button class="btn" onclick="closeModal()">Hủy</button><button class="btn pri" onclick="khoanSave()">Lưu</button>`);
+}
+function khoanSave() {
+  const f = $('khF');
+  const o = formData('khF');
+  o.doiTuong = f.doiTuong.value;
+  o._row = o._row ? Number(o._row) : '';
+  act(async () => { S.khoan = await run('apiSaveKhoan', o); closeModal(); toast('Đã lưu khoản trích.', 'ok'); setKhoan(); });
+}
+function khoanDel(row) {
+  const k = S.khoan.find((x) => x._row === row);
+  if (!confirm(`Xóa dòng ${k.ma} (hiệu lực ${fmtD(k.ngayHL)})?\nNếu muốn ngừng áp dụng, nên tạo phiên bản mới với trạng thái "Ngừng áp dụng".`)) return;
+  act(async () => { S.khoan = await run('apiDeleteKhoan', row); toast('Đã xóa.', 'ok'); setKhoan(); });
+}
+function setMaPL() {
+  const admin = isRole('Admin');
+  const ten = {};
+  S.khoan.forEach((k) => { ten[k.ma] = k.ten; });
+  const show = (s) => String(s || '').split(';').map((x) => x.trim()).filter(Boolean)
+    .map((x) => { const p = x.split('='); return `<span class="badge info" title="${esc(ten[p[0]] || '')}">${esc(p[0])}${p[1] ? ' ' + esc(p[1]) + '%' : ''}</span>`; }).join(' ');
+  let h = `<div class="card"><div class="row between" style="margin-bottom:10px"><div class="small muted">Mỗi mã phân loại quy định NV thuộc mã đó phải đóng những khoản nào.
+    Tỉ lệ ghi bên cạnh (nếu có) là tỉ lệ riêng, thay cho tỉ lệ mặc định.</div>
+    ${admin ? '<button class="btn pri" onclick="maplForm(null)">＋ Thêm mã</button>' : ''}</div>
+    <div class="tbl-wrap"><table><thead><tr><th>Mã phân loại</th><th>Mô tả</th><th>Trạng thái</th><th>Khoản NLĐ</th><th>Khoản DN</th><th>Ghi chú</th><th></th></tr></thead><tbody>
+    ${S.mapl.map((m) => `<tr class="${m.trangThai === 'Ngừng áp dụng' ? 'off' : ''}"><td><b>${esc(m.ma)}</b></td><td>${esc(m.moTa)}</td><td>${esc(m.trangThai)}</td>
+      <td>${show(m.khoanNLD)}</td><td>${show(m.khoanDN)}</td><td class="small">${esc(m.ghiChu)}</td>
+      <td>${admin ? `<div class="row"><button class="btn sm" onclick="maplForm('${esc(m.ma)}')">Sửa</button>
+        <button class="btn sm danger" onclick="maplDel('${esc(m.ma)}')">Xóa</button></div>` : ''}</td></tr>`).join('')
+      || '<tr><td colspan="7" class="muted">Chưa có mã phân loại.</td></tr>'}</tbody></table></div></div>`;
+  $('setBody').innerHTML = h;
+}
+function maplForm(ma) {
+  const m = ma ? S.mapl.find((x) => x.ma === ma) : { trangThai: 'Đang áp dụng' };
+  const sel = {};
+  (String(m.khoanNLD || '') + ';' + String(m.khoanDN || '')).split(';').map((x) => x.trim()).filter(Boolean)
+    .forEach((x) => { const p = x.split('='); sel[p[0].trim()] = p[1] !== undefined ? p[1].trim() : ''; });
+  const codes = [...new Set(S.khoan.map((k) => k.ma))];
+  const list = (dt) => codes.map((c) => hieuLucHienTai(c) || S.khoan.find((k) => k.ma === c)).filter((k) => k.doiTuong === dt)
+    .map((k) => `<div class="chk-item"><input type="checkbox" data-ma="${esc(k.ma)}" ${k.ma in sel ? 'checked' : ''}>
+      <div><b>${esc(k.ma)}</b> <span class="muted small">${esc(k.ten)} · mặc định ${fmtPct(k.tiLe)}%${k.chiDoanVien === 'Có' ? ' · chỉ đoàn viên' : ''}</span></div>
+      <input type="number" step="any" placeholder="Tỉ lệ riêng %" data-rate="${esc(k.ma)}" value="${esc(sel[k.ma] || '')}"></div>`).join('')
+    || '<div class="muted small">Chưa có khoản nào.</div>';
+  const body = `<form id="plF" onsubmit="return false"><div class="form">
+    <label><span class="req">Mã phân loại</span><input name="ma" value="${esc(m.ma || '')}" ${ma ? 'readonly' : ''}></label>
+    <label>Mô tả<input name="moTa" value="${esc(m.moTa || '')}"></label>
+    <label>Trạng thái<select name="trangThai">${opt(S.lists.trangThai, m.trangThai)}</select></label>
+    <label>Ghi chú<input name="ghiChu" value="${esc(m.ghiChu || '')}"></label></div>
+    <p class="small muted">Tick các khoản áp dụng. Để trống ô "Tỉ lệ riêng" để dùng tỉ lệ mặc định.</p>
+    <div class="chk-grid"><div><h3>Người lao động (NLĐ)</h3><div class="chk-list">${list('NLĐ')}</div></div>
+    <div><h3>Doanh nghiệp (DN)</h3><div class="chk-list">${list('DN')}</div></div></div></form>`;
+  openModal(ma ? 'Sửa mã phân loại ' + ma : 'Thêm mã phân loại', body,
+    `<button class="btn" onclick="closeModal()">Hủy</button><button class="btn pri" onclick="maplSave(${ma ? 'false' : 'true'})">Lưu</button>`);
+}
+function maplSave(isNew) {
+  const o = formData('plF');
+  o.ds = [];
+  $('plF').querySelectorAll('input[data-ma]').forEach((c) => {
+    if (!c.checked) return;
+    const r = $('plF').querySelector(`input[data-rate="${c.dataset.ma}"]`).value;
+    o.ds.push({ ma: c.dataset.ma, tiLe: r === '' ? null : Number(r) });
+  });
+  act(async () => { S.mapl = await run('apiSaveMaPL', o, isNew); closeModal(); toast('Đã lưu mã phân loại.', 'ok'); setMaPL(); });
+}
+function maplDel(ma) {
+  if (!confirm('Xóa mã phân loại ' + ma + '?')) return;
+  act(async () => { S.mapl = await run('apiDeleteMaPL', ma); toast('Đã xóa.', 'ok'); setMaPL(); });
+}
+async function setPQ() {
+  $('setBody').innerHTML = '<div class="card muted">Đang tải…</div>';
+  try { S.pq = await run('apiPhanQuyen'); } catch (e) { return; }
+  renderPQ();
+}
+function renderPQ() {
+  $('setBody').innerHTML = `<div class="card"><div class="row between" style="margin-bottom:10px"><div class="small muted">
+    <b>Admin</b>: thiết lập, tạo/chốt kỳ, toàn quyền. <b>Nhập liệu</b>: sửa hồ sơ NV có "Email NV quản lý hồ sơ" = email của mình, tính kỳ, nhập truy thu.
+    <b>Xem</b>: chỉ xem toàn bộ dữ liệu & báo cáo (Kế toán, Ban Giám đốc).</div>
+    <button class="btn pri" onclick="pqForm(null)">＋ Thêm người dùng</button></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Email</th><th>Họ tên</th><th>Vai trò</th><th>Trạng thái</th><th>Ghi chú</th><th></th></tr></thead><tbody>
+    ${S.pq.map((p) => `<tr class="${p.trangThai === 'Khóa' ? 'off' : ''}"><td>${esc(p.email)}</td><td>${esc(p.hoTen)}</td>
+      <td><span class="badge info">${esc(p.vaiTro)}</span></td><td>${esc(p.trangThai)}</td><td class="small">${esc(p.ghiChu)}</td>
+      <td><div class="row"><button class="btn sm" onclick="pqForm('${esc(p.email)}')">Sửa</button>
+      <button class="btn sm danger" onclick="pqDel('${esc(p.email)}')">Xóa</button></div></td></tr>`).join('')}</tbody></table></div></div>`;
+}
+function pqForm(email) {
+  const p = email ? S.pq.find((x) => x.email === email) : { vaiTro: 'Nhập liệu', trangThai: 'Hoạt động' };
+  openModal(email ? 'Sửa quyền' : 'Thêm người dùng', `<form id="pqF" onsubmit="return false"><div class="form">
+    <label><span class="req">Email Google</span><input name="email" type="email" value="${esc(p.email || '')}" ${email ? 'readonly' : ''}></label>
+    <label>Họ tên<input name="hoTen" value="${esc(p.hoTen || '')}"></label>
+    <label>Vai trò<select name="vaiTro">${opt(S.lists.role, p.vaiTro)}</select></label>
+    <label>Trạng thái<select name="trangThai">${opt(S.lists.pqTrangThai, p.trangThai)}</select></label>
+    <label class="full">Ghi chú<input name="ghiChu" value="${esc(p.ghiChu || '')}"></label></div></form>`,
+    `<button class="btn" onclick="closeModal()">Hủy</button><button class="btn pri" onclick="pqSave()">Lưu</button>`);
+}
+function pqSave() {
+  act(async () => { S.pq = await run('apiSavePQ', formData('pqF')); closeModal(); toast('Đã lưu phân quyền.', 'ok'); renderPQ(); });
+}
+function pqDel(email) {
+  if (!confirm('Xóa quyền của ' + email + '?')) return;
+  act(async () => { S.pq = await run('apiDeletePQ', email); toast('Đã xóa.', 'ok'); renderPQ(); });
+}
+
+// =====================================================================
+// NHẬT KÝ
+// =====================================================================
+async function vNhatKy() {
+  V().innerHTML = '<h2>Nhật ký thao tác</h2><div class="card muted">Đang tải…</div>';
+  let rows;
+  try { rows = await run('apiNhatKy'); } catch (e) { return; }
+  V().innerHTML = `<h2>Nhật ký thao tác</h2><div class="card"><p class="small muted">500 thao tác gần nhất.</p><div class="tbl-wrap"><table>
+    <thead><tr><th>Thời gian</th><th>Người thực hiện</th><th>Hành động</th><th>Chi tiết</th></tr></thead><tbody>
+    ${rows.map((r) => `<tr><td class="small">${esc(r.thoiGian)}</td><td class="small">${esc(r.email)}</td><td>${esc(r.hanhDong)}</td>
+      <td class="small">${esc(r.chiTiet)}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">Chưa có.</td></tr>'}</tbody></table></div></div>`;
+}
+
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+boot();
+</script>
