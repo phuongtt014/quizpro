@@ -20,24 +20,27 @@ function fmt(n) { return (Math.round(Number(n) || 0)).toLocaleString('vi-VN'); }
 function fmtPct(n) { return (Number(n) || 0).toLocaleString('vi-VN', { maximumFractionDigits: 4 }); }
 function fmtD(iso) { return iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : ''; }
 function fmtM(k) { return k ? k.slice(5, 7) + '/' + k.slice(0, 4) : ''; }
-// Lọc nhanh "ẩn dòng có giá trị 0" theo 1 cột tùy chọn, dùng ở các bảng theo NV/phòng ban
+// Lọc nhanh theo giá trị 0 của 1 cột tùy chọn, dùng ở các bảng theo NV/phòng ban
 function zfBar(tab, cols) {
   const cur = S.zf[tab] || {};
   return `<div class="row no-print" style="margin:8px 0">
-    <span class="small muted">Lọc giá trị 0:</span>
+    <span class="small muted">Lọc theo cột:</span>
     <select onchange="S.zf['${tab}']=Object.assign({},S.zf['${tab}'],{col:this.value});rpRefilter()">
       <option value="">-- chọn cột --</option>
       ${cols.map((c) => `<option value="${c.key}" ${cur.col === c.key ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}
     </select>
-    <label class="small"><input type="checkbox" ${cur.hide ? 'checked' : ''}
-      onchange="S.zf['${tab}']=Object.assign({},S.zf['${tab}'],{hide:this.checked});rpRefilter()"> Ẩn dòng có giá trị 0</label></div>`;
+    <select onchange="S.zf['${tab}']=Object.assign({},S.zf['${tab}'],{mode:this.value});rpRefilter()">
+      <option value="">Không lọc</option>
+      <option value="zero" ${cur.mode === 'zero' ? 'selected' : ''}>Chỉ hiện dòng có giá trị 0</option>
+      <option value="nonzero" ${cur.mode === 'nonzero' ? 'selected' : ''}>Ẩn dòng có giá trị 0</option>
+    </select></div>`;
 }
 function zfApply(tab, rows, cols) {
   const cur = S.zf[tab] || {};
-  if (!cur.hide || !cur.col) return rows;
+  if (!cur.mode || !cur.col) return rows;
   const c = cols.find((x) => x.key === cur.col);
   if (!c) return rows;
-  return rows.filter((r) => Number(c.get(r)) !== 0);
+  return rows.filter((r) => cur.mode === 'zero' ? Number(c.get(r)) === 0 : Number(c.get(r)) !== 0);
 }
 // ---------- Biểu đồ SVG đơn giản (không cần thư viện ngoài) ----------
 const CHART_COLORS = ['var(--pri-2)', 'var(--ok)', 'var(--warn)', 'var(--bad)', '#6b4fbb', '#c2410c', '#0f766e', '#a16207', '#0369a1', '#be185d'];
@@ -82,6 +85,34 @@ function chartLine(labels, series, opts) {
 }
 function chartLegend(series) {
   return `<div class="row small" style="gap:14px;margin-top:6px">${series.map((s) => `<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${s.color};margin-right:4px"></span>${esc(s.label)}</span>`).join('')}</div>`;
+}
+// Biểu đồ cột chồng theo tháng, mỗi tháng 1 cột chia đoạn theo từng nhóm (ví dụ phòng ban), có tổng in đậm phía trên
+function chartStackedBar(labels, series, opts) {
+  opts = opts || {};
+  const w = opts.width || 700, h = opts.height || 280, padL = 40, padR = 14, top = 30, bottom = 34;
+  const n = Math.max(1, labels.length);
+  const totals = labels.map((_, i) => series.reduce((s, ser) => s + (ser.values[i] || 0), 0));
+  const max = Math.max(1, ...totals);
+  const bw = (w - padL - padR) / n;
+  const bwv = bw * 0.58;
+  const bars = labels.map((lab, i) => {
+    const x = padL + i * bw + (bw - bwv) / 2;
+    let yCursor = h - bottom;
+    let segs = '';
+    series.forEach((ser) => {
+      const v = ser.values[i] || 0;
+      if (!v) return;
+      const bh = (h - top - bottom) * (v / max);
+      yCursor -= bh;
+      segs += `<rect x="${x.toFixed(1)}" y="${yCursor.toFixed(1)}" width="${bwv.toFixed(1)}" height="${bh.toFixed(1)}" fill="${ser.color}"></rect>`;
+    });
+    const totalTop = h - bottom - (h - top - bottom) * (totals[i] / max);
+    return `${segs}
+      <text x="${(x + bwv / 2).toFixed(1)}" y="${(totalTop - 6).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">${fmt(totals[i])}</text>
+      <text x="${(x + bwv / 2).toFixed(1)}" y="${h - bottom + 16}" text-anchor="middle" font-size="10" fill="var(--muted)">${esc(lab)}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:${h}px" role="img">
+    <line x1="${padL}" y1="${h - bottom}" x2="${w - padR}" y2="${h - bottom}" stroke="var(--line)"></line>${bars}</svg>`;
 }
 // Ô nhập số tiền: hiển thị có phân tách hàng ngàn, gõ tới đâu định dạng lại tới đó
 function moneyVal(v) { const n = Number(v) || 0; return n ? fmt(n) : ''; }
@@ -214,48 +245,14 @@ async function vTongQuan() {
       <ol class="steps"><li>Kiểm tra <b>Thiết lập</b>: Thông tin chung, Khoản trích đóng, Mã phân loại, Phòng ban.</li>
       <li>Nhập danh sách nhân viên vào <b>Nhân viên → Hồ sơ gốc</b> (hoặc dán trực tiếp vào tab "Danh sách nhân viên" trên Google Sheet).</li>
       <li>Admin vào <b>Kỳ BHXH</b> tạo kỳ đầu tiên, rồi bấm <b>Tính</b>.</li></ol></div>`;
-  } else {
-    h += `<div class="row between" style="margin-bottom:10px"><div>Kỳ mới nhất: <b>${fmtM(last.ky)}</b> ${kyBadge(last.trangThai)}
-      ${last.daTinh ? `<span class="muted small">· tính lúc ${esc(last.ngayTinh)}</span>` : '<span class="badge warn">Chưa tính</span>'}</div>
-      <button class="btn" onclick="S.rpKy='${last.ky}';S.rpTab='chitiet';go('baocao')">Xem bảng tính</button></div>
-      <div class="stats">
-        <div class="stat"><div class="lbl">NV đóng BHXH</div><div class="val">${fmt(last.soDong)}<span class="muted small"> / ${fmt(last.soNV)}</span></div></div>
-        <div class="stat"><div class="lbl">Quỹ lương đóng</div><div class="val">${fmt(last.quyLuong)}</div></div>
-        <div class="stat"><div class="lbl">Tổng BHXH NLĐ</div><div class="val">${fmt(last.tongNLDChinh)}</div></div>
-        <div class="stat"><div class="lbl">Tổng BHXH DN</div><div class="val">${fmt(last.tongDNChinh)}</div></div>
-        <div class="stat"><div class="lbl">Tổng nộp BHXH</div><div class="val">${fmt(last.tongNopBHXH)}</div></div>
-        <div class="stat"><div class="lbl">DPCD_NLD</div><div class="val">${fmt(last.cdNLD)}</div></div>
-        <div class="stat"><div class="lbl">KPCD_DN</div><div class="val">${fmt(last.cdDN)}</div></div>
-        <div class="stat"><div class="lbl">Tổng cộng</div><div class="val">${fmt(last.tongCong)}</div></div>
-        <div class="stat"><div class="lbl">Truy thu BHXH</div><div class="val">${fmt(last.ttBhxh)}</div></div>
-        <div class="stat"><div class="lbl">Truy thu Công đoàn</div><div class="val">${fmt(last.ttCd)}</div></div>
-        <div class="stat"><div class="lbl">Tổng nộp cơ quan BHXH</div><div class="val">${fmt(last.tongNopCoQuanBHXH)}</div></div>
-        <div class="stat"><div class="lbl">NV có cảnh báo</div><div class="val" style="color:${last.soCanhBao ? 'var(--bad)' : 'inherit'}">${fmt(last.soCanhBao)}</div></div>
-      </div>
-      <div class="card"><h3>Các kỳ gần đây</h3><div class="tbl-wrap"><table><thead><tr>
-        <th>Kỳ</th><th>Trạng thái</th><th class="num">NV đóng</th><th class="num">Quỹ lương</th><th class="num">Tổng BHXH NLĐ</th>
-        <th class="num">Tổng BHXH DN</th><th class="num">Tổng nộp BHXH</th><th class="num">DPCD_NLD</th><th class="num">KPCD_DN</th>
-        <th class="num">Tổng cộng</th><th class="num">Truy thu BHXH</th><th class="num">Truy thu CĐ</th><th class="num">Tổng nộp cơ quan BHXH</th></tr></thead><tbody>
-        ${list.map((k) => `<tr><td><b>${fmtM(k.ky)}</b></td><td>${kyBadge(k.trangThai)} ${k.daTinh ? '' : '<span class="badge warn">Chưa tính</span>'}</td>
-          <td class="num">${fmt(k.soDong)}</td><td class="num">${fmt(k.quyLuong)}</td><td class="num">${fmt(k.tongNLDChinh)}</td>
-          <td class="num">${fmt(k.tongDNChinh)}</td><td class="num">${fmt(k.tongNopBHXH)}</td><td class="num">${fmt(k.cdNLD)}</td><td class="num">${fmt(k.cdDN)}</td>
-          <td class="num">${fmt(k.tongCong)}</td><td class="num">${fmt(k.ttBhxh)}</td><td class="num">${fmt(k.ttCd)}</td>
-          <td class="num"><b>${fmt(k.tongNopCoQuanBHXH)}</b></td></tr>`).join('')}
-      </tbody></table></div></div>`;
+    V().innerHTML = h;
+    return;
   }
-  if (last) h += `<div id="dashArea"></div>`;
-  h += `<div class="card"><h3>Quy trình hằng tháng</h3><ol class="steps">
-    <li><b>Admin</b> tạo kỳ mới (danh sách NV + lương được sao chép từ kỳ trước).</li>
-    <li><b>Nhập liệu</b> cập nhật biến động trong kỳ: NV mới, nghỉ việc (nhập <i>Tháng dừng đóng</i>), điều chỉnh lương, đổi mã phân loại.</li>
-    <li>Phát sinh cho các tháng đã chốt → nhập ở <b>Truy thu</b>.</li>
-    <li>Bấm <b>Tính</b>, kiểm tra cảnh báo và báo cáo biến động.</li>
-    <li><b>Admin</b> chốt kỳ → kỳ bị khóa, xuất báo cáo Excel/PDF.</li></ol></div>`;
+  h += `<div id="dashArea"></div>`;
   V().innerHTML = h;
-  if (last) {
-    if (!S.dashTuKy) S.dashTuKy = S.kys[S.kys.length - 1].ky;
-    if (!S.dashDenKy) S.dashDenKy = S.kys[0].ky;
-    loadDashboard();
-  }
+  if (!S.dashTuKy) S.dashTuKy = S.kys[S.kys.length - 1].ky;
+  if (!S.dashDenKy) S.dashDenKy = S.kys[0].ky;
+  loadDashboard();
 }
 async function loadDashboard() {
   const area = $('dashArea'); if (!area) return;
@@ -268,13 +265,14 @@ async function loadDashboard() {
 function renderDashboard() {
   const d = S.dashData; const area = $('dashArea'); if (!d || !area) return;
   const labels = d.months.map((m) => fmtM(m.ky));
-  let seriesHC, titleHC;
+  let hcChart, titleHC;
   if (S.dashPB) {
-    seriesHC = [{ label: S.dashPB, color: CHART_COLORS[0], values: d.months.map((m) => m.soDong), bold: true }];
+    const seriesHC = [{ label: S.dashPB, color: CHART_COLORS[0], values: d.months.map((m) => m.soDong), bold: true }];
+    hcChart = chartLine(labels, seriesHC, {}) + chartLegend(seriesHC);
     titleHC = 'Biến động số lượng nhân sự – ' + esc(S.dashPB);
   } else {
-    seriesHC = d.phongBanList.map((pb, i) => ({ label: pb, color: CHART_COLORS[(i + 1) % CHART_COLORS.length], values: d.months.map((m) => m.byPhongBan[pb] || 0) }));
-    seriesHC.push({ label: 'Tổng công ty', color: CHART_COLORS[0], values: d.months.map((m) => m.soDong), bold: true });
+    const seriesHC = d.phongBanList.map((pb, i) => ({ label: pb, color: CHART_COLORS[(i + 1) % CHART_COLORS.length], values: d.months.map((m) => m.byPhongBan[pb] || 0) }));
+    hcChart = chartStackedBar(labels, seriesHC, {}) + chartLegend(seriesHC) + '<div class="small muted" style="margin-top:4px">Số in đậm trên mỗi cột là tổng nhân sự công ty trong tháng đó.</div>';
     titleHC = 'Biến động số lượng nhân sự theo phòng ban và công ty';
   }
   const seriesQL = [{ label: 'Quỹ lương đóng', color: CHART_COLORS[0], values: d.months.map((m) => m.quyLuong), bold: true }];
@@ -283,7 +281,7 @@ function renderDashboard() {
       <label class="small">Đến kỳ <input type="month" value="${S.dashDenKy}" onchange="S.dashDenKy=this.value;loadDashboard()"></label>
       <label class="small">Phòng ban <select onchange="S.dashPB=this.value;loadDashboard()">${opt(S.phongBan, S.dashPB, 'Tất cả phòng ban')}</select></label>
     </div></div>
-    <div class="card"><h3>${titleHC}</h3>${chartLine(labels, seriesHC, {})}${chartLegend(seriesHC)}</div>
+    <div class="card"><h3>${titleHC}</h3>${hcChart}</div>
     <div class="card"><h3>Biến động quỹ lương đóng${S.dashPB ? ' – ' + esc(S.dashPB) : ''}</h3>${chartLine(labels, seriesQL, {})}</div>
     <div class="row" style="gap:16px;align-items:stretch">
       <div class="card" style="flex:1;min-width:280px"><h3>Nhân viên theo thâm niên${S.dashPB ? ' – ' + esc(S.dashPB) : ''}</h3>
@@ -689,6 +687,7 @@ function rpRefilter() {
   else if (S.rpTab === 'chiphi') renderChiPhi();
   else if (S.rpTab === 'congdoan') renderCongDoan();
   else if (S.rpTab === 'nhansu') renderNhanSu();
+  else if (S.rpTab === 'tonghop') renderTongHop();
 }
 async function rpCongDoan() {
   $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>';
@@ -1017,10 +1016,29 @@ async function rpTongHop() {
   $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>';
   let d;
   try { d = await run('apiTongHop', S.rpTuKy, S.rpDenKy); } catch (e) { $('rpBody').innerHTML = ''; return; }
-  S.rpTuKy = d.tuKy; S.rpDenKy = d.denKy;
+  S.rpTHData = d; S.rpTuKy = d.tuKy; S.rpDenKy = d.denKy;
   const tk = $('rpTuKy'), dk = $('rpDenKy');
   if (tk) tk.value = d.tuKy; if (dk) dk.value = d.denKy;
+  renderTongHop();
+}
+function renderTongHop() {
+  const d = S.rpTHData; if (!d) return;
   const t = d.total;
+  const cols = [
+    { key: 'quyLuong', label: 'Quỹ lương đóng', get: (x) => x.quyLuong },
+    { key: 'tongNLDChinh', label: 'Tổng BHXH NLĐ', get: (x) => x.tongNLDChinh },
+    { key: 'tongDNChinh', label: 'Tổng BHXH DN', get: (x) => x.tongDNChinh },
+    { key: 'tongNopCoQuanBHXH', label: 'Tổng nộp BHXH', get: (x) => x.tongNopCoQuanBHXH },
+    { key: 'cdNLD', label: 'DPCD_NLD', get: (x) => x.cdNLD },
+    { key: 'cdDN', label: 'KPCD_DN', get: (x) => x.cdDN },
+    { key: 'tongNLD', label: 'Tổng NLĐ', get: (x) => x.tongNLD },
+    { key: 'tongDN', label: 'Tổng DN', get: (x) => x.tongDN },
+    { key: 'tongCong', label: 'Tổng cộng', get: (x) => x.tongCong },
+    { key: 'ttBhxh', label: 'Truy thu BHXH', get: (x) => x.ttBhxh || x.ttBhxhNLD + x.ttBhxhDN },
+    { key: 'ttCd', label: 'Truy thu Công đoàn', get: (x) => x.ttCd || x.ttCdNLD + x.ttCdDN }
+  ];
+  const months = zfApply('tonghop_thang', d.months, cols);
+  const phongBan = zfApply('tonghop_pb', d.phongBan, cols);
   let h = `<div class="stats">
     <div class="stat"><div class="lbl">Số kỳ</div><div class="val">${d.months.length}</div></div>
     <div class="stat"><div class="lbl">Tổng BHXH NLĐ</div><div class="val">${fmt(t.tongNLDChinh)}</div></div>
@@ -1032,19 +1050,20 @@ async function rpTongHop() {
     <div class="stat"><div class="lbl">Truy thu BHXH</div><div class="val">${fmt(t.ttBhxh)}</div></div>
     <div class="stat"><div class="lbl">Truy thu Công đoàn</div><div class="val">${fmt(t.ttCd)}</div></div>
     <div class="stat"><div class="lbl">Tổng nộp cơ quan BHXH</div><div class="val">${fmt(t.tongNopCoQuanBHXH)}</div></div></div>
-    <div class="card"><h3>Tổng hợp theo tháng</h3><div class="tbl-wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th class="num">NV đóng</th>
+    <div class="card"><h3>Tổng hợp theo tháng</h3>${zfBar('tonghop_thang', cols)}<div class="tbl-wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th class="num">NV đóng</th>
     <th class="num">Quỹ lương đóng</th><th class="num">Tổng BHXH NLĐ</th><th class="num">Truy thu BHXH NLĐ</th>
     <th class="num">Tổng BHXH DN</th><th class="num">Truy thu BHXH DN</th><th class="num">Tổng nộp BHXH</th>
     <th class="num">DPCD_NLD</th><th class="num">Truy thu DPCD_NLD</th><th class="num">Tổng DPCD_NLD</th>
     <th class="num">KPCD_DN</th><th class="num">Truy thu KPCD_DN</th><th class="num">Tổng KPCD_DN</th>
     <th class="num">Tổng NLĐ</th><th class="num">Tổng DN</th><th class="num">Tổng cộng</th></tr></thead><tbody>
-    ${d.months.map((m) => `<tr><td><b>${fmtM(m.ky)}</b></td><td>${kyBadge(m.trangThai)} ${m.daTinh ? '' : '<span class="badge warn">Chưa tính</span>'}</td>
+    ${months.length ? months.map((m) => `<tr><td><b>${fmtM(m.ky)}</b></td><td>${kyBadge(m.trangThai)} ${m.daTinh ? '' : '<span class="badge warn">Chưa tính</span>'}</td>
       <td class="num">${fmt(m.soDong)}</td><td class="num">${fmt(m.quyLuong)}</td>
       <td class="num">${fmt(m.tongNLDChinh)}</td><td class="num">${fmt(m.ttBhxhNLD)}</td>
       <td class="num">${fmt(m.tongDNChinh)}</td><td class="num">${fmt(m.ttBhxhDN)}</td><td class="num"><b>${fmt(m.tongNopCoQuanBHXH)}</b></td>
       <td class="num">${fmt(m.cdNLD)}</td><td class="num">${fmt(m.ttCdNLD)}</td><td class="num">${fmt(m.cdNLD + m.ttCdNLD)}</td>
       <td class="num">${fmt(m.cdDN)}</td><td class="num">${fmt(m.ttCdDN)}</td><td class="num">${fmt(m.cdDN + m.ttCdDN)}</td>
-      <td class="num">${fmt(m.tongNLD)}</td><td class="num">${fmt(m.tongDN)}</td><td class="num">${fmt(m.tongCong)}</td></tr>`).join('')}
+      <td class="num">${fmt(m.tongNLD)}</td><td class="num">${fmt(m.tongDN)}</td><td class="num">${fmt(m.tongCong)}</td></tr>`).join('')
+      : '<tr><td colspan="18" class="muted">Không có kỳ khớp bộ lọc.</td></tr>'}
     <tr class="total"><td colspan="3">CẢ KỲ</td><td class="num">${fmt(t.quyLuong)}</td>
       <td class="num">${fmt(t.tongNLDChinh)}</td><td class="num">${fmt(t.ttBhxhNLD)}</td>
       <td class="num">${fmt(t.tongDNChinh)}</td><td class="num">${fmt(t.ttBhxhDN)}</td><td class="num"><b>${fmt(t.tongNopCoQuanBHXH)}</b></td>
@@ -1053,18 +1072,19 @@ async function rpTongHop() {
       <td class="num">${fmt(t.tongNLD)}</td><td class="num">${fmt(t.tongDN)}</td><td class="num">${fmt(t.tongCong)}</td></tr>
     </tbody></table></div></div>`;
   if (d.phongBan.length) {
-    h += `<div class="card"><h3>Tổng hợp theo phòng ban <span class="muted small">(cả khoảng thời gian đã chọn)</span></h3><div class="tbl-wrap"><table><thead><tr>
+    h += `<div class="card"><h3>Tổng hợp theo phòng ban <span class="muted small">(cả khoảng thời gian đã chọn)</span></h3>${zfBar('tonghop_pb', cols)}<div class="tbl-wrap"><table><thead><tr>
       <th>Phòng ban</th><th class="num">Quỹ lương đóng</th><th class="num">Tổng BHXH NLĐ</th><th class="num">Truy thu BHXH NLĐ</th>
       <th class="num">Tổng BHXH DN</th><th class="num">Truy thu BHXH DN</th><th class="num">Tổng nộp BHXH</th>
       <th class="num">DPCD_NLD</th><th class="num">Truy thu DPCD_NLD</th><th class="num">Tổng DPCD_NLD</th>
       <th class="num">KPCD_DN</th><th class="num">Truy thu KPCD_DN</th><th class="num">Tổng KPCD_DN</th>
       <th class="num">Tổng NLĐ</th><th class="num">Tổng DN</th><th class="num">Tổng cộng</th></tr></thead><tbody>
-      ${d.phongBan.map((b) => `<tr><td>${esc(b.phongBan)}</td><td class="num">${fmt(b.quyLuong)}</td>
+      ${phongBan.length ? phongBan.map((b) => `<tr><td>${esc(b.phongBan)}</td><td class="num">${fmt(b.quyLuong)}</td>
         <td class="num">${fmt(b.tongNLDChinh)}</td><td class="num">${fmt(b.ttBhxhNLD)}</td>
         <td class="num">${fmt(b.tongDNChinh)}</td><td class="num">${fmt(b.ttBhxhDN)}</td><td class="num"><b>${fmt(b.tongNopCoQuanBHXH)}</b></td>
         <td class="num">${fmt(b.cdNLD)}</td><td class="num">${fmt(b.ttCdNLD)}</td><td class="num">${fmt(b.cdNLD + b.ttCdNLD)}</td>
         <td class="num">${fmt(b.cdDN)}</td><td class="num">${fmt(b.ttCdDN)}</td><td class="num">${fmt(b.cdDN + b.ttCdDN)}</td>
-        <td class="num">${fmt(b.tongNLD)}</td><td class="num">${fmt(b.tongDN)}</td><td class="num">${fmt(b.tongCong)}</td></tr>`).join('')}
+        <td class="num">${fmt(b.tongNLD)}</td><td class="num">${fmt(b.tongDN)}</td><td class="num">${fmt(b.tongCong)}</td></tr>`).join('')
+        : '<tr><td colspan="16" class="muted">Không có phòng ban khớp bộ lọc.</td></tr>'}
       <tr class="total"><td>TỔNG CỘNG</td><td class="num">${fmt(t.quyLuong)}</td>
         <td class="num">${fmt(t.tongNLDChinh)}</td><td class="num">${fmt(t.ttBhxhNLD)}</td>
         <td class="num">${fmt(t.tongDNChinh)}</td><td class="num">${fmt(t.ttBhxhDN)}</td><td class="num"><b>${fmt(t.tongNopCoQuanBHXH)}</b></td>
@@ -1100,28 +1120,33 @@ function renderNhanSu() {
   }
   const q = ($('rpQ') ? $('rpQ').value : '').toLowerCase().trim();
   const pl = $('rpPL') ? $('rpPL').value : '';
-  const zfCols = [{ key: 'thamNienNam', label: 'Thâm niên (năm)', get: (nv) => (nv.thamNien ? nv.thamNien.years : 0) }];
+  const tnTu = $('rpTnTu') && $('rpTnTu').value !== '' ? Number($('rpTnTu').value) : null;
+  const tnDen = $('rpTnDen') && $('rpTnDen').value !== '' ? Number($('rpTnDen').value) : null;
   let rows = d.rows.filter((nv) => (!q || [nv.maNV, nv.hoTen, nv.maBHXH].join(' ').toLowerCase().includes(q))
-    && (!pl || nv.periods.some((p) => p.maPL === pl)));
-  rows = zfApply('nhansu', rows, zfCols);
+    && (!pl || nv.periods.some((p) => p.maPL === pl))
+    && (tnTu === null || (nv.thamNienNam !== null && nv.thamNienNam >= tnTu))
+    && (tnDen === null || (nv.thamNienNam !== null && nv.thamNienNam <= tnDen)));
   let h = `<div class="stats">
     <div class="stat"><div class="lbl">Khoảng thời gian</div><div class="val">${fmtM(d.tuKy)} – ${fmtM(d.denKy)}</div></div>
     <div class="stat"><div class="lbl">Số nhân sự</div><div class="val">${rows.length}<span class="muted small"> / ${d.rows.length}</span></div></div>
     <div class="stat"><div class="lbl">Đang làm việc</div><div class="val">${rows.filter((nv) => nv.dangLam).length}</div></div>
-    <div class="stat"><div class="lbl">Đã dừng đóng</div><div class="val">${rows.filter((nv) => !nv.dangLam).length}</div></div></div>`;
-  h += zfBar('nhansu', zfCols);
-  const totalCols = 8;
-  const head = `<tr><th>Kỳ</th><th>Mã PL</th><th>Đóng</th><th class="num">Lương đóng</th>
+    <div class="stat"><div class="lbl">Đã dừng đóng</div><div class="val">${rows.filter((nv) => !nv.dangLam).length}</div></div></div>
+    <div class="card no-print"><div class="row"><span class="small muted">Lọc theo thâm niên (năm, có thể để số thập phân, ví dụ 0.5 = 6 tháng):</span>
+      <label class="small">Từ <input type="number" step="0.5" id="rpTnTu" style="width:80px" value="${tnTu === null ? '' : tnTu}" oninput="rpRefilter()"></label>
+      <label class="small">Đến <input type="number" step="0.5" id="rpTnDen" style="width:80px" value="${tnDen === null ? '' : tnDen}" oninput="rpRefilter()"></label></div></div>`;
+  const totalCols = 10;
+  const head = `<tr><th>Kỳ</th><th>Chức danh</th><th>Phòng ban</th><th>Mã PL</th><th>Đóng</th><th class="num">Lương đóng</th>
     <th class="num">Tổng NLĐ</th><th class="num">Tổng DN</th><th class="num">Tổng cộng</th><th>Cảnh báo</th></tr>`;
   let body = '';
   rows.forEach((nv) => {
     const tn = nv.thamNien;
     body += `<tr class="group"><td colspan="${totalCols}">${esc(nv.maNV)} – ${esc(nv.hoTen)}
-      <span class="muted small">${esc(nv.chucDanh)} · ${esc(nv.phongBan)} · Vào làm ${fmtD(nv.ngayVao)}</span>
+      <span class="muted small">Vào làm ${fmtD(nv.ngayVao)}</span>
       · Thâm niên: <b>${tn ? tn.years + ' năm ' + tn.months + ' tháng ' + tn.days + ' ngày' : 'Chưa rõ ngày vào làm'}</b>
       ${nv.dangLam ? '' : ' <span class="badge bad">Đã dừng đóng</span>'}</td></tr>`;
     nv.periods.forEach((p) => {
-      body += `<tr class="${p.dong === 'Có' ? '' : 'off'}"><td>${fmtM(p.ky)}</td><td>${esc(p.maPL)}</td><td>${esc(p.dong)}</td>
+      body += `<tr class="${p.dong === 'Có' ? '' : 'off'}"><td>${fmtM(p.ky)}</td><td>${esc(p.chucDanh)}</td><td>${esc(p.phongBan)}</td>
+        <td>${esc(p.maPL)}</td><td>${esc(p.dong)}</td>
         <td class="num">${fmt(p.luongDong)}</td><td class="num">${fmt(p.tongNLD)}</td><td class="num">${fmt(p.tongDN)}</td>
         <td class="num"><b>${fmt(p.tongCong)}</b></td><td class="warn-txt">${esc(p.canhBao)}</td></tr>`;
     });
