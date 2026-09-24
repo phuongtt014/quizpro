@@ -1161,6 +1161,53 @@ function apiTongQuan() {
   });
 }
 
+/** Dữ liệu cho biểu đồ dashboard ở Tổng quan: biến động nhân sự/quỹ lương theo tháng, thâm niên, theo mã PL */
+function apiDashboard(tuKy, denKy, phongBan) {
+  const user = getUser_();
+  const all = listKy_(); // mới nhất trước
+  const minKy = all.length ? all[all.length - 1].ky : '', maxKy = all.length ? all[0].ky : '';
+  tuKy = tuKy ? normMonth_(tuKy) : minKy;
+  denKy = denKy ? normMonth_(denKy) : maxKy;
+  if (tuKy && denKy && tuKy > denKy) { const x = tuKy; tuKy = denKy; denKy = x; }
+  const kys = all.filter(function (k) { return k.ky >= tuKy && k.ky <= denKy; }).slice().reverse(); // tăng dần
+  const kqAll = loadKQAll_().rows.filter(function (r) { return r.ky >= tuKy && r.ky <= denKy && canSee_(user, r); });
+  const kq = phongBan ? kqAll.filter(function (r) { return r.phongBan === phongBan; }) : kqAll;
+  const months = kys.map(function (k) {
+    const rows = kq.filter(function (r) { return r.ky === k.ky && r.dong === CO; });
+    const byPB = {};
+    rows.forEach(function (r) { const pb = r.phongBan || '(Chưa có phòng ban)'; byPB[pb] = (byPB[pb] || 0) + 1; });
+    return { ky: k.ky, soDong: rows.length, quyLuong: rows.reduce(function (s, r) { return s + r.luongDong; }, 0), byPhongBan: byPB };
+  });
+  const phongBanList = [];
+  months.forEach(function (m) { Object.keys(m.byPhongBan).forEach(function (pb) { if (phongBanList.indexOf(pb) < 0) phongBanList.push(pb); }); });
+  const lastKyRows = kq.filter(function (r) { return r.ky === denKy && r.dong === CO; });
+  const dlky = load_(T.DLKY).rows.filter(function (r) { return r.ky === denKy; });
+  const dlMap = {};
+  dlky.forEach(function (r) { dlMap[r.maNV] = r; });
+  const today = todayStr_();
+  const buckets = [
+    { label: '< 1 năm', min: 0, max: 1 }, { label: '1 - 3 năm', min: 1, max: 3 }, { label: '3 - 5 năm', min: 3, max: 5 },
+    { label: '5 - 10 năm', min: 5, max: 10 }, { label: '> 10 năm', min: 10, max: 999 }, { label: 'Chưa rõ', min: -1, max: 0 }
+  ];
+  const bucketCounts = buckets.map(function (b) { return { label: b.label, count: 0 }; });
+  lastKyRows.forEach(function (r) {
+    const dl = dlMap[r.maNV];
+    const start = dl && (dl.ngayVao || dl.ngayBHXH);
+    if (!start) { bucketCounts[bucketCounts.length - 1].count++; return; }
+    const years = (new Date(today) - new Date(start)) / (365.25 * 86400000);
+    let idx = buckets.findIndex(function (b) { return b.min >= 0 && years >= b.min && years < b.max; });
+    if (idx < 0) idx = buckets.length - 2; // > 10 năm mặc định nếu vượt hết mốc
+    bucketCounts[idx].count++;
+  });
+  const byMaPLMap = {};
+  lastKyRows.forEach(function (r) { const k = r.maPL || '(Chưa có)'; byMaPLMap[k] = (byMaPLMap[k] || 0) + 1; });
+  const byMaPL = Object.keys(byMaPLMap).map(function (k) { return { maPL: k, count: byMaPLMap[k] }; });
+  return {
+    tuKy: tuKy, denKy: denKy, minKy: minKy, maxKy: maxKy, months: months, phongBanList: phongBanList,
+    seniority: bucketCounts, byMaPL: byMaPL, tongNVCuoiKy: lastKyRows.length
+  };
+}
+
 function apiBaoCaoChiTiet(ky) {
   const user = getUser_();
   ky = normMonth_(ky);
@@ -1332,6 +1379,67 @@ function apiCongDoanChiTiet(ky) {
   };
 }
 
+function todayStr_() { return Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd'); }
+
+/** Số năm/tháng/ngày giữa 2 ngày ISO (yyyy-MM-dd); null nếu thiếu dữ liệu hoặc endStr < startStr */
+function tinhThamNien_(startStr, endStr) {
+  if (!startStr) return null;
+  const s = new Date(startStr + 'T00:00:00');
+  const e = new Date((endStr || todayStr_()) + 'T00:00:00');
+  if (isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) return null;
+  let years = e.getFullYear() - s.getFullYear();
+  let months = e.getMonth() - s.getMonth();
+  let days = e.getDate() - s.getDate();
+  if (days < 0) { months--; days += new Date(e.getFullYear(), e.getMonth(), 0).getDate(); }
+  if (months < 0) { years--; months += 12; }
+  return { years: years, months: months, days: days };
+}
+function thamNienStr_(t) { return t ? (t.years + ' năm ' + t.months + ' tháng ' + t.days + ' ngày') : ''; }
+
+/** Tổng hợp theo nhân sự: lịch sử từng kỳ đóng trong khoảng thời gian + thâm niên tính đến cuối khoảng (hoặc hôm nay) */
+function apiLichSuNhanSu(tuKy, denKy) {
+  const user = getUser_();
+  const all = listKy_(); // mới nhất trước
+  const minKy = all.length ? all[all.length - 1].ky : '', maxKy = all.length ? all[0].ky : '';
+  tuKy = tuKy ? normMonth_(tuKy) : minKy;
+  denKy = denKy ? normMonth_(denKy) : maxKy;
+  if (tuKy && denKy && tuKy > denKy) { const x = tuKy; tuKy = denKy; denKy = x; }
+  const kq = loadKQAll_().rows.filter(function (r) { return r.ky >= tuKy && r.ky <= denKy && canSee_(user, r); });
+  const dlky = load_(T.DLKY).rows.filter(function (r) { return r.ky >= tuKy && r.ky <= denKy; });
+  const dlMap = {};
+  dlky.forEach(function (r) { dlMap[r.ky + '|' + r.maNV] = r; });
+  const byNV = {};
+  kq.forEach(function (r) {
+    if (!byNV[r.maNV]) byNV[r.maNV] = { maNV: r.maNV, periods: [], _lastKy: '' };
+    const nv = byNV[r.maNV];
+    const dl = dlMap[r.ky + '|' + r.maNV] || {};
+    nv.periods.push({
+      ky: r.ky, maPL: r.maPL, luongDong: r.luongDong, dong: r.dong,
+      tongNLD: r.tongNLD, tongDN: r.tongDN, tongCong: r.tongCong, canhBao: r.canhBao
+    });
+    if (r.ky >= nv._lastKy) {
+      nv._lastKy = r.ky; nv.hoTen = r.hoTen; nv.maBHXH = dl.maBHXH || r.maBHXH || '';
+      nv.phongBan = r.phongBan; nv.chucDanh = r.chucDanh;
+      nv.ngayVao = dl.ngayVao || ''; nv.ngayBHXH = dl.ngayBHXH || '';
+      nv.ngayNghi = dl.ngayNghi || ''; nv.thangDung = dl.thangDung || '';
+    }
+  });
+  const today = todayStr_();
+  const kyHomNay = normMonth_(today.slice(0, 7));
+  const list = Object.keys(byNV).map(function (k) {
+    const nv = byNV[k];
+    delete nv._lastKy;
+    nv.periods.sort(function (a, b) { return a.ky < b.ky ? -1 : 1; });
+    const start = nv.ngayVao || nv.ngayBHXH;
+    const dangLam = !nv.thangDung || nv.thangDung > kyHomNay;
+    const end = dangLam ? today : nv.thangDung + '-01';
+    nv.dangLam = dangLam;
+    nv.thamNien = tinhThamNien_(start, end);
+    return nv;
+  }).sort(function (a, b) { return (a.phongBan + a.maNV) < (b.phongBan + b.maNV) ? -1 : 1; });
+  return { info: getInfo_(), tuKy: tuKy, denKy: denKy, minKy: minKy, maxKy: maxKy, rows: list };
+}
+
 // ---------------------------------------------------------------------
 // API: XUẤT EXCEL / PDF
 // ---------------------------------------------------------------------
@@ -1452,13 +1560,14 @@ function buildDoc_(loai, p) {
     });
     const s = function (i) { return r1.reduce(function (a, r) { return a + r[i]; }, 0); };
     const t1 = ['CẢ KỲ', '', s(2), s(3), s(4), s(5), s(6), s(7), s(8), s(9), s(10), s(11), s(12), s(13), s(14), s(15), s(16), s(17)];
-    const h3 = ['Phòng ban', 'Tổng BHXH NLĐ', 'Tổng BHXH DN', 'Tổng nộp BHXH', 'DPCD_NLD', 'KPCD_DN', 'Tổng NLĐ', 'Tổng DN', 'Tổng cộng',
-      'Truy thu BHXH', 'Truy thu Công đoàn'];
+    const h3 = ['Phòng ban', 'Quỹ lương đóng', 'Tổng BHXH NLĐ', 'Truy thu BHXH NLĐ', 'Tổng BHXH DN', 'Truy thu BHXH DN', 'Tổng nộp BHXH',
+      'DPCD_NLD', 'Truy thu DPCD_NLD', 'Tổng DPCD_NLD', 'KPCD_DN', 'Truy thu KPCD_DN', 'Tổng KPCD_DN', 'Tổng NLĐ', 'Tổng DN', 'Tổng cộng'];
     const r3 = d.phongBan.map(function (b) {
-      return [b.phongBan, b.tongNLDChinh, b.tongDNChinh, b.tongNopBHXH, b.cdNLD, b.cdDN, b.tongNLD, b.tongDN, b.tongCong, b.ttBhxh, b.ttCd];
+      return [b.phongBan, b.quyLuong, b.tongNLDChinh, b.ttBhxhNLD, b.tongDNChinh, b.ttBhxhDN, b.tongNopCoQuanBHXH,
+        b.cdNLD, b.ttCdNLD, b.cdNLD + b.ttCdNLD, b.cdDN, b.ttCdDN, b.cdDN + b.ttCdDN, b.tongNLD, b.tongDN, b.tongCong];
     });
     const s3 = function (i) { return r3.reduce(function (a, r) { return a + r[i]; }, 0); };
-    const t3 = ['TỔNG CỘNG', s3(1), s3(2), s3(3), s3(4), s3(5), s3(6), s3(7), s3(8), s3(9), s3(10)];
+    const t3 = ['TỔNG CỘNG', s3(1), s3(2), s3(3), s3(4), s3(5), s3(6), s3(7), s3(8), s3(9), s3(10), s3(11), s3(12), s3(13), s3(14), s3(15)];
     const h2 = ['Mã khoản', 'Tên khoản', 'Đối tượng'].concat(d.months.map(function (m) { return monthDisp_(m.ky); })).concat(['Cả kỳ']);
     const r2 = d.codes.map(function (c) {
       const vals = d.months.map(function (m) { return m.items[c.ma] || 0; });
@@ -1470,7 +1579,7 @@ function buildDoc_(loai, p) {
       info: d.info, title: 'TỔNG HỢP BHXH – TỪ ' + monthDisp_(d.tuKy) + ' ĐẾN ' + monthDisp_(d.denKy), fileName: 'BHXH_TongHop_' + d.tuKy + '_' + d.denKy,
       sections: [
         { title: 'Tổng hợp theo tháng', header: h1, rows: r1, total: t1, numCols: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17] },
-        { title: 'Tổng hợp theo phòng ban (cả khoảng thời gian)', header: h3, rows: r3, total: t3, numCols: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
+        { title: 'Tổng hợp theo phòng ban (cả khoảng thời gian)', header: h3, rows: r3, total: t3, numCols: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] },
         { title: 'Chi tiết theo khoản trích (không gồm truy thu)', header: h2, rows: r2, numCols: nc2 }
       ]
     };
@@ -1514,6 +1623,26 @@ function buildDoc_(loai, p) {
     return {
       info: d.info, title: 'BẢNG PHÂN TÁCH QUỸ CÔNG ĐOÀN – KỲ ' + monthDisp_(d.ky), fileName: 'CongDoan_' + d.ky,
       sections: sections
+    };
+  }
+  if (loai === 'nhansu') {
+    const pp = String(p || '').split('|');
+    const d = apiLichSuNhanSu(pp[0], pp[1]);
+    const header = ['STT', 'Mã NV', 'Họ và tên', 'Mã số BHXH', 'Chức danh', 'Đơn vị_Phòng ban',
+      'Ngày vào làm', 'Ngày bắt đầu BHXH', 'Thâm niên (đến hôm nay, hoặc đến ngày dừng đóng nếu đã nghỉ)',
+      'Kỳ', 'Mã PL', 'Đóng trong kỳ', 'Lương đóng BHXH', 'Tổng NLĐ', 'Tổng DN', 'Tổng cộng', 'Cảnh báo'];
+    const rows = [];
+    d.rows.forEach(function (nv) {
+      nv.periods.forEach(function (per, i) {
+        rows.push([rows.length + 1, nv.maNV, nv.hoTen, nv.maBHXH, nv.chucDanh, nv.phongBan,
+          dateDisp_(nv.ngayVao), dateDisp_(nv.ngayBHXH), i === 0 ? thamNienStr_(nv.thamNien) : '',
+          monthDisp_(per.ky), per.maPL, per.dong, per.luongDong, per.tongNLD, per.tongDN, per.tongCong, per.canhBao]);
+      });
+    });
+    return {
+      info: d.info, title: 'TỔNG HỢP THEO NHÂN SỰ – TỪ ' + monthDisp_(d.tuKy) + ' ĐẾN ' + monthDisp_(d.denKy),
+      fileName: 'BHXH_NhanSu_' + d.tuKy + '_' + d.denKy,
+      sections: [{ title: '', header: header, rows: rows, numCols: [12, 13, 14, 15] }]
     };
   }
   throw new Error('Loại báo cáo không hợp lệ.');

@@ -146,7 +146,7 @@ Màn hình **Tổng quan** (trang chủ) và tab **Báo cáo → Tổng hợp** 
 - **Tổng quan**: hiện số liệu kỳ mới nhất và bảng các kỳ gần đây theo cấu trúc trên.
 - **Tổng hợp**: thay vì chỉ chọn theo **năm**, nay chọn khoảng thời gian linh hoạt bằng 2 ô **"Từ kỳ"** / **"Đến kỳ"** (chọn tháng/năm), cho phép xem một khoảng bất kỳ (ví dụ nửa năm, năm tài chính không trùng năm dương lịch…). Gồm 3 bảng:
   1. **Tổng hợp theo tháng** trong khoảng đã chọn, có dòng "CẢ KỲ". Thứ tự cột: Kỳ, Trạng thái, NV đóng, Quỹ lương đóng, Tổng BHXH NLĐ, Truy thu BHXH NLĐ, Tổng BHXH DN, Truy thu BHXH DN, Tổng nộp BHXH, DPCD_NLD, Truy thu DPCD_NLD, Tổng DPCD_NLD, KPCD_DN, Truy thu KPCD_DN, Tổng KPCD_DN, Tổng NLĐ, Tổng DN, Tổng cộng — mỗi khoản chính đi kèm cột Truy thu và cột Tổng (= khoản chính + truy thu) ngay sau nó.
-  2. **Tổng hợp theo phòng ban** (mới) – cộng dồn cả khoảng thời gian đã chọn theo từng phòng ban, cùng cấu trúc cột như trên.
+  2. **Tổng hợp theo phòng ban** (mới) – cộng dồn cả khoảng thời gian đã chọn theo từng phòng ban, cùng thứ tự cột như bảng theo tháng (thay cột Kỳ/Trạng thái/NV đóng bằng cột Phòng ban).
   3. **Chi tiết theo khoản trích** (không gồm truy thu), theo từng tháng.
   Nút xuất Excel/PDF xuất đủ cả 3 bảng.
 
@@ -157,11 +157,12 @@ Màn hình **Tổng quan** (trang chủ) và tab **Báo cáo → Tổng hợp** 
    - Giống tab Khoản trích đóng: mỗi khi tỉ lệ thay đổi, bấm **"＋ Thêm phiên bản"** để thêm dòng mới với ngày hiệu lực mới, **không sửa dòng cũ**. Mỗi kỳ tự dùng đúng tỉ lệ có hiệu lực tại tháng đó (dòng có ngày hiệu lực gần nhất nhưng ≤ cuối tháng), nên kỳ cũ luôn giữ đúng tỉ lệ tại thời điểm đó dù sau này tỉ lệ có đổi.
 3. Vào **Báo cáo → Công đoàn**, chọn **kỳ** để xem bảng chi tiết theo từng nhân viên, nhóm theo phòng ban (giống cấu trúc *Bảng tính nộp BHXH*): Lương đóng, Đoàn phí NLĐ (thu/giữ lại/nộp), Kinh phí công đoàn DN (thu/giữ lại/nộp), tổng giữ lại và tổng nộp Công đoàn Việt Nam. Có thể tìm theo mã NV/họ tên, lọc theo mã PL, và xuất Excel/PDF. Nếu trong kỳ có phát sinh **Truy thu/Thoái thu** ảnh hưởng Đoàn phí/Kinh phí công đoàn, bảng **Truy thu/Thoái thu Công đoàn trong kỳ** sẽ hiện thêm bên dưới (giữ lại/nộp Công đoàn Việt Nam theo đúng tỉ lệ hiệu lực từng tháng).
 
-## 8. Tìm kiếm và lọc ở Bảng tính nộp BHXH / Báo cáo chi phí / Công đoàn
+## 8. Tìm kiếm và lọc ở Bảng tính nộp BHXH / Báo cáo chi phí / Công đoàn / Theo nhân sự
 
 Các màn hình này có thêm:
 - **Ô tìm kiếm**: gõ mã NV hoặc họ tên để lọc nhanh (không phân biệt hoa/thường).
 - **Lọc theo Mã PL**: chỉ xem nhân viên thuộc một mã phân loại.
+- **Lọc giá trị 0**: chọn một cột tiền (ví dụ "Tổng BHXH NLĐ", "DPCD_NLD"…) và tick **"Ẩn dòng có giá trị 0"** để chỉ xem những nhân viên/dòng có phát sinh ở cột đó – tiện khi cần rà soát ai đang bị 0 (thiếu cấu hình) hoặc chỉ muốn xem những người thực sự có khoản đó.
 
 Dòng tổng/cộng theo phòng ban và tổng cộng cuối bảng tự tính lại theo đúng những dòng đang hiển thị sau khi lọc.
 
@@ -174,6 +175,27 @@ Kết quả tính ở màn hình **Truy thu** được tách thành 4 phần vì
 - **Kinh phí Công đoàn (DN)**: tương tự, tách Giữ lại / Nộp theo tỉ lệ DN.
 
 *Tổng NLĐ* = BHXH NLĐ + Đoàn phí; *Tổng DN* = BHXH DN + Kinh phí — dùng để đối chiếu chi phí đầy đủ (xem tab **Báo cáo chi phí**, mục 6b). Bảng "Truy thu/Thoái thu BHXH trong kỳ" ở tab **Bảng tính nộp BHXH** và file xuất Excel/PDF của tab này chỉ hiện **BHXH NLĐ / BHXH DN** (số nộp cơ quan BHXH); phần Đoàn phí/Kinh phí công đoàn của truy thu xem ở tab **Công đoàn**.
+
+## 9b. Báo cáo → Theo nhân sự
+
+Tab mới, xem **quá trình đóng BHXH của từng nhân sự** theo thời gian:
+
+1. Chọn khoảng thời gian bằng 2 ô **"Từ kỳ" / "Đến kỳ"** (giống tab Tổng hợp), có thể tìm theo mã NV/họ tên và lọc theo mã PL.
+2. Mỗi nhân sự hiện một khối riêng: dòng đầu là **Mã NV – Họ tên**, kèm Chức danh, Phòng ban, Ngày vào làm và **Thâm niên** (tính theo số năm – tháng – ngày, tính đến hôm nay nếu đang làm, hoặc đến ngày dừng đóng nếu đã nghỉ). Nếu đã dừng đóng sẽ có nhãn **"Đã dừng đóng"**.
+3. Bên dưới là các dòng chi tiết từng **kỳ** trong khoảng đã chọn: Mã PL, Đóng/Không, Lương đóng, Tổng NLĐ, Tổng DN, Tổng cộng, Cảnh báo.
+4. Có thể **lọc giá trị 0** theo số năm thâm niên (mục 8), và xuất Excel/PDF.
+
+Thâm niên tính từ **Ngày vào làm** (nếu có), hoặc **Ngày bắt đầu BHXH** nếu chưa nhập Ngày vào làm.
+
+## 9c. Tổng quan – dashboard biểu đồ nhân sự
+
+Màn hình **Tổng quan** (trang chủ), sau phần số liệu kỳ mới nhất, có thêm khu vực biểu đồ trực quan:
+
+- **Bộ lọc**: chọn **Từ kỳ / Đến kỳ** và **Phòng ban** (hoặc "Tất cả phòng ban") – đổi bộ lọc sẽ tự tính lại toàn bộ biểu đồ.
+- **Biến động số lượng nhân sự theo phòng ban và công ty**: biểu đồ đường số NV đang đóng theo từng tháng, mỗi phòng ban một đường (kèm đường "Tổng công ty" in đậm); nếu đã chọn 1 phòng ban cụ thể thì chỉ hiện 1 đường của phòng ban đó.
+- **Biến động quỹ lương đóng**: biểu đồ đường quỹ lương đóng BHXH theo từng tháng (theo phòng ban đã lọc, hoặc toàn công ty).
+- **Nhân viên theo thâm niên**: biểu đồ cột số NV đang đóng tại kỳ cuối của khoảng đã chọn, chia theo mốc thâm niên (&lt;1 năm, 1–3, 3–5, 5–10, &gt;10 năm; "Chưa rõ" nếu thiếu Ngày vào làm/Ngày bắt đầu BHXH).
+- **Số lượng nhân sự theo mã phân loại**: biểu đồ cột số NV đang đóng tại kỳ cuối, chia theo Mã PL.
 
 ## 10. Lưu ý
 
