@@ -1290,23 +1290,23 @@ function buildDoc_(loai, p) {
     const d = apiBaoCaoChiTiet(p);
     const codesNLD = d.codes.filter(function (c) { return c.doiTuong !== DT_DN; });
     const codesDN = d.codes.filter(function (c) { return c.doiTuong === DT_DN; });
-    const header = ['STT', 'Mã NV', 'Họ và tên', 'Mã số BHXH', 'Đơn vị_Phòng ban', 'Mã PL', 'Lương đóng BHXH']
+    const header = ['STT', 'Mã NV', 'Họ và tên', 'Chức danh', 'Đơn vị_Phòng ban', 'Mã PL', 'Lương đóng BHXH']
       .concat(codesNLD.map(function (c) { return c.ten + ' (' + c.ma + ')'; }))
       .concat(['Tổng BHXH NLĐ (không gồm Đoàn phí CĐ)'])
       .concat(codesDN.map(function (c) { return c.ten + ' (' + c.ma + ')'; }))
-      .concat(['Tổng BHXH DN (không gồm KPCĐ)', 'Tổng nộp BHXH (NLĐ + DN)'])
+      .concat(['Tổng BHXH DN (không gồm KPCĐ)', 'Tổng nộp cơ quan BHXH (NLĐ + DN)'])
       .concat(d.codesCD.map(function (c) { return c.ten + ' (' + c.ma + ')'; }))
-      .concat(['Tổng NLĐ', 'Tổng DN', 'Tổng cộng', 'Ghi chú']);
+      .concat(['Ghi chú']);
     const dong = d.rows.filter(function (r) { return r.dong === CO; })
       .sort(function (a, b) { return (a.phongBan + a.maNV) < (b.phongBan + b.maNV) ? -1 : 1; });
     const rows = dong.map(function (r, i) {
-      return [i + 1, r.maNV, r.hoTen, r.maBHXH, r.phongBan, r.maPL, r.luongDong]
+      return [i + 1, r.maNV, r.hoTen, r.chucDanh, r.phongBan, r.maPL, r.luongDong]
         .concat(codesNLD.map(function (c) { return r.items[c.ma] || 0; }))
         .concat([r.tongNLDChinh])
         .concat(codesDN.map(function (c) { return r.items[c.ma] || 0; }))
         .concat([r.tongDNChinh, r.tongNopBHXH])
         .concat(d.codesCD.map(function (c) { return r.items[c.ma] || 0; }))
-        .concat([r.tongNLD, r.tongDN, r.tongCong, r.canhBao]);
+        .concat([r.canhBao]);
     });
     const sum = function (col) { return rows.reduce(function (s, r) { return s + (Number(r[col]) || 0); }, 0); };
     const total = ['', '', 'TỔNG CỘNG', '', '', '', sum(6)];
@@ -1314,20 +1314,39 @@ function buildDoc_(loai, p) {
     total.push('');
     const numCols = [];
     for (let c = 6; c < header.length - 1; c++) numCols.push(c);
-    const sections = [{ title: 'Danh sách NV đóng BHXH (' + dong.length + ' người)', header: header, rows: rows, total: total, numCols: numCols }];
+    const sections = [{ title: 'Danh sách NV đóng BHXH (' + dong.length + ' người) – dùng để nộp cơ quan BHXH', header: header, rows: rows, total: total, numCols: numCols }];
     if (d.truyThu.length) {
       const h2 = ['STT', 'Mã NV', 'Họ và tên', 'Từ tháng', 'Đến tháng', 'Số tháng', 'Lương cũ', 'Lương mới',
-        'BHXH NLĐ', 'BHXH DN', 'Đoàn phí - Giữ lại', 'Đoàn phí - Nộp CĐVN', 'Kinh phí - Giữ lại', 'Kinh phí - Nộp CĐVN',
-        'Tổng NLĐ', 'Tổng DN', 'Chi tiết', 'Ghi chú'];
+        'Truy thu BHXH NLĐ', 'Truy thu BHXH DN', 'Chi tiết', 'Ghi chú'];
       const r2 = d.truyThu.map(function (t, i) {
         return [i + 1, t.maNV, t.hoTen, monthDisp_(t.tuThang), monthDisp_(t.denThang), t.soThang, t.luongCu, t.luongMoi,
-          t.bhxhNLD, t.bhxhDN, t.dpcdGiuLai, t.dpcdNop, t.kpcdGiuLai, t.kpcdNop, t.tienNLD, t.tienDN, t.chiTiet, t.ghiChu];
+          t.bhxhNLD, t.bhxhDN, t.chiTiet, t.ghiChu];
       });
       const s2 = function (i) { return r2.reduce(function (s, r) { return s + r[i]; }, 0); };
-      const tot2 = ['', '', 'TỔNG', '', '', '', '', '', s2(8), s2(9), s2(10), s2(11), s2(12), s2(13), s2(14), s2(15), '', ''];
-      sections.push({ title: 'Truy thu / Thoái thu', header: h2, rows: r2, total: tot2, numCols: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15] });
+      const tot2 = ['', '', 'TỔNG', '', '', '', '', '', s2(8), s2(9), '', ''];
+      sections.push({
+        title: 'Truy thu / Thoái thu BHXH (nộp cơ quan BHXH – không gồm Công đoàn, xem ở Báo cáo Công đoàn)',
+        header: h2, rows: r2, total: tot2, numCols: [6, 7, 8, 9]
+      });
     }
-    return { info: d.info, title: 'BẢNG TÍNH BHXH – KỲ ' + monthDisp_(d.ky), fileName: 'BHXH_ChiTiet_' + d.ky, sections: sections };
+    return { info: d.info, title: 'BẢNG TÍNH NỘP BHXH – KỲ ' + monthDisp_(d.ky), fileName: 'BHXH_ChiTiet_' + d.ky, sections: sections };
+  }
+  if (loai === 'chiphi') {
+    const d = apiBaoCaoChiTiet(p);
+    const header = ['STT', 'Mã NV', 'Họ và tên', 'Chức danh', 'Đơn vị_Phòng ban', 'Mã PL', 'Lương đóng BHXH',
+      'Tổng BHXH NLĐ', 'Tổng BHXH DN', 'Tổng nộp BHXH', 'Đoàn phí CĐ (NLĐ)', 'Kinh phí CĐ (DN)', 'Tổng NLĐ', 'Tổng DN', 'Tổng cộng'];
+    const dong = d.rows.filter(function (r) { return r.dong === CO; })
+      .sort(function (a, b) { return (a.phongBan + a.maNV) < (b.phongBan + b.maNV) ? -1 : 1; });
+    const rows = dong.map(function (r, i) {
+      return [i + 1, r.maNV, r.hoTen, r.chucDanh, r.phongBan, r.maPL, r.luongDong,
+        r.tongNLDChinh, r.tongDNChinh, r.tongNopBHXH, r.cdNLD, r.cdDN, r.tongNLD, r.tongDN, r.tongCong];
+    });
+    const sum = function (col) { return rows.reduce(function (s, r) { return s + (Number(r[col]) || 0); }, 0); };
+    const total = ['', '', 'TỔNG CỘNG', '', '', '', sum(6), sum(7), sum(8), sum(9), sum(10), sum(11), sum(12), sum(13), sum(14)];
+    return {
+      info: d.info, title: 'BÁO CÁO CHI PHÍ BHXH – KỲ ' + monthDisp_(d.ky), fileName: 'BHXH_ChiPhi_' + d.ky,
+      sections: [{ title: 'Chi phí theo nhân viên (' + dong.length + ' người)', header: header, rows: rows, total: total, numCols: [6, 7, 8, 9, 10, 11, 12, 13, 14] }]
+    };
   }
   if (loai === 'biendong') {
     const d = apiBienDong(p);

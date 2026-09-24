@@ -84,7 +84,7 @@ Admin có thể đổi *Email NV quản lý hồ sơ* của bất kỳ NV nào �
    - Điều chỉnh lương, phụ cấp, mã phân loại, tham gia công đoàn.
    - Sửa ở kỳ mới nhất thì hồ sơ gốc cũng được cập nhật theo.
 4. **Truy thu / thoái thu** cho các tháng đã qua: nhập NV, từ tháng – đến tháng, lương cũ, lương mới. Để truy đóng tháng chưa đóng, nhập lương cũ = 0.
-5. Bấm **Tính**. Kiểm tra *Báo cáo → Bảng tính chi tiết* (cột Cảnh báo) và *Biến động tăng/giảm*.
+5. Bấm **Tính**. Kiểm tra *Báo cáo → Bảng tính nộp BHXH* (cột Cảnh báo) và *Biến động tăng/giảm*.
 6. **Admin chốt kỳ**: app tính lại lần cuối rồi khóa kỳ. Kỳ đã chốt không sửa được nữa. Phát sinh cho tháng đó phải nhập truy thu ở kỳ sau.
 7. **Xuất Excel/PDF** ở màn hình *Báo cáo*.
 
@@ -98,7 +98,7 @@ Admin có thể đổi *Email NV quản lý hồ sơ* của bất kỳ NV nào �
   - *Mức lương đóng tối đa*: tiền = min(Lương đóng, Mức tối đa) × Tỉ lệ.
   - *Mức đóng tối đa*: tiền = min(Lương đóng × Tỉ lệ, Mức tối đa).
   - *Không áp dụng*: tiền = Lương đóng × Tỉ lệ.
-- **Công đoàn:** khoản có *Chỉ áp dụng đoàn viên công đoàn = Có* (ví dụ đoàn phí) chỉ tính cho NV có *Tham gia công đoàn = Có*. Kinh phí công đoàn (DN) tính cho tất cả NV thuộc mã phân loại có khoản đó. Ở *Báo cáo → Bảng tính chi tiết*, các khoản đánh dấu *Thuộc quỹ Công đoàn* được tách ra cột riêng ở cuối bảng; cột *Tổng BHXH NLĐ*/*Tổng BHXH DN* và *Tổng nộp BHXH* (= hai cột đó cộng lại) không gồm các khoản này, còn *Tổng NLĐ*/*Tổng DN*/*Tổng cộng* vẫn là tổng đầy đủ (gồm cả Công đoàn).
+- **Công đoàn:** khoản có *Chỉ áp dụng đoàn viên công đoàn = Có* (ví dụ đoàn phí) chỉ tính cho NV có *Tham gia công đoàn = Có*. Kinh phí công đoàn (DN) tính cho tất cả NV thuộc mã phân loại có khoản đó. Ở *Báo cáo → Bảng tính nộp BHXH*, các khoản đánh dấu *Thuộc quỹ Công đoàn* được tách ra cột riêng ở cuối bảng, chỉ để tham khảo; cột *Tổng BHXH NLĐ*/*Tổng BHXH DN* và *Tổng nộp BHXH* (= hai cột đó cộng lại) **không gồm** các khoản Công đoàn – đây là số dùng để nộp cơ quan BHXH. Tổng đầy đủ có gộp Công đoàn (Tổng NLĐ/Tổng DN/Tổng cộng) nay xem ở tab **Báo cáo chi phí** (mục 6b).
 - **Làm tròn:** từng khoản của từng NV làm tròn đến 1 đồng. Tổng bằng cộng các số đã làm tròn.
 - **Lương tối thiểu vùng:** NV có lương đóng thấp hơn mức ở *Thông tin chung* sẽ bị **cảnh báo**. App không tự sửa số.
 - **Truy thu/thoái thu** = Σ các tháng [tiền theo lương mới − tiền theo lương cũ], dùng tỉ lệ và mức trần của **chính tháng đó**. Số âm là thoái thu.
@@ -130,16 +130,23 @@ Người **Nhập liệu** chỉ nhập/xuất được hồ sơ mình quản l�
 
 **Các trường số tiền** (Mức lương chính, PC…, Mức tối đa, Lương đóng cũ/mới ở Truy thu) hiển thị có phân tách hàng ngàn khi nhập trên web app (gõ số, ứng dụng tự thêm dấu chấm).
 
+## 6b. Bảng tính nộp BHXH và Báo cáo chi phí
+
+Từ bản cập nhật này, *Báo cáo* có 2 tab tách vai trò rõ ràng:
+
+- **Bảng tính nộp BHXH** (trước gọi là Bảng tính chi tiết): tập trung vào số liệu **nộp cơ quan BHXH**. Cột định danh dùng **Chức danh** thay cho Mã số BHXH. Các số *Truy thu (NLĐ + DN)* và *Tổng nộp cơ quan BHXH* ở phần thống kê, cũng như bảng "Truy thu/Thoái thu BHXH trong kỳ", chỉ gồm BHXH NLĐ + BHXH DN — **không** gồm Đoàn phí/Kinh phí công đoàn. Phần truy thu/thoái thu của Công đoàn nay chỉ xem ở tab **Công đoàn** (mục 7).
+- **Báo cáo chi phí**: tab mới, liệt kê theo từng nhân viên **Tổng BHXH NLĐ**, **Tổng BHXH DN**, **Tổng nộp BHXH**, **DPCD_NLD**, **KPCD_DN**, **Tổng NLĐ**, **Tổng DN**, **Tổng cộng** — dùng khi cần xem đầy đủ chi phí (gồm cả Công đoàn) phải trả cho từng người, ví dụ để hạch toán chi phí nhân sự. Có tìm kiếm/lọc mã PL và xuất Excel/PDF như các tab khác.
+
 ## 7. Phân tách quỹ Công đoàn theo kỳ
 
 1. Vào **Thiết lập → Khoản trích đóng**, sửa khoản **Đoàn phí công đoàn (NLĐ)** và **Kinh phí công đoàn (DN)** (hoặc khoản tương đương do bạn đặt), chọn **"Thuộc quỹ Công đoàn" = Có**. Đây là dấu hiệu để ứng dụng biết khoản nào tính vào quỹ Công đoàn – không phụ thuộc tên/mã khoản.
 2. Vào **Thiết lập → Tỉ lệ Công đoàn**, thêm **hai** tỉ lệ giữ lại riêng: một cho **Đoàn phí công đoàn (NLĐ)**, một cho **Kinh phí công đoàn (DN)**, cùng **Ngày hiệu lực**. Tỉ lệ nộp Công đoàn Việt Nam của mỗi bên tự tính = 100% − tỉ lệ giữ lại tương ứng.
    - Giống tab Khoản trích đóng: mỗi khi tỉ lệ thay đổi, bấm **"＋ Thêm phiên bản"** để thêm dòng mới với ngày hiệu lực mới, **không sửa dòng cũ**. Mỗi kỳ tự dùng đúng tỉ lệ có hiệu lực tại tháng đó (dòng có ngày hiệu lực gần nhất nhưng ≤ cuối tháng), nên kỳ cũ luôn giữ đúng tỉ lệ tại thời điểm đó dù sau này tỉ lệ có đổi.
-3. Vào **Báo cáo → Công đoàn**, chọn **kỳ** để xem bảng chi tiết theo từng nhân viên, nhóm theo phòng ban (giống cấu trúc *Bảng tính chi tiết*): Lương đóng, Đoàn phí NLĐ (thu/giữ lại/nộp), Kinh phí công đoàn DN (thu/giữ lại/nộp), tổng giữ lại và tổng nộp Công đoàn Việt Nam. Có thể tìm theo mã NV/họ tên, lọc theo mã PL, và xuất Excel/PDF.
+3. Vào **Báo cáo → Công đoàn**, chọn **kỳ** để xem bảng chi tiết theo từng nhân viên, nhóm theo phòng ban (giống cấu trúc *Bảng tính nộp BHXH*): Lương đóng, Đoàn phí NLĐ (thu/giữ lại/nộp), Kinh phí công đoàn DN (thu/giữ lại/nộp), tổng giữ lại và tổng nộp Công đoàn Việt Nam. Có thể tìm theo mã NV/họ tên, lọc theo mã PL, và xuất Excel/PDF.
 
-## 8. Tìm kiếm và lọc ở Bảng tính chi tiết / Công đoàn
+## 8. Tìm kiếm và lọc ở Bảng tính nộp BHXH / Báo cáo chi phí / Công đoàn
 
-Hai màn hình này có thêm:
+Các màn hình này có thêm:
 - **Ô tìm kiếm**: gõ mã NV hoặc họ tên để lọc nhanh (không phân biệt hoa/thường).
 - **Lọc theo Mã PL**: chỉ xem nhân viên thuộc một mã phân loại.
 
@@ -153,9 +160,9 @@ Kết quả tính ở màn hình **Truy thu** được tách thành 4 phần vì
 - **Đoàn phí Công đoàn (NLĐ)**: tách tiếp thành **Giữ lại cơ sở** / **Nộp Công đoàn Việt Nam**, theo đúng tỉ lệ có hiệu lực của **từng tháng** trong khoảng truy thu (xem mục 7).
 - **Kinh phí Công đoàn (DN)**: tương tự, tách Giữ lại / Nộp theo tỉ lệ DN.
 
-*Tổng NLĐ* = BHXH NLĐ + Đoàn phí; *Tổng DN* = BHXH DN + Kinh phí — vẫn giữ như cột tổng trước đây để đối chiếu. Việc tách này áp dụng cho cả bảng trên màn hình Truy thu, bảng "Truy thu/Thoái thu trong kỳ" ở Bảng tính chi tiết, và file xuất Excel/PDF.
+*Tổng NLĐ* = BHXH NLĐ + Đoàn phí; *Tổng DN* = BHXH DN + Kinh phí — dùng để đối chiếu chi phí đầy đủ (xem tab **Báo cáo chi phí**, mục 6b). Bảng "Truy thu/Thoái thu BHXH trong kỳ" ở tab **Bảng tính nộp BHXH** và file xuất Excel/PDF của tab này chỉ hiện **BHXH NLĐ / BHXH DN** (số nộp cơ quan BHXH); phần Đoàn phí/Kinh phí công đoàn của truy thu xem ở tab **Công đoàn**.
 
-## 9. Lưu ý
+## 10. Lưu ý
 
 - **Sửa tay trên Google Sheet:** Nhân viên, Kỳ BHXH, Truy thu, và mọi tính toán/báo cáo luôn đọc dữ liệu **mới nhất** từ Sheet mỗi lần bạn mở màn hình đó hoặc bấm Tính — sửa tay xong là có tác dụng ngay. Riêng 5 danh mục **Khoản trích đóng, Mã phân loại, Tỉ lệ Công đoàn, Phòng ban, Thông tin chung** chỉ được tải **một lần lúc mở trang** để dùng cho dropdown; sửa tay trên Sheet sẽ không hiện ngay trên các màn hình đó. Bấm nút **"🔄 Làm mới dữ liệu"** ở góc trên (hoặc tải lại trang F5) để nạp lại.
 - Không đổi tên các tab và tiêu đề cột. Có thể thêm cột riêng ở cuối, app sẽ bỏ qua các cột đó.
