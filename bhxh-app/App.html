@@ -5,7 +5,7 @@
 const S = {
   user: null, info: {}, kys: [], khoan: [], mapl: [], phongBan: [], lists: {}, today: '',
   view: 'tongquan', nvKy: null, nvData: null, ttKy: null, ttData: null,
-  rpTab: 'chitiet', rpKy: null, rpNam: null, rpData: null, setTab: 'info', pq: [], impTab: 'paste'
+  rpTab: 'chitiet', rpKy: null, rpTuKy: null, rpDenKy: null, rpData: null, setTab: 'info', pq: [], impTab: 'paste'
 };
 const $ = (id) => document.getElementById(id);
 const V = () => $('view');
@@ -157,18 +157,26 @@ async function vTongQuan() {
       <div class="stats">
         <div class="stat"><div class="lbl">NV đóng BHXH</div><div class="val">${fmt(last.soDong)}<span class="muted small"> / ${fmt(last.soNV)}</span></div></div>
         <div class="stat"><div class="lbl">Quỹ lương đóng</div><div class="val">${fmt(last.quyLuong)}</div></div>
-        <div class="stat"><div class="lbl">NLĐ đóng</div><div class="val">${fmt(last.nld)}</div></div>
-        <div class="stat"><div class="lbl">DN đóng</div><div class="val">${fmt(last.dn)}</div></div>
-        <div class="stat"><div class="lbl">Truy thu / thoái thu</div><div class="val">${fmt(last.ttNLD + last.ttDN)}</div></div>
-        <div class="stat"><div class="lbl">Tổng phải nộp</div><div class="val">${fmt(last.tong)}</div></div>
+        <div class="stat"><div class="lbl">Tổng BHXH NLĐ</div><div class="val">${fmt(last.tongNLDChinh)}</div></div>
+        <div class="stat"><div class="lbl">Tổng BHXH DN</div><div class="val">${fmt(last.tongDNChinh)}</div></div>
+        <div class="stat"><div class="lbl">Tổng nộp BHXH</div><div class="val">${fmt(last.tongNopBHXH)}</div></div>
+        <div class="stat"><div class="lbl">DPCD_NLD</div><div class="val">${fmt(last.cdNLD)}</div></div>
+        <div class="stat"><div class="lbl">KPCD_DN</div><div class="val">${fmt(last.cdDN)}</div></div>
+        <div class="stat"><div class="lbl">Tổng cộng</div><div class="val">${fmt(last.tongCong)}</div></div>
+        <div class="stat"><div class="lbl">Truy thu BHXH</div><div class="val">${fmt(last.ttBhxh)}</div></div>
+        <div class="stat"><div class="lbl">Truy thu Công đoàn</div><div class="val">${fmt(last.ttCd)}</div></div>
+        <div class="stat"><div class="lbl">Tổng nộp cơ quan BHXH</div><div class="val">${fmt(last.tongNopCoQuanBHXH)}</div></div>
         <div class="stat"><div class="lbl">NV có cảnh báo</div><div class="val" style="color:${last.soCanhBao ? 'var(--bad)' : 'inherit'}">${fmt(last.soCanhBao)}</div></div>
       </div>
       <div class="card"><h3>Các kỳ gần đây</h3><div class="tbl-wrap"><table><thead><tr>
-        <th>Kỳ</th><th>Trạng thái</th><th class="num">NV đóng</th><th class="num">Quỹ lương</th><th class="num">NLĐ</th>
-        <th class="num">DN</th><th class="num">Truy thu</th><th class="num">Tổng phải nộp</th></tr></thead><tbody>
+        <th>Kỳ</th><th>Trạng thái</th><th class="num">NV đóng</th><th class="num">Quỹ lương</th><th class="num">Tổng BHXH NLĐ</th>
+        <th class="num">Tổng BHXH DN</th><th class="num">Tổng nộp BHXH</th><th class="num">DPCD_NLD</th><th class="num">KPCD_DN</th>
+        <th class="num">Tổng cộng</th><th class="num">Truy thu BHXH</th><th class="num">Truy thu CĐ</th><th class="num">Tổng nộp cơ quan BHXH</th></tr></thead><tbody>
         ${list.map((k) => `<tr><td><b>${fmtM(k.ky)}</b></td><td>${kyBadge(k.trangThai)} ${k.daTinh ? '' : '<span class="badge warn">Chưa tính</span>'}</td>
-          <td class="num">${fmt(k.soDong)}</td><td class="num">${fmt(k.quyLuong)}</td><td class="num">${fmt(k.nld)}</td>
-          <td class="num">${fmt(k.dn)}</td><td class="num">${fmt(k.ttNLD + k.ttDN)}</td><td class="num"><b>${fmt(k.tong)}</b></td></tr>`).join('')}
+          <td class="num">${fmt(k.soDong)}</td><td class="num">${fmt(k.quyLuong)}</td><td class="num">${fmt(k.tongNLDChinh)}</td>
+          <td class="num">${fmt(k.tongDNChinh)}</td><td class="num">${fmt(k.tongNopBHXH)}</td><td class="num">${fmt(k.cdNLD)}</td><td class="num">${fmt(k.cdDN)}</td>
+          <td class="num">${fmt(k.tongCong)}</td><td class="num">${fmt(k.ttBhxh)}</td><td class="num">${fmt(k.ttCd)}</td>
+          <td class="num"><b>${fmt(k.tongNopCoQuanBHXH)}</b></td></tr>`).join('')}
       </tbody></table></div></div>`;
   }
   h += `<div class="card"><h3>Quy trình hằng tháng</h3><ol class="steps">
@@ -540,17 +548,20 @@ function ttDel(id) {
 // =====================================================================
 function vBaoCao() {
   if (!S.rpKy) S.rpKy = latestKy();
-  if (!S.rpNam) S.rpNam = (latestKy() || S.today).slice(0, 4);
   const tab = (k, t) => `<button class="${S.rpTab === k ? 'active' : ''}" onclick="S.rpTab='${k}';vBaoCao()">${t}</button>`;
-  V().innerHTML = `<h2>Báo cáo</h2><div class="tabs">${tab('chitiet', 'Bảng tính nộp BHXH')}${tab('chiphi', 'Báo cáo chi phí')}${tab('biendong', 'Biến động tăng/giảm')}${tab('tonghop', 'Tổng hợp năm')}${tab('congdoan', 'Công đoàn')}</div>
+  V().innerHTML = `<h2>Báo cáo</h2><div class="tabs">${tab('chitiet', 'Bảng tính nộp BHXH')}${tab('chiphi', 'Báo cáo chi phí')}${tab('biendong', 'Biến động tăng/giảm')}${tab('tonghop', 'Tổng hợp')}${tab('congdoan', 'Công đoàn')}</div>
     <div id="rpBar" class="card no-print"></div><div id="rpBody"></div>`;
   if (!S.kys.length) { $('rpBar').innerHTML = 'Chưa có kỳ BHXH nào.'; return; }
   const exp = (loai, p) => `<button class="btn" onclick="xuat('${loai}','${p}','xlsx')">⬇ Excel</button>
     <button class="btn" onclick="xuat('${loai}','${p}','pdf')">⬇ PDF</button>`;
   if (S.rpTab === 'tonghop') {
-    const years = [...new Set(S.kys.map((k) => k.ky.slice(0, 4)))];
-    $('rpBar').innerHTML = `<div class="row"><select onchange="S.rpNam=this.value;vBaoCao()">${opt(years, S.rpNam)}</select>
-      <span class="spacer"></span>${exp('tonghop', S.rpNam)}</div>`;
+    if (!S.rpTuKy) S.rpTuKy = S.kys[S.kys.length - 1].ky;
+    if (!S.rpDenKy) S.rpDenKy = S.kys[0].ky;
+    $('rpBar').innerHTML = `<div class="row"><label class="small">Từ kỳ
+        <input type="month" id="rpTuKy" value="${S.rpTuKy}" onchange="S.rpTuKy=this.value;vBaoCao()"></label>
+      <label class="small">Đến kỳ
+        <input type="month" id="rpDenKy" value="${S.rpDenKy}" onchange="S.rpDenKy=this.value;vBaoCao()"></label>
+      <span class="spacer"></span>${exp('tonghop', S.rpTuKy + '|' + S.rpDenKy)}</div>`;
     rpTongHop();
   } else {
     const showFilter = S.rpTab === 'chitiet' || S.rpTab === 'chiphi' || S.rpTab === 'congdoan';
@@ -627,6 +638,20 @@ function renderCongDoan() {
   });
   body += `<tr class="total"><td colspan="5">TỔNG CỘNG</td>${cellsSum(rows)}</tr>`;
   h += `<div class="card"><div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div></div>`;
+  if (d.truyThu && d.truyThu.length) {
+    const sumTT = (f) => d.truyThu.reduce((s, t) => s + (Number(f(t)) || 0), 0);
+    h += `<div class="card"><h3>Truy thu / Thoái thu Công đoàn trong kỳ</h3><div class="tbl-wrap"><table><thead><tr><th>Mã NV</th><th>Họ và tên</th>
+      <th>Từ – Đến</th><th class="num">Lương cũ</th><th class="num">Lương mới</th>
+      <th class="num">Đoàn phí – giữ lại (NLĐ)</th><th class="num">Đoàn phí – nộp CĐVN (NLĐ)</th>
+      <th class="num">Kinh phí – giữ lại (DN)</th><th class="num">Kinh phí – nộp CĐVN (DN)</th><th>Chi tiết</th></tr></thead><tbody>
+      ${d.truyThu.map((t) => `<tr><td>${esc(t.maNV)}</td><td>${esc(t.hoTen)}</td><td>${fmtM(t.tuThang)} – ${fmtM(t.denThang)}</td>
+        <td class="num">${fmt(t.luongCu)}</td><td class="num">${fmt(t.luongMoi)}</td>
+        <td class="num">${fmt(t.dpcdGiuLai)}</td><td class="num">${fmt(t.dpcdNop)}</td>
+        <td class="num">${fmt(t.kpcdGiuLai)}</td><td class="num">${fmt(t.kpcdNop)}</td><td class="small">${esc(t.chiTiet)}</td></tr>`).join('')}
+      <tr class="total"><td colspan="5">TỔNG</td>
+        <td class="num">${fmt(sumTT((t) => t.dpcdGiuLai))}</td><td class="num">${fmt(sumTT((t) => t.dpcdNop))}</td>
+        <td class="num">${fmt(sumTT((t) => t.kpcdGiuLai))}</td><td class="num">${fmt(sumTT((t) => t.kpcdNop))}</td><td></td></tr></tbody></table></div></div>`;
+  }
   $('rpBody').innerHTML = h;
 }
 async function rpChiTiet() {
@@ -765,6 +790,26 @@ function renderChiPhi() {
   });
   body += `<tr class="total"><td colspan="5">TỔNG CỘNG</td>${cellsSum(rows)}</tr>`;
   h += `<div class="card"><div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div></div>`;
+  if (d.truyThu.length) {
+    const sumTT = (f) => d.truyThu.reduce((s, t) => s + (Number(f(t)) || 0), 0);
+    h += `<div class="card"><h3>Truy thu / Thoái thu trong kỳ <span class="muted small">(đầy đủ, gồm cả Công đoàn)</span></h3><div class="tbl-wrap"><table><thead><tr><th>Mã NV</th><th>Họ và tên</th>
+      <th>Từ – Đến</th><th class="num">Lương cũ</th><th class="num">Lương mới</th>
+      <th class="num">BHXH NLĐ</th><th class="num">BHXH DN</th><th class="num">Đoàn phí (giữ lại/nộp)</th><th class="num">Kinh phí (giữ lại/nộp)</th>
+      <th class="num">Tổng NLĐ</th><th class="num">Tổng DN</th><th class="num">Tổng cộng</th><th>Chi tiết</th></tr></thead><tbody>
+      ${d.truyThu.map((t) => `<tr><td>${esc(t.maNV)}</td><td>${esc(t.hoTen)}</td><td>${fmtM(t.tuThang)} – ${fmtM(t.denThang)}</td>
+        <td class="num">${fmt(t.luongCu)}</td><td class="num">${fmt(t.luongMoi)}</td>
+        <td class="num">${fmt(t.bhxhNLD)}</td><td class="num">${fmt(t.bhxhDN)}</td>
+        <td class="num small">${t.dpcd ? fmt(t.dpcdGiuLai) + ' / ' + fmt(t.dpcdNop) : ''}</td>
+        <td class="num small">${t.kpcd ? fmt(t.kpcdGiuLai) + ' / ' + fmt(t.kpcdNop) : ''}</td>
+        <td class="num">${fmt(t.tienNLD)}</td><td class="num">${fmt(t.tienDN)}</td><td class="num"><b>${fmt(t.tienNLD + t.tienDN)}</b></td>
+        <td class="small">${esc(t.chiTiet)}</td></tr>`).join('')}
+      <tr class="total"><td colspan="5">TỔNG</td>
+        <td class="num">${fmt(sumTT((t) => t.bhxhNLD))}</td><td class="num">${fmt(sumTT((t) => t.bhxhDN))}</td>
+        <td class="num small">${fmt(sumTT((t) => t.dpcdGiuLai))} / ${fmt(sumTT((t) => t.dpcdNop))}</td>
+        <td class="num small">${fmt(sumTT((t) => t.kpcdGiuLai))} / ${fmt(sumTT((t) => t.kpcdNop))}</td>
+        <td class="num">${fmt(sumTT((t) => t.tienNLD))}</td><td class="num">${fmt(sumTT((t) => t.tienDN))}</td>
+        <td class="num">${fmt(sumTT((t) => t.tienNLD) + sumTT((t) => t.tienDN))}</td><td></td></tr></tbody></table></div></div>`;
+  }
   $('rpBody').innerHTML = h;
 }
 async function rpBienDong() {
@@ -791,26 +836,58 @@ async function rpBienDong() {
 async function rpTongHop() {
   $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>';
   let d;
-  try { d = await run('apiTongHop', S.rpNam); } catch (e) { $('rpBody').innerHTML = ''; return; }
-  const s = (f) => d.months.reduce((a, m) => a + (Number(f(m)) || 0), 0);
+  try { d = await run('apiTongHop', S.rpTuKy, S.rpDenKy); } catch (e) { $('rpBody').innerHTML = ''; return; }
+  S.rpTuKy = d.tuKy; S.rpDenKy = d.denKy;
+  const tk = $('rpTuKy'), dk = $('rpDenKy');
+  if (tk) tk.value = d.tuKy; if (dk) dk.value = d.denKy;
+  const t = d.total;
   let h = `<div class="stats">
-    <div class="stat"><div class="lbl">Số kỳ trong năm ${d.nam}</div><div class="val">${d.months.length}</div></div>
-    <div class="stat"><div class="lbl">NLĐ đóng cả năm</div><div class="val">${fmt(s((m) => m.nld))}</div></div>
-    <div class="stat"><div class="lbl">DN đóng cả năm</div><div class="val">${fmt(s((m) => m.dn))}</div></div>
-    <div class="stat"><div class="lbl">Truy thu cả năm</div><div class="val">${fmt(s((m) => m.ttNLD + m.ttDN))}</div></div>
-    <div class="stat"><div class="lbl">Tổng phải nộp cả năm</div><div class="val">${fmt(s((m) => m.tong))}</div></div></div>
+    <div class="stat"><div class="lbl">Số kỳ</div><div class="val">${d.months.length}</div></div>
+    <div class="stat"><div class="lbl">Tổng BHXH NLĐ</div><div class="val">${fmt(t.tongNLDChinh)}</div></div>
+    <div class="stat"><div class="lbl">Tổng BHXH DN</div><div class="val">${fmt(t.tongDNChinh)}</div></div>
+    <div class="stat"><div class="lbl">Tổng nộp BHXH</div><div class="val">${fmt(t.tongNopBHXH)}</div></div>
+    <div class="stat"><div class="lbl">DPCD_NLD</div><div class="val">${fmt(t.cdNLD)}</div></div>
+    <div class="stat"><div class="lbl">KPCD_DN</div><div class="val">${fmt(t.cdDN)}</div></div>
+    <div class="stat"><div class="lbl">Tổng cộng</div><div class="val">${fmt(t.tongCong)}</div></div>
+    <div class="stat"><div class="lbl">Truy thu BHXH</div><div class="val">${fmt(t.ttBhxh)}</div></div>
+    <div class="stat"><div class="lbl">Truy thu Công đoàn</div><div class="val">${fmt(t.ttCd)}</div></div>
+    <div class="stat"><div class="lbl">Tổng nộp cơ quan BHXH</div><div class="val">${fmt(t.tongNopCoQuanBHXH)}</div></div></div>
     <div class="card"><h3>Tổng hợp theo tháng</h3><div class="tbl-wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th class="num">NV đóng</th>
-    <th class="num">Quỹ lương đóng</th><th class="num">NLĐ</th><th class="num">DN</th><th class="num">Truy thu NLĐ</th><th class="num">Truy thu DN</th>
-    <th class="num">Tổng phải nộp</th></tr></thead><tbody>
+    <th class="num">Quỹ lương đóng</th><th class="num">Tổng BHXH NLĐ</th><th class="num">Tổng BHXH DN</th><th class="num">Tổng nộp BHXH</th>
+    <th class="num">DPCD_NLD</th><th class="num">KPCD_DN</th><th class="num">Tổng NLĐ</th><th class="num">Tổng DN</th><th class="num">Tổng cộng</th>
+    <th class="num">Truy thu BHXH</th><th class="num">Truy thu Công đoàn</th><th class="num">Tổng nộp cơ quan BHXH</th></tr></thead><tbody>
     ${d.months.map((m) => `<tr><td><b>${fmtM(m.ky)}</b></td><td>${kyBadge(m.trangThai)} ${m.daTinh ? '' : '<span class="badge warn">Chưa tính</span>'}</td>
-      <td class="num">${fmt(m.soDong)}</td><td class="num">${fmt(m.quyLuong)}</td><td class="num">${fmt(m.nld)}</td><td class="num">${fmt(m.dn)}</td>
-      <td class="num">${fmt(m.ttNLD)}</td><td class="num">${fmt(m.ttDN)}</td><td class="num"><b>${fmt(m.tong)}</b></td></tr>`).join('')}
-    <tr class="total"><td colspan="3">CẢ NĂM</td><td class="num">${fmt(s((m) => m.quyLuong))}</td><td class="num">${fmt(s((m) => m.nld))}</td>
-      <td class="num">${fmt(s((m) => m.dn))}</td><td class="num">${fmt(s((m) => m.ttNLD))}</td><td class="num">${fmt(s((m) => m.ttDN))}</td>
-      <td class="num">${fmt(s((m) => m.tong))}</td></tr></tbody></table></div></div>`;
+      <td class="num">${fmt(m.soDong)}</td><td class="num">${fmt(m.quyLuong)}</td>
+      <td class="num">${fmt(m.tongNLDChinh)}</td><td class="num">${fmt(m.tongDNChinh)}</td><td class="num">${fmt(m.tongNopBHXH)}</td>
+      <td class="num">${fmt(m.cdNLD)}</td><td class="num">${fmt(m.cdDN)}</td>
+      <td class="num">${fmt(m.tongNLD)}</td><td class="num">${fmt(m.tongDN)}</td><td class="num">${fmt(m.tongCong)}</td>
+      <td class="num">${fmt(m.ttBhxh)}</td><td class="num">${fmt(m.ttCd)}</td><td class="num"><b>${fmt(m.tongNopCoQuanBHXH)}</b></td></tr>`).join('')}
+    <tr class="total"><td colspan="3">CẢ KỲ</td><td class="num">${fmt(t.quyLuong)}</td>
+      <td class="num">${fmt(t.tongNLDChinh)}</td><td class="num">${fmt(t.tongDNChinh)}</td><td class="num">${fmt(t.tongNopBHXH)}</td>
+      <td class="num">${fmt(t.cdNLD)}</td><td class="num">${fmt(t.cdDN)}</td>
+      <td class="num">${fmt(t.tongNLD)}</td><td class="num">${fmt(t.tongDN)}</td><td class="num">${fmt(t.tongCong)}</td>
+      <td class="num">${fmt(t.ttBhxh)}</td><td class="num">${fmt(t.ttCd)}</td><td class="num"><b>${fmt(t.tongNopCoQuanBHXH)}</b></td></tr>
+    </tbody></table></div></div>`;
+  if (d.phongBan.length) {
+    h += `<div class="card"><h3>Tổng hợp theo phòng ban <span class="muted small">(cả khoảng thời gian đã chọn)</span></h3><div class="tbl-wrap"><table><thead><tr>
+      <th>Phòng ban</th><th class="num">Tổng BHXH NLĐ</th><th class="num">Tổng BHXH DN</th><th class="num">Tổng nộp BHXH</th>
+      <th class="num">DPCD_NLD</th><th class="num">KPCD_DN</th><th class="num">Tổng NLĐ</th><th class="num">Tổng DN</th><th class="num">Tổng cộng</th>
+      <th class="num">Truy thu BHXH</th><th class="num">Truy thu Công đoàn</th></tr></thead><tbody>
+      ${d.phongBan.map((b) => `<tr><td>${esc(b.phongBan)}</td>
+        <td class="num">${fmt(b.tongNLDChinh)}</td><td class="num">${fmt(b.tongDNChinh)}</td><td class="num">${fmt(b.tongNopBHXH)}</td>
+        <td class="num">${fmt(b.cdNLD)}</td><td class="num">${fmt(b.cdDN)}</td>
+        <td class="num">${fmt(b.tongNLD)}</td><td class="num">${fmt(b.tongDN)}</td><td class="num"><b>${fmt(b.tongCong)}</b></td>
+        <td class="num">${fmt(b.ttBhxh)}</td><td class="num">${fmt(b.ttCd)}</td></tr>`).join('')}
+      <tr class="total"><td>TỔNG CỘNG</td>
+        <td class="num">${fmt(t.tongNLDChinh)}</td><td class="num">${fmt(t.tongDNChinh)}</td><td class="num">${fmt(t.tongNopBHXH)}</td>
+        <td class="num">${fmt(t.cdNLD)}</td><td class="num">${fmt(t.cdDN)}</td>
+        <td class="num">${fmt(t.tongNLD)}</td><td class="num">${fmt(t.tongDN)}</td><td class="num">${fmt(t.tongCong)}</td>
+        <td class="num">${fmt(t.ttBhxh)}</td><td class="num">${fmt(t.ttCd)}</td></tr>
+      </tbody></table></div></div>`;
+  }
   if (d.codes.length) {
     h += `<div class="card"><h3>Chi tiết theo khoản trích <span class="muted small">(không gồm truy thu)</span></h3><div class="tbl-wrap"><table><thead><tr>
-      <th>Khoản</th><th>Đối tượng</th>${d.months.map((m) => `<th class="num">${fmtM(m.ky)}</th>`).join('')}<th class="num">Cả năm</th></tr></thead><tbody>
+      <th>Khoản</th><th>Đối tượng</th>${d.months.map((m) => `<th class="num">${fmtM(m.ky)}</th>`).join('')}<th class="num">Cả kỳ</th></tr></thead><tbody>
       ${d.codes.map((c) => { const v = d.months.map((m) => m.items[c.ma] || 0);
         return `<tr><td><b>${esc(c.ma)}</b><br><span class="small muted">${esc(c.ten)}</span></td><td>${esc(c.doiTuong)}</td>
         ${v.map((x) => `<td class="num">${fmt(x)}</td>`).join('')}<td class="num"><b>${fmt(v.reduce((a, b) => a + b, 0))}</b></td></tr>`; }).join('')}

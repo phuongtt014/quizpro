@@ -135,14 +135,25 @@ Người **Nhập liệu** chỉ nhập/xuất được hồ sơ mình quản l�
 Từ bản cập nhật này, *Báo cáo* có 2 tab tách vai trò rõ ràng:
 
 - **Bảng tính nộp BHXH** (trước gọi là Bảng tính chi tiết): tập trung vào số liệu **nộp cơ quan BHXH**. Cột định danh dùng **Chức danh** thay cho Mã số BHXH. Các số *Truy thu (NLĐ + DN)* và *Tổng nộp cơ quan BHXH* ở phần thống kê, cũng như bảng "Truy thu/Thoái thu BHXH trong kỳ", chỉ gồm BHXH NLĐ + BHXH DN — **không** gồm Đoàn phí/Kinh phí công đoàn. Phần truy thu/thoái thu của Công đoàn nay chỉ xem ở tab **Công đoàn** (mục 7).
-- **Báo cáo chi phí**: tab mới, liệt kê theo từng nhân viên **Tổng BHXH NLĐ**, **Tổng BHXH DN**, **Tổng nộp BHXH**, **DPCD_NLD**, **KPCD_DN**, **Tổng NLĐ**, **Tổng DN**, **Tổng cộng** — dùng khi cần xem đầy đủ chi phí (gồm cả Công đoàn) phải trả cho từng người, ví dụ để hạch toán chi phí nhân sự. Có tìm kiếm/lọc mã PL và xuất Excel/PDF như các tab khác.
+- **Báo cáo chi phí**: tab mới, liệt kê theo từng nhân viên **Tổng BHXH NLĐ**, **Tổng BHXH DN**, **Tổng nộp BHXH**, **DPCD_NLD**, **KPCD_DN**, **Tổng NLĐ**, **Tổng DN**, **Tổng cộng** — dùng khi cần xem đầy đủ chi phí (gồm cả Công đoàn) phải trả cho từng người, ví dụ để hạch toán chi phí nhân sự. Có thêm bảng **Truy thu/Thoái thu trong kỳ (đầy đủ, gồm cả Công đoàn)** bên dưới, tách BHXH NLĐ/DN và Đoàn phí/Kinh phí (giữ lại/nộp). Có tìm kiếm/lọc mã PL và xuất Excel/PDF như các tab khác.
+
+## 6c. Tổng quan và Tổng hợp – thống nhất theo cấu trúc chi phí
+
+Màn hình **Tổng quan** (trang chủ) và tab **Báo cáo → Tổng hợp** (trước gọi là "Tổng hợp năm") nay dùng chung cấu trúc cột với **Báo cáo chi phí**: Tổng BHXH NLĐ, Tổng BHXH DN, Tổng nộp BHXH, DPCD_NLD, KPCD_DN, Tổng NLĐ, Tổng DN, Tổng cộng — cộng thêm 2 cột truy thu tách riêng: **Truy thu BHXH** (BHXH NLĐ + DN) và **Truy thu Công đoàn** (Đoàn phí + Kinh phí), vì hai quỹ này hạch toán và nộp về hai nơi khác nhau.
+
+- **Tổng quan**: hiện số liệu kỳ mới nhất và bảng các kỳ gần đây theo cấu trúc trên.
+- **Tổng hợp**: thay vì chỉ chọn theo **năm**, nay chọn khoảng thời gian linh hoạt bằng 2 ô **"Từ kỳ"** / **"Đến kỳ"** (chọn tháng/năm), cho phép xem một khoảng bất kỳ (ví dụ nửa năm, năm tài chính không trùng năm dương lịch…). Gồm 3 bảng:
+  1. **Tổng hợp theo tháng** trong khoảng đã chọn, có dòng "CẢ KỲ".
+  2. **Tổng hợp theo phòng ban** (mới) – cộng dồn cả khoảng thời gian đã chọn theo từng phòng ban, cùng cấu trúc cột như trên.
+  3. **Chi tiết theo khoản trích** (không gồm truy thu), theo từng tháng.
+  Nút xuất Excel/PDF xuất đủ cả 3 bảng.
 
 ## 7. Phân tách quỹ Công đoàn theo kỳ
 
 1. Vào **Thiết lập → Khoản trích đóng**, sửa khoản **Đoàn phí công đoàn (NLĐ)** và **Kinh phí công đoàn (DN)** (hoặc khoản tương đương do bạn đặt), chọn **"Thuộc quỹ Công đoàn" = Có**. Đây là dấu hiệu để ứng dụng biết khoản nào tính vào quỹ Công đoàn – không phụ thuộc tên/mã khoản.
 2. Vào **Thiết lập → Tỉ lệ Công đoàn**, thêm **hai** tỉ lệ giữ lại riêng: một cho **Đoàn phí công đoàn (NLĐ)**, một cho **Kinh phí công đoàn (DN)**, cùng **Ngày hiệu lực**. Tỉ lệ nộp Công đoàn Việt Nam của mỗi bên tự tính = 100% − tỉ lệ giữ lại tương ứng.
    - Giống tab Khoản trích đóng: mỗi khi tỉ lệ thay đổi, bấm **"＋ Thêm phiên bản"** để thêm dòng mới với ngày hiệu lực mới, **không sửa dòng cũ**. Mỗi kỳ tự dùng đúng tỉ lệ có hiệu lực tại tháng đó (dòng có ngày hiệu lực gần nhất nhưng ≤ cuối tháng), nên kỳ cũ luôn giữ đúng tỉ lệ tại thời điểm đó dù sau này tỉ lệ có đổi.
-3. Vào **Báo cáo → Công đoàn**, chọn **kỳ** để xem bảng chi tiết theo từng nhân viên, nhóm theo phòng ban (giống cấu trúc *Bảng tính nộp BHXH*): Lương đóng, Đoàn phí NLĐ (thu/giữ lại/nộp), Kinh phí công đoàn DN (thu/giữ lại/nộp), tổng giữ lại và tổng nộp Công đoàn Việt Nam. Có thể tìm theo mã NV/họ tên, lọc theo mã PL, và xuất Excel/PDF.
+3. Vào **Báo cáo → Công đoàn**, chọn **kỳ** để xem bảng chi tiết theo từng nhân viên, nhóm theo phòng ban (giống cấu trúc *Bảng tính nộp BHXH*): Lương đóng, Đoàn phí NLĐ (thu/giữ lại/nộp), Kinh phí công đoàn DN (thu/giữ lại/nộp), tổng giữ lại và tổng nộp Công đoàn Việt Nam. Có thể tìm theo mã NV/họ tên, lọc theo mã PL, và xuất Excel/PDF. Nếu trong kỳ có phát sinh **Truy thu/Thoái thu** ảnh hưởng Đoàn phí/Kinh phí công đoàn, bảng **Truy thu/Thoái thu Công đoàn trong kỳ** sẽ hiện thêm bên dưới (giữ lại/nộp Công đoàn Việt Nam theo đúng tỉ lệ hiệu lực từng tháng).
 
 ## 8. Tìm kiếm và lọc ở Bảng tính nộp BHXH / Báo cáo chi phí / Công đoàn
 
