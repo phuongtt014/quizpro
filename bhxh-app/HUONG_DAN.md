@@ -137,13 +137,15 @@ Từ bản cập nhật này, *Báo cáo* có 2 tab tách vai trò rõ ràng:
 - **Bảng tính nộp BHXH** (trước gọi là Bảng tính chi tiết): tập trung vào số liệu **nộp cơ quan BHXH**. Cột định danh dùng **Chức danh** thay cho Mã số BHXH. Các số *Truy thu (NLĐ + DN)* và *Tổng nộp cơ quan BHXH* ở phần thống kê, cũng như bảng "Truy thu/Thoái thu BHXH trong kỳ", chỉ gồm BHXH NLĐ + BHXH DN — **không** gồm Đoàn phí/Kinh phí công đoàn. Phần truy thu/thoái thu của Công đoàn nay chỉ xem ở tab **Công đoàn** (mục 7).
 - **Báo cáo chi phí**: tab mới, liệt kê theo từng nhân viên **Tổng BHXH NLĐ**, **Tổng BHXH DN**, **Tổng nộp BHXH**, **DPCD_NLD**, **KPCD_DN**, **Tổng NLĐ**, **Tổng DN**, **Tổng cộng** — dùng khi cần xem đầy đủ chi phí (gồm cả Công đoàn) phải trả cho từng người, ví dụ để hạch toán chi phí nhân sự. Có thêm bảng **Truy thu/Thoái thu trong kỳ (đầy đủ, gồm cả Công đoàn)** bên dưới, tách BHXH NLĐ/DN và Đoàn phí/Kinh phí (giữ lại/nộp). Có tìm kiếm/lọc mã PL và xuất Excel/PDF như các tab khác.
 
+Ở cả tab **Công đoàn** và **Báo cáo chi phí**, nếu trong kỳ có Truy thu/Thoái thu, bảng chính (theo từng nhân viên) sẽ có thêm 2 dòng ngay dưới dòng **TỔNG CỘNG**: dòng **"Truy thu / Thoái thu"** (tổng phát sinh truy thu trong kỳ) và dòng **"TỔNG CỘNG SAU TRUY THU"** (= TỔNG CỘNG + Truy thu, theo từng cột). Áp dụng cho cả màn hình xem và file xuất Excel/PDF.
+
 ## 6c. Tổng quan và Tổng hợp – thống nhất theo cấu trúc chi phí
 
 Màn hình **Tổng quan** (trang chủ) và tab **Báo cáo → Tổng hợp** (trước gọi là "Tổng hợp năm") nay dùng chung cấu trúc cột với **Báo cáo chi phí**: Tổng BHXH NLĐ, Tổng BHXH DN, Tổng nộp BHXH, DPCD_NLD, KPCD_DN, Tổng NLĐ, Tổng DN, Tổng cộng — cộng thêm 2 cột truy thu tách riêng: **Truy thu BHXH** (BHXH NLĐ + DN) và **Truy thu Công đoàn** (Đoàn phí + Kinh phí), vì hai quỹ này hạch toán và nộp về hai nơi khác nhau.
 
 - **Tổng quan**: hiện số liệu kỳ mới nhất và bảng các kỳ gần đây theo cấu trúc trên.
 - **Tổng hợp**: thay vì chỉ chọn theo **năm**, nay chọn khoảng thời gian linh hoạt bằng 2 ô **"Từ kỳ"** / **"Đến kỳ"** (chọn tháng/năm), cho phép xem một khoảng bất kỳ (ví dụ nửa năm, năm tài chính không trùng năm dương lịch…). Gồm 3 bảng:
-  1. **Tổng hợp theo tháng** trong khoảng đã chọn, có dòng "CẢ KỲ".
+  1. **Tổng hợp theo tháng** trong khoảng đã chọn, có dòng "CẢ KỲ". Thứ tự cột: Kỳ, Trạng thái, NV đóng, Quỹ lương đóng, Tổng BHXH NLĐ, Truy thu BHXH NLĐ, Tổng BHXH DN, Truy thu BHXH DN, Tổng nộp BHXH, DPCD_NLD, Truy thu DPCD_NLD, Tổng DPCD_NLD, KPCD_DN, Truy thu KPCD_DN, Tổng KPCD_DN, Tổng NLĐ, Tổng DN, Tổng cộng — mỗi khoản chính đi kèm cột Truy thu và cột Tổng (= khoản chính + truy thu) ngay sau nó.
   2. **Tổng hợp theo phòng ban** (mới) – cộng dồn cả khoảng thời gian đã chọn theo từng phòng ban, cùng cấu trúc cột như trên.
   3. **Chi tiết theo khoản trích** (không gồm truy thu), theo từng tháng.
   Nút xuất Excel/PDF xuất đủ cả 3 bảng.

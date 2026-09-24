@@ -1398,7 +1398,19 @@ function buildDoc_(loai, p) {
     });
     const sum = function (col) { return rows.reduce(function (s, r) { return s + (Number(r[col]) || 0); }, 0); };
     const total = ['', '', 'TỔNG CỘNG', '', '', '', sum(6), sum(7), sum(8), sum(9), sum(10), sum(11), sum(12), sum(13), sum(14)];
-    const sections = [{ title: 'Chi phí theo nhân viên (' + dong.length + ' người)', header: header, rows: rows, total: total, numCols: [6, 7, 8, 9, 10, 11, 12, 13, 14] }];
+    const totals = [total];
+    if (d.truyThu.length) {
+      const ttNLD = d.truyThu.reduce(function (s, t) { return s + (t.bhxhNLD || 0); }, 0);
+      const ttDN = d.truyThu.reduce(function (s, t) { return s + (t.bhxhDN || 0); }, 0);
+      const ttCdNLD = d.truyThu.reduce(function (s, t) { return s + (t.dpcd || 0); }, 0);
+      const ttCdDN = d.truyThu.reduce(function (s, t) { return s + (t.kpcd || 0); }, 0);
+      const ttTongNLD = d.truyThu.reduce(function (s, t) { return s + (t.tienNLD || 0); }, 0);
+      const ttTongDN = d.truyThu.reduce(function (s, t) { return s + (t.tienDN || 0); }, 0);
+      totals.push(['', '', 'Truy thu / Thoái thu', '', '', '', '', ttNLD, ttDN, ttNLD + ttDN, ttCdNLD, ttCdDN, ttTongNLD, ttTongDN, ttTongNLD + ttTongDN]);
+      totals.push(['', '', 'TỔNG CỘNG SAU TRUY THU', '', '', '', sum(6), sum(7) + ttNLD, sum(8) + ttDN, sum(9) + ttNLD + ttDN,
+        sum(10) + ttCdNLD, sum(11) + ttCdDN, sum(12) + ttTongNLD, sum(13) + ttTongDN, sum(14) + ttTongNLD + ttTongDN]);
+    }
+    const sections = [{ title: 'Chi phí theo nhân viên (' + dong.length + ' người)', header: header, rows: rows, total: totals, numCols: [6, 7, 8, 9, 10, 11, 12, 13, 14] }];
     if (d.truyThu.length) {
       const h2 = ['STT', 'Mã NV', 'Họ và tên', 'Từ tháng', 'Đến tháng', 'Số tháng', 'Lương cũ', 'Lương mới',
         'BHXH NLĐ', 'BHXH DN', 'DPCD giữ lại', 'DPCD nộp CĐVN', 'KPCD giữ lại', 'KPCD nộp CĐVN', 'Tổng NLĐ', 'Tổng DN', 'Tổng cộng', 'Chi tiết'];
@@ -1432,14 +1444,14 @@ function buildDoc_(loai, p) {
   if (loai === 'tonghop') {
     const pp = String(p || '').split('|');
     const d = apiTongHop(pp[0], pp[1]);
-    const h1 = ['Kỳ', 'Trạng thái', 'Số NV đóng', 'Quỹ lương đóng', 'Tổng BHXH NLĐ', 'Tổng BHXH DN', 'Tổng nộp BHXH',
-      'DPCD_NLD', 'KPCD_DN', 'Tổng NLĐ', 'Tổng DN', 'Tổng cộng', 'Truy thu BHXH', 'Truy thu Công đoàn', 'Tổng nộp cơ quan BHXH'];
+    const h1 = ['Kỳ', 'Trạng thái', 'NV đóng', 'Quỹ lương đóng', 'Tổng BHXH NLĐ', 'Truy thu BHXH NLĐ', 'Tổng BHXH DN', 'Truy thu BHXH DN', 'Tổng nộp BHXH',
+      'DPCD_NLD', 'Truy thu DPCD_NLD', 'Tổng DPCD_NLD', 'KPCD_DN', 'Truy thu KPCD_DN', 'Tổng KPCD_DN', 'Tổng NLĐ', 'Tổng DN', 'Tổng cộng'];
     const r1 = d.months.map(function (m) {
-      return [monthDisp_(m.ky), m.trangThai, m.soDong, m.quyLuong, m.tongNLDChinh, m.tongDNChinh, m.tongNopBHXH,
-        m.cdNLD, m.cdDN, m.tongNLD, m.tongDN, m.tongCong, m.ttBhxh, m.ttCd, m.tongNopCoQuanBHXH];
+      return [monthDisp_(m.ky), m.trangThai, m.soDong, m.quyLuong, m.tongNLDChinh, m.ttBhxhNLD, m.tongDNChinh, m.ttBhxhDN, m.tongNopCoQuanBHXH,
+        m.cdNLD, m.ttCdNLD, m.cdNLD + m.ttCdNLD, m.cdDN, m.ttCdDN, m.cdDN + m.ttCdDN, m.tongNLD, m.tongDN, m.tongCong];
     });
     const s = function (i) { return r1.reduce(function (a, r) { return a + r[i]; }, 0); };
-    const t1 = ['CẢ KỲ', '', s(2), s(3), s(4), s(5), s(6), s(7), s(8), s(9), s(10), s(11), s(12), s(13), s(14)];
+    const t1 = ['CẢ KỲ', '', s(2), s(3), s(4), s(5), s(6), s(7), s(8), s(9), s(10), s(11), s(12), s(13), s(14), s(15), s(16), s(17)];
     const h3 = ['Phòng ban', 'Tổng BHXH NLĐ', 'Tổng BHXH DN', 'Tổng nộp BHXH', 'DPCD_NLD', 'KPCD_DN', 'Tổng NLĐ', 'Tổng DN', 'Tổng cộng',
       'Truy thu BHXH', 'Truy thu Công đoàn'];
     const r3 = d.phongBan.map(function (b) {
@@ -1457,7 +1469,7 @@ function buildDoc_(loai, p) {
     return {
       info: d.info, title: 'TỔNG HỢP BHXH – TỪ ' + monthDisp_(d.tuKy) + ' ĐẾN ' + monthDisp_(d.denKy), fileName: 'BHXH_TongHop_' + d.tuKy + '_' + d.denKy,
       sections: [
-        { title: 'Tổng hợp theo tháng', header: h1, rows: r1, total: t1, numCols: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] },
+        { title: 'Tổng hợp theo tháng', header: h1, rows: r1, total: t1, numCols: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17] },
         { title: 'Tổng hợp theo phòng ban (cả khoảng thời gian)', header: h3, rows: r3, total: t3, numCols: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
         { title: 'Chi tiết theo khoản trích (không gồm truy thu)', header: h2, rows: r2, numCols: nc2 }
       ]
@@ -1475,7 +1487,19 @@ function buildDoc_(loai, p) {
       });
     const s = function (i) { return rows.reduce(function (a, r) { return a + r[i]; }, 0); };
     const total = ['', '', 'TỔNG CỘNG', '', '', '', s(6), s(7), '', s(9), s(10), s(11), '', s(13), s(14)];
-    const sections = [{ title: '', header: header, rows: rows, total: total, numCols: [6, 7, 9, 10, 11, 13, 14] }];
+    const totals = [total];
+    if (d.truyThu.length) {
+      const ttCdNLD = d.truyThu.reduce(function (a, t) { return a + (t.dpcd || 0); }, 0);
+      const ttGiuLaiNLD = d.truyThu.reduce(function (a, t) { return a + (t.dpcdGiuLai || 0); }, 0);
+      const ttNopNLD = d.truyThu.reduce(function (a, t) { return a + (t.dpcdNop || 0); }, 0);
+      const ttCdDN = d.truyThu.reduce(function (a, t) { return a + (t.kpcd || 0); }, 0);
+      const ttGiuLaiDN = d.truyThu.reduce(function (a, t) { return a + (t.kpcdGiuLai || 0); }, 0);
+      const ttNopDN = d.truyThu.reduce(function (a, t) { return a + (t.kpcdNop || 0); }, 0);
+      totals.push(['', '', 'Truy thu / Thoái thu', '', '', '', '', ttCdNLD, '', ttGiuLaiNLD, ttNopNLD, ttCdDN, '', ttGiuLaiDN, ttNopDN]);
+      totals.push(['', '', 'TỔNG CỘNG SAU TRUY THU', '', '', '', s(6), s(7) + ttCdNLD, '', s(9) + ttGiuLaiNLD, s(10) + ttNopNLD,
+        s(11) + ttCdDN, '', s(13) + ttGiuLaiDN, s(14) + ttNopDN]);
+    }
+    const sections = [{ title: '', header: header, rows: rows, total: totals, numCols: [6, 7, 9, 10, 11, 13, 14] }];
     if (d.truyThu.length) {
       const h2 = ['STT', 'Mã NV', 'Họ và tên', 'Từ tháng', 'Đến tháng', 'Số tháng', 'Lương cũ', 'Lương mới',
         'Đoàn phí – giữ lại (NLĐ)', 'Đoàn phí – nộp CĐVN (NLĐ)', 'Kinh phí – giữ lại (DN)', 'Kinh phí – nộp CĐVN (DN)', 'Chi tiết'];
@@ -1509,7 +1533,10 @@ function makeFile_(doc, format) {
     push(s.header); styles.push({ row: grid.length, type: 'head', len: s.header.length });
     const start = grid.length + 1;
     s.rows.forEach(push);
-    if (s.total) { push(s.total); styles.push({ row: grid.length, type: 'total', len: s.header.length }); }
+    if (s.total) {
+      const totals = Array.isArray(s.total[0]) ? s.total : [s.total];
+      totals.forEach(function (t) { push(t); styles.push({ row: grid.length, type: 'total', len: s.header.length }); });
+    }
     const end = grid.length;
     if (end >= start) styles.push({ type: 'num', start: start, end: end, cols: s.numCols || [], len: s.header.length });
     push([]);
