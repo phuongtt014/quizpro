@@ -457,7 +457,8 @@ async function vTruyThu() {
     <span class="spacer"></span><span id="ttAdd"></span></div>
     <div class="small muted" style="margin-top:8px">Dùng cho phát sinh của các tháng đã qua (đã chốt): truy đóng, điều chỉnh lương hồi tố, thoái thu.
     Số tiền = Σ theo từng tháng [tiền tính theo lương mới − tiền tính theo lương cũ], áp dụng tỉ lệ & mức trần của chính tháng đó.
-    Truy đóng cho tháng chưa đóng: để Lương cũ = 0.</div></div>
+    Truy đóng cho tháng chưa đóng: để Lương cũ = 0. Kết quả tách riêng <b>BHXH NLĐ</b> (không gồm đoàn phí), <b>BHXH DN</b> (không gồm kinh phí CĐ),
+    <b>Đoàn phí Công đoàn</b> và <b>Kinh phí Công đoàn</b> (2 khoản CĐ được tách tiếp thành Giữ lại cơ sở / Nộp Công đoàn Việt Nam theo đúng tỉ lệ có hiệu lực từng tháng) vì các khoản này hạch toán chi trả khác nhau.</div></div>
     <div id="ttTbl" class="card muted">Đang tải…</div>`;
   loadTT();
 }
@@ -465,22 +466,33 @@ async function loadTT() {
   try { S.ttData = await run('apiTruyThu', S.ttKy); } catch (e) { $('ttTbl').innerHTML = ''; return; }
   const d = S.ttData;
   $('ttAdd').innerHTML = d.editable ? '<button class="btn pri" onclick="ttForm(null)">＋ Thêm dòng</button>' : kyBadge(d.trangThai);
-  let sN = 0, sD = 0;
+  const sum = (f) => d.rows.reduce((s, r) => s + (Number(f(r)) || 0), 0);
   let h = `<div class="tbl-wrap"><table><thead><tr><th>Loại</th><th>Mã NV</th><th>Họ và tên</th><th>Từ – Đến</th><th class="num">Số tháng</th>
-    <th class="num">Lương cũ</th><th class="num">Lương mới</th><th>Mã PL</th><th class="num">Chênh lệch NLĐ</th><th class="num">Chênh lệch DN</th>
+    <th class="num">Lương cũ</th><th class="num">Lương mới</th><th>Mã PL</th>
+    <th class="num">BHXH NLĐ</th><th class="num">BHXH DN</th>
+    <th class="num">Đoàn phí – Giữ lại</th><th class="num">Đoàn phí – Nộp CĐVN</th>
+    <th class="num">Kinh phí – Giữ lại</th><th class="num">Kinh phí – Nộp CĐVN</th>
+    <th class="num">Tổng NLĐ</th><th class="num">Tổng DN</th>
     <th>Chi tiết</th><th>Ghi chú</th><th></th></tr></thead><tbody>`;
-  if (!d.rows.length) h += '<tr><td colspan="13" class="muted">Chưa có dòng truy thu/thoái thu trong kỳ này.</td></tr>';
+  if (!d.rows.length) h += '<tr><td colspan="18" class="muted">Chưa có dòng truy thu/thoái thu trong kỳ này.</td></tr>';
   d.rows.forEach((r) => {
-    sN += r.tienNLD; sD += r.tienDN;
     const tt = r.tienNLD + r.tienDN >= 0;
     h += `<tr><td><span class="badge ${tt ? 'info' : 'warn'}">${tt ? 'Truy thu' : 'Thoái thu'}</span></td><td>${esc(r.maNV)}</td><td>${esc(r.hoTen)}</td>
       <td>${fmtM(r.tuThang)} – ${fmtM(r.denThang)}</td><td class="num">${r.soThang}</td><td class="num">${fmt(r.luongCu)}</td>
-      <td class="num">${fmt(r.luongMoi)}</td><td>${esc(r.maPL)}</td><td class="num">${fmt(r.tienNLD)}</td><td class="num">${fmt(r.tienDN)}</td>
+      <td class="num">${fmt(r.luongMoi)}</td><td>${esc(r.maPL)}</td>
+      <td class="num">${fmt(r.bhxhNLD)}</td><td class="num">${fmt(r.bhxhDN)}</td>
+      <td class="num">${r.dpcd ? fmt(r.dpcdGiuLai) : ''}</td><td class="num">${r.dpcd ? fmt(r.dpcdNop) : ''}</td>
+      <td class="num">${r.kpcd ? fmt(r.kpcdGiuLai) : ''}</td><td class="num">${r.kpcd ? fmt(r.kpcdNop) : ''}</td>
+      <td class="num"><b>${fmt(r.tienNLD)}</b></td><td class="num"><b>${fmt(r.tienDN)}</b></td>
       <td class="small">${esc(r.chiTiet)}</td><td class="small">${esc(r.ghiChu)}</td>
       <td>${d.editable ? `<div class="row"><button class="btn sm" onclick="ttForm('${r.id}')">Sửa</button>
         <button class="btn sm danger" onclick="ttDel('${r.id}')">Xóa</button></div>` : ''}</td></tr>`;
   });
-  if (d.rows.length) h += `<tr class="total"><td colspan="8">TỔNG</td><td class="num">${fmt(sN)}</td><td class="num">${fmt(sD)}</td><td colspan="3"></td></tr>`;
+  if (d.rows.length) h += `<tr class="total"><td colspan="8">TỔNG</td>
+    <td class="num">${fmt(sum((r) => r.bhxhNLD))}</td><td class="num">${fmt(sum((r) => r.bhxhDN))}</td>
+    <td class="num">${fmt(sum((r) => r.dpcdGiuLai))}</td><td class="num">${fmt(sum((r) => r.dpcdNop))}</td>
+    <td class="num">${fmt(sum((r) => r.kpcdGiuLai))}</td><td class="num">${fmt(sum((r) => r.kpcdNop))}</td>
+    <td class="num">${fmt(sum((r) => r.tienNLD))}</td><td class="num">${fmt(sum((r) => r.tienDN))}</td><td colspan="3"></td></tr>`;
   $('ttTbl').className = 'card';
   $('ttTbl').innerHTML = h + '</tbody></table></div>';
 }
@@ -513,7 +525,9 @@ function ttSave() {
   ['luongCu', 'luongMoi'].forEach((k) => { o[k] = Number(String(o[k] || '').replace(/[^\d-]/g, '')) || 0; });
   act(async () => {
     const r = await run('apiSaveTruyThu', S.ttData.ky, o);
-    closeModal(); toast(`Đã lưu: NLĐ ${fmt(r.tienNLD)}, DN ${fmt(r.tienDN)}`, 'ok'); loadTT();
+    closeModal();
+    toast(`Đã lưu: BHXH NLĐ ${fmt(r.bhxhNLD)}, BHXH DN ${fmt(r.bhxhDN)}, Đoàn phí ${fmt(r.dpcd)}, Kinh phí ${fmt(r.kpcd)}`, 'ok');
+    loadTT();
   });
 }
 function ttDel(id) {
@@ -687,12 +701,22 @@ function renderChiTiet() {
   body += `<tr class="total"><td colspan="5">TỔNG CỘNG</td>${cellsSum(rows)}<td></td></tr>`;
   h += `<div class="card"><div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div></div>`;
   if (d.truyThu.length) {
+    const sumTT = (f) => d.truyThu.reduce((s, t) => s + (Number(f(t)) || 0), 0);
     h += `<div class="card"><h3>Truy thu / Thoái thu trong kỳ</h3><div class="tbl-wrap"><table><thead><tr><th>Mã NV</th><th>Họ và tên</th>
-      <th>Từ – Đến</th><th class="num">Lương cũ</th><th class="num">Lương mới</th><th class="num">NLĐ</th><th class="num">DN</th><th>Chi tiết</th></tr></thead><tbody>
+      <th>Từ – Đến</th><th class="num">Lương cũ</th><th class="num">Lương mới</th>
+      <th class="num">BHXH NLĐ</th><th class="num">BHXH DN</th><th class="num">Đoàn phí (giữ lại/nộp)</th><th class="num">Kinh phí (giữ lại/nộp)</th>
+      <th class="num">Tổng NLĐ</th><th class="num">Tổng DN</th><th>Chi tiết</th></tr></thead><tbody>
       ${d.truyThu.map((t) => `<tr><td>${esc(t.maNV)}</td><td>${esc(t.hoTen)}</td><td>${fmtM(t.tuThang)} – ${fmtM(t.denThang)}</td>
-        <td class="num">${fmt(t.luongCu)}</td><td class="num">${fmt(t.luongMoi)}</td><td class="num">${fmt(t.tienNLD)}</td>
-        <td class="num">${fmt(t.tienDN)}</td><td class="small">${esc(t.chiTiet)}</td></tr>`).join('')}
-      <tr class="total"><td colspan="5">TỔNG</td><td class="num">${fmt(ttN)}</td><td class="num">${fmt(ttD)}</td><td></td></tr></tbody></table></div></div>`;
+        <td class="num">${fmt(t.luongCu)}</td><td class="num">${fmt(t.luongMoi)}</td>
+        <td class="num">${fmt(t.bhxhNLD)}</td><td class="num">${fmt(t.bhxhDN)}</td>
+        <td class="num small">${t.dpcd ? fmt(t.dpcdGiuLai) + ' / ' + fmt(t.dpcdNop) : ''}</td>
+        <td class="num small">${t.kpcd ? fmt(t.kpcdGiuLai) + ' / ' + fmt(t.kpcdNop) : ''}</td>
+        <td class="num"><b>${fmt(t.tienNLD)}</b></td><td class="num"><b>${fmt(t.tienDN)}</b></td><td class="small">${esc(t.chiTiet)}</td></tr>`).join('')}
+      <tr class="total"><td colspan="5">TỔNG</td>
+        <td class="num">${fmt(sumTT((t) => t.bhxhNLD))}</td><td class="num">${fmt(sumTT((t) => t.bhxhDN))}</td>
+        <td class="num small">${fmt(sumTT((t) => t.dpcdGiuLai))} / ${fmt(sumTT((t) => t.dpcdNop))}</td>
+        <td class="num small">${fmt(sumTT((t) => t.kpcdGiuLai))} / ${fmt(sumTT((t) => t.kpcdNop))}</td>
+        <td class="num">${fmt(ttN)}</td><td class="num">${fmt(ttD)}</td><td></td></tr></tbody></table></div></div>`;
   }
   $('rpBody').innerHTML = h;
 }

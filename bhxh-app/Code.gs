@@ -123,6 +123,14 @@ const T = {
     ['congDoan', 'Tham gia công đoàn', 'text'],
     ['tienNLD', 'Chênh lệch NLĐ', 'num'],
     ['tienDN', 'Chênh lệch DN', 'num'],
+    ['bhxhNLD', 'Chênh lệch BHXH NLĐ (không gồm Đoàn phí)', 'num'],
+    ['bhxhDN', 'Chênh lệch BHXH DN (không gồm Kinh phí CĐ)', 'num'],
+    ['dpcd', 'Chênh lệch Đoàn phí Công đoàn (NLĐ)', 'num'],
+    ['dpcdGiuLai', 'Đoàn phí - Giữ lại cơ sở', 'num'],
+    ['dpcdNop', 'Đoàn phí - Nộp Công đoàn VN', 'num'],
+    ['kpcd', 'Chênh lệch Kinh phí Công đoàn (DN)', 'num'],
+    ['kpcdGiuLai', 'Kinh phí - Giữ lại cơ sở', 'num'],
+    ['kpcdNop', 'Kinh phí - Nộp Công đoàn VN', 'num'],
     ['chiTiet', 'Chi tiết theo khoản', 'text'],
     ['ghiChu', 'Ghi chú', 'text'],
     ['nguoiTao', 'Người tạo', 'text'],
@@ -684,24 +692,49 @@ function tinhNV_(nv, ky, kmap, maplMap, ltt) {
   if (dong) r = tinhTheoPL_(luong, pl, kmap, nv.congDoan);
   return { luong: luong, dong: dong, items: r.items, nld: r.nld, dn: r.dn, canhBao: cb };
 }
-function tinhTruyThu_(r, ctxFn, maplMap) {
+/**
+ * Tính chênh lệch truy thu/thoái thu, tách riêng BHXH NLĐ / BHXH DN / Đoàn phí CĐ (NLĐ) / Kinh phí CĐ (DN)
+ * vì các khoản này hạch toán chi trả khác nhau. Đoàn phí và Kinh phí CĐ còn được tách tiếp thành phần
+ * giữ lại cơ sở / nộp Công đoàn Việt Nam, theo đúng tỉ lệ có hiệu lực của TỪNG THÁNG trong khoảng truy thu.
+ * cdCodes: {ma: true} các khoản "Thuộc quỹ Công đoàn". ten: map mã khoản -> {doiTuong}. tlRows: rows tab Tỉ lệ Công đoàn.
+ */
+function tinhTruyThu_(r, ctxFn, maplMap, cdCodes, ten, tlRows) {
   const pl = maplMap[r.maPL];
   const months = monthRange_(r.tuThang, r.denThang);
-  if (!pl) return { soThang: months.length, nld: 0, dn: 0, chiTiet: 'Mã phân loại không hợp lệ' };
+  if (!pl) {
+    return {
+      soThang: months.length, nld: 0, dn: 0, bhxhNLD: 0, bhxhDN: 0,
+      dpcd: 0, dpcdGiuLai: 0, dpcdNop: 0, kpcd: 0, kpcdGiuLai: 0, kpcdNop: 0,
+      chiTiet: 'Mã phân loại không hợp lệ'
+    };
+  }
   const sum = {};
-  let nld = 0, dn = 0;
+  let nld = 0, dn = 0, dpcd = 0, dpcdGiuLai = 0, kpcd = 0, kpcdGiuLai = 0;
   months.forEach(function (m) {
     const km = ctxFn(m);
     const a = tinhTheoPL_(moneyNum_(r.luongMoi), pl, km, r.congDoan);
     const b = tinhTheoPL_(moneyNum_(r.luongCu), pl, km, r.congDoan);
     const codes = {};
     Object.keys(a.items).concat(Object.keys(b.items)).forEach(function (c) { codes[c] = 1; });
-    Object.keys(codes).forEach(function (c) { sum[c] = (sum[c] || 0) + (a.items[c] || 0) - (b.items[c] || 0); });
+    let mDpcd = 0, mKpcd = 0;
+    Object.keys(codes).forEach(function (c) {
+      const diff = (a.items[c] || 0) - (b.items[c] || 0);
+      sum[c] = (sum[c] || 0) + diff;
+      if (cdCodes && cdCodes[c]) { if ((ten[c] || {}).doiTuong === DT_DN) mKpcd += diff; else mDpcd += diff; }
+    });
+    dpcd += mDpcd; kpcd += mKpcd;
+    if (tlRows) {
+      const tl = tyLeGiuLaiHieuLuc_(tlRows, m);
+      dpcdGiuLai += Math.round(mDpcd * tl.nld / 100);
+      kpcdGiuLai += Math.round(mKpcd * tl.dn / 100);
+    }
     nld += a.nld - b.nld;
     dn += a.dn - b.dn;
   });
   return {
-    soThang: months.length, nld: nld, dn: dn,
+    soThang: months.length, nld: nld, dn: dn, bhxhNLD: nld - dpcd, bhxhDN: dn - kpcd,
+    dpcd: dpcd, dpcdGiuLai: dpcdGiuLai, dpcdNop: dpcd - dpcdGiuLai,
+    kpcd: kpcd, kpcdGiuLai: kpcdGiuLai, kpcdNop: kpcd - kpcdGiuLai,
     chiTiet: Object.keys(sum).filter(function (c) { return sum[c]; }).map(function (c) { return c + ': ' + fmtNum_(sum[c]); }).join('; ')
   };
 }
@@ -862,11 +895,18 @@ function tinhKy_(ky, user) {
   });
   writeKQ_(ky, out, codes);
 
+  const cdCodes = congDoanCodes_(ctx.khoanRows);
+  const ten = khoanTen_(ctx.khoanRows);
+  const tlRows = load_(T.TLCD).rows;
   let ttNLD = 0, ttDN = 0;
   load_(T.TT).rows.filter(function (r) { return r.ky === ky; }).forEach(function (r) {
-    const c = tinhTruyThu_(r, ctx.fn, maplMap);
+    const c = tinhTruyThu_(r, ctx.fn, maplMap, cdCodes, ten, tlRows);
     ttNLD += c.nld; ttDN += c.dn;
-    update_(T.TT, r._row, { soThang: c.soThang, tienNLD: c.nld, tienDN: c.dn, chiTiet: c.chiTiet });
+    update_(T.TT, r._row, {
+      soThang: c.soThang, tienNLD: c.nld, tienDN: c.dn, bhxhNLD: c.bhxhNLD, bhxhDN: c.bhxhDN,
+      dpcd: c.dpcd, dpcdGiuLai: c.dpcdGiuLai, dpcdNop: c.dpcdNop, kpcd: c.kpcd, kpcdGiuLai: c.kpcdGiuLai, kpcdNop: c.kpcdNop,
+      chiTiet: c.chiTiet
+    });
   });
   update_(T.KY, getKy_(ky)._row, { ngayTinh: now_(), nguoiTinh: user.email });
   return { ky: ky, soNV: nvs.length, soDong: soDong, soCanhBao: soCB, tongNLD: tongNLD, tongDN: tongDN, ttNLD: ttNLD, ttDN: ttDN };
@@ -1019,8 +1059,13 @@ function apiSaveTruyThu(ky, o) {
       ghiChu: o.ghiChu || '', emailQL: nv.emailQL
     };
     if (!maplMap[rec.maPL]) throw new Error('Mã phân loại không hợp lệ.');
-    const c = tinhTruyThu_(rec, ctxFactory_().fn, maplMap);
-    rec.soThang = c.soThang; rec.tienNLD = c.nld; rec.tienDN = c.dn; rec.chiTiet = c.chiTiet;
+    const ctx = ctxFactory_();
+    const c = tinhTruyThu_(rec, ctx.fn, maplMap, congDoanCodes_(ctx.khoanRows), khoanTen_(ctx.khoanRows), load_(T.TLCD).rows);
+    rec.soThang = c.soThang; rec.tienNLD = c.nld; rec.tienDN = c.dn;
+    rec.bhxhNLD = c.bhxhNLD; rec.bhxhDN = c.bhxhDN;
+    rec.dpcd = c.dpcd; rec.dpcdGiuLai = c.dpcdGiuLai; rec.dpcdNop = c.dpcdNop;
+    rec.kpcd = c.kpcd; rec.kpcdGiuLai = c.kpcdGiuLai; rec.kpcdNop = c.kpcdNop;
+    rec.chiTiet = c.chiTiet;
     if (o.id) {
       const ex = load_(T.TT).rows.find(function (r) { return r.id === o.id && r.ky === ky; });
       if (!ex || !canSee_(user, ex)) throw new Error('Không tìm thấy dòng truy thu.');
@@ -1271,13 +1316,16 @@ function buildDoc_(loai, p) {
     for (let c = 6; c < header.length - 1; c++) numCols.push(c);
     const sections = [{ title: 'Danh sách NV đóng BHXH (' + dong.length + ' người)', header: header, rows: rows, total: total, numCols: numCols }];
     if (d.truyThu.length) {
-      const h2 = ['STT', 'Mã NV', 'Họ và tên', 'Từ tháng', 'Đến tháng', 'Số tháng', 'Lương cũ', 'Lương mới', 'Chênh lệch NLĐ', 'Chênh lệch DN', 'Chi tiết', 'Ghi chú'];
+      const h2 = ['STT', 'Mã NV', 'Họ và tên', 'Từ tháng', 'Đến tháng', 'Số tháng', 'Lương cũ', 'Lương mới',
+        'BHXH NLĐ', 'BHXH DN', 'Đoàn phí - Giữ lại', 'Đoàn phí - Nộp CĐVN', 'Kinh phí - Giữ lại', 'Kinh phí - Nộp CĐVN',
+        'Tổng NLĐ', 'Tổng DN', 'Chi tiết', 'Ghi chú'];
       const r2 = d.truyThu.map(function (t, i) {
-        return [i + 1, t.maNV, t.hoTen, monthDisp_(t.tuThang), monthDisp_(t.denThang), t.soThang, t.luongCu, t.luongMoi, t.tienNLD, t.tienDN, t.chiTiet, t.ghiChu];
+        return [i + 1, t.maNV, t.hoTen, monthDisp_(t.tuThang), monthDisp_(t.denThang), t.soThang, t.luongCu, t.luongMoi,
+          t.bhxhNLD, t.bhxhDN, t.dpcdGiuLai, t.dpcdNop, t.kpcdGiuLai, t.kpcdNop, t.tienNLD, t.tienDN, t.chiTiet, t.ghiChu];
       });
-      const tot2 = ['', '', 'TỔNG', '', '', '', '', '',
-        r2.reduce(function (s, r) { return s + r[8]; }, 0), r2.reduce(function (s, r) { return s + r[9]; }, 0), '', ''];
-      sections.push({ title: 'Truy thu / Thoái thu', header: h2, rows: r2, total: tot2, numCols: [6, 7, 8, 9] });
+      const s2 = function (i) { return r2.reduce(function (s, r) { return s + r[i]; }, 0); };
+      const tot2 = ['', '', 'TỔNG', '', '', '', '', '', s2(8), s2(9), s2(10), s2(11), s2(12), s2(13), s2(14), s2(15), '', ''];
+      sections.push({ title: 'Truy thu / Thoái thu', header: h2, rows: r2, total: tot2, numCols: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15] });
     }
     return { info: d.info, title: 'BẢNG TÍNH BHXH – KỲ ' + monthDisp_(d.ky), fileName: 'BHXH_ChiTiet_' + d.ky, sections: sections };
   }

@@ -145,6 +145,16 @@ Hai màn hình này có thêm:
 
 Dòng tổng/cộng theo phòng ban và tổng cộng cuối bảng tự tính lại theo đúng những dòng đang hiển thị sau khi lọc.
 
+## 9. Truy thu / Thoái thu – tách theo khoản hạch toán
+
+Kết quả tính ở màn hình **Truy thu** được tách thành 4 phần vì hạch toán chi trả khác nhau:
+- **BHXH NLĐ**: tổng tất cả khoản BHXH bên người lao động (BHXH, BHYT, BHTN…), không gồm Đoàn phí công đoàn.
+- **BHXH DN**: tổng tất cả khoản BHXH bên doanh nghiệp, không gồm Kinh phí công đoàn.
+- **Đoàn phí Công đoàn (NLĐ)**: tách tiếp thành **Giữ lại cơ sở** / **Nộp Công đoàn Việt Nam**, theo đúng tỉ lệ có hiệu lực của **từng tháng** trong khoảng truy thu (xem mục 7).
+- **Kinh phí Công đoàn (DN)**: tương tự, tách Giữ lại / Nộp theo tỉ lệ DN.
+
+*Tổng NLĐ* = BHXH NLĐ + Đoàn phí; *Tổng DN* = BHXH DN + Kinh phí — vẫn giữ như cột tổng trước đây để đối chiếu. Việc tách này áp dụng cho cả bảng trên màn hình Truy thu, bảng "Truy thu/Thoái thu trong kỳ" ở Bảng tính chi tiết, và file xuất Excel/PDF.
+
 ## 9. Lưu ý
 
 - **Sửa tay trên Google Sheet:** Nhân viên, Kỳ BHXH, Truy thu, và mọi tính toán/báo cáo luôn đọc dữ liệu **mới nhất** từ Sheet mỗi lần bạn mở màn hình đó hoặc bấm Tính — sửa tay xong là có tác dụng ngay. Riêng 5 danh mục **Khoản trích đóng, Mã phân loại, Tỉ lệ Công đoàn, Phòng ban, Thông tin chung** chỉ được tải **một lần lúc mở trang** để dùng cho dropdown; sửa tay trên Sheet sẽ không hiện ngay trên các màn hình đó. Bấm nút **"🔄 Làm mới dữ liệu"** ở góc trên (hoặc tải lại trang F5) để nạp lại.
