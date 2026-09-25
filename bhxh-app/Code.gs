@@ -928,6 +928,43 @@ function apiChotKy(ky) {
   });
 }
 
+/** Mở lại một kỳ đã chốt để sửa/tính lại. Không giới hạn ở kỳ mới nhất (trường hợp khẩn cấp có thể cần sửa kỳ cũ). */
+function apiMoLaiKy(ky) {
+  const user = getUser_();
+  requireRole_(user, [ROLE.ADMIN]);
+  ky = normMonth_(ky);
+  return withLock_(function () {
+    const k = getKy_(ky);
+    if (k.trangThai !== KY_CHOT) throw new Error('Kỳ ' + monthDisp_(ky) + ' đang mở, không cần mở lại.');
+    update_(T.KY, k._row, { trangThai: KY_MO, ngayChot: '', nguoiChot: '' });
+    log_(user, 'Mở lại kỳ', monthDisp_(ky));
+    return { ky: ky };
+  });
+}
+
+/**
+ * Xóa hẳn một kỳ (chỉ cho phép xóa kỳ MỚI NHẤT, để tránh làm đứt quãng dữ liệu của các kỳ sau).
+ * Xóa dữ liệu NV của kỳ (Dữ liệu kỳ), kết quả tính (Kết quả tính) và các dòng Truy thu ghi nhận trong kỳ đó.
+ */
+function apiXoaKy(ky) {
+  const user = getUser_();
+  requireRole_(user, [ROLE.ADMIN]);
+  ky = normMonth_(ky);
+  return withLock_(function () {
+    const kys = listKy_(); // mới nhất trước
+    if (!kys.length || kys[0].ky !== ky) throw new Error('Chỉ được xóa kỳ mới nhất (' + (kys.length ? monthDisp_(kys[0].ky) : '') + ').');
+    const k = getKy_(ky);
+    const dlkyRows = load_(T.DLKY).rows.filter(function (r) { return r.ky === ky; });
+    if (dlkyRows.length) deleteRows_(T.DLKY, dlkyRows.map(function (r) { return r._row; }));
+    const ttRows = load_(T.TT).rows.filter(function (r) { return r.ky === ky; });
+    if (ttRows.length) deleteRows_(T.TT, ttRows.map(function (r) { return r._row; }));
+    writeKQ_(ky, [], allCodes_(ctxFactory_().khoanRows)); // xóa kết quả tính của kỳ (giữ nguyên các kỳ khác)
+    deleteRows_(T.KY, [k._row]);
+    log_(user, 'Xóa kỳ', monthDisp_(ky));
+    return true;
+  });
+}
+
 // ---------------------------------------------------------------------
 // API: NHÂN VIÊN
 // ky = '' nghĩa là làm việc trên hồ sơ gốc (tab Danh sách nhân viên)

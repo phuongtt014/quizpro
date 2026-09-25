@@ -307,8 +307,9 @@ async function vKy() {
   h += `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th>Tạo</th><th>Lần tính gần nhất</th>
     <th>Chốt</th><th></th></tr></thead><tbody>`;
   if (!S.kys.length) h += '<tr><td colspan="6" class="muted">Chưa có kỳ nào.</td></tr>';
-  S.kys.forEach((k) => {
+  S.kys.forEach((k, i) => {
     const open = k.trangThai !== 'Đã chốt';
+    const isLatest = i === 0;
     h += `<tr><td><b>${fmtM(k.ky)}</b></td><td>${kyBadge(k.trangThai)}</td>
       <td class="small">${esc(k.ngayTao)}<br><span class="muted">${esc(k.nguoiTao)}</span></td>
       <td class="small">${k.ngayTinh ? esc(k.ngayTinh) + '<br><span class="muted">' + esc(k.nguoiTinh) + '</span>' : '<span class="badge warn">Chưa tính</span>'}</td>
@@ -316,9 +317,11 @@ async function vKy() {
       <td><div class="row">
         ${open && isRole('Admin', 'Nhập liệu') ? `<button class="btn sm pri" onclick="tinhKy('${k.ky}')">Tính</button>` : ''}
         ${open && isRole('Admin') ? `<button class="btn sm ok" onclick="chotKy('${k.ky}')">Chốt kỳ</button>` : ''}
+        ${!open && isRole('Admin') ? `<button class="btn sm warn" onclick="moLaiKy('${k.ky}')">Mở lại kỳ</button>` : ''}
         <button class="btn sm" onclick="S.nvKy='${k.ky}';go('nhanvien')">Nhân viên</button>
         <button class="btn sm" onclick="S.rpKy='${k.ky}';S.rpTab='chitiet';go('baocao')">Bảng tính</button>
         <button class="btn sm" onclick="S.rpKy='${k.ky}';S.rpTab='biendong';go('baocao')">Biến động</button>
+        ${isLatest && isRole('Admin') ? `<button class="btn sm danger" onclick="xoaKy('${k.ky}')">Xóa kỳ</button>` : ''}
       </div></td></tr>`;
   });
   h += '</tbody></table></div></div>';
@@ -351,6 +354,14 @@ function tinhKy(ky) {
 function chotKy(ky) {
   if (!confirm(`Chốt kỳ ${fmtM(ky)}?\n\nApp sẽ tính lại lần cuối rồi KHÓA kỳ. Sau khi chốt không thể sửa; phát sinh cho tháng này phải nhập Truy thu/Thoái thu ở kỳ sau.`)) return;
   act(async () => { const r = await run('apiChotKy', ky); await refreshKys(); vKy(); ketQuaTinh(r, 'Đã chốt kỳ ' + fmtM(ky)); });
+}
+function moLaiKy(ky) {
+  if (!confirm(`Mở lại kỳ ${fmtM(ky)}?\n\nKỳ sẽ chuyển về "Đang mở", có thể sửa dữ liệu và bấm Tính lại. Chỉ dùng khi cần điều chỉnh gấp cho kỳ đã chốt.`)) return;
+  act(async () => { await run('apiMoLaiKy', ky); await refreshKys(); vKy(); toast(`Đã mở lại kỳ ${fmtM(ky)}. Có thể sửa dữ liệu và bấm Tính lại.`, 'ok'); });
+}
+function xoaKy(ky) {
+  if (!confirm(`XÓA HẲN kỳ ${fmtM(ky)}?\n\nSẽ xóa toàn bộ dữ liệu NV, kết quả tính và các dòng Truy thu ghi nhận trong kỳ này. KHÔNG THỂ HOÀN TÁC. Chỉ xóa được kỳ mới nhất.`)) return;
+  act(async () => { await run('apiXoaKy', ky); await refreshKys(); vKy(); toast(`Đã xóa kỳ ${fmtM(ky)}.`, 'ok'); });
 }
 
 // =====================================================================
