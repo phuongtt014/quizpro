@@ -505,7 +505,7 @@ function renderNV() {
   $('nvTbl').innerHTML = h + '</tbody></table></div>';
 }
 async function nvForm(maNV) {
-  if (isRole('Admin') && !S.pq) {
+  if (isRole('Admin') && !S.pq.length) {
     try { busy(true); S.pq = await run('apiPhanQuyen'); } catch (e) { toast(e.message, 'err'); S.pq = []; } finally { busy(false); }
   }
   const d = S.nvData;
