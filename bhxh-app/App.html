@@ -87,32 +87,31 @@ function chartLegend(series) {
   return `<div class="row small" style="gap:14px;margin-top:6px">${series.map((s) => `<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${s.color};margin-right:4px"></span>${esc(s.label)}</span>`).join('')}</div>`;
 }
 // Biểu đồ cột chồng theo tháng, mỗi tháng 1 cột chia đoạn theo từng nhóm (ví dụ phòng ban), có tổng in đậm phía trên
-function chartStackedBar(labels, series, opts) {
+// Biểu đồ cột nhóm theo tháng (ví dụ Tăng mới / Nghỉ việc), mỗi tháng vài cột đặt cạnh nhau, có nhãn số trên mỗi cột
+function chartGroupedBar(labels, series, opts) {
   opts = opts || {};
-  const w = opts.width || 700, h = opts.height || 280, padL = 40, padR = 14, top = 30, bottom = 34;
+  const w = opts.width || 700, h = opts.height || 260, padL = 40, padR = 14, top = 24, bottom = 34;
   const n = Math.max(1, labels.length);
-  const totals = labels.map((_, i) => series.reduce((s, ser) => s + (ser.values[i] || 0), 0));
-  const max = Math.max(1, ...totals);
-  const bw = (w - padL - padR) / n;
-  const bwv = bw * 0.58;
+  const allVals = series.reduce((a, s) => a.concat(s.values.map((v) => Math.abs(v || 0))), []);
+  const max = Math.max(1, ...allVals);
+  const groupW = (w - padL - padR) / n;
+  const barW = (groupW * 0.7) / series.length;
+  const zeroY = h - bottom;
   const bars = labels.map((lab, i) => {
-    const x = padL + i * bw + (bw - bwv) / 2;
-    let yCursor = h - bottom;
+    const gx = padL + i * groupW + groupW * 0.15;
     let segs = '';
-    series.forEach((ser) => {
+    series.forEach((ser, si) => {
       const v = ser.values[i] || 0;
-      if (!v) return;
-      const bh = (h - top - bottom) * (v / max);
-      yCursor -= bh;
-      segs += `<rect x="${x.toFixed(1)}" y="${yCursor.toFixed(1)}" width="${bwv.toFixed(1)}" height="${bh.toFixed(1)}" fill="${ser.color}"></rect>`;
+      const bh = (h - top - bottom) * (Math.abs(v) / max);
+      const x = gx + si * barW;
+      const y = zeroY - bh;
+      segs += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(barW * 0.82).toFixed(1)}" height="${bh.toFixed(1)}" fill="${ser.color}" rx="2"></rect>
+        <text x="${(x + barW * 0.41).toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--ink)">${fmt(v)}</text>`;
     });
-    const totalTop = h - bottom - (h - top - bottom) * (totals[i] / max);
-    return `${segs}
-      <text x="${(x + bwv / 2).toFixed(1)}" y="${(totalTop - 6).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">${fmt(totals[i])}</text>
-      <text x="${(x + bwv / 2).toFixed(1)}" y="${h - bottom + 16}" text-anchor="middle" font-size="10" fill="var(--muted)">${esc(lab)}</text>`;
+    return `${segs}<text x="${(gx + groupW * 0.35).toFixed(1)}" y="${h - bottom + 16}" text-anchor="middle" font-size="10" fill="var(--muted)">${esc(lab)}</text>`;
   }).join('');
   return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:${h}px" role="img">
-    <line x1="${padL}" y1="${h - bottom}" x2="${w - padR}" y2="${h - bottom}" stroke="var(--line)"></line>${bars}</svg>`;
+    <line x1="${padL}" y1="${zeroY}" x2="${w - padR}" y2="${zeroY}" stroke="var(--line)"></line>${bars}</svg>`;
 }
 // Ô nhập số tiền: hiển thị có phân tách hàng ngàn, gõ tới đâu định dạng lại tới đó
 function moneyVal(v) { const n = Number(v) || 0; return n ? fmt(n) : ''; }
@@ -265,24 +264,21 @@ async function loadDashboard() {
 function renderDashboard() {
   const d = S.dashData; const area = $('dashArea'); if (!d || !area) return;
   const labels = d.months.map((m) => fmtM(m.ky));
-  let hcChart, titleHC;
-  if (S.dashPB) {
-    const seriesHC = [{ label: S.dashPB, color: CHART_COLORS[0], values: d.months.map((m) => m.soDong), bold: true }];
-    hcChart = chartLine(labels, seriesHC, {}) + chartLegend(seriesHC);
-    titleHC = 'Biến động số lượng nhân sự – ' + esc(S.dashPB);
-  } else {
-    const seriesHC = d.phongBanList.map((pb, i) => ({ label: pb, color: CHART_COLORS[(i + 1) % CHART_COLORS.length], values: d.months.map((m) => m.byPhongBan[pb] || 0) }));
-    hcChart = chartStackedBar(labels, seriesHC, {}) + chartLegend(seriesHC) + '<div class="small muted" style="margin-top:4px">Số in đậm trên mỗi cột là tổng nhân sự công ty trong tháng đó.</div>';
-    titleHC = 'Biến động số lượng nhân sự theo phòng ban và công ty';
-  }
   const seriesQL = [{ label: 'Quỹ lương đóng', color: CHART_COLORS[0], values: d.months.map((m) => m.quyLuong), bold: true }];
+  const seriesTurnover = [
+    { label: 'Tăng mới', color: 'var(--ok)', values: d.months.map((m) => m.tangMoi || 0) },
+    { label: 'Nghỉ việc', color: 'var(--bad)', values: d.months.map((m) => m.nghiViec || 0) }
+  ];
+  const thieuKyGoc = d.months.length > 0 && d.months[0].tangMoi === null;
   const h = `<div class="card"><div class="row">
       <label class="small">Từ kỳ <input type="month" value="${S.dashTuKy}" onchange="S.dashTuKy=this.value;loadDashboard()"></label>
       <label class="small">Đến kỳ <input type="month" value="${S.dashDenKy}" onchange="S.dashDenKy=this.value;loadDashboard()"></label>
       <label class="small">Phòng ban <select onchange="S.dashPB=this.value;loadDashboard()">${opt(S.phongBan, S.dashPB, 'Tất cả phòng ban')}</select></label>
     </div></div>
-    <div class="card"><h3>${titleHC}</h3>${hcChart}</div>
     <div class="card"><h3>Biến động quỹ lương đóng${S.dashPB ? ' – ' + esc(S.dashPB) : ''}</h3>${chartLine(labels, seriesQL, {})}</div>
+    <div class="card"><h3>Biến động nhân sự: Tăng mới / Nghỉ việc theo tháng${S.dashPB ? ' – ' + esc(S.dashPB) : ''}</h3>
+      ${thieuKyGoc ? '<div class="alert warn small">Không có kỳ trước để so sánh cho tháng đầu tiên trong khoảng đã chọn.</div>' : ''}
+      ${chartGroupedBar(labels, seriesTurnover, {})}${chartLegend(seriesTurnover)}</div>
     <div class="row" style="gap:16px;align-items:stretch">
       <div class="card" style="flex:1;min-width:280px"><h3>Nhân viên theo thâm niên${S.dashPB ? ' – ' + esc(S.dashPB) : ''}</h3>
         <span class="small muted">Tại kỳ ${fmtM(d.denKy)} · ${fmt(d.tongNVCuoiKy)} NV đang đóng</span>

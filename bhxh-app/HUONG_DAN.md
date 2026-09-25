@@ -193,8 +193,8 @@ Thâm niên tính từ **Ngày vào làm** (nếu có), hoặc **Ngày bắt đ�
 Màn hình **Tổng quan** (trang chủ) chỉ gồm bộ lọc và biểu đồ (không còn bảng số liệu):
 
 - **Bộ lọc**: chọn **Từ kỳ / Đến kỳ** và **Phòng ban** (hoặc "Tất cả phòng ban") – đổi bộ lọc sẽ tự tính lại toàn bộ biểu đồ.
-- **Biến động số lượng nhân sự theo phòng ban và công ty**: biểu đồ **cột chồng** theo từng tháng – mỗi cột là 1 tháng, chia thành các đoạn màu theo từng phòng ban (xem chú giải màu dưới biểu đồ), số in đậm phía trên cột là tổng nhân sự cả công ty tháng đó. Cách thể hiện này tránh việc nhiều đường màu đè lên nhau khó phân biệt như biểu đồ đường trước đây. Nếu đã chọn 1 phòng ban cụ thể thì hiện biểu đồ đường đơn giản cho riêng phòng ban đó.
 - **Biến động quỹ lương đóng**: biểu đồ đường quỹ lương đóng BHXH theo từng tháng (theo phòng ban đã lọc, hoặc toàn công ty).
+- **Biến động nhân sự: Tăng mới / Nghỉ việc theo tháng**: biểu đồ cột nhóm (2 cột mỗi tháng) so sánh số NV bắt đầu đóng mới và số NV thôi đóng so với tháng liền trước (theo phòng ban đã lọc, hoặc toàn công ty). Tháng đầu tiên trong khoảng đã chọn cần có kỳ liền trước để so sánh; nếu kỳ đó không tồn tại (ví dụ chọn ngay từ kỳ đầu tiên của công ty) app sẽ báo "Không có kỳ trước để so sánh" cho tháng đó.
 - **Nhân viên theo thâm niên**: biểu đồ cột số NV đang đóng tại kỳ cuối của khoảng đã chọn, chia theo mốc thâm niên (&lt;1 năm, 1–3, 3–5, 5–10, &gt;10 năm; "Chưa rõ" nếu thiếu Ngày vào làm/Ngày bắt đầu BHXH).
 - **Số lượng nhân sự theo mã phân loại**: biểu đồ cột số NV đang đóng tại kỳ cuối, chia theo Mã PL.
 

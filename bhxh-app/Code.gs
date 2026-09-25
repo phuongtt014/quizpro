@@ -1170,16 +1170,29 @@ function apiDashboard(tuKy, denKy, phongBan) {
   denKy = denKy ? normMonth_(denKy) : maxKy;
   if (tuKy && denKy && tuKy > denKy) { const x = tuKy; tuKy = denKy; denKy = x; }
   const kys = all.filter(function (k) { return k.ky >= tuKy && k.ky <= denKy; }).slice().reverse(); // tăng dần
-  const kqAll = loadKQAll_().rows.filter(function (r) { return r.ky >= tuKy && r.ky <= denKy && canSee_(user, r); });
+  // Kỳ liền trước tuKy (nếu có), dùng làm mốc so sánh để tính tăng mới/nghỉ việc của tháng đầu tiên trong khoảng
+  const idxTu = all.findIndex(function (k) { return k.ky === tuKy; });
+  const baselineKy = idxTu >= 0 && idxTu + 1 < all.length ? all[idxTu + 1].ky : '';
+  const neededKys = (baselineKy ? [baselineKy] : []).concat(kys.map(function (k) { return k.ky; }));
+  const kqAll = loadKQAll_().rows.filter(function (r) { return neededKys.indexOf(r.ky) >= 0 && canSee_(user, r); });
   const kq = phongBan ? kqAll.filter(function (r) { return r.phongBan === phongBan; }) : kqAll;
-  const months = kys.map(function (k) {
+  const setByKy = {};
+  kq.forEach(function (r) { if (r.dong !== CO) return; (setByKy[r.ky] = setByKy[r.ky] || {})[r.maNV] = true; });
+  const months = kys.map(function (k, i) {
     const rows = kq.filter(function (r) { return r.ky === k.ky && r.dong === CO; });
-    const byPB = {};
-    rows.forEach(function (r) { const pb = r.phongBan || '(Chưa có phòng ban)'; byPB[pb] = (byPB[pb] || 0) + 1; });
-    return { ky: k.ky, soDong: rows.length, quyLuong: rows.reduce(function (s, r) { return s + r.luongDong; }, 0), byPhongBan: byPB };
+    const prevKy = i === 0 ? baselineKy : kys[i - 1].ky;
+    const curSet = setByKy[k.ky] || {};
+    const prevSet = prevKy ? (setByKy[prevKy] || {}) : null;
+    let tangMoi = null, nghiViec = null;
+    if (prevSet) {
+      tangMoi = Object.keys(curSet).filter(function (m) { return !prevSet[m]; }).length;
+      nghiViec = Object.keys(prevSet).filter(function (m) { return !curSet[m]; }).length;
+    }
+    return {
+      ky: k.ky, soDong: rows.length, quyLuong: rows.reduce(function (s, r) { return s + r.luongDong; }, 0),
+      tangMoi: tangMoi, nghiViec: nghiViec
+    };
   });
-  const phongBanList = [];
-  months.forEach(function (m) { Object.keys(m.byPhongBan).forEach(function (pb) { if (phongBanList.indexOf(pb) < 0) phongBanList.push(pb); }); });
   const lastKyRows = kq.filter(function (r) { return r.ky === denKy && r.dong === CO; });
   const dlky = load_(T.DLKY).rows.filter(function (r) { return r.ky === denKy; });
   const dlMap = {};
@@ -1203,7 +1216,7 @@ function apiDashboard(tuKy, denKy, phongBan) {
   lastKyRows.forEach(function (r) { const k = r.maPL || '(Chưa có)'; byMaPLMap[k] = (byMaPLMap[k] || 0) + 1; });
   const byMaPL = Object.keys(byMaPLMap).map(function (k) { return { maPL: k, count: byMaPLMap[k] }; });
   return {
-    tuKy: tuKy, denKy: denKy, minKy: minKy, maxKy: maxKy, months: months, phongBanList: phongBanList,
+    tuKy: tuKy, denKy: denKy, minKy: minKy, maxKy: maxKy, months: months,
     seniority: bucketCounts, byMaPL: byMaPL, tongNVCuoiKy: lastKyRows.length
   };
 }
