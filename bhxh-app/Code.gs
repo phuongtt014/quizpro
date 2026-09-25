@@ -414,7 +414,9 @@ function moneyNum_(v) {
   const n = Number(String(v).replace(/[^\d-]/g, ''));
   return isFinite(n) ? n : 0;
 }
-function fmtNum_(n) { return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+/** Làm tròn đến đồng theo đúng nguyên tắc hàm ROUND (nửa làm tròn ra xa số 0), đúng cho cả số âm (thoái thu) */
+function round0_(x) { return x < 0 ? -Math.round(-x) : Math.round(x); }
+function fmtNum_(n) { return round0_(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
 function fmtOf_(type) {
   return { text: '@', month: '@', date: 'dd/MM/yyyy', num: '#,##0', pct: '0.####' }[type] || '@';
 }
@@ -656,7 +658,7 @@ function tienKhoan_(k, luong, tiLe) {
   if (k.loaiTran === TRAN_LUONG && max > 0) base = Math.min(luong, max);
   let amt = base * tiLe / 100;
   if (k.loaiTran === TRAN_DONG && max > 0) amt = Math.min(amt, max);
-  return Math.ceil(amt); // làm tròn lên đến đồng, từng khoản
+  return round0_(amt); // làm tròn đến đồng theo nguyên tắc hàm ROUND, từng khoản
 }
 function tinhTheoPL_(luong, pl, kmap, congDoan) {
   const items = {};
@@ -725,8 +727,8 @@ function tinhTruyThu_(r, ctxFn, maplMap, cdCodes, ten, tlRows) {
     dpcd += mDpcd; kpcd += mKpcd;
     if (tlRows) {
       const tl = tyLeGiuLaiHieuLuc_(tlRows, m);
-      dpcdGiuLai += Math.ceil(mDpcd * tl.nld / 100);
-      kpcdGiuLai += Math.ceil(mKpcd * tl.dn / 100);
+      dpcdGiuLai += round0_(mDpcd * tl.nld / 100);
+      kpcdGiuLai += round0_(mKpcd * tl.dn / 100);
     }
     nld += a.nld - b.nld;
     dn += a.dn - b.dn;
@@ -1377,8 +1379,8 @@ function apiCongDoanChiTiet(ky) {
       if (!cdCodes[c]) return;
       if ((ten[c] || {}).doiTuong === DT_DN) cdDN += r.items[c]; else cdNLD += r.items[c];
     });
-    const giuLaiNLD = Math.ceil(cdNLD * tl.nld / 100);
-    const giuLaiDN = Math.ceil(cdDN * tl.dn / 100);
+    const giuLaiNLD = round0_(cdNLD * tl.nld / 100);
+    const giuLaiDN = round0_(cdDN * tl.dn / 100);
     return {
       maNV: r.maNV, hoTen: r.hoTen, maBHXH: r.maBHXH, phongBan: r.phongBan, chucDanh: r.chucDanh, maPL: r.maPL,
       luongDong: r.luongDong, cdNLD: cdNLD, giuLaiNLD: giuLaiNLD, nopNLD: cdNLD - giuLaiNLD,
