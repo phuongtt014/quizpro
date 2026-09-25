@@ -656,7 +656,7 @@ function tienKhoan_(k, luong, tiLe) {
   if (k.loaiTran === TRAN_LUONG && max > 0) base = Math.min(luong, max);
   let amt = base * tiLe / 100;
   if (k.loaiTran === TRAN_DONG && max > 0) amt = Math.min(amt, max);
-  return Math.round(amt); // làm tròn đến đồng, từng khoản
+  return Math.ceil(amt); // làm tròn lên đến đồng, từng khoản
 }
 function tinhTheoPL_(luong, pl, kmap, congDoan) {
   const items = {};
@@ -725,8 +725,8 @@ function tinhTruyThu_(r, ctxFn, maplMap, cdCodes, ten, tlRows) {
     dpcd += mDpcd; kpcd += mKpcd;
     if (tlRows) {
       const tl = tyLeGiuLaiHieuLuc_(tlRows, m);
-      dpcdGiuLai += Math.round(mDpcd * tl.nld / 100);
-      kpcdGiuLai += Math.round(mKpcd * tl.dn / 100);
+      dpcdGiuLai += Math.ceil(mDpcd * tl.nld / 100);
+      kpcdGiuLai += Math.ceil(mKpcd * tl.dn / 100);
     }
     nld += a.nld - b.nld;
     dn += a.dn - b.dn;
@@ -1377,8 +1377,8 @@ function apiCongDoanChiTiet(ky) {
       if (!cdCodes[c]) return;
       if ((ten[c] || {}).doiTuong === DT_DN) cdDN += r.items[c]; else cdNLD += r.items[c];
     });
-    const giuLaiNLD = Math.round(cdNLD * tl.nld / 100);
-    const giuLaiDN = Math.round(cdDN * tl.dn / 100);
+    const giuLaiNLD = Math.ceil(cdNLD * tl.nld / 100);
+    const giuLaiDN = Math.ceil(cdDN * tl.dn / 100);
     return {
       maNV: r.maNV, hoTen: r.hoTen, maBHXH: r.maBHXH, phongBan: r.phongBan, chucDanh: r.chucDanh, maPL: r.maPL,
       luongDong: r.luongDong, cdNLD: cdNLD, giuLaiNLD: giuLaiNLD, nopNLD: cdNLD - giuLaiNLD,

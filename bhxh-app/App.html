@@ -504,7 +504,10 @@ function renderNV() {
   $('nvTbl').className = 'card';
   $('nvTbl').innerHTML = h + '</tbody></table></div>';
 }
-function nvForm(maNV) {
+async function nvForm(maNV) {
+  if (isRole('Admin') && !S.pq) {
+    try { busy(true); S.pq = await run('apiPhanQuyen'); } catch (e) { toast(e.message, 'err'); S.pq = []; } finally { busy(false); }
+  }
   const d = S.nvData;
   const r = maNV ? d.rows.find((x) => x.maNV === maNV) : { congDoan: 'Không', emailQL: S.user.role === 'Nhập liệu' ? S.user.email : '' };
   const ro = !d.editable;
@@ -533,7 +536,7 @@ function nvForm(maNV) {
     <label>Lương đóng BHXH (tự tính)<input id="nvLD" readonly value="${fmt(r.luongDong)}"></label>
     <label><span class="req">Mã phân loại</span><select name="maPL" ${dis}>${opt(plList, r.maPL || '', '— Chọn —')}</select></label>
     <label>Tham gia công đoàn<select name="congDoan" ${dis}>${opt(['Có', 'Không'], r.congDoan || 'Không')}</select></label>
-    <label>Email NV quản lý hồ sơ<input name="emailQL" type="email" value="${esc(r.emailQL || '')}" ${dis} ${isRole('Admin') ? '' : 'readonly'}></label>
+    <label>Email NV quản lý hồ sơ<select name="emailQL" ${dis} ${isRole('Admin') ? '' : 'disabled'}>${opt((S.pq || []).map((p) => p.email), r.emailQL || '', '— Không chọn —')}</select></label>
     <label class="full">Ghi chú<input name="ghiChu" value="${esc(r.ghiChu || '')}" ${dis}></label>
   </div></form>`;
   const foot = ro ? '<button class="btn" onclick="closeModal()">Đóng</button>'

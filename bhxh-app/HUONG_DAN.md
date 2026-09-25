@@ -68,7 +68,7 @@ Với file Sheet đã cài xong, vào **Tệp → Tạo bản sao**. Script đư
 | **Nhập liệu** | Thêm/sửa hồ sơ NV có **Email NV quản lý hồ sơ = email của mình** (NV mới tự gán email của người tạo), nhập truy thu, bấm Tính kỳ. Chỉ thấy NV mình quản lý, kể cả trong báo cáo |
 | **Xem** | Xem toàn bộ nhân viên và báo cáo, xuất Excel/PDF (dành cho Kế toán, Ban Giám đốc) |
 
-Admin có thể đổi *Email NV quản lý hồ sơ* của bất kỳ NV nào để chuyển giao hồ sơ.
+Admin có thể đổi *Email NV quản lý hồ sơ* của bất kỳ NV nào để chuyển giao hồ sơ — trên form Nhân viên, trường này là **dropdown** lấy đúng danh sách email trong **Thiết lập → Phân quyền** (không gõ tay), tránh gõ sai email dẫn đến sai người quản lý hồ sơ.
 
 ## 4. Quy trình hằng tháng
 
@@ -99,7 +99,7 @@ Admin có thể đổi *Email NV quản lý hồ sơ* của bất kỳ NV nào �
   - *Mức đóng tối đa*: tiền = min(Lương đóng × Tỉ lệ, Mức tối đa).
   - *Không áp dụng*: tiền = Lương đóng × Tỉ lệ.
 - **Công đoàn:** khoản có *Chỉ áp dụng đoàn viên công đoàn = Có* (ví dụ đoàn phí) chỉ tính cho NV có *Tham gia công đoàn = Có*. Kinh phí công đoàn (DN) tính cho tất cả NV thuộc mã phân loại có khoản đó. Ở *Báo cáo → Bảng tính nộp BHXH*, các khoản đánh dấu *Thuộc quỹ Công đoàn* được tách ra cột riêng ở cuối bảng, chỉ để tham khảo; cột *Tổng BHXH NLĐ*/*Tổng BHXH DN* và *Tổng nộp BHXH* (= hai cột đó cộng lại) **không gồm** các khoản Công đoàn – đây là số dùng để nộp cơ quan BHXH. Tổng đầy đủ có gộp Công đoàn (Tổng NLĐ/Tổng DN/Tổng cộng) nay xem ở tab **Báo cáo chi phí** (mục 6b).
-- **Làm tròn:** từng khoản của từng NV làm tròn đến 1 đồng. Tổng bằng cộng các số đã làm tròn.
+- **Làm tròn:** từng khoản của từng NV được **làm tròn lên** đến 1 đồng (ví dụ 100.000,4 → 100.001). Tổng bằng cộng các số đã làm tròn.
 - **Lương tối thiểu vùng:** NV có lương đóng thấp hơn mức ở *Thông tin chung* sẽ bị **cảnh báo**. App không tự sửa số.
 - **Truy thu/thoái thu** = Σ các tháng [tiền theo lương mới − tiền theo lương cũ], dùng tỉ lệ và mức trần của **chính tháng đó**. Số âm là thoái thu.
 
