@@ -711,7 +711,7 @@ function tinhTruyThu_(r, ctxFn, maplMap, cdCodes, ten, tlRows) {
     };
   }
   const sum = {};
-  let nld = 0, dn = 0, dpcd = 0, dpcdGiuLai = 0, kpcd = 0, kpcdGiuLai = 0;
+  let nld = 0, dn = 0, dpcd = 0, dpcdNop = 0, kpcd = 0, kpcdNop = 0;
   months.forEach(function (m) {
     const km = ctxFn(m);
     const a = tinhTheoPL_(moneyNum_(r.luongMoi), pl, km, r.congDoan);
@@ -726,17 +726,18 @@ function tinhTruyThu_(r, ctxFn, maplMap, cdCodes, ten, tlRows) {
     });
     dpcd += mDpcd; kpcd += mKpcd;
     if (tlRows) {
+      // Tính phần nộp Công đoàn Việt Nam trước và làm tròn, phần giữ lại cơ sở = phần còn lại (không làm tròn riêng)
       const tl = tyLeGiuLaiHieuLuc_(tlRows, m);
-      dpcdGiuLai += round0_(mDpcd * tl.nld / 100);
-      kpcdGiuLai += round0_(mKpcd * tl.dn / 100);
+      dpcdNop += round0_(mDpcd * (100 - tl.nld) / 100);
+      kpcdNop += round0_(mKpcd * (100 - tl.dn) / 100);
     }
     nld += a.nld - b.nld;
     dn += a.dn - b.dn;
   });
   return {
     soThang: months.length, nld: nld, dn: dn, bhxhNLD: nld - dpcd, bhxhDN: dn - kpcd,
-    dpcd: dpcd, dpcdGiuLai: dpcdGiuLai, dpcdNop: dpcd - dpcdGiuLai,
-    kpcd: kpcd, kpcdGiuLai: kpcdGiuLai, kpcdNop: kpcd - kpcdGiuLai,
+    dpcd: dpcd, dpcdGiuLai: dpcd - dpcdNop, dpcdNop: dpcdNop,
+    kpcd: kpcd, kpcdGiuLai: kpcd - kpcdNop, kpcdNop: kpcdNop,
     chiTiet: Object.keys(sum).filter(function (c) { return sum[c]; }).map(function (c) { return c + ': ' + fmtNum_(sum[c]); }).join('; ')
   };
 }
@@ -1379,12 +1380,13 @@ function apiCongDoanChiTiet(ky) {
       if (!cdCodes[c]) return;
       if ((ten[c] || {}).doiTuong === DT_DN) cdDN += r.items[c]; else cdNLD += r.items[c];
     });
-    const giuLaiNLD = round0_(cdNLD * tl.nld / 100);
-    const giuLaiDN = round0_(cdDN * tl.dn / 100);
+    // Tính phần nộp Công đoàn Việt Nam trước và làm tròn, phần giữ lại cơ sở = phần còn lại (không làm tròn riêng)
+    const nopNLD = round0_(cdNLD * (100 - tl.nld) / 100);
+    const nopDN = round0_(cdDN * (100 - tl.dn) / 100);
     return {
       maNV: r.maNV, hoTen: r.hoTen, maBHXH: r.maBHXH, phongBan: r.phongBan, chucDanh: r.chucDanh, maPL: r.maPL,
-      luongDong: r.luongDong, cdNLD: cdNLD, giuLaiNLD: giuLaiNLD, nopNLD: cdNLD - giuLaiNLD,
-      cdDN: cdDN, giuLaiDN: giuLaiDN, nopDN: cdDN - giuLaiDN
+      luongDong: r.luongDong, cdNLD: cdNLD, giuLaiNLD: cdNLD - nopNLD, nopNLD: nopNLD,
+      cdDN: cdDN, giuLaiDN: cdDN - nopDN, nopDN: nopDN
     };
   });
   const tt = load_(T.TT).rows.filter(function (r) { return r.ky === ky && canSee_(user, r) && (r.dpcd || r.kpcd); });
