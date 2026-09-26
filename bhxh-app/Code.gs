@@ -832,6 +832,27 @@ function apiBootstrap() {
 // ---------------------------------------------------------------------
 function apiListKy() { getUser_(); return listKy_(); }
 
+/**
+ * Bổ sung vào kỳ những NV có trong hồ sơ gốc nhưng chưa có trong kỳ này (NV mới, hoặc NV thử việc đã vào làm
+ * nhưng trước đó bị bỏ sót). Chỉ loại NV có Ngày vào làm SAU tháng của kỳ (chưa thực sự vào làm ở kỳ đó);
+ * KHÔNG loại theo Ngày bắt đầu BHXH — NV chưa đến ngày đóng vẫn phải có mặt trong kỳ với trạng thái "Không đóng"
+ * (tinhNV_ tự đánh cảnh báo "Chưa đến tháng bắt đầu BHXH"), để thấy đầy đủ trong các báo cáo.
+ */
+function themTuHoSoVaoKy_(ky, have) {
+  const themMoi = [];
+  load_(T.NV).rows.forEach(function (m) {
+    if (!m.maNV || have[m.maNV]) return;
+    if (m.ngayVao && m.ngayVao.slice(0, 7) > ky) return;
+    const o = strip_(m);
+    o.ky = ky;
+    o.luongDong = luongDong_(o);
+    themMoi.push(o);
+    have[m.maNV] = 1;
+  });
+  if (themMoi.length) append_(T.DLKY, themMoi);
+  return themMoi.length;
+}
+
 function apiTaoKy(ky) {
   const user = getUser_();
   requireRole_(user, [ROLE.ADMIN]);
@@ -845,12 +866,6 @@ function apiTaoKy(ky) {
     const base = src ? load_(T.DLKY).rows.filter(function (r) { return r.ky === src; }) : [];
     const have = {};
     base.forEach(function (r) { have[r.maNV] = 1; });
-    let themTuHoSo = 0;
-    load_(T.NV).rows.forEach(function (m) {
-      if (!m.maNV || have[m.maNV]) return;
-      if (m.ngayBHXH && m.ngayBHXH.slice(0, 7) > ky) return;
-      base.push(m); have[m.maNV] = 1; themTuHoSo++;
-    });
     const copy = base.filter(function (r) { return !r.thangDung || r.thangDung > ky; }).map(function (r) {
       const o = strip_(r);
       o.ky = ky;
@@ -859,9 +874,10 @@ function apiTaoKy(ky) {
     });
     append_(T.DLKY, copy);
     append_(T.KY, [{ ky: ky, trangThai: KY_MO, ngayTao: now_(), nguoiTao: user.email }]);
+    const themTuHoSo = themTuHoSoVaoKy_(ky, have);
     const nguon = src ? 'kỳ ' + monthDisp_(src) : 'tab Danh sách nhân viên';
-    log_(user, 'Tạo kỳ', monthDisp_(ky) + ' – ' + copy.length + ' NV, nguồn: ' + nguon);
-    return { ky: ky, soNV: copy.length, nguon: nguon, themTuHoSo: src ? themTuHoSo : 0 };
+    log_(user, 'Tạo kỳ', monthDisp_(ky) + ' – ' + (copy.length + themTuHoSo) + ' NV, nguồn: ' + nguon);
+    return { ky: ky, soNV: copy.length + themTuHoSo, nguon: nguon, themTuHoSo: src ? themTuHoSo : 0 };
   });
 }
 
@@ -882,6 +898,9 @@ function tinhKy_(ky, user) {
   const ctx = ctxFactory_();
   const maplMap = maplMap_();
   const kmap = ctx.fn(ky);
+  const have = {};
+  load_(T.DLKY).rows.forEach(function (r) { if (r.ky === ky) have[r.maNV] = 1; });
+  themTuHoSoVaoKy_(ky, have); // tự bổ sung NV mới/thử việc còn thiếu trong kỳ này từ hồ sơ gốc
   const nvs = load_(T.DLKY).rows.filter(function (r) { return r.ky === ky; });
   const codes = allCodes_(ctx.khoanRows);
   let tongNLD = 0, tongDN = 0, soDong = 0, soCB = 0;

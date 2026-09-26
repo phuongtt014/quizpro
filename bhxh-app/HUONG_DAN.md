@@ -92,6 +92,7 @@ Admin có thể đổi *Email NV quản lý hồ sơ* của bất kỳ NV nào �
 
 - **Lương đóng BHXH** = Mức lương chính + PC Kiêm nhiệm + PC Chức vụ + PC Độc hại + PC Khác.
 - **NV đóng trong kỳ T** khi: tháng của *Ngày bắt đầu BHXH* ≤ T, **và** *Tháng dừng đóng* trống hoặc > T, **và** có mã phân loại đang áp dụng. App tính theo tháng, không xét số ngày làm việc.
+- **NV thử việc (đã vào làm nhưng chưa đến ngày bắt đầu BHXH):** vẫn có mặt đầy đủ trong Dữ liệu kỳ và mọi báo cáo (Bảng tính nộp BHXH, Báo cáo chi phí, Tổng hợp, Theo nhân sự) với trạng thái **"Không đóng"** và cảnh báo *"Chưa đến tháng bắt đầu BHXH"**, miễn là *Ngày vào làm* ≤ tháng của kỳ. App tự động bổ sung các NV này vào kỳ (từ hồ sơ gốc) mỗi khi bấm **Tính** — không cần xóa/tạo lại kỳ khi vừa thêm NV thử việc mới.
 - **Phiên bản khoản trích:** với mỗi *Mã nhận diện*, app dùng dòng có *Ngày hiệu lực* gần nhất nhưng ≤ ngày cuối tháng T. Nếu dòng đó có trạng thái *Ngừng áp dụng* thì khoản không được tính. Khi thay đổi tỉ lệ, **thêm dòng mới** (nút *Phiên bản mới*) thay vì sửa dòng cũ, để các kỳ cũ và truy thu vẫn tính đúng.
 - **Tỉ lệ:** dùng tỉ lệ riêng khai trong mã phân loại (nếu có), không có thì dùng tỉ lệ mặc định. Nhập 8 nghĩa là 8%.
 - **Mức trần:**
@@ -104,6 +105,8 @@ Admin có thể đổi *Email NV quản lý hồ sơ* của bất kỳ NV nào �
 - **Truy thu/thoái thu** = Σ các tháng [tiền theo lương mới − tiền theo lương cũ], dùng tỉ lệ và mức trần của **chính tháng đó**. Số âm là thoái thu.
 
 ## 6. Nhập / xuất Excel, CSV ở tab Nhân viên
+
+Phía trên danh sách có ô tìm kiếm (mã NV/họ tên/mã BHXH) và các bộ lọc: **Phòng ban**, **Mã PL**, và trạng thái (Đã nhập tháng dừng đóng / Thiếu mã PL hoặc ngày BHXH) — có thể kết hợp nhiều bộ lọc cùng lúc.
 
 Màn hình **Nhân viên** có 4 nút:
 
@@ -166,6 +169,8 @@ Các màn hình này có thêm:
 - **Lọc theo cột**: chọn một cột tiền (ví dụ "Tổng BHXH NLĐ", "DPCD_NLD"…), rồi chọn **"Chỉ hiện dòng có giá trị 0"** để tìm nhanh ai/kỳ nào đang bị 0 ở cột đó (rà soát thiếu cấu hình), hoặc **"Ẩn dòng có giá trị 0"** để chỉ xem những dòng thực sự có phát sinh. Có ở cả 2 bảng "Tổng hợp theo tháng" và "Tổng hợp theo phòng ban".
 
 Dòng tổng/cộng theo phòng ban và tổng cộng cuối bảng tự tính lại theo đúng những dòng đang hiển thị sau khi lọc.
+
+Các cột "Tổng…" (Tổng BHXH NLĐ/DN, Tổng nộp BHXH, Tổng NLĐ/DN/cộng…) được tô nền xanh nhạt để dễ phân biệt với các cột chi tiết từng khoản khi nhìn bảng.
 
 ## 9. Truy thu / Thoái thu – tách theo khoản hạch toán
 
