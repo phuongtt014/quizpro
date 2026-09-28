@@ -206,6 +206,16 @@ Màn hình **Tổng quan** (trang chủ) chỉ gồm bộ lọc và biểu đồ
 - **Nhân viên theo thâm niên**: biểu đồ cột số NV đang đóng tại kỳ cuối của khoảng đã chọn, chia theo mốc thâm niên (&lt;1 năm, 1–3, 3–5, 5–10, &gt;10 năm; "Chưa rõ" nếu thiếu Ngày vào làm/Ngày bắt đầu BHXH).
 - **Số lượng nhân sự theo mã phân loại**: biểu đồ cột số NV đang đóng tại kỳ cuối, chia theo Mã PL.
 
+## 9d. Tab Nhân viên – đầy đủ lương/phụ cấp và khóa hồ sơ nhân viên nghỉ việc
+
+- **Bảng danh sách** hiện đầy đủ **Mức lương chính, PC Kiêm nhiệm, PC Chức vụ, PC Độc hại, PC Khác** ngay trước cột **Lương đóng BHXH**; cột **Email NV quản lý hồ sơ** không còn hiện trong bảng (vẫn xem/sửa được trong form chi tiết của từng NV, mục Admin). Có thêm dòng **TỔNG CỘNG** ở cuối bảng, cộng các cột lương/phụ cấp và Lương đóng theo đúng danh sách đang lọc.
+- **Khóa hồ sơ NV đã nghỉ việc:** với vai trò **Nhập liệu**, một NV có **Tháng dừng đóng** đã tới (≤ tháng hiện tại hoặc ≤ kỳ đang xem) sẽ bị **khóa**, hiện nhãn **"Đã khóa"** trên danh sách và form chỉ xem (không sửa/lưu được). Vai trò **Admin** và **Xem** không bị ảnh hưởng bởi khóa này.
+- Muốn sửa hồ sơ đã khóa, người **Nhập liệu** mở NV đó, bấm **"Gửi yêu cầu mở khóa"**, ghi rõ **lý do**. Admin vào **Thiết lập → Yêu cầu mở khóa** để **Duyệt** hoặc **Từ chối**; sau khi được Duyệt, NV đó tạm mở khóa cho đến khi Admin bấm **"Khóa lại"** trên chính màn hình đó.
+
+## 9e. Truy thu – Thoái thu: cột Chênh lệch
+
+Bảng **Truy thu – Thoái thu** có thêm cột **Chênh lệch** (= Lương mới − Lương cũ) ngay sau cột Lương mới, giúp thấy ngay mức thay đổi lương làm căn cứ tính truy thu/thoái thu, kèm dòng TỔNG cộng dồn ở cuối bảng.
+
 ## 10. Lưu ý
 
 - **Sửa tay trên Google Sheet:** Nhân viên, Kỳ BHXH, Truy thu, và mọi tính toán/báo cáo luôn đọc dữ liệu **mới nhất** từ Sheet mỗi lần bạn mở màn hình đó hoặc bấm Tính — sửa tay xong là có tác dụng ngay. Riêng 5 danh mục **Khoản trích đóng, Mã phân loại, Tỉ lệ Công đoàn, Phòng ban, Thông tin chung** chỉ được tải **một lần lúc mở trang** để dùng cho dropdown; sửa tay trên Sheet sẽ không hiện ngay trên các màn hình đó. Bấm nút **"🔄 Làm mới dữ liệu"** ở góc trên (hoặc tải lại trang F5) để nạp lại.

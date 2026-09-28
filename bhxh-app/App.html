@@ -504,22 +504,35 @@ function renderNV() {
     && (!pc || Number(r[pc]) > 0))
     .sort((a, b) => (a.phongBan + a.maNV).localeCompare(b.phongBan + b.maNV, 'vi'));
   const tong = rows.reduce((s, r) => s + (Number(r.luongDong) || 0), 0);
+  const sumCol = (k) => rows.reduce((s, r) => s + (Number(r[k]) || 0), 0);
   let h = `<div class="row between" style="margin-bottom:8px"><span><b>${rows.length}</b> / ${d.rows.length} nhân viên</span>
     <span class="muted">Tổng lương đóng: <b>${fmt(tong)}</b></span></div>
     <div class="tbl-wrap"><table><thead><tr><th>Mã NV</th><th>Họ và tên</th><th>Mã số BHXH</th><th>Phòng ban</th><th>Chức danh</th>
-    <th>Bắt đầu BHXH</th><th>Tháng dừng</th><th class="num">Lương đóng</th><th>Mã PL</th><th>CĐ</th><th>Email quản lý</th><th></th></tr></thead><tbody>`;
-  if (!rows.length) h += '<tr><td colspan="12" class="muted">Không có dữ liệu.</td></tr>';
+    <th>Bắt đầu BHXH</th><th>Tháng dừng</th>
+    <th class="num">Mức lương chính</th><th class="num">PC Kiêm nhiệm</th><th class="num">PC Chức vụ</th><th class="num">PC Độc hại</th><th class="num">PC Khác</th>
+    <th class="num">Lương đóng</th><th>Mã PL</th><th>CĐ</th><th></th></tr></thead><tbody>`;
+  if (!rows.length) h += '<tr><td colspan="15" class="muted">Không có dữ liệu.</td></tr>';
   rows.forEach((r) => {
     const stop = r.thangDung && (!d.ky || r.thangDung <= d.ky);
+    const locked = r.khoa && !r.moKhoa;
     h += `<tr class="${stop ? 'off' : ''}"><td>${esc(r.maNV)}</td><td><b>${esc(r.hoTen)}</b></td><td>${esc(r.maBHXH)}</td>
       <td>${esc(r.phongBan)}</td><td>${esc(r.chucDanh)}</td><td>${fmtD(r.ngayBHXH) || '<span class="warn-txt">Thiếu</span>'}</td>
-      <td>${fmtM(r.thangDung)}</td><td class="num">${fmt(r.luongDong)}</td><td>${esc(r.maPL) || '<span class="warn-txt">Thiếu</span>'}</td>
-      <td>${esc(r.congDoan)}</td><td class="small">${esc(r.emailQL)}</td>
-      <td><div class="row"><button class="btn sm" onclick="nvForm('${esc(r.maNV)}')">${d.editable ? 'Sửa' : 'Xem'}</button>
+      <td>${fmtM(r.thangDung)}</td>
+      <td class="num">${fmt(r.luongChinh)}</td><td class="num">${fmt(r.pcKN)}</td><td class="num">${fmt(r.pcCV)}</td><td class="num">${fmt(r.pcDH)}</td><td class="num">${fmt(r.pcKhac)}</td>
+      <td class="num">${fmt(r.luongDong)}</td><td>${esc(r.maPL) || '<span class="warn-txt">Thiếu</span>'}</td>
+      <td>${esc(r.congDoan)}</td>
+      <td><div class="row">${locked ? '<span class="badge bad" title="' + esc(nvKhoaTitle(r)) + '">Đã khóa</span>' : ''}
+      <button class="btn sm" onclick="nvForm('${esc(r.maNV)}')">${d.editable ? 'Sửa' : 'Xem'}</button>
       ${d.editable && isRole('Admin') ? `<button class="btn sm danger" onclick="nvDel('${esc(r.maNV)}')">Xóa</button>` : ''}</div></td></tr>`;
   });
+  if (rows.length) h += `<tr class="total"><td colspan="7">TỔNG CỘNG</td>
+    <td class="num">${fmt(sumCol('luongChinh'))}</td><td class="num">${fmt(sumCol('pcKN'))}</td><td class="num">${fmt(sumCol('pcCV'))}</td>
+    <td class="num">${fmt(sumCol('pcDH'))}</td><td class="num">${fmt(sumCol('pcKhac'))}</td><td class="num">${fmt(tong)}</td><td colspan="3"></td></tr>`;
   $('nvTbl').className = 'card';
   $('nvTbl').innerHTML = h + '</tbody></table></div>';
+}
+function nvKhoaTitle(r) {
+  return r.moKhoa ? 'Đã được duyệt mở khóa' : 'Nhân viên đã nghỉ việc (dừng đóng từ ' + fmtM(r.thangDung) + '), gửi yêu cầu để mở khóa.';
 }
 async function nvForm(maNV) {
   if (isRole('Admin') && !S.pq.length) {
@@ -527,14 +540,17 @@ async function nvForm(maNV) {
   }
   const d = S.nvData;
   const r = maNV ? d.rows.find((x) => x.maNV === maNV) : { congDoan: 'Không', emailQL: S.user.role === 'Nhập liệu' ? S.user.email : '' };
-  const ro = !d.editable;
+  const locked = !!(r.khoa && !r.moKhoa && S.user.role === 'Nhập liệu');
+  const ro = !d.editable || locked;
   const dis = ro ? 'disabled' : '';
   const plList = S.mapl.filter((m) => m.trangThai !== 'Ngừng áp dụng' || m.ma === r.maPL).map((m) => m.ma);
   const inp = (name, label, type, extra) => `<label class="${extra && extra.includes('req') ? '' : ''}"><span class="${extra && extra.includes('req') ? 'req' : ''}">${label}</span>
     <input name="${name}" type="${type || 'text'}" value="${esc(r[name] === 0 && type === 'number' ? '' : (r[name] ?? ''))}" ${dis} ${extra && extra.includes('ro') ? 'readonly' : ''} ${type === 'number' ? 'min="0" step="1" oninput="nvSum()"' : ''}></label>`;
   const money = (name, label, extra) => `<label class="${extra && extra.includes('req') ? '' : ''}"><span class="${extra && extra.includes('req') ? 'req' : ''}">${label}</span>
     <input name="${name}" type="text" inputmode="numeric" value="${moneyVal(r[name])}" ${dis} oninput="onMoneyInput(this);nvSum()"></label>`;
-  const body = `<form id="nvF1" onsubmit="return false"><div class="form">
+  const body = `${locked ? `<div class="alert bad">Nhân viên này đã nghỉ việc (dừng đóng từ ${fmtM(r.thangDung)}) và hồ sơ đã bị khóa.
+    Hãy gửi yêu cầu mở khóa kèm lý do để Admin xét duyệt.</div>` : ''}
+    <form id="nvF1" onsubmit="return false"><div class="form">
     ${inp('maNV', 'Mã NV', 'text', maNV ? 'req ro' : 'req')}
     ${inp('hoTen', 'Họ và tên', 'text', 'req')}
     ${inp('maBHXH', 'Mã số BHXH')}
@@ -556,9 +572,29 @@ async function nvForm(maNV) {
     <label>Email NV quản lý hồ sơ<select name="emailQL" ${dis} ${isRole('Admin') ? '' : 'disabled'}>${opt((S.pq || []).map((p) => p.email), r.emailQL || '', '— Không chọn —')}</select></label>
     <label class="full">Ghi chú<input name="ghiChu" value="${esc(r.ghiChu || '')}" ${dis}></label>
   </div></form>`;
-  const foot = ro ? '<button class="btn" onclick="closeModal()">Đóng</button>'
+  const foot = locked
+    ? `<button class="btn" onclick="closeModal()">Đóng</button><button class="btn warn" onclick="ycForm('${esc(r.maNV)}','${esc(r.hoTen)}')">Gửi yêu cầu mở khóa</button>`
+    : ro ? '<button class="btn" onclick="closeModal()">Đóng</button>'
     : `<button class="btn" onclick="closeModal()">Hủy</button><button class="btn pri" onclick="nvSave(${maNV ? 'false' : 'true'})">Lưu</button>`;
   openModal(maNV ? 'Nhân viên ' + maNV : 'Thêm nhân viên', body, foot);
+}
+function ycForm(maNV, hoTen) {
+  const body = `<form id="ycF1" onsubmit="return false"><div class="form">
+    <label class="full">Nhân viên<input value="${esc(maNV)} – ${esc(hoTen)}" readonly></label>
+    <label class="full req">Lý do yêu cầu mở khóa<textarea name="lyDo" rows="4" style="width:100%"></textarea></label>
+  </div></form>`;
+  openModal('Yêu cầu mở khóa – ' + maNV, body,
+    `<button class="btn" onclick="closeModal()">Hủy</button><button class="btn pri" onclick="ycSubmit('${esc(maNV)}')">Gửi yêu cầu</button>`);
+}
+function ycSubmit(maNV) {
+  const o = formData('ycF1');
+  if (!o.lyDo || !o.lyDo.trim()) return toast('Vui lòng ghi lý do.', 'err');
+  act(async () => {
+    await run('apiYeuCauMoKhoa', maNV, o.lyDo);
+    closeModal();
+    toast('Đã gửi yêu cầu mở khóa, chờ Admin duyệt.', 'ok');
+    loadNV();
+  });
 }
 function nvSum() {
   const o = formData('nvF1');
@@ -598,18 +634,19 @@ async function loadTT() {
   $('ttAdd').innerHTML = d.editable ? '<button class="btn pri" onclick="ttForm(null)">＋ Thêm dòng</button>' : kyBadge(d.trangThai);
   const sum = (f) => d.rows.reduce((s, r) => s + (Number(f(r)) || 0), 0);
   let h = `<div class="tbl-wrap"><table><thead><tr><th>Loại</th><th>Mã NV</th><th>Họ và tên</th><th>Từ – Đến</th><th class="num">Số tháng</th>
-    <th class="num">Lương cũ</th><th class="num">Lương mới</th><th>Mã PL</th>
+    <th class="num">Lương cũ</th><th class="num">Lương mới</th><th class="num">Chênh lệch</th><th>Mã PL</th>
     <th class="num">BHXH NLĐ</th><th class="num">BHXH DN</th>
     <th class="num">Đoàn phí – Giữ lại</th><th class="num">Đoàn phí – Nộp CĐVN</th>
     <th class="num">Kinh phí – Giữ lại</th><th class="num">Kinh phí – Nộp CĐVN</th>
     <th class="num tot">Tổng NLĐ</th><th class="num tot">Tổng DN</th>
     <th>Chi tiết</th><th>Ghi chú</th><th></th></tr></thead><tbody>`;
-  if (!d.rows.length) h += '<tr><td colspan="18" class="muted">Chưa có dòng truy thu/thoái thu trong kỳ này.</td></tr>';
+  if (!d.rows.length) h += '<tr><td colspan="19" class="muted">Chưa có dòng truy thu/thoái thu trong kỳ này.</td></tr>';
   d.rows.forEach((r) => {
     const tt = r.tienNLD + r.tienDN >= 0;
+    const chenhLech = (Number(r.luongMoi) || 0) - (Number(r.luongCu) || 0);
     h += `<tr><td><span class="badge ${tt ? 'info' : 'warn'}">${tt ? 'Truy thu' : 'Thoái thu'}</span></td><td>${esc(r.maNV)}</td><td>${esc(r.hoTen)}</td>
       <td>${fmtM(r.tuThang)} – ${fmtM(r.denThang)}</td><td class="num">${r.soThang}</td><td class="num">${fmt(r.luongCu)}</td>
-      <td class="num">${fmt(r.luongMoi)}</td><td>${esc(r.maPL)}</td>
+      <td class="num">${fmt(r.luongMoi)}</td><td class="num">${fmt(chenhLech)}</td><td>${esc(r.maPL)}</td>
       <td class="num">${fmt(r.bhxhNLD)}</td><td class="num">${fmt(r.bhxhDN)}</td>
       <td class="num">${r.dpcd ? fmt(r.dpcdGiuLai) : ''}</td><td class="num">${r.dpcd ? fmt(r.dpcdNop) : ''}</td>
       <td class="num">${r.kpcd ? fmt(r.kpcdGiuLai) : ''}</td><td class="num">${r.kpcd ? fmt(r.kpcdNop) : ''}</td>
@@ -618,7 +655,8 @@ async function loadTT() {
       <td>${d.editable ? `<div class="row"><button class="btn sm" onclick="ttForm('${r.id}')">Sửa</button>
         <button class="btn sm danger" onclick="ttDel('${r.id}')">Xóa</button></div>` : ''}</td></tr>`;
   });
-  if (d.rows.length) h += `<tr class="total"><td colspan="8">TỔNG</td>
+  if (d.rows.length) h += `<tr class="total"><td colspan="6">TỔNG</td>
+    <td class="num">${fmt(sum((r) => (Number(r.luongMoi) || 0) - (Number(r.luongCu) || 0)))}</td><td></td>
     <td class="num">${fmt(sum((r) => r.bhxhNLD))}</td><td class="num">${fmt(sum((r) => r.bhxhDN))}</td>
     <td class="num">${fmt(sum((r) => r.dpcdGiuLai))}</td><td class="num">${fmt(sum((r) => r.dpcdNop))}</td>
     <td class="num">${fmt(sum((r) => r.kpcdGiuLai))}</td><td class="num">${fmt(sum((r) => r.kpcdNop))}</td>
@@ -1189,10 +1227,43 @@ function renderNhanSu() {
 // =====================================================================
 function vThietLap() {
   const tabs = [['info', 'Thông tin chung'], ['pb', 'Phòng ban'], ['khoan', 'Khoản trích đóng'], ['mapl', 'Mã phân loại'], ['tlcd', 'Tỉ lệ Công đoàn']];
+  if (isRole('Admin') || isRole('Nhập liệu')) tabs.push(['ycml', 'Yêu cầu mở khóa']);
   if (isRole('Admin')) tabs.push(['pq', 'Phân quyền']);
   V().innerHTML = `<h2>Thiết lập</h2><div class="tabs">${tabs.map((t) => `<button class="${S.setTab === t[0] ? 'active' : ''}" onclick="S.setTab='${t[0]}';vThietLap()">${t[1]}</button>`).join('')}</div>
     ${isRole('Admin') ? '' : '<div class="alert info">Bạn đang ở chế độ chỉ xem. Chỉ Admin được thay đổi thiết lập.</div>'}<div id="setBody"></div>`;
-  ({ info: setInfo, pb: setPB, khoan: setKhoan, mapl: setMaPL, tlcd: setTLCD, pq: setPQ }[S.setTab])();
+  ({ info: setInfo, pb: setPB, khoan: setKhoan, mapl: setMaPL, tlcd: setTLCD, ycml: setYCML, pq: setPQ }[S.setTab])();
+}
+async function setYCML() {
+  $('setBody').innerHTML = '<div class="card muted">Đang tải…</div>';
+  let rows;
+  try { rows = await run('apiListYeuCauMoKhoa'); } catch (e) { return; }
+  S.ycml = rows;
+  renderYCML();
+}
+function renderYCML() {
+  const admin = isRole('Admin');
+  const badge = (t) => ({ 'Chờ duyệt': 'warn', 'Đã duyệt': 'open', 'Từ chối': 'bad', 'Đã khóa lại': 'closed' }[t] || 'info');
+  $('setBody').innerHTML = `<div class="card"><div class="small muted" style="margin-bottom:10px">
+    ${admin ? 'Duyệt hoặc từ chối yêu cầu mở khóa hồ sơ nhân viên đã nghỉ việc do vai trò Nhập liệu gửi lên.'
+      : 'Các yêu cầu mở khóa hồ sơ nhân viên nghỉ việc do bạn gửi lên.'}</div>
+    <div class="tbl-wrap"><table><thead><tr><th>Mã NV</th><th>Họ và tên</th><th>Lý do</th><th>Người yêu cầu</th><th>Thời gian YC</th>
+      <th>Trạng thái</th><th>Người duyệt</th><th>Thời gian duyệt</th><th></th></tr></thead><tbody>
+    ${(S.ycml || []).map((r) => `<tr><td>${esc(r.maNV)}</td><td>${esc(r.hoTen)}</td><td class="small">${esc(r.lyDo)}</td>
+      <td class="small">${esc(r.nguoiYeuCau)}</td><td class="small">${esc(r.thoiGianYC)}</td>
+      <td><span class="badge ${badge(r.trangThai)}">${esc(r.trangThai)}</span></td>
+      <td class="small">${esc(r.nguoiDuyet)}</td><td class="small">${esc(r.thoiGianDuyet)}</td>
+      <td>${admin && r.trangThai === 'Chờ duyệt' ? `<div class="row"><button class="btn sm ok" onclick="ycDuyet('${r.id}',true)">Duyệt</button>
+        <button class="btn sm danger" onclick="ycDuyet('${r.id}',false)">Từ chối</button></div>`
+        : admin && r.trangThai === 'Đã duyệt' ? `<button class="btn sm warn" onclick="ycKhoaLai('${esc(r.maNV)}')">Khóa lại</button>` : ''}</td></tr>`)
+      .join('') || '<tr><td colspan="9" class="muted">Chưa có yêu cầu nào.</td></tr>'}
+    </tbody></table></div></div>`;
+}
+function ycDuyet(id, duyet) {
+  act(async () => { await run('apiDuyetYeuCauMoKhoa', id, duyet); toast(duyet ? 'Đã duyệt mở khóa.' : 'Đã từ chối.', 'ok'); setYCML(); });
+}
+function ycKhoaLai(maNV) {
+  if (!confirm('Khóa lại hồ sơ NV ' + maNV + '?')) return;
+  act(async () => { await run('apiKhoaLaiNV', maNV); toast('Đã khóa lại.', 'ok'); setYCML(); });
 }
 function setTLCD() {
   const admin = isRole('Admin');

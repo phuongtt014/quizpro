@@ -23,6 +23,10 @@ const CO = 'Có';
 const KHONG = 'Không';
 const PQ_HD = 'Hoạt động';
 const PQ_KHOA = 'Khóa';
+const YCML_CHO = 'Chờ duyệt';
+const YCML_DUYET = 'Đã duyệt';
+const YCML_TUCHOI = 'Từ chối';
+const YCML_KHOALAI = 'Đã khóa lại';
 
 const LISTS = {
   role: [ROLE.ADMIN, ROLE.NHAP, ROLE.XEM],
@@ -30,7 +34,8 @@ const LISTS = {
   loaiTran: [TRAN_LUONG, TRAN_DONG, TRAN_KHONG],
   trangThai: [TT_AD, TT_NGUNG],
   coKhong: [CO, KHONG],
-  pqTrangThai: [PQ_HD, PQ_KHOA]
+  pqTrangThai: [PQ_HD, PQ_KHOA],
+  ycmlTrangThai: [YCML_CHO, YCML_DUYET, YCML_TUCHOI, YCML_KHOALAI]
 };
 
 // Cột của hồ sơ nhân viên: [key, tiêu đề cột trên Sheet, kiểu]
@@ -151,6 +156,17 @@ const T = {
     ['tyLeGiuLaiNLD', 'Tỉ lệ giữ lại - Đoàn phí (NLĐ) (%)', 'pct'],
     ['tyLeGiuLaiDN', 'Tỉ lệ giữ lại - Kinh phí công đoàn (DN) (%)', 'pct'],
     ['ngayHL', 'Ngày hiệu lực', 'date'],
+    ['ghiChu', 'Ghi chú', 'text']] },
+  YCML: { name: 'Yêu cầu mở khóa NV', cols: [
+    ['id', 'ID', 'text'],
+    ['maNV', 'Mã NV', 'text'],
+    ['hoTen', 'Họ và tên', 'text'],
+    ['lyDo', 'Lý do', 'text'],
+    ['nguoiYeuCau', 'Người yêu cầu', 'text'],
+    ['thoiGianYC', 'Thời gian yêu cầu', 'text'],
+    ['trangThai', 'Trạng thái', 'text'],
+    ['nguoiDuyet', 'Người duyệt', 'text'],
+    ['thoiGianDuyet', 'Thời gian duyệt', 'text'],
     ['ghiChu', 'Ghi chú', 'text']] }
 };
 
@@ -299,6 +315,7 @@ function khoiTaoCauTruc() {
   v(T.KY, 'Trạng thái', [KY_MO, KY_CHOT]);
   v(T.PQ, 'Vai trò', LISTS.role);
   v(T.PQ, 'Trạng thái', LISTS.pqTrangThai);
+  v(T.YCML, 'Trạng thái', LISTS.ycmlTrangThai);
 
   try { ss.toast('Đã khởi tạo cấu trúc. Hãy kiểm tra các tab Thông tin chung, Khoản trích đóng, Mã phân loại.', 'BHXH', 8); } catch (e) { /* không có giao diện Sheet */ }
   return 'OK';
@@ -988,6 +1005,30 @@ function apiXoaKy(ky) {
 // API: NHÂN VIÊN
 // ky = '' nghĩa là làm việc trên hồ sơ gốc (tab Danh sách nhân viên)
 // ---------------------------------------------------------------------
+// Nhân viên đã nghỉ việc (có Tháng dừng đóng <= kỳ/hiện tại) coi như bị khóa với vai trò Nhập liệu
+function nvDaKhoa_(nv, ky) {
+  if (!nv || !nv.thangDung) return false;
+  return nv.thangDung <= (ky || todayStr_().slice(0, 7));
+}
+function ycmlRowsCuaNV_(maNV) {
+  return load_(T.YCML).rows.filter(function (r) { return r.maNV === maNV; })
+    .sort(function (a, b) { return a.thoiGianYC < b.thoiGianYC ? 1 : -1; });
+}
+// true nếu yêu cầu mở khóa gần nhất của NV đã được Admin duyệt (và chưa bị khóa lại)
+function nvDangMoKhoa_(maNV) {
+  const rows = ycmlRowsCuaNV_(maNV);
+  return !!(rows.length && rows[0].trangThai === YCML_DUYET);
+}
+function nvCoTheSua_(nv, ky, user) {
+  if (user.role !== ROLE.NHAP) return true;
+  if (!nvDaKhoa_(nv, ky)) return true;
+  return nvDangMoKhoa_(nv.maNV);
+}
+function nvKhoaMsg_(nv) {
+  return 'Nhân viên "' + nv.maNV + '" đã nghỉ việc (dừng đóng từ ' + monthDisp_(nv.thangDung)
+    + '), hồ sơ đã bị khóa. Hãy gửi yêu cầu mở khóa để Admin xét duyệt.';
+}
+
 function apiNhanVien(ky) {
   const user = getUser_();
   ky = normMonth_(ky);
@@ -1004,9 +1045,62 @@ function apiNhanVien(ky) {
   editable = editable && user.role !== ROLE.XEM;
   rows = rows.filter(function (r) { return canSee_(user, r); }).map(function (r) {
     r.luongDong = luongDong_(r);
+    r.khoa = nvDaKhoa_(r, ky);
+    r.moKhoa = r.khoa && nvDangMoKhoa_(r.maNV);
     return r;
   });
   return { ky: ky, trangThai: trangThai, editable: editable, rows: rows };
+}
+
+// ---------------------------------------------------------------------
+// API: YÊU CẦU MỞ KHÓA NHÂN VIÊN NGHỈ VIỆC
+// ---------------------------------------------------------------------
+function apiYeuCauMoKhoa(maNV, lyDo) {
+  const user = getUser_();
+  requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
+  lyDo = String(lyDo || '').trim();
+  if (!lyDo) throw new Error('Vui lòng ghi lý do yêu cầu mở khóa.');
+  return withLock_(function () {
+    const nv = load_(T.NV).rows.find(function (r) { return r.maNV === maNV; });
+    if (!nv) throw new Error('Không tìm thấy NV "' + maNV + '".');
+    if (!canSee_(user, nv)) throw new Error('Bạn không quản lý hồ sơ NV này.');
+    append_(T.YCML, [{
+      id: 'YC' + new Date().getTime(), maNV: maNV, hoTen: nv.hoTen, lyDo: lyDo,
+      nguoiYeuCau: user.email, thoiGianYC: now_(), trangThai: YCML_CHO
+    }]);
+    log_(user, 'Yêu cầu mở khóa NV', maNV + ' ' + nv.hoTen + ' – ' + lyDo);
+    return true;
+  });
+}
+function apiListYeuCauMoKhoa() {
+  const user = getUser_();
+  requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
+  let rows = load_(T.YCML).rows;
+  if (user.role !== ROLE.ADMIN) rows = rows.filter(function (r) { return r.nguoiYeuCau === user.email; });
+  return rows.sort(function (a, b) { return a.thoiGianYC < b.thoiGianYC ? 1 : -1; });
+}
+function apiDuyetYeuCauMoKhoa(id, duyet) {
+  const user = getUser_();
+  requireRole_(user, [ROLE.ADMIN]);
+  return withLock_(function () {
+    const r = load_(T.YCML).rows.find(function (x) { return x.id === id; });
+    if (!r) throw new Error('Không tìm thấy yêu cầu.');
+    const trangThai = duyet ? YCML_DUYET : YCML_TUCHOI;
+    update_(T.YCML, r._row, { trangThai: trangThai, nguoiDuyet: user.email, thoiGianDuyet: now_() });
+    log_(user, duyet ? 'Duyệt mở khóa NV' : 'Từ chối mở khóa NV', r.maNV + ' ' + r.hoTen);
+    return true;
+  });
+}
+function apiKhoaLaiNV(maNV) {
+  const user = getUser_();
+  requireRole_(user, [ROLE.ADMIN]);
+  return withLock_(function () {
+    const rows = ycmlRowsCuaNV_(maNV);
+    if (!rows.length || rows[0].trangThai !== YCML_DUYET) throw new Error('Nhân viên này chưa được mở khóa.');
+    update_(T.YCML, rows[0]._row, { trangThai: YCML_KHOALAI, nguoiDuyet: user.email, thoiGianDuyet: now_() });
+    log_(user, 'Khóa lại NV', maNV);
+    return true;
+  });
 }
 
 function apiSaveNV(ky, o, isNew) {
@@ -1017,6 +1111,10 @@ function apiSaveNV(ky, o, isNew) {
   return withLock_(function () {
     const kys = listKy_();
     const latest = kys.length ? kys[0].ky : '';
+    if (!isNew) {
+      const hoSo = load_(T.NV).rows.find(function (r) { return r.maNV === o.maNV; });
+      if (hoSo && !nvCoTheSua_(hoSo, ky, user)) throw new Error(nvKhoaMsg_(hoSo));
+    }
     if (ky) {
       requireOpen_(ky);
       const dl = load_(T.DLKY);
