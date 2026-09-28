@@ -377,6 +377,9 @@ async function vNhanVien() {
       <select id="nvPL" onchange="renderNV()">${opt(S.mapl.map((m) => m.ma), '', 'Tất cả mã PL')}</select>
       <select id="nvF" onchange="renderNV()"><option value="">Tất cả</option><option value="dung">Đã nhập tháng dừng đóng</option>
         <option value="thieu">Thiếu mã PL / ngày BHXH</option></select>
+      <select id="nvPC" onchange="renderNV()"><option value="">Tất cả phụ cấp</option>
+        <option value="pcKN">Đang có PC Kiêm nhiệm</option><option value="pcCV">Đang có PC Chức vụ</option>
+        <option value="pcDH">Đang có PC Độc hại</option><option value="pcKhac">Đang có PC Khác</option></select>
       <span class="spacer"></span><span id="nvAdd"></span>
     </div>
     <div class="row no-print" style="margin-top:10px">
@@ -493,11 +496,12 @@ function nvImportResult(r) {
 }
 function renderNV() {
   const d = S.nvData; if (!d) return;
-  const q = ($('nvQ').value || '').toLowerCase().trim(), pb = $('nvPB').value, pl = $('nvPL').value, f = $('nvF').value;
+  const q = ($('nvQ').value || '').toLowerCase().trim(), pb = $('nvPB').value, pl = $('nvPL').value, f = $('nvF').value, pc = $('nvPC').value;
   const rows = d.rows.filter((r) => (!q || [r.maNV, r.hoTen, r.maBHXH].join(' ').toLowerCase().includes(q))
     && (!pb || r.phongBan === pb)
     && (!pl || r.maPL === pl)
-    && (!f || (f === 'dung' ? !!r.thangDung : (!r.maPL || !r.ngayBHXH))))
+    && (!f || (f === 'dung' ? !!r.thangDung : (!r.maPL || !r.ngayBHXH)))
+    && (!pc || Number(r[pc]) > 0))
     .sort((a, b) => (a.phongBan + a.maNV).localeCompare(b.phongBan + b.maNV, 'vi'));
   const tong = rows.reduce((s, r) => s + (Number(r.luongDong) || 0), 0);
   let h = `<div class="row between" style="margin-bottom:8px"><span><b>${rows.length}</b> / ${d.rows.length} nhân viên</span>
@@ -1007,20 +1011,33 @@ async function rpBienDong() {
   $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>';
   let d;
   try { d = await run('apiBienDong', S.rpKy); } catch (e) { $('rpBody').innerHTML = ''; return; }
+  S.rpBDData = d;
+  renderBienDong();
+}
+function renderBienDong() {
+  const d = S.rpBDData; if (!d) return;
   const cnt = {};
   d.rows.forEach((r) => { cnt[r.loai] = (cnt[r.loai] || 0) + 1; });
   const cls = (l) => (l.startsWith('Tăng') || l === 'Truy thu') ? 'open' : (l === 'Giảm' || l === 'Thoái thu') ? 'bad' : 'info';
+  const loaiList = Object.keys(cnt);
+  const bdLoai = $('rpBdLoai') ? $('rpBdLoai').value : '';
+  const rows = d.rows.filter((r) => !bdLoai || r.loai === bdLoai)
+    .slice().sort((a, b) => (a.loai + '|' + a.phongBan).localeCompare(b.loai + '|' + b.phongBan, 'vi'));
   let h = d.prev ? `<div class="alert info">So sánh kỳ <b>${fmtM(d.ky)}</b> với kỳ <b>${fmtM(d.prev)}</b>.</div>`
     : '<div class="alert warn">Đây là kỳ đầu tiên – không có kỳ trước để so sánh tăng/giảm.</div>';
-  h += `<div class="row" style="margin-bottom:10px">${Object.keys(cnt).map((k) => `<span class="badge ${cls(k)}">${esc(k)}: ${cnt[k]}</span>`).join(' ') || '<span class="muted">Không có biến động.</span>'}</div>`;
+  h += `<div class="row" style="margin-bottom:10px">
+    <select id="rpBdLoai" onchange="renderBienDong()"><option value="">Tất cả loại biến động</option>
+      ${loaiList.map((k) => `<option value="${esc(k)}" ${bdLoai === k ? 'selected' : ''}>${esc(k)} (${cnt[k]})</option>`).join('')}</select>
+    <span class="spacer"></span>
+    ${loaiList.map((k) => `<span class="badge ${cls(k)}">${esc(k)}: ${cnt[k]}</span>`).join(' ') || '<span class="muted">Không có biến động.</span>'}</div>`;
   h += `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>STT</th><th>Loại biến động</th><th>Mã NV</th><th>Họ và tên</th><th>Mã số BHXH</th>
     <th>Chức danh</th><th>Phòng ban</th><th class="num">Lương cũ</th><th class="num">Lương mới</th><th>Mã PL cũ → mới</th><th>Từ tháng</th><th>Đến tháng</th><th>Ghi chú</th></tr></thead><tbody>
-    ${d.rows.map((r, i) => `<tr><td>${i + 1}</td><td><span class="badge ${cls(r.loai)}">${esc(r.loai)}</span></td><td>${esc(r.maNV)}</td><td>${esc(r.hoTen)}</td>
+    ${rows.map((r, i) => `<tr><td>${i + 1}</td><td><span class="badge ${cls(r.loai)}">${esc(r.loai)}</span></td><td>${esc(r.maNV)}</td><td>${esc(r.hoTen)}</td>
       <td>${esc(r.maBHXH)}</td><td>${esc(r.chucDanh)}</td><td>${esc(r.phongBan)}</td>
       <td class="num">${r.luongCu === '' ? '' : fmt(r.luongCu)}</td><td class="num">${r.luongMoi === '' ? '' : fmt(r.luongMoi)}</td>
       <td>${esc(r.maPLCu)}${r.maPLCu && r.maPLMoi && r.maPLCu !== r.maPLMoi ? ' → ' + esc(r.maPLMoi) : ''}</td>
       <td>${fmtM(r.tuThang)}</td><td>${fmtM(r.denThang)}</td><td class="small">${esc(r.ghiChu)}</td></tr>`).join('')
-      || '<tr><td colspan="13" class="muted">Không có dữ liệu.</td></tr>'}
+      || '<tr><td colspan="13" class="muted">Không có dữ liệu khớp bộ lọc.</td></tr>'}
     </tbody></table></div></div>`;
   $('rpBody').innerHTML = h;
 }

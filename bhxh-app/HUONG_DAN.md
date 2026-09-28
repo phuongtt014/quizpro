@@ -106,7 +106,7 @@ Admin có thể đổi *Email NV quản lý hồ sơ* của bất kỳ NV nào �
 
 ## 6. Nhập / xuất Excel, CSV ở tab Nhân viên
 
-Phía trên danh sách có ô tìm kiếm (mã NV/họ tên/mã BHXH) và các bộ lọc: **Phòng ban**, **Mã PL**, và trạng thái (Đã nhập tháng dừng đóng / Thiếu mã PL hoặc ngày BHXH) — có thể kết hợp nhiều bộ lọc cùng lúc.
+Phía trên danh sách có ô tìm kiếm (mã NV/họ tên/mã BHXH) và các bộ lọc: **Phòng ban**, **Mã PL**, trạng thái (Đã nhập tháng dừng đóng / Thiếu mã PL hoặc ngày BHXH), và **Phụ cấp** (PC Kiêm nhiệm / PC Chức vụ / PC Độc hại / PC Khác — chọn để chỉ xem những NV đang có mức phụ cấp đó lớn hơn 0) — có thể kết hợp nhiều bộ lọc cùng lúc.
 
 Màn hình **Nhân viên** có 4 nút:
 
@@ -171,6 +171,8 @@ Các màn hình này có thêm:
 Dòng tổng/cộng theo phòng ban và tổng cộng cuối bảng tự tính lại theo đúng những dòng đang hiển thị sau khi lọc.
 
 Các cột "Tổng…" (Tổng BHXH NLĐ/DN, Tổng nộp BHXH, Tổng NLĐ/DN/cộng…) được tô nền xanh nhạt để dễ phân biệt với các cột chi tiết từng khoản khi nhìn bảng.
+
+**Báo cáo → Biến động tăng/giảm**: danh sách được sắp xếp theo **Loại biến động** (ưu tiên 1) rồi **Phòng ban** (ưu tiên 2) để dễ nhìn theo từng nhóm; có thêm bộ lọc **theo Loại biến động** (Tăng mới, Giảm, Điều chỉnh tăng/giảm lương, Đổi mã phân loại, Truy thu, Thoái thu…) ngay trên bảng, kèm số lượng từng loại.
 
 ## 9. Truy thu / Thoái thu – tách theo khoản hạch toán
 
