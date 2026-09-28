@@ -174,6 +174,10 @@ Các cột "Tổng…" (Tổng BHXH NLĐ/DN, Tổng nộp BHXH, Tổng NLĐ/DN/c
 
 **Báo cáo → Biến động tăng/giảm**: danh sách được sắp xếp theo **Loại biến động** (ưu tiên 1) rồi **Phòng ban** (ưu tiên 2) để dễ nhìn theo từng nhóm; có thêm bộ lọc **theo Loại biến động** (Tăng mới, Giảm, Điều chỉnh tăng/giảm lương, Đổi mã phân loại, Truy thu, Thoái thu…) ngay trên bảng, kèm số lượng từng loại.
 
+Thứ tự các tab trong màn hình **Báo cáo** là: **Biến động tăng/giảm, Bảng tính nộp BHXH, Công đoàn, Báo cáo chi phí, Tổng hợp, Theo nhân sự**.
+
+Trong từng nhóm phòng ban của **Bảng tính nộp BHXH**, **Công đoàn** và **Báo cáo chi phí**, danh sách nhân viên được sắp theo thứ tự **Mã phân loại** (mã **CT** luôn đứng đầu, các mã khác theo đúng thứ tự đã cấu hình ở **Thiết lập → Mã phân loại**); nhân viên **đã nghỉ việc** (đã tới Tháng dừng đóng) luôn xếp **cuối** nhóm, bất kể mã phân loại.
+
 ## 9. Truy thu / Thoái thu – tách theo khoản hạch toán
 
 Kết quả tính ở màn hình **Truy thu** được tách thành 4 phần vì hạch toán chi trả khác nhau:
@@ -214,7 +218,7 @@ Màn hình **Tổng quan** (trang chủ) chỉ gồm bộ lọc và biểu đồ
 
 ## 9e. Truy thu – Thoái thu: cột Chênh lệch
 
-Bảng **Truy thu – Thoái thu** có thêm cột **Chênh lệch** (= Lương mới − Lương cũ) ngay sau cột Lương mới, giúp thấy ngay mức thay đổi lương làm căn cứ tính truy thu/thoái thu, kèm dòng TỔNG cộng dồn ở cuối bảng.
+Bảng **Truy thu – Thoái thu** có thêm cột **Chênh lệch** (= Lương mới − Lương cũ) ngay sau cột Lương mới, tô nền để dễ nhận biết, giúp thấy ngay mức thay đổi lương làm căn cứ tính truy thu/thoái thu, kèm dòng TỔNG cộng dồn đúng cột ở cuối bảng.
 
 ## 10. Lưu ý
 

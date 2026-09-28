@@ -42,6 +42,26 @@ function zfApply(tab, rows, cols) {
   if (!c) return rows;
   return rows.filter((r) => cur.mode === 'zero' ? Number(c.get(r)) === 0 : Number(c.get(r)) !== 0);
 }
+// Sắp xếp danh sách NV trong 1 phòng ban: theo thứ tự Mã phân loại (CT đứng đầu, theo đúng thứ tự
+// cấu hình ở Thiết lập → Mã phân loại), NV đã nghỉ việc (đã dừng đóng) luôn xếp cuối cùng.
+function plOrderIndex_(maPL) {
+  const codes = (S.mapl || []).map((m) => m.ma);
+  if (maPL === 'CT') return -1;
+  const i = codes.indexOf(maPL);
+  return i < 0 ? codes.length : i;
+}
+function nvResigned_(r, ky) {
+  return !!(r.thangDung && (!ky || r.thangDung <= ky));
+}
+function rpSortCmp_(ky) {
+  return (a, b) => {
+    const ra = nvResigned_(a, ky) ? 1 : 0, rb = nvResigned_(b, ky) ? 1 : 0;
+    if (ra !== rb) return ra - rb;
+    const pa = plOrderIndex_(a.maPL), pb = plOrderIndex_(b.maPL);
+    if (pa !== pb) return pa - pb;
+    return String(a.maNV).localeCompare(String(b.maNV), 'vi');
+  };
+}
 // ---------- Biểu đồ SVG đơn giản (không cần thư viện ngoài) ----------
 const CHART_COLORS = ['var(--pri-2)', 'var(--ok)', 'var(--warn)', 'var(--bad)', '#6b4fbb', '#c2410c', '#0f766e', '#a16207', '#0369a1', '#be185d'];
 function chartBar(data, opts) {
@@ -634,7 +654,7 @@ async function loadTT() {
   $('ttAdd').innerHTML = d.editable ? '<button class="btn pri" onclick="ttForm(null)">＋ Thêm dòng</button>' : kyBadge(d.trangThai);
   const sum = (f) => d.rows.reduce((s, r) => s + (Number(f(r)) || 0), 0);
   let h = `<div class="tbl-wrap"><table><thead><tr><th>Loại</th><th>Mã NV</th><th>Họ và tên</th><th>Từ – Đến</th><th class="num">Số tháng</th>
-    <th class="num">Lương cũ</th><th class="num">Lương mới</th><th class="num">Chênh lệch</th><th>Mã PL</th>
+    <th class="num">Lương cũ</th><th class="num">Lương mới</th><th class="num tot">Chênh lệch</th><th>Mã PL</th>
     <th class="num">BHXH NLĐ</th><th class="num">BHXH DN</th>
     <th class="num">Đoàn phí – Giữ lại</th><th class="num">Đoàn phí – Nộp CĐVN</th>
     <th class="num">Kinh phí – Giữ lại</th><th class="num">Kinh phí – Nộp CĐVN</th>
@@ -646,7 +666,7 @@ async function loadTT() {
     const chenhLech = (Number(r.luongMoi) || 0) - (Number(r.luongCu) || 0);
     h += `<tr><td><span class="badge ${tt ? 'info' : 'warn'}">${tt ? 'Truy thu' : 'Thoái thu'}</span></td><td>${esc(r.maNV)}</td><td>${esc(r.hoTen)}</td>
       <td>${fmtM(r.tuThang)} – ${fmtM(r.denThang)}</td><td class="num">${r.soThang}</td><td class="num">${fmt(r.luongCu)}</td>
-      <td class="num">${fmt(r.luongMoi)}</td><td class="num">${fmt(chenhLech)}</td><td>${esc(r.maPL)}</td>
+      <td class="num">${fmt(r.luongMoi)}</td><td class="num tot">${fmt(chenhLech)}</td><td>${esc(r.maPL)}</td>
       <td class="num">${fmt(r.bhxhNLD)}</td><td class="num">${fmt(r.bhxhDN)}</td>
       <td class="num">${r.dpcd ? fmt(r.dpcdGiuLai) : ''}</td><td class="num">${r.dpcd ? fmt(r.dpcdNop) : ''}</td>
       <td class="num">${r.kpcd ? fmt(r.kpcdGiuLai) : ''}</td><td class="num">${r.kpcd ? fmt(r.kpcdNop) : ''}</td>
@@ -655,8 +675,8 @@ async function loadTT() {
       <td>${d.editable ? `<div class="row"><button class="btn sm" onclick="ttForm('${r.id}')">Sửa</button>
         <button class="btn sm danger" onclick="ttDel('${r.id}')">Xóa</button></div>` : ''}</td></tr>`;
   });
-  if (d.rows.length) h += `<tr class="total"><td colspan="6">TỔNG</td>
-    <td class="num">${fmt(sum((r) => (Number(r.luongMoi) || 0) - (Number(r.luongCu) || 0)))}</td><td></td>
+  if (d.rows.length) h += `<tr class="total"><td colspan="6">TỔNG</td><td></td>
+    <td class="num tot">${fmt(sum((r) => (Number(r.luongMoi) || 0) - (Number(r.luongCu) || 0)))}</td><td></td>
     <td class="num">${fmt(sum((r) => r.bhxhNLD))}</td><td class="num">${fmt(sum((r) => r.bhxhDN))}</td>
     <td class="num">${fmt(sum((r) => r.dpcdGiuLai))}</td><td class="num">${fmt(sum((r) => r.dpcdNop))}</td>
     <td class="num">${fmt(sum((r) => r.kpcdGiuLai))}</td><td class="num">${fmt(sum((r) => r.kpcdNop))}</td>
@@ -709,7 +729,7 @@ function ttDel(id) {
 function vBaoCao() {
   if (!S.rpKy) S.rpKy = latestKy();
   const tab = (k, t) => `<button class="${S.rpTab === k ? 'active' : ''}" onclick="S.rpTab='${k}';vBaoCao()">${t}</button>`;
-  V().innerHTML = `<h2>Báo cáo</h2><div class="tabs">${tab('chitiet', 'Bảng tính nộp BHXH')}${tab('chiphi', 'Báo cáo chi phí')}${tab('biendong', 'Biến động tăng/giảm')}${tab('tonghop', 'Tổng hợp')}${tab('congdoan', 'Công đoàn')}${tab('nhansu', 'Theo nhân sự')}</div>
+  V().innerHTML = `<h2>Báo cáo</h2><div class="tabs">${tab('biendong', 'Biến động tăng/giảm')}${tab('chitiet', 'Bảng tính nộp BHXH')}${tab('congdoan', 'Công đoàn')}${tab('chiphi', 'Báo cáo chi phí')}${tab('tonghop', 'Tổng hợp')}${tab('nhansu', 'Theo nhân sự')}</div>
     <div id="rpBar" class="card no-print"></div><div id="rpBody"></div>`;
   if (!S.kys.length) { $('rpBar').innerHTML = 'Chưa có kỳ BHXH nào.'; return; }
   const exp = (loai, p) => `<button class="btn" onclick="xuat('${loai}','${p}','xlsx')">⬇ Excel</button>
@@ -773,7 +793,7 @@ function renderCongDoan() {
     { key: 'tongNop', label: 'Tổng nộp CĐVN', get: (r) => r.nopNLD + r.nopDN }
   ];
   let rows = d.rows.filter((r) => (!q || [r.maNV, r.hoTen, r.maBHXH].join(' ').toLowerCase().includes(q)) && (!pl || r.maPL === pl))
-    .sort((a, b) => (a.phongBan + a.maNV).localeCompare(b.phongBan + b.maNV, 'vi'));
+    .sort((a, b) => a.phongBan.localeCompare(b.phongBan, 'vi') || rpSortCmp_(d.ky)(a, b));
   rows = zfApply('congdoan', rows, zfCols);
   const sum = (arr, f) => arr.reduce((s, r) => s + (Number(f(r)) || 0), 0);
   let h = `<div class="alert info">Tỉ lệ giữ lại cơ sở dùng cho kỳ ${fmtM(d.ky)}: Đoàn phí NLĐ <b>${fmtPct(d.tyLeNLD)}%</b>, Kinh phí công đoàn DN <b>${fmtPct(d.tyLeDN)}%</b>.
@@ -869,7 +889,7 @@ function renderChiTiet() {
   let rows = d.rows.filter((r) => (all || r.dong === 'Có')
     && (!q || [r.maNV, r.hoTen, r.maBHXH].join(' ').toLowerCase().includes(q))
     && (!pl || r.maPL === pl))
-    .sort((a, b) => (a.phongBan + a.maNV).localeCompare(b.phongBan + b.maNV, 'vi'));
+    .sort((a, b) => a.phongBan.localeCompare(b.phongBan, 'vi') || rpSortCmp_(d.ky)(a, b));
   rows = zfApply('chitiet', rows, zfCols);
   const codesNLD = d.codes.filter((c) => c.doiTuong !== 'DN');
   const codesDN = d.codes.filter((c) => c.doiTuong === 'DN');
@@ -965,7 +985,7 @@ function renderChiPhi() {
   let rows = d.rows.filter((r) => (all || r.dong === 'Có')
     && (!q || [r.maNV, r.hoTen, r.maBHXH].join(' ').toLowerCase().includes(q))
     && (!pl || r.maPL === pl))
-    .sort((a, b) => (a.phongBan + a.maNV).localeCompare(b.phongBan + b.maNV, 'vi'));
+    .sort((a, b) => a.phongBan.localeCompare(b.phongBan, 'vi') || rpSortCmp_(d.ky)(a, b));
   rows = zfApply('chiphi', rows, zfCols);
   const dong = d.rows.filter((r) => r.dong === 'Có');
   const sum = (arr, f) => arr.reduce((s, r) => s + (Number(f(r)) || 0), 0);
