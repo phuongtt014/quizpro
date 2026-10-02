@@ -166,6 +166,33 @@ function saveBenefit(b) {
   return "Đã lưu chính sách phúc lợi!";
 }
 
+// 3c. XÓA PHÚC LỢI (kèm các bậc thưởng của nó)
+function deleteBenefit(maPL) {
+  maPL = String(maPL).trim();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const shPL = ss.getSheetByName("DM_PhucLoi");
+  if (!shPL) throw new Error("Không tìm thấy sheet DM_PhucLoi.");
+
+  const data = shPL.getDataRange().getValues();
+  let found = false;
+  for (let i = data.length - 1; i >= 1; i--) {
+    if (String(data[i][0]).trim() === maPL) {
+      shPL.deleteRow(i + 1);
+      found = true;
+    }
+  }
+  if (!found) throw new Error("Không tìm thấy phúc lợi " + maPL);
+
+  const shBac = ss.getSheetByName("DM_PhucLoi_Bac");
+  if (shBac) {
+    const t = shBac.getDataRange().getValues();
+    for (let i = t.length - 1; i >= 1; i--) {
+      if (String(t[i][0]).trim() === maPL) shBac.deleteRow(i + 1);
+    }
+  }
+  return "Đã xóa chính sách " + maPL + "!";
+}
+
 // 4. THÊM / SỬA HỒ SƠ NHÂN VIÊN
 function saveEmployee(emp) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();

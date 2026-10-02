@@ -764,10 +764,24 @@
             <button class="btn btn-sm btn-outline-dark py-0 px-2" onclick="editBenefit(${idx})">
               <i class="fa-solid fa-pen-to-square"></i> Sửa
             </button>
+            <button class="btn btn-sm btn-outline-danger py-0 px-2 ms-1" onclick="deleteBenefit(${idx})">
+              <i class="fa-solid fa-trash"></i> Xóa
+            </button>
           </td>
         `;
         tbody.appendChild(tr);
       });
+    }
+
+    function deleteBenefit(idx) {
+      let b = currentBenefits[idx];
+      if (!b) return;
+      if (!confirm(`Xóa chính sách "${b.Ma_PhucLoi} - ${b.Ten_PhucLoi}" và các bậc thưởng của nó?\nThao tác này không thể hoàn tác và sẽ làm thay đổi dự toán.`)) return;
+      toggleLoading(true);
+      google.script.run
+        .withSuccessHandler(() => loadInitialData())
+        .withFailureHandler(err => { toggleLoading(false); alert("Lỗi xóa: " + err.message); })
+        .deleteBenefit(b.Ma_PhucLoi);
     }
 
     function tiersOf(code) {
