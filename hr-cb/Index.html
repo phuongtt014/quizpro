@@ -850,8 +850,9 @@
     }
 
     function payDateLabel(b) {
-      let d = parseInt(b.Ngay_Chi_Tra) || 1;
-      let m = parseInt(b.Thang_Chi_Tra);
+      let num = v => parseInt((String(v == null ? '' : v).match(/\d+/) || [])[0]);
+      let d = num(b.Ngay_Chi_Tra) || 1;
+      let m = num(b.Thang_Chi_Tra);
       if (b.Chu_Ky === 'Tháng') return `Ngày ${d} hàng tháng`;
       if (b.Chu_Ky === 'Quý') {
         let start = (((m >= 1 && m <= 12) ? m : 3) - 1) % 3 + 1;
@@ -964,7 +965,7 @@
       document.getElementById('pl_ThamNien').value = b.Tham_Nien_Toi_Thieu_Thang || 0;
       fillMonthSelect();
       document.getElementById('pl_Ngay').value = parseInt(b.Ngay_Chi_Tra) || 1;
-      document.getElementById('pl_Thang').value = b.Thang_Chi_Tra || '';
+      document.getElementById('pl_Thang').value = parseInt((String(b.Thang_Chi_Tra == null ? '' : b.Thang_Chi_Tra).match(/\d+/) || [])[0]) || '';
       updateCycleFields();
       document.getElementById('tierTbody').innerHTML = '';
       tiersOf(b.Ma_PhucLoi).forEach(t => addTierRow(t));

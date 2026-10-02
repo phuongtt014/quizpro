@@ -155,7 +155,7 @@ function saveBenefit(b, oldCode) {
 
   for (let i = 1; i < data.length; i++) {
     const code = String(data[i][0]).trim();
-    if (code === lookupCode) foundRowIndex = i + 1;
+    if (code === lookupCode && foundRowIndex < 0) foundRowIndex = i + 1;
     // Đổi mã: không được trùng với mã của chính sách khác
     if (oldCode && newCode !== oldCode && code === newCode) {
       throw new Error("Mã " + newCode + " đã tồn tại, vui lòng chọn mã khác.");
@@ -565,7 +565,7 @@ function getSheetDataAsJson(sheet) {
   if (!sheet) return [];
   let data = sheet.getDataRange().getValues();
   if (data.length <= 1) return [];
-  let headers = data.shift();
+  let headers = data.shift().map(h => String(h).trim());
   const timeZone = Session.getScriptTimeZone() || "GMT+7";
 
   return data.map(row => {
