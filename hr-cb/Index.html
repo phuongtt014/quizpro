@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Hệ Thống Ngân Sách Phúc Lợi & Chi Phí Nhân Sự</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --slate-900: #0f172a;
+      --slate-800: #1e293b;
+      --slate-700: #334155;
+      --slate-600: #475569;
+      --slate-100: #f1f5f9;
+      --slate-50:  #f8fafc;
+      --border-color: #e2e8f0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--slate-50);
+      color: var(--slate-800);
+    }
+
+    .app-header {
+      background-color: var(--slate-900);
+      border-bottom: 1px solid var(--slate-800);
+    }
+
+    .card-executive {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+
+    .kpi-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--slate-600);
+    }
+
+    .kpi-value {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--slate-900);
+    }
+
+    .nav-tabs-subtle .nav-link {
+      border: none;
+      color: var(--slate-600);
+      font-weight: 500;
+      padding: 0.75rem 1.25rem;
+      font-size: 0.875rem;
+    }
+    .nav-tabs-subtle .nav-link.active {
+      color: var(--slate-900);
+      font-weight: 600;
+      border-bottom: 2px solid var(--slate-900);
+      background: transparent;
+    }
+
+    .table-executive { font-size: 0.85rem; }
+    .table-executive th {
+      background-color: var(--slate-100);
+      color: var(--slate-700);
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .table-executive td { padding: 10px 12px; border-bottom: 1px solid var(--border-color); }
+
+    .btn-executive {
+      background-color: var(--slate-900);
+      color: #ffffff;
+      font-weight: 500;
+      font-size: 0.875rem;
+      border-radius: 6px;
+      padding: 8px 16px;
+      border: none;
+    }
+    .btn-executive:hover { background-color: var(--slate-700); color: #ffffff; }
+
+    .badge-subtle {
+      background-color: var(--slate-100);
+      color: var(--slate-700);
+      font-weight: 500;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+    }
+
+    .loading-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(2px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading State -->
+  <div id="loading" class="loading-overlay">
+    <div class="text-center">
+      <div class="spinner-border text-dark" style="width: 2.5rem; height: 2.5rem;" role="status"></div>
+      <p class="mt-3 text-secondary small fw-medium">Đang đồng bộ & tính toán dữ liệu C&B...</p>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="app-header py-3 px-4 text-white">
+    <div class="d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center gap-3">
+        <i class="fa-solid fa-chart-simple text-slate-400 fs-5"></i>
+        <span class="fw-semibold fs-6">DỰ BÁO NGÂN SÁCH PHÚC LỢI & CHI PHÍ NHÂN SỰ</span>
+      </div>
+      <div>
+        <button class="btn btn-sm btn-outline-light" onclick="initDB()">
+          <i class="fa-solid fa-arrows-rotate me-1"></i> Reset DB Mẫu
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container-fluid px-4 py-4">
+
+    <!-- Filter Control -->
+    <div class="card-executive p-3 mb-4">
+      <div class="row g-3 align-items-center">
+        <div class="col-md-3">
+          <label class="form-label small text-muted mb-1">Năm dự báo</label>
+          <input type="number" id="targetYear" class="form-control form-control-sm" value="2027">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted mb-1">Tỷ lệ lạm phát / Tăng chi phí (%)</label>
+          <input type="number" id="inflationRate" class="form-control form-control-sm" value="5" step="0.5">
+        </div>
+        <div class="col-md-6 d-flex align-items-end">
+          <button class="btn btn-executive w-100" onclick="runCalculation()">
+            <i class="fa-solid fa-calculator me-2"></i> TÍNH TOÁN NGÂN SÁCH DỰ BÁO
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card-executive p-3">
+          <span class="kpi-title">Tổng Ngân Sách Dự Báo</span>
+          <div class="kpi-value mt-2" id="kpiTotal">0 VNĐ</div>
+          <span class="small text-muted" id="kpiYearLabel">Năm --</span>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card-executive p-3">
+          <span class="kpi-title">Ngân Sách Nhân Sự Hiện Tại</span>
+          <div class="kpi-value mt-2" id="kpiExisting">0 VNĐ</div>
+          <span class="small text-muted" id="kpiExistingStaffCount">0 Nhân sự</span>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card-executive p-3">
+          <span class="kpi-title">Ngân Sách Tuyển Mới</span>
+          <div class="kpi-value mt-2" id="kpiNewHire">0 VNĐ</div>
+          <span class="small text-muted" id="kpiNewHireCount">0 Chỉ tiêu mới</span>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card-executive p-3">
+          <span class="kpi-title">Chi Phí Phúc Lợi TB / NV Mới</span>
+          <div class="kpi-value mt-2" id="kpiAvgNewHire">0 VNĐ</div>
+          <span class="small text-muted">BHXH, Thưởng & Phúc Lợi</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs-subtle mb-4" id="mainTab" role="tablist">
+      <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-dashboard">
+          <i class="fa-solid fa-chart-pie me-2"></i>Tổng Quan Chi Phí
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-benefits">
+          <i class="fa-solid fa-list-check me-2"></i>Cấu Hình Phúc Lợi & Điều Kiện
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-employees">
+          <i class="fa-solid fa-users me-2"></i>Bảng Mức Lương & Hồ Sơ Nhân Sự
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-emp-details">
+          <i class="fa-solid fa-table-list me-2"></i>Chi Tiết Theo Nhân Sự
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-newhire">
+          <i class="fa-solid fa-user-plus me-2"></i>Kế Hoạch Tuyển Mới
+        </button>
+      </li>
+    </ul>
+
+    <!-- Tab Contents -->
+    <div class="tab-content">
+      
+      <!-- TAB 1: DASHBOARD -->
+      <div class="tab-pane fade show active" id="tab-dashboard">
+        <div class="row g-4">
+          <div class="col-md-7">
+            <div class="card-executive p-4">
+              <h6 class="fw-bold mb-3 text-slate-800">Cơ Cấu Chi Phí Phúc Lợi & Thưởng Hàng Năm</h6>
+              <canvas id="categoryChart" height="150"></canvas>
+            </div>
+          </div>
+          <div class="col-md-5">
+            <div class="card-executive p-4">
+              <h6 class="fw-bold mb-3 text-slate-800">Phân Bổ Chi Phí Theo Khối / Phòng Ban</h6>
+              <canvas id="deptChart" height="220"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: CẤU HÌNH PHÚC LỢI & ĐIỀU KIỆN -->
+      <div class="tab-pane fade" id="tab-benefits">
+        <div class="card-executive p-3">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold text-slate-800 mb-0">Danh Mục Phúc Lợi, Chi Phí BHXH & Điều Kiện Áp Dụng</h6>
+            <button class="btn btn-sm btn-dark" onclick="openBenefitModal()">
+              <i class="fa-solid fa-plus me-1"></i> Thêm Chính Sách Mới
+            </button>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-executive align-middle">
+              <thead>
+                <tr>
+                  <th>Mã PL</th>
+                  <th>Tên Khoản Chi Phí / Thưởng</th>
+                  <th>Mức Áp Dụng / Bậc Thưởng</th>
+                  <th>Chu Kỳ</th>
+                  <th>Đối Tượng</th>
+                  <th>Giới Tính</th>
+                  <th>Cấp Bậc</th>
+                  <th>Thâm Niên</th>
+                  <th>Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody id="benefitTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: DANH SÁCH NHÂN VIÊN -->
+      <div class="tab-pane fade" id="tab-employees">
+        <div class="card-executive p-3">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h6 class="fw-bold text-slate-800 d-inline me-2">Bảng Mức Lương & Hồ Sơ Nhân Sự</h6>
+              <span class="badge-subtle" id="empCountBadge">0 NV</span>
+            </div>
+            <button class="btn btn-sm btn-dark" onclick="openEmpModal()">
+              <i class="fa-solid fa-user-plus me-1"></i> Thêm Nhân Viên Mới
+            </button>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-executive align-middle">
+              <thead>
+                <tr>
+                  <th>Mã NV</th>
+                  <th>Họ Và Tên</th>
+                  <th>Phòng Ban</th>
+                  <th>Vị Trí / Cấp Bậc</th>
+                  <th>Giới Tính</th>
+                  <th>Đối Tượng</th>
+                  <th>Ngày Vào Làm</th>
+                  <th>Lương</th>
+                  <th>Lương BHXH</th>
+                  <th>ĐCH</th>
+                  <th>Trạng Thái</th>
+                  <th>Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody id="empTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: BẢNG CÁC KHOẢN CHI TIẾT THEO TỪNG NHÂN SỰ -->
+      <div class="tab-pane fade" id="tab-emp-details">
+        <div class="card-executive p-3">
+          <div class="row g-2 mb-3 align-items-center">
+            <div class="col-md-4">
+              <input type="text" id="searchEmpDetail" class="form-control form-control-sm" placeholder="🔍 Tìm theo Mã NV hoặc Họ tên..." oninput="filterEmpDetails()">
+            </div>
+            <div class="col-md-3">
+              <select id="filterDeptDetail" class="form-select form-select-sm" onchange="filterEmpDetails()">
+                <option value="All">Tất cả Phòng Ban</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <select id="filterObjDetail" class="form-select form-select-sm" onchange="filterEmpDetails()">
+                <option value="All">Tất cả Đối Tượng</option>
+                <option value="Cơ hữu">Cơ hữu</option>
+                <option value="Dịch vụ">Dịch vụ</option>
+              </select>
+            </div>
+            <div class="col-md-2 text-end">
+              <span class="badge bg-dark" id="countDetailBadge">0 Nhân sự</span>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-executive align-middle">
+              <thead>
+                <tr>
+                  <th>Mã NV</th>
+                  <th>Họ Và Tên</th>
+                  <th>Phòng Ban / Vị Trí</th>
+                  <th>Cấp Bậc</th>
+                  <th>Lương/Tháng</th>
+                  <th>Lương Cả Năm</th>
+                  <th>Tổng PL & Thưởng (Năm)</th>
+                  <th>Tổng Chi Phí / Năm</th>
+                  <th>Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody id="empDetailTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: KẾ HOẠCH TUYỂN MỚI -->
+      <div class="tab-pane fade" id="tab-newhire">
+        <div class="card-executive p-3">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold text-slate-800 mb-0">Chỉ Tiêu Tuyển Dụng Dự Kiến Năm Sau</h6>
+            <button class="btn btn-sm btn-outline-dark" onclick="addNewHireRow()">
+              <i class="fa-solid fa-plus me-1"></i> Thêm Vị Trí Mới
+            </button>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-executive align-middle">
+              <thead>
+                <tr>
+                  <th>Phòng Ban</th>
+                  <th>Vị Trí</th>
+                  <th>Cấp Bậc</th>
+                  <th>Giới Tính</th>
+                  <th>Đối Tượng</th>
+                  <th>SL Tuyển</th>
+                  <th>Lương Dự Kiến</th>
+                  <th>Lương BHXH Dự Kiến</th>
+                  <th>Tháng Vào</th>
+                  <th>Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody id="newHireTbody"></tbody>
+            </table>
+          </div>
+          <div class="mt-3 text-end">
+            <button class="btn btn-executive" onclick="saveAndRecalculate()">
+              <i class="fa-solid fa-floppy-disk me-1"></i> Lưu Kế Hoạch & Cập Nhật Báo Cáo
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- MODAL: BẢNG KÊ CHI TIẾT CÁC KHOẢN CỦA 1 NHÂN SỰ -->
+  <div class="modal fade" id="itemizedDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h6 class="modal-title fw-bold" id="itemizedModalTitle">Bảng Kê Chi Tiết Chi Phí Nhân Sự</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="p-3 bg-light rounded mb-3">
+            <div class="row text-secondary small">
+              <div class="col-md-6">Họ tên: <b class="text-dark fs-6" id="popEmpName">--</b></div>
+              <div class="col-md-6">Mã NV: <b class="text-dark fs-6" id="popEmpCode">--</b></div>
+              <div class="col-md-6 mt-1">Phòng ban: <span class="text-dark" id="popEmpDept">--</span></div>
+              <div class="col-md-6 mt-1">Lương tháng: <b class="text-dark" id="popEmpSalary">--</b></div>
+            </div>
+          </div>
+          <h6 class="fw-bold text-dark fs-7 mb-2">Chi Tiết Các Khoản Phúc Lợi, BHXH & Thưởng Hưởng Trong Năm</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle text-sm" style="font-size:0.85rem">
+              <thead class="table-secondary">
+                <tr>
+                  <th>Mã PL</th>
+                  <th>Tên Khoản Chi Phí / Thưởng</th>
+                  <th>Chu Kỳ</th>
+                  <th class="text-end">Tổng Thành Tiền (Năm)</th>
+                </tr>
+              </thead>
+              <tbody id="itemizedTbody"></tbody>
+              <tfoot class="table-group-divider">
+                <tr class="fw-bold">
+                  <td colspan="3" class="text-end">TỔNG CỘNG PHÚC LỢI & THƯỞNG:</td>
+                  <td class="text-end text-success" id="popTotalBenefits">0 VNĐ</td>
+                </tr>
+                <tr class="fw-bold table-active">
+                  <td colspan="3" class="text-end">TỔNG CHI PHÍ DOANH NGHIỆP TRẢ (LƯƠNG + PL):</td>
+                  <td class="text-end text-danger" id="popTotalGrandCost">0 VNĐ</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Đóng</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: THÊM / SỬA PHÚC LỢI -->
+  <div class="modal fade" id="benefitModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h6 class="modal-title fw-bold" id="benefitModalTitle">Thêm Chính Sách Phúc Lợi</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="benefitForm">
+            <div class="row g-2 mb-2">
+              <div class="col-md-4">
+                <label class="form-label small">Mã Phúc Lợi</label>
+                <input type="text" id="pl_Ma" class="form-control form-control-sm" required placeholder="PL07">
+              </div>
+              <div class="col-md-8">
+                <label class="form-label small">Tên Phúc Lợi / Khoản Chi</label>
+                <input type="text" id="pl_Ten" class="form-control form-control-sm" required>
+              </div>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-md-3">
+                <label class="form-label small">Loại Tính Toán</label>
+                <select id="pl_Loai" class="form-select form-select-sm">
+                  <option value="Số tiền cố định">Số tiền cố định</option>
+                  <option value="Phần trăm lương">Phần trăm lương</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small">Giá Trị / Tỷ Lệ (%)</label>
+                <input type="number" id="pl_GiaTri" class="form-control form-control-sm" required step="any">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small">Căn Cứ Lương</label>
+                <select id="pl_CanCu" class="form-select form-select-sm">
+                  <option value="Không">Không</option>
+                  <option value="Luong">Luong (Lương)</option>
+                  <option value="Luong_Dong_BHXH">Luong_Dong_BHXH</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small">Chu Kỳ Chi Trả</label>
+                <select id="pl_ChuKy" class="form-select form-select-sm">
+                  <option value="Tháng">Tháng</option>
+                  <option value="Quý">Quý</option>
+                  <option value="Năm">Năm</option>
+                  <option value="1 lần">1 lần</option>
+                </select>
+              </div>
+            </div>
+
+            <hr class="my-3 text-muted">
+            <h6 class="fw-bold fs-7 text-dark mb-2"><i class="fa-solid fa-filter me-1"></i> Điều Kiện Áp Dụng Phúc Lợi</h6>
+
+            <div class="row g-2 mb-2">
+              <div class="col-md-4">
+                <label class="form-label small">Đối Tượng Áp Dụng</label>
+                <select id="pl_DoiTuong" class="form-select form-select-sm">
+                  <option value="All">Tất cả đối tượng</option>
+                  <option value="Cơ hữu">Chỉ Cơ hữu</option>
+                  <option value="Dịch vụ">Chỉ Dịch vụ</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small">Giới Tính Áp Dụng</label>
+                <select id="pl_GioiTinh" class="form-select form-select-sm">
+                  <option value="All">Tất cả giới tính</option>
+                  <option value="Nam">Chỉ Nam</option>
+                  <option value="Nữ">Chỉ Nữ</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-dark">Cấp Bậc Áp Dụng</label>
+                <select id="pl_CapBac" class="form-select form-select-sm">
+                  <option value="All">Tất cả cấp bậc</option>
+                  <option value="Nhân viên">Nhân viên</option>
+                  <option value="Quản lý cấp trung">Quản lý cấp trung</option>
+                  <option value="Quản lý cấp cao">Quản lý cấp cao</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label small">Phòng Ban Áp Dụng</label>
+                <input type="text" id="pl_PhongBan" class="form-control form-control-sm" value="All" placeholder="All hoặc tên khối">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small">Thâm Niên Tối Thiểu (Tháng)</label>
+                <input type="number" id="pl_ThamNien" class="form-control form-control-sm" value="0" min="0">
+              </div>
+            </div>
+
+            <hr class="my-3 text-muted">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <h6 class="fw-bold fs-7 text-dark mb-0"><i class="fa-solid fa-layer-group me-1"></i> Các Bậc Thưởng (theo thâm niên / đối tượng / cấp bậc)</h6>
+              <button type="button" class="btn btn-sm btn-outline-dark py-0" onclick="addTierRow()">
+                <i class="fa-solid fa-plus me-1"></i> Thêm bậc
+              </button>
+            </div>
+            <div class="small text-muted mb-2">
+              Để trống = dùng "Giá Trị / Tỷ Lệ" ở trên cho mọi người. Nếu có bậc: hệ thống lấy giá trị của bậc khớp
+              (đơn vị theo "Loại Tính Toán" ở trên); người không thuộc bậc nào sẽ <b>không được hưởng</b>.
+              Khoảng thâm niên tính <b>[Từ, Đến)</b> theo tháng; "Đến" để trống = không giới hạn. Nhiều bậc cùng khớp thì bậc có Đối Tượng/Cấp Bậc cụ thể được ưu tiên.
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered align-middle mb-0" style="font-size:0.8rem">
+                <thead class="table-light">
+                  <tr>
+                    <th>Tên bậc</th>
+                    <th style="width:90px">Từ (tháng)</th>
+                    <th style="width:90px">Đến (tháng)</th>
+                    <th style="width:110px">Đối tượng</th>
+                    <th style="width:140px">Cấp bậc</th>
+                    <th style="width:120px">Giá trị / %</th>
+                    <th style="width:40px"></th>
+                  </tr>
+                </thead>
+                <tbody id="tierTbody"></tbody>
+              </table>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Hủy</button>
+          <button type="button" class="btn btn-sm btn-dark" onclick="submitBenefitForm()">Lưu Chính Sách</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: THÊM / SỬA NHÂN VIÊN -->
+  <div class="modal fade" id="empModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h6 class="modal-title fw-bold" id="empModalTitle">Thêm Nhân Viên Mới</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="empForm">
+            <div class="row g-2 mb-2">
+              <div class="col-md-3">
+                <label class="form-label small">Mã NV</label>
+                <input type="text" id="emp_Ma" class="form-control form-control-sm" required placeholder="NV005">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small">Họ Và Tên</label>
+                <input type="text" id="emp_Ten" class="form-control form-control-sm" required>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small">Giới Tính</label>
+                <select id="emp_GioiTinh" class="form-select form-select-sm">
+                  <option value="Nam">Nam</option>
+                  <option value="Nữ">Nữ</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small fw-bold text-primary">Đối Tượng</label>
+                <select id="emp_DoiTuong" class="form-select form-select-sm border-primary">
+                  <option value="Cơ hữu">Cơ hữu</option>
+                  <option value="Dịch vụ">Dịch vụ</option>
+                </select>
+              </div>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-md-4">
+                <label class="form-label small">Phòng Ban</label>
+                <input type="text" id="emp_PhongBan" class="form-control form-control-sm" required placeholder="Khối Công nghệ">
+              </div>
+              <div class="col-md-5">
+                <label class="form-label small">Vị Trí Chức Danh</label>
+                <input type="text" id="emp_ViTri" class="form-control form-control-sm" required placeholder="Lập trình viên">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small fw-bold text-dark">Cấp Bậc</label>
+                <select id="emp_CapBac" class="form-select form-select-sm">
+                  <option value="Nhân viên">Nhân viên</option>
+                  <option value="Quản lý cấp trung">Quản lý cấp trung</option>
+                  <option value="Quản lý cấp cao">Quản lý cấp cao</option>
+                </select>
+              </div>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-md-4">
+                <label class="form-label small">Khu Vực</label>
+                <input type="text" id="emp_KhuVuc" class="form-control form-control-sm" value="Hồ Chí Minh">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small">Ngày Vào Làm (dd/mm/yyyy)</label>
+                <input type="text" id="emp_NgayVao" class="form-control form-control-sm" placeholder="dd/mm/yyyy" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small">Trạng Thái</label>
+                <select id="emp_TrangThai" class="form-select form-select-sm">
+                  <option value="Đang làm việc">Đang làm việc</option>
+                  <option value="Đã nghỉ việc">Đã nghỉ việc</option>
+                </select>
+              </div>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-dark">Lương (VNĐ)</label>
+                <input type="number" id="emp_Luong" class="form-control form-control-sm" required step="100000">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small">Lương Đóng BHXH (VNĐ)</label>
+                <input type="number" id="emp_LuongBH" class="form-control form-control-sm" required step="100000">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small">ĐCH (Dạng số)</label>
+                <input type="number" id="emp_DCH" class="form-control form-control-sm" value="0" step="any">
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Hủy</button>
+          <button type="button" class="btn btn-sm btn-dark" onclick="submitEmpForm()">Lưu Hồ Sơ</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    let categoryChartInst = null;
+    let deptChartInst = null;
+    let currentBenefits = [];
+    let currentBenefitTiers = [];
+    let currentEmployees = [];
+    let currentEmpDetails = [];
+    let bModal, eModal, iModal;
+
+    window.onload = function() {
+      bModal = new bootstrap.Modal(document.getElementById('benefitModal'));
+      eModal = new bootstrap.Modal(document.getElementById('empModal'));
+      iModal = new bootstrap.Modal(document.getElementById('itemizedDetailModal'));
+      loadInitialData();
+    };
+
+    function toggleLoading(show) {
+      document.getElementById('loading').style.display = show ? 'flex' : 'none';
+    }
+
+    function formatVND(amt) {
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amt || 0);
+    }
+
+    function formatDateDisplay(dateStr) {
+      if (!dateStr) return '';
+      if (typeof dateStr === 'string' && dateStr.includes('-')) {
+        let p = dateStr.split('T')[0].split('-');
+        if (p.length === 3) return `${p[2]}/${p[1]}/${p[0]}`;
+      }
+      return dateStr;
+    }
+
+    function initDB() {
+      toggleLoading(true);
+      google.script.run
+        .withSuccessHandler(res => {
+          alert(res);
+          loadInitialData();
+        })
+        .withFailureHandler(err => {
+          toggleLoading(false);
+          alert("Lỗi khởi tạo: " + err.message);
+        })
+        .setupDatabase();
+    }
+
+    function loadInitialData() {
+      toggleLoading(true);
+      google.script.run
+        .withSuccessHandler(data => {
+          try {
+            currentBenefits = data.benefits || [];
+            currentBenefitTiers = data.benefitTiers || [];
+            currentEmployees = data.employees || [];
+            renderBenefitsTable(currentBenefits);
+            renderEmployeesTable(currentEmployees);
+            renderNewHireTable(data.newHirePlan || []);
+            runCalculation();
+          } catch(err) {
+            alert("Lỗi hiển thị: " + err.message);
+            toggleLoading(false);
+          }
+        })
+        .withFailureHandler(err => {
+          toggleLoading(false);
+          alert("Lỗi tải dữ liệu: " + err.message);
+        })
+        .getInitialData();
+    }
+
+    // --- PHÚC LỢI ---
+    function renderBenefitsTable(benefits) {
+      let tbody = document.getElementById('benefitTbody');
+      tbody.innerHTML = '';
+      benefits.forEach((b, idx) => {
+        let isPct = b.Loai_Tinh_Toan === 'Phần trăm lương';
+        let fmtVal = v => isPct ? `${v}%` : formatVND(v);
+        let tiers = tiersOf(b.Ma_PhucLoi);
+        let valStr;
+        if (tiers.length > 0) {
+          valStr = tiers.map(t => {
+            let rng = `${t.Tham_Nien_Tu_Thang || 0}–${t.Tham_Nien_Den_Thang === '' || t.Tham_Nien_Den_Thang == null ? '∞' : t.Tham_Nien_Den_Thang} th`;
+            let who = [t.Doi_Tuong, t.Cap_Bac].filter(x => x && x !== 'All').join(', ');
+            return `<div class="small fw-normal">${t.Ten_Bac ? t.Ten_Bac + ': ' : ''}<span class="text-muted">${rng}${who ? ' · ' + who : ''}</span> → <b>${fmtVal(t.Gia_Tri)}</b></div>`;
+          }).join('');
+        } else {
+          valStr = fmtVal(b.Gia_Tri_Mac_Dinh);
+        }
+        let tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><span class="badge-subtle">${b.Ma_PhucLoi}</span></td>
+          <td class="fw-semibold">${b.Ten_PhucLoi}${tiers.length ? ` <span class="badge bg-warning-subtle text-warning-emphasis">${tiers.length} bậc</span>` : ''}</td>
+          <td class="fw-bold text-dark">${valStr}</td>
+          <td><span class="badge bg-light text-dark border">${b.Chu_Ky}</span></td>
+          <td><span class="badge ${b.Doi_Tuong === 'Cơ hữu' ? 'bg-primary' : (b.Doi_Tuong === 'Dịch vụ' ? 'bg-info' : 'bg-secondary')}">${b.Doi_Tuong || 'All'}</span></td>
+          <td>${b.Gioi_Tinh || 'All'}</td>
+          <td>${b.Cap_Bac || 'All'}</td>
+          <td>${b.Tham_Nien_Toi_Thieu_Thang || 0} tháng</td>
+          <td>
+            <button class="btn btn-sm btn-outline-dark py-0 px-2" onclick="editBenefit(${idx})">
+              <i class="fa-solid fa-pen-to-square"></i> Sửa
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function tiersOf(code) {
+      return currentBenefitTiers.filter(t => String(t.Ma_PhucLoi).trim() === String(code).trim());
+    }
+
+    function esc(v) {
+      return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    function addTierRow(t) {
+      t = t || {};
+      let sel = (opts, cur) => opts.map(o => `<option value="${o[0]}" ${(cur || 'All') === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('');
+      let tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" class="form-control form-control-sm t-name" value="${esc(t.Ten_Bac)}" placeholder="VD: Từ 3-5 năm"></td>
+        <td><input type="number" class="form-control form-control-sm t-from" value="${esc(t.Tham_Nien_Tu_Thang != null ? t.Tham_Nien_Tu_Thang : 0)}" min="0"></td>
+        <td><input type="number" class="form-control form-control-sm t-to" value="${esc(t.Tham_Nien_Den_Thang)}" min="1" placeholder="∞"></td>
+        <td><select class="form-select form-select-sm t-obj">${sel([['All','Tất cả'],['Cơ hữu','Cơ hữu'],['Dịch vụ','Dịch vụ']], t.Doi_Tuong)}</select></td>
+        <td><select class="form-select form-select-sm t-level">${sel([['All','Tất cả'],['Nhân viên','Nhân viên'],['Quản lý cấp trung','QL cấp trung'],['Quản lý cấp cao','QL cấp cao']], t.Cap_Bac)}</select></td>
+        <td><input type="number" class="form-control form-control-sm t-val" value="${esc(t.Gia_Tri)}" step="any"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="this.closest('tr').remove()"><i class="fa-solid fa-trash"></i></button></td>
+      `;
+      document.getElementById('tierTbody').appendChild(tr);
+    }
+
+    function collectTiers() {
+      return [...document.querySelectorAll('#tierTbody tr')].map(r => ({
+        Ten_Bac: r.querySelector('.t-name').value.trim(),
+        Tham_Nien_Tu_Thang: r.querySelector('.t-from').value,
+        Tham_Nien_Den_Thang: r.querySelector('.t-to').value,
+        Doi_Tuong: r.querySelector('.t-obj').value,
+        Cap_Bac: r.querySelector('.t-level').value,
+        Gia_Tri: r.querySelector('.t-val').value
+      }));
+    }
+
+    function openBenefitModal() {
+      document.getElementById('tierTbody').innerHTML = '';
+      document.getElementById('benefitModalTitle').innerText = "Thêm Chính Sách Phúc Lợi Mới";
+      document.getElementById('pl_Ma').value = "";
+      document.getElementById('pl_Ma').readOnly = false;
+      document.getElementById('pl_Ten').value = "";
+      document.getElementById('pl_Loai').value = "Số tiền cố định";
+      document.getElementById('pl_GiaTri').value = "";
+      document.getElementById('pl_CanCu').value = "Không";
+      document.getElementById('pl_ChuKy').value = "Tháng";
+      document.getElementById('pl_DoiTuong').value = "All";
+      document.getElementById('pl_GioiTinh').value = "All";
+      document.getElementById('pl_CapBac').value = "All";
+      document.getElementById('pl_PhongBan').value = "All";
+      document.getElementById('pl_ThamNien').value = 0;
+      bModal.show();
+    }
+
+    function editBenefit(idx) {
+      let b = currentBenefits[idx];
+      document.getElementById('benefitModalTitle').innerText = "Chỉnh Sửa Phúc Lợi: " + b.Ma_PhucLoi;
+      document.getElementById('pl_Ma').value = b.Ma_PhucLoi;
+      document.getElementById('pl_Ma').readOnly = true;
+      document.getElementById('pl_Ten').value = b.Ten_PhucLoi;
+      document.getElementById('pl_Loai').value = b.Loai_Tinh_Toan;
+      document.getElementById('pl_GiaTri').value = b.Gia_Tri_Mac_Dinh;
+      document.getElementById('pl_CanCu').value = (b.Can_Cu_Luong === 'Luong_Co_Ban') ? 'Luong' : (b.Can_Cu_Luong || 'Không');
+      document.getElementById('pl_ChuKy').value = b.Chu_Ky;
+      document.getElementById('pl_DoiTuong').value = b.Doi_Tuong || "All";
+      document.getElementById('pl_GioiTinh').value = b.Gioi_Tinh || "All";
+      document.getElementById('pl_CapBac').value = b.Cap_Bac || "All";
+      document.getElementById('pl_PhongBan').value = b.Phong_Ban || "All";
+      document.getElementById('pl_ThamNien').value = b.Tham_Nien_Toi_Thieu_Thang || 0;
+      document.getElementById('tierTbody').innerHTML = '';
+      tiersOf(b.Ma_PhucLoi).forEach(t => addTierRow(t));
+      bModal.show();
+    }
+
+    function submitBenefitForm() {
+      let data = {
+        Ma_PhucLoi: document.getElementById('pl_Ma').value.trim(),
+        Ten_PhucLoi: document.getElementById('pl_Ten').value.trim(),
+        Loai_Tinh_Toan: document.getElementById('pl_Loai').value,
+        Gia_Tri_Mac_Dinh: document.getElementById('pl_GiaTri').value,
+        Can_Cu_Luong: document.getElementById('pl_CanCu').value,
+        Chu_Ky: document.getElementById('pl_ChuKy').value,
+        Doi_Tuong: document.getElementById('pl_DoiTuong').value,
+        Gioi_Tinh: document.getElementById('pl_GioiTinh').value,
+        Cap_Bac: document.getElementById('pl_CapBac').value,
+        Phong_Ban: document.getElementById('pl_PhongBan').value.trim(),
+        Tham_Nien_Toi_Thieu_Thang: document.getElementById('pl_ThamNien').value
+      };
+
+      if (!data.Ma_PhucLoi || !data.Ten_PhucLoi || !data.Gia_Tri_Mac_Dinh) {
+        alert("Vui lòng điền đầy đủ các thông tin bắt buộc!");
+        return;
+      }
+
+      let tiers = collectTiers();
+      for (let i = 0; i < tiers.length; i++) {
+        let from = parseInt(tiers[i].Tham_Nien_Tu_Thang) || 0;
+        let to = tiers[i].Tham_Nien_Den_Thang;
+        if (tiers[i].Gia_Tri === '' || (to !== '' && parseInt(to) <= from)) {
+          alert(`Bậc ${i + 1}: cần nhập giá trị và 'Đến' phải lớn hơn 'Từ'.`);
+          return;
+        }
+      }
+
+      bModal.hide();
+      toggleLoading(true);
+      google.script.run
+        .withSuccessHandler(() => {
+          google.script.run
+            .withSuccessHandler(() => loadInitialData())
+            .withFailureHandler(err => { toggleLoading(false); alert("Lỗi lưu bậc thưởng: " + err.message); })
+            .saveBenefitTiers(data.Ma_PhucLoi, tiers);
+        })
+        .withFailureHandler(err => { toggleLoading(false); alert("Lỗi: " + err.message); })
+        .saveBenefit(data);
+    }
+
+    // --- NHÂN VIÊN ---
+    function renderEmployeesTable(emps) {
+      let tbody = document.getElementById('empTbody');
+      tbody.innerHTML = '';
+      document.getElementById('empCountBadge').innerText = `${emps.length} Nhân sự`;
+
+      emps.forEach((e, idx) => {
+        let salaryVal = e.Luong !== undefined ? e.Luong : e.Luong_Co_Ban;
+        let tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><span class="badge-subtle">${e.Ma_NV}</span></td>
+          <td class="fw-semibold">${e.Ho_Ten}</td>
+          <td>${e.Phong_Ban}</td>
+          <td>${e.Vi_Tri} <small class="text-muted">(${e.Cap_Bac})</small></td>
+          <td>${e.Gioi_Tinh}</td>
+          <td><span class="badge ${e.Doi_Tuong === 'Cơ hữu' ? 'bg-primary-subtle text-primary' : 'bg-info-subtle text-info'}">${e.Doi_Tuong || 'Cơ hữu'}</span></td>
+          <td>${formatDateDisplay(e.Ngay_Vao_Lam)}</td>
+          <td class="fw-semibold text-dark">${formatVND(salaryVal)}</td>
+          <td class="text-muted">${formatVND(e.Luong_Dong_BHXH)}</td>
+          <td class="fw-bold text-primary">${e.DCH || 0}</td>
+          <td><span class="badge ${e.Trang_Thai === 'Đang làm việc' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'}">${e.Trang_Thai}</span></td>
+          <td>
+            <button class="btn btn-sm btn-outline-dark py-0 px-2" onclick="editEmp(${idx})">
+              <i class="fa-solid fa-pen-to-square"></i> Sửa
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openEmpModal() {
+      let today = new Date();
+      let dd = String(today.getDate()).padStart(2, '0');
+      let mm = String(today.getMonth() + 1).padStart(2, '0');
+      let yyyy = today.getFullYear();
+
+      document.getElementById('empModalTitle').innerText = "Thêm Nhân Viên Mới";
+      document.getElementById('emp_Ma').value = "";
+      document.getElementById('emp_Ma').readOnly = false;
+      document.getElementById('emp_Ten').value = "";
+      document.getElementById('emp_PhongBan').value = "";
+      document.getElementById('emp_ViTri').value = "";
+      document.getElementById('emp_CapBac').value = "Nhân viên";
+      document.getElementById('emp_KhuVuc').value = "Hồ Chí Minh";
+      document.getElementById('emp_GioiTinh').value = "Nam";
+      document.getElementById('emp_DoiTuong').value = "Cơ hữu";
+      document.getElementById('emp_NgayVao').value = `${dd}/${mm}/${yyyy}`;
+      document.getElementById('emp_Luong').value = "";
+      document.getElementById('emp_LuongBH').value = "";
+      document.getElementById('emp_DCH').value = 0;
+      document.getElementById('emp_TrangThai').value = "Đang làm việc";
+      eModal.show();
+    }
+
+    function editEmp(idx) {
+      let e = currentEmployees[idx];
+      document.getElementById('empModalTitle').innerText = "Chỉnh Sửa Nhân Viên: " + e.Ma_NV;
+      document.getElementById('emp_Ma').value = e.Ma_NV;
+      document.getElementById('emp_Ma').readOnly = true;
+      document.getElementById('emp_Ten').value = e.Ho_Ten;
+      document.getElementById('emp_PhongBan').value = e.Phong_Ban;
+      document.getElementById('emp_ViTri').value = e.Vi_Tri;
+      document.getElementById('emp_CapBac').value = e.Cap_Bac || "Nhân viên";
+      document.getElementById('emp_KhuVuc').value = e.Khu_Vuc;
+      document.getElementById('emp_GioiTinh').value = e.Gioi_Tinh;
+      document.getElementById('emp_DoiTuong').value = e.Doi_Tuong || "Cơ hữu";
+      document.getElementById('emp_NgayVao').value = formatDateDisplay(e.Ngay_Vao_Lam);
+      document.getElementById('emp_Luong').value = e.Luong !== undefined ? e.Luong : e.Luong_Co_Ban;
+      document.getElementById('emp_LuongBH').value = e.Luong_Dong_BHXH;
+      document.getElementById('emp_DCH').value = e.DCH || 0;
+      document.getElementById('emp_TrangThai').value = e.Trang_Thai;
+      eModal.show();
+    }
+
+    function submitEmpForm() {
+      let data = {
+        Ma_NV: document.getElementById('emp_Ma').value.trim(),
+        Ho_Ten: document.getElementById('emp_Ten').value.trim(),
+        Phong_Ban: document.getElementById('emp_PhongBan').value.trim(),
+        Vi_Tri: document.getElementById('emp_ViTri').value.trim(),
+        Cap_Bac: document.getElementById('emp_CapBac').value,
+        Khu_Vuc: document.getElementById('emp_KhuVuc').value,
+        Gioi_Tinh: document.getElementById('emp_GioiTinh').value,
+        Doi_Tuong: document.getElementById('emp_DoiTuong').value,
+        Ngay_Vao_Lam: document.getElementById('emp_NgayVao').value.trim(),
+        Luong: document.getElementById('emp_Luong').value,
+        Luong_Dong_BHXH: document.getElementById('emp_LuongBH').value,
+        DCH: document.getElementById('emp_DCH').value,
+        Trang_Thai: document.getElementById('emp_TrangThai').value
+      };
+
+      if (!data.Ma_NV || !data.Ho_Ten || !data.Luong) {
+        alert("Vui lòng điền đầy đủ các trường thông tin bắt buộc!");
+        return;
+      }
+
+      eModal.hide();
+      toggleLoading(true);
+      google.script.run
+        .withSuccessHandler(res => loadInitialData())
+        .withFailureHandler(err => { toggleLoading(false); alert("Lỗi: " + err.message); })
+        .saveEmployee(data);
+    }
+
+    // --- TAB 4: BẢNG CHI TIẾT THEO TỪNG NHÂN SỰ ---
+    function renderEmpDetailsTable(details) {
+      currentEmpDetails = details || [];
+      
+      // Populate Department Filter Dropdown
+      let depts = [...new Set(currentEmpDetails.map(d => d.Phong_Ban))];
+      let deptSelect = document.getElementById('filterDeptDetail');
+      deptSelect.innerHTML = '<option value="All">Tất cả Phòng Ban</option>';
+      depts.forEach(dp => {
+        deptSelect.innerHTML += `<option value="${dp}">${dp}</option>`;
+      });
+
+      filterEmpDetails();
+    }
+
+    function filterEmpDetails() {
+      let kw = document.getElementById('searchEmpDetail').value.toLowerCase().trim();
+      let selDept = document.getElementById('filterDeptDetail').value;
+      let selObj = document.getElementById('filterObjDetail').value;
+
+      let filtered = currentEmpDetails.filter(d => {
+        let matchKw = d.Ma_NV.toLowerCase().includes(kw) || d.Ho_Ten.toLowerCase().includes(kw);
+        let matchDept = (selDept === 'All') || (d.Phong_Ban === selDept);
+        let matchObj = (selObj === 'All') || (d.Doi_Tuong === selObj);
+        return matchKw && matchDept && matchObj;
+      });
+
+      document.getElementById('countDetailBadge').innerText = `${filtered.length} Nhân sự`;
+
+      let tbody = document.getElementById('empDetailTbody');
+      tbody.innerHTML = '';
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Không tìm thấy dữ liệu nhân sự phù hợp</td></tr>';
+        return;
+      }
+
+      filtered.forEach((d, idx) => {
+        let tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><span class="badge-subtle">${d.Ma_NV}</span></td>
+          <td class="fw-semibold">${d.Ho_Ten}</td>
+          <td>${d.Phong_Ban} <br><small class="text-muted">${d.Vi_Tri}</small></td>
+          <td><span class="badge bg-light text-dark border">${d.Cap_Bac}</span></td>
+          <td class="fw-semibold">${formatVND(d.Luong_Thang)}</td>
+          <td>${formatVND(d.Luong_Nam)}</td>
+          <td class="fw-bold text-success">${formatVND(d.Tong_PhucLoi_Thuong)}</td>
+          <td class="fw-bold text-danger">${formatVND(d.Tong_ChiPhi_Nam)}</td>
+          <td>
+            <button class="btn btn-sm btn-dark py-0 px-2" onclick="showItemizedModal('${d.Ma_NV}')">
+              <i class="fa-solid fa-list me-1"></i> Bảng Kê
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function showItemizedModal(empCode) {
+      let emp = currentEmpDetails.find(d => d.Ma_NV === empCode);
+      if (!emp) return;
+
+      document.getElementById('popEmpName').innerText = emp.Ho_Ten;
+      document.getElementById('popEmpCode').innerText = emp.Ma_NV;
+      document.getElementById('popEmpDept').innerText = `${emp.Phong_Ban} - ${emp.Vi_Tri}`;
+      document.getElementById('popEmpSalary').innerText = formatVND(emp.Luong_Thang);
+
+      let tbody = document.getElementById('itemizedTbody');
+      tbody.innerHTML = '';
+
+      if (!emp.ChiTiet_KhoanChi || emp.ChiTiet_KhoanChi.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Không có khoản phúc lợi / thưởng phát sinh</td></tr>';
+      } else {
+        emp.ChiTiet_KhoanChi.forEach(k => {
+          let tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><span class="badge-subtle">${k.code}</span></td>
+            <td class="fw-semibold">${k.name}</td>
+            <td><span class="badge bg-light text-dark border">${k.cycle}</span></td>
+            <td class="text-end fw-bold">${formatVND(k.total)}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      document.getElementById('popTotalBenefits').innerText = formatVND(emp.Tong_PhucLoi_Thuong);
+      document.getElementById('popTotalGrandCost').innerText = formatVND(emp.Tong_ChiPhi_Nam);
+
+      iModal.show();
+    }
+
+    // --- TUYỂN MỚI ---
+    function renderNewHireTable(plan) {
+      let tbody = document.getElementById('newHireTbody');
+      tbody.innerHTML = '';
+      plan.forEach(p => {
+        let salaryVal = p.Luong_Dukien !== undefined ? p.Luong_Dukien : p.Luong_Co_Ban_Dukien;
+        let tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><input type="text" class="form-control form-control-sm" value="${p.Phong_Ban}"></td>
+          <td><input type="text" class="form-control form-control-sm" value="${p.Vi_Tri}"></td>
+          <td>
+            <select class="form-select form-select-sm">
+              <option value="Nhân viên" ${p.Cap_Bac === 'Nhân viên' ? 'selected' : ''}>Nhân viên</option>
+              <option value="Quản lý cấp trung" ${p.Cap_Bac === 'Quản lý cấp trung' ? 'selected' : ''}>Quản lý cấp trung</option>
+              <option value="Quản lý cấp cao" ${p.Cap_Bac === 'Quản lý cấp cao' ? 'selected' : ''}>Quản lý cấp cao</option>
+            </select>
+          </td>
+          <td>
+            <select class="form-select form-select-sm">
+              <option value="All" ${p.Gioi_Tinh_Du_Kien === 'All' ? 'selected' : ''}>Tất cả</option>
+              <option value="Nam" ${p.Gioi_Tinh_Du_Kien === 'Nam' ? 'selected' : ''}>Nam</option>
+              <option value="Nữ" ${p.Gioi_Tinh_Du_Kien === 'Nữ' ? 'selected' : ''}>Nữ</option>
+            </select>
+          </td>
+          <td>
+            <select class="form-select form-select-sm fw-bold text-primary">
+              <option value="Cơ hữu" ${p.Doi_Tuong_Du_Kien === 'Cơ hữu' ? 'selected' : ''}>Cơ hữu</option>
+              <option value="Dịch vụ" ${p.Doi_Tuong_Du_Kien === 'Dịch vụ' ? 'selected' : ''}>Dịch vụ</option>
+            </select>
+          </td>
+          <td><input type="number" class="form-control form-control-sm" value="${p.So_Luong_Tuyen_Moi}" style="width:65px"></td>
+          <td><input type="number" class="form-control form-control-sm" value="${salaryVal}"></td>
+          <td><input type="number" class="form-control form-control-sm" value="${p.Luong_BHXH_Dukien}"></td>
+          <td><input type="number" class="form-control form-control-sm" value="${p.Thang_Du_Kien_Vao}" min="1" max="12" style="width:65px"></td>
+          <td>
+            <button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function addNewHireRow() {
+      let tbody = document.getElementById('newHireTbody');
+      let tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" class="form-control form-control-sm" value="Khối Mới"></td>
+        <td><input type="text" class="form-control form-control-sm" value="Chuyên viên"></td>
+        <td>
+          <select class="form-select form-select-sm">
+            <option value="Nhân viên">Nhân viên</option>
+            <option value="Quản lý cấp trung">Quản lý cấp trung</option>
+            <option value="Quản lý cấp cao">Quản lý cấp cao</option>
+          </select>
+        </td>
+        <td>
+          <select class="form-select form-select-sm">
+            <option value="All">Tất cả</option>
+            <option value="Nam">Nam</option>
+            <option value="Nữ">Nữ</option>
+          </select>
+        </td>
+        <td>
+          <select class="form-select form-select-sm fw-bold text-primary">
+            <option value="Cơ hữu">Cơ hữu</option>
+            <option value="Dịch vụ">Dịch vụ</option>
+          </select>
+        </td>
+        <td><input type="number" class="form-control form-control-sm" value="1" style="width:65px"></td>
+        <td><input type="number" class="form-control form-control-sm" value="15000000"></td>
+        <td><input type="number" class="form-control form-control-sm" value="7000000"></td>
+        <td><input type="number" class="form-control form-control-sm" value="1" min="1" max="12" style="width:65px"></td>
+        <td>
+          <button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    function saveAndRecalculate() {
+      let rows = document.querySelectorAll('#newHireTbody tr');
+      let planArray = [];
+      rows.forEach(r => {
+        let inputs = r.querySelectorAll('input, select');
+        planArray.push({
+          Phong_Ban: inputs[0].value,
+          Vi_Tri: inputs[1].value,
+          Cap_Bac: inputs[2].value,
+          Khu_Vuc: 'Hồ Chí Minh',
+          Gioi_Tinh_Du_Kien: inputs[3].value,
+          Doi_Tuong_Du_Kien: inputs[4].value,
+          So_Luong_Tuyen_Moi: inputs[5].value,
+          Luong_Dukien: inputs[6].value,
+          Luong_BHXH_Dukien: inputs[7].value,
+          Thang_Du_Kien_Vao: inputs[8].value
+        });
+      });
+
+      toggleLoading(true);
+      google.script.run
+        .withSuccessHandler(res => runCalculation())
+        .withFailureHandler(err => { toggleLoading(false); alert("Lỗi: " + err.message); })
+        .saveNewHirePlan(planArray);
+    }
+
+    function runCalculation() {
+      toggleLoading(true);
+      let year = document.getElementById('targetYear').value;
+      let inflation = document.getElementById('inflationRate').value;
+
+      google.script.run
+        .withSuccessHandler(res => {
+          try {
+            updateKPIs(res.summary);
+            renderCharts(res);
+            renderEmpDetailsTable(res.employeeDetails);
+          } catch(err) {
+            alert("Lỗi xử lý báo cáo: " + err.message);
+          } finally {
+            toggleLoading(false);
+          }
+        })
+        .withFailureHandler(err => {
+          toggleLoading(false);
+          alert("Lỗi tính toán: " + err.message);
+        })
+        .calculateBudget(year, inflation);
+    }
+
+    function updateKPIs(s) {
+      document.getElementById('kpiTotal').innerText = formatVND(s.totalBudget);
+      document.getElementById('kpiExisting').innerText = formatVND(s.existingBudget);
+      document.getElementById('kpiNewHire').innerText = formatVND(s.newHireBudget);
+      document.getElementById('kpiAvgNewHire').innerText = formatVND(s.avgCostPerNewHire);
+
+      document.getElementById('kpiYearLabel').innerText = `Dự báo năm ${s.targetYear}`;
+      document.getElementById('kpiExistingStaffCount').innerText = `${s.totalEmployees} Nhân sự hiện tại`;
+      document.getElementById('kpiNewHireCount').innerText = `${s.totalNewHires} Chỉ tiêu mới`;
+    }
+
+    function renderCharts(res) {
+      let catLabels = Object.keys(res.categoryBreakdown);
+      let catData = Object.values(res.categoryBreakdown);
+
+      let ctx1 = document.getElementById('categoryChart').getContext('2d');
+      if (categoryChartInst) categoryChartInst.destroy();
+      categoryChartInst = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: catLabels,
+          datasets: [{
+            label: 'Chi phí (VNĐ)',
+            data: catData,
+            backgroundColor: '#334155',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { x: { grid: { color: '#f1f5f9' } }, y: { grid: { display: false } } }
+        }
+      });
+
+      let deptLabels = Object.keys(res.deptBreakdown);
+      let deptData = Object.values(res.deptBreakdown);
+
+      let ctx2 = document.getElementById('deptChart').getContext('2d');
+      if (deptChartInst) deptChartInst.destroy();
+      deptChartInst = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+          labels: deptLabels,
+          datasets: [{
+            data: deptData,
+            backgroundColor: ['#0f172a', '#334155', '#475569', '#64748b', '#94a3b8']
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
