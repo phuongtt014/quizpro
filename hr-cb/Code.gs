@@ -72,11 +72,39 @@ function getOrCreateTierSheet() {
   return sh;
 }
 
+// Đọc DM_PhucLoi: 2 cột ngày/tháng chi trả (cột 12, 13) luôn đọc theo VỊ TRÍ, giống cách ghi,
+// nên không phụ thuộc việc tên tiêu đề cột có bị sửa/gõ lệch hay không.
+function loadBenefits(ss) {
+  const sh = ss.getSheetByName("DM_PhucLoi");
+  const list = getSheetDataAsJson(sh);
+  if (!sh || list.length === 0) return list;
+  const raw = sh.getDataRange().getValues();
+  raw.shift();
+  list.forEach((b, i) => {
+    const r = raw[i] || [];
+    b.Ngay_Chi_Tra = cellToInt(r[11]);
+    b.Thang_Chi_Tra = cellToInt(r[12]);
+  });
+  return list;
+}
+
+// Số nguyên từ ô: số, chữ có chứa số ("Tháng 10"), hoặc ô bị định dạng Ngày (lấy lại số gốc). Không có => ""
+function cellToInt(v) {
+  if (v instanceof Date) {
+    const d = new Date(v.getFullYear(), v.getMonth(), v.getDate());
+    return Math.round((d - new Date(1899, 11, 30)) / 86400000);
+  }
+  if (typeof v === "number") return Math.round(v);
+  const m = String(v == null ? "" : v).match(/\d+/);
+  return m ? parseInt(m[0], 10) : "";
+}
+
 // Sheet DM_PhucLoi cũ (11 cột): tự bổ sung 2 cột Ngay_Chi_Tra, Thang_Chi_Tra
 function ensureBenefitColumns(sh) {
   const need = 13;
   if (sh.getMaxColumns() < need) sh.insertColumnsAfter(sh.getMaxColumns(), need - sh.getMaxColumns());
-  if (String(sh.getRange(1, 12).getValue()) !== "Ngay_Chi_Tra") {
+  if (String(sh.getRange(1, 12).getValue()).trim() !== "Ngay_Chi_Tra" ||
+      String(sh.getRange(1, 13).getValue()).trim() !== "Thang_Chi_Tra") {
     sh.getRange(1, 12, 1, 2).setValues([["Ngay_Chi_Tra", "Thang_Chi_Tra"]]);
     formatHeader(sh, need);
   }
@@ -94,7 +122,7 @@ function getInitialData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   return {
     employees: getSheetDataAsJson(ss.getSheetByName("DB_NhanSu")),
-    benefits: getSheetDataAsJson(ss.getSheetByName("DM_PhucLoi")),
+    benefits: loadBenefits(ss),
     benefitTiers: getSheetDataAsJson(ss.getSheetByName("DM_PhucLoi_Bac")),
     newHirePlan: getSheetDataAsJson(ss.getSheetByName("KeHoach_TuyenDung"))
   };
@@ -281,7 +309,7 @@ function calculateBudget(targetYear, inflationRate) {
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const employees = getSheetDataAsJson(ss.getSheetByName("DB_NhanSu"));
-  const benefits = getSheetDataAsJson(ss.getSheetByName("DM_PhucLoi"));
+  const benefits = loadBenefits(ss);
   const newHirePlan = getSheetDataAsJson(ss.getSheetByName("KeHoach_TuyenDung"));
 
   // Gắn các bậc thưởng vào từng phúc lợi (nếu có)
