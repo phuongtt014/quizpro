@@ -29,14 +29,14 @@ function setupDatabase() {
   // Sheet 2: DM_PhucLoi (11 Cột - Căn cứ Luong)
   let shPL = ss.getSheetByName("DM_PhucLoi") || ss.insertSheet("DM_PhucLoi");
   if (shPL.getLastRow() === 0) {
-    shPL.appendRow(["Ma_PhucLoi", "Ten_PhucLoi", "Loai_Tinh_Toan", "Gia_Tri_Mac_Dinh", "Can_Cu_Luong", "Chu_Ky", "Doi_Tuong", "Gioi_Tinh", "Cap_Bac", "Phong_Ban", "Tham_Nien_Toi_Thieu_Thang"]);
-    shPL.appendRow(["PL01", "Chi phí BHXH, BHYT, BHTN (DN đóng 21.5%)", "Phần trăm lương", 21.5, "Luong_Dong_BHXH", "Tháng", "Cơ hữu", "All", "All", "All", 0]);
-    shPL.appendRow(["PL02", "Phụ cấp Ăn trưa Cố định", "Số tiền cố định", 1000000, "Không", "Tháng", "All", "All", "All", "All", 0]);
-    shPL.appendRow(["PL03", "Thưởng Tết Nguyên Đán (Tháng 13)", "Phần trăm lương", 100, "Luong", "Năm", "Cơ hữu", "All", "All", "All", 12]);
-    shPL.appendRow(["PL04", "Quà tặng 8/3 & 20/10", "Số tiền cố định", 500000, "Không", "Quý", "All", "Nữ", "All", "All", 0]);
-    shPL.appendRow(["PL05", "Bảo hiểm sức khỏe PVI (Quản lý)", "Số tiền cố định", 4500000, "Không", "Năm", "Cơ hữu", "All", "Quản lý cấp trung", "All", 6]);
-    shPL.appendRow(["PL06", "Chi phí Đồng phục Hàng năm", "Số tiền cố định", 2000000, "Không", "Năm", "All", "All", "Nhân viên", "All", 0]);
-    formatHeader(shPL, 11);
+    shPL.appendRow(["Ma_PhucLoi", "Ten_PhucLoi", "Loai_Tinh_Toan", "Gia_Tri_Mac_Dinh", "Can_Cu_Luong", "Chu_Ky", "Doi_Tuong", "Gioi_Tinh", "Cap_Bac", "Phong_Ban", "Tham_Nien_Toi_Thieu_Thang", "Ngay_Chi_Tra", "Thang_Chi_Tra"]);
+    shPL.appendRow(["PL01", "Chi phí BHXH, BHYT, BHTN (DN đóng 21.5%)", "Phần trăm lương", 21.5, "Luong_Dong_BHXH", "Tháng", "Cơ hữu", "All", "All", "All", 0, 5, ""]);
+    shPL.appendRow(["PL02", "Phụ cấp Ăn trưa Cố định", "Số tiền cố định", 1000000, "Không", "Tháng", "All", "All", "All", "All", 0, 5, ""]);
+    shPL.appendRow(["PL03", "Thưởng Tết Nguyên Đán (Tháng 13)", "Phần trăm lương", 100, "Luong", "Năm", "Cơ hữu", "All", "All", "All", 12, 25, 1]);
+    shPL.appendRow(["PL04", "Quà tặng 8/3 & 20/10", "Số tiền cố định", 500000, "Không", "Quý", "All", "Nữ", "All", "All", 0, 5, 3]);
+    shPL.appendRow(["PL05", "Bảo hiểm sức khỏe PVI (Quản lý)", "Số tiền cố định", 4500000, "Không", "Năm", "Cơ hữu", "All", "Quản lý cấp trung", "All", 6, 15, 1]);
+    shPL.appendRow(["PL06", "Chi phí Đồng phục Hàng năm", "Số tiền cố định", 2000000, "Không", "Năm", "All", "All", "Nhân viên", "All", 0, 15, 1]);
+    formatHeader(shPL, 13);
   }
 
   // Sheet 2b: DM_PhucLoi_Bac (Bậc thưởng theo thâm niên / đối tượng / cấp bậc)
@@ -70,6 +70,16 @@ function getOrCreateTierSheet() {
     formatHeader(sh, TIER_HEADERS.length);
   }
   return sh;
+}
+
+// Sheet DM_PhucLoi cũ (11 cột): tự bổ sung 2 cột Ngay_Chi_Tra, Thang_Chi_Tra
+function ensureBenefitColumns(sh) {
+  const need = 13;
+  if (sh.getMaxColumns() < need) sh.insertColumnsAfter(sh.getMaxColumns(), need - sh.getMaxColumns());
+  if (String(sh.getRange(1, 12).getValue()) !== "Ngay_Chi_Tra") {
+    sh.getRange(1, 12, 1, 2).setValues([["Ngay_Chi_Tra", "Thang_Chi_Tra"]]);
+    formatHeader(sh, need);
+  }
 }
 
 function formatHeader(sheet, numCols) {
@@ -134,6 +144,8 @@ function saveBenefit(b, oldCode) {
   let shPL = ss.getSheetByName("DM_PhucLoi");
   if (!shPL) { setupDatabase(); shPL = ss.getSheetByName("DM_PhucLoi"); }
 
+  ensureBenefitColumns(shPL);
+
   const newCode = String(b.Ma_PhucLoi).trim();
   oldCode = String(oldCode || "").trim();
   const lookupCode = oldCode || newCode;
@@ -170,11 +182,13 @@ function saveBenefit(b, oldCode) {
     b.Gioi_Tinh || "All",
     b.Cap_Bac || "All",
     b.Phong_Ban || "All",
-    parseInt(b.Tham_Nien_Toi_Thieu_Thang) || 0
+    parseInt(b.Tham_Nien_Toi_Thieu_Thang) || 0,
+    Math.min(Math.max(parseInt(b.Ngay_Chi_Tra) || 1, 1), 31),
+    (parseInt(b.Thang_Chi_Tra) >= 1 && parseInt(b.Thang_Chi_Tra) <= 12) ? parseInt(b.Thang_Chi_Tra) : ""
   ];
 
   if (foundRowIndex > 0) {
-    shPL.getRange(foundRowIndex, 1, 1, 11).setValues([newRow]);
+    shPL.getRange(foundRowIndex, 1, 1, 13).setValues([newRow]);
   } else {
     shPL.appendRow(newRow);
   }
@@ -283,6 +297,7 @@ function calculateBudget(targetYear, inflationRate) {
   let categoryBreakdown = {};
   let deptBreakdown = {};
   let employeeDetails = [];
+  let cashEvents = {};
 
   // A. Tính cho từng Nhân sự hiện tại
   employees.forEach(emp => {
@@ -291,29 +306,22 @@ function calculateBudget(targetYear, inflationRate) {
       let joinDate = parseDateVN(emp.Ngay_Vao_Lam);
       let benefitMap = {};
 
-      for (let m = 1; m <= 12; m++) {
-        let curDate = new Date(targetYear, m - 1, 15);
-        let seniorityMonths = (curDate.getFullYear() - joinDate.getFullYear()) * 12 + (curDate.getMonth() - joinDate.getMonth());
-        if (seniorityMonths < 0) continue;
+      collectPayments(benefits, emp, joinDate, targetYear).forEach(p => {
+        let amt = p.amount * inflationFactor;
+        empBenefitTotal += amt;
+        categoryBreakdown[p.benefit.Ten_PhucLoi] = (categoryBreakdown[p.benefit.Ten_PhucLoi] || 0) + amt;
+        addCashEvent(cashEvents, "Nhân sự hiện tại", p.benefit, p.date, amt);
 
-        benefits.forEach(b => {
-          if (checkEligibility(emp, seniorityMonths, b)) {
-            let amt = calculateBenefitAmount(b, emp, m, seniorityMonths) * inflationFactor;
-            empBenefitTotal += amt;
-            categoryBreakdown[b.Ten_PhucLoi] = (categoryBreakdown[b.Ten_PhucLoi] || 0) + amt;
-
-            if (!benefitMap[b.Ma_PhucLoi]) {
-              benefitMap[b.Ma_PhucLoi] = {
-                code: b.Ma_PhucLoi,
-                name: b.Ten_PhucLoi,
-                cycle: b.Chu_Ky,
-                total: 0
-              };
-            }
-            benefitMap[b.Ma_PhucLoi].total += amt;
-          }
-        });
-      }
+        if (!benefitMap[p.benefit.Ma_PhucLoi]) {
+          benefitMap[p.benefit.Ma_PhucLoi] = {
+            code: p.benefit.Ma_PhucLoi,
+            name: p.benefit.Ten_PhucLoi,
+            cycle: p.benefit.Chu_Ky,
+            total: 0
+          };
+        }
+        benefitMap[p.benefit.Ma_PhucLoi].total += amt;
+      });
 
       let monthlySalary = parseFloat(emp.Luong !== undefined ? emp.Luong : emp.Luong_Co_Ban) || 0;
       let annualSalary = monthlySalary * 12;
@@ -359,17 +367,14 @@ function calculateBudget(targetYear, inflationRate) {
         Luong_Dong_BHXH: parseFloat(plan.Luong_BHXH_Dukien) || 0
       };
 
-      for (let m = startMonth; m <= 12; m++) {
-        let seniorityMonths = m - startMonth;
-
-        benefits.forEach(b => {
-          if (checkEligibility(mockEmp, seniorityMonths, b)) {
-            let amt = calculateBenefitAmount(b, mockEmp, m, seniorityMonths) * inflationFactor;
-            planCost += amt;
-            categoryBreakdown[b.Ten_PhucLoi] = (categoryBreakdown[b.Ten_PhucLoi] || 0) + amt;
-          }
-        });
-      }
+      // Giả định nhân sự mới vào làm ngày 1 của tháng dự kiến
+      const hireDate = new Date(targetYear, Math.min(Math.max(startMonth, 1), 12) - 1, 1);
+      collectPayments(benefits, mockEmp, hireDate, targetYear).forEach(p => {
+        let amt = p.amount * inflationFactor;
+        planCost += amt;
+        categoryBreakdown[p.benefit.Ten_PhucLoi] = (categoryBreakdown[p.benefit.Ten_PhucLoi] || 0) + amt;
+        addCashEvent(cashEvents, "Tuyển mới", p.benefit, p.date, amt);
+      });
     }
 
     totalNewHireBudget += planCost;
@@ -389,7 +394,8 @@ function calculateBudget(targetYear, inflationRate) {
     },
     categoryBreakdown: categoryBreakdown,
     deptBreakdown: deptBreakdown,
-    employeeDetails: employeeDetails
+    employeeDetails: employeeDetails,
+    cashflow: Object.values(cashEvents).sort((a, b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : String(a.code).localeCompare(String(b.code))))
   };
 }
 
@@ -425,14 +431,95 @@ function findTier(tiers, emp, seniorityMonths) {
   return best;
 }
 
-function calculateBenefitAmount(benefit, emp, month, seniorityMonths) {
+// ---- Ngày chi trả & thâm niên chính xác theo ngày ----
+
+function isLastDayOfMonth(d) {
+  return d.getDate() === new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+}
+
+// Số tháng tròn thâm niên tại ngày payDate (chưa đủ ngày trong tháng thì chưa tính tháng đó)
+function seniorityAt(joinDate, payDate) {
+  let m = (payDate.getFullYear() - joinDate.getFullYear()) * 12 + (payDate.getMonth() - joinDate.getMonth());
+  if (payDate.getDate() < joinDate.getDate() && !isLastDayOfMonth(payDate)) m--;
+  return m;
+}
+
+function addMonthsClamped(d, n) {
+  const first = new Date(d.getFullYear(), d.getMonth() + n, 1);
+  const dim = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  return new Date(first.getFullYear(), first.getMonth(), Math.min(d.getDate(), dim));
+}
+
+function dateInMonth(year, monthIdx, day) {
+  const dim = new Date(year, monthIdx + 1, 0).getDate();
+  return new Date(year, monthIdx, Math.min(day, dim));
+}
+
+/**
+ * Các ngày chi trả của 1 phúc lợi trong năm:
+ *  - Tháng: mỗi tháng vào Ngay_Chi_Tra
+ *  - Quý: mỗi 3 tháng, bắt đầu từ Thang_Chi_Tra (mặc định tháng 3 => 3/6/9/12)
+ *  - Năm: 1 lần vào Thang_Chi_Tra (mặc định tháng 12) + Ngay_Chi_Tra
+ *  - 1 lần: đúng ngày kỷ niệm thâm niên (ngày vào + số tháng thâm niên tối thiểu)
+ * Ngay_Chi_Tra để trống = ngày 1. Ngày > số ngày của tháng thì lấy ngày cuối tháng.
+ */
+function getPaymentDates(b, joinDate, year) {
+  const day = Math.min(Math.max(parseInt(b.Ngay_Chi_Tra) || 1, 1), 31);
+  const tm = parseInt(b.Thang_Chi_Tra);
+  const dates = [];
+  if (b.Chu_Ky === "Tháng") {
+    for (let m = 0; m < 12; m++) dates.push(dateInMonth(year, m, day));
+  } else if (b.Chu_Ky === "Quý") {
+    const start = (((tm >= 1 && tm <= 12) ? tm : 3) - 1) % 3;
+    for (let k = 0; k < 4; k++) dates.push(dateInMonth(year, start + 3 * k, day));
+  } else if (b.Chu_Ky === "Năm") {
+    dates.push(dateInMonth(year, ((tm >= 1 && tm <= 12) ? tm : 12) - 1, day));
+  } else if (b.Chu_Ky === "1 lần") {
+    const d = addMonthsClamped(joinDate, parseInt(b.Tham_Nien_Toi_Thieu_Thang) || 0);
+    if (d.getFullYear() === year) dates.push(d);
+  }
+  return dates;
+}
+
+// Toàn bộ khoản chi (chưa nhân lạm phát) của 1 nhân sự trong năm: [{benefit, date, amount}]
+function collectPayments(benefits, emp, joinDate, year) {
+  const join = new Date(joinDate.getFullYear(), joinDate.getMonth(), joinDate.getDate());
+  const out = [];
+  benefits.forEach(b => {
+    getPaymentDates(b, join, year).forEach(date => {
+      if (date < join) return; // chưa vào làm tại ngày chi trả
+      const sen = seniorityAt(join, date);
+      if (!checkEligibility(emp, sen, b)) return;
+      const amount = calculateBenefitAmount(b, emp, sen);
+      if (amount > 0) out.push({ benefit: b, date: date, amount: amount });
+    });
+  });
+  return out;
+}
+
+function fmtISO(d) {
+  const p = n => (n < 10 ? "0" : "") + n;
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+
+function addCashEvent(events, source, b, date, amt) {
+  const iso = fmtISO(date);
+  const key = iso + "|" + b.Ma_PhucLoi + "|" + source;
+  if (!events[key]) {
+    events[key] = { date: iso, code: b.Ma_PhucLoi, name: b.Ten_PhucLoi, cycle: b.Chu_Ky, source: source, count: 0, amount: 0 };
+  }
+  events[key].count += 1;
+  events[key].amount += amt;
+}
+
+// Số tiền 1 lần chi (chưa nhân lạm phát) theo thâm niên tại ngày chi trả
+function calculateBenefitAmount(benefit, emp, seniorityMonths) {
   let rate = parseFloat(benefit.Gia_Tri_Mac_Dinh) || 0;
   if (benefit.tiers && benefit.tiers.length > 0) {
     const tier = findTier(benefit.tiers, emp, seniorityMonths);
     if (!tier) return 0; // Có cấu hình bậc nhưng nhân sự không thuộc bậc nào => không được hưởng
     rate = parseFloat(tier.Gia_Tri) || 0;
   }
-  let cycle = benefit.Chu_Ky;
   let isPercentage = benefit.Loai_Tinh_Toan === "Phần trăm lương";
 
   let baseAmount = rate;
@@ -443,12 +530,7 @@ function calculateBenefitAmount(benefit, emp, month, seniorityMonths) {
     baseAmount = salaryBase * (rate / 100);
   }
 
-  if (cycle === "Tháng") return baseAmount;
-  if (cycle === "Quý" && [3, 6, 9, 12].includes(month)) return baseAmount;
-  if (cycle === "Năm" && month === 12) return baseAmount;
-  if (cycle === "1 lần" && seniorityMonths === (parseInt(benefit.Tham_Nien_Toi_Thieu_Thang) || 0)) return baseAmount;
-
-  return 0;
+  return baseAmount;
 }
 
 // 7. Lưu Kế hoạch Tuyển dụng

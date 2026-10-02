@@ -209,6 +209,11 @@
         </button>
       </li>
       <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-cashflow">
+          <i class="fa-solid fa-chart-line me-2"></i>Dòng Tiền Theo Thời Gian
+        </button>
+      </li>
+      <li class="nav-item">
         <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-newhire">
           <i class="fa-solid fa-user-plus me-2"></i>Kế Hoạch Tuyển Mới
         </button>
@@ -253,6 +258,7 @@
                   <th>Tên Khoản Chi Phí / Thưởng</th>
                   <th>Mức Áp Dụng / Bậc Thưởng</th>
                   <th>Chu Kỳ</th>
+                  <th>Ngày Chi Trả</th>
                   <th>Đối Tượng</th>
                   <th>Giới Tính</th>
                   <th>Cấp Bậc</th>
@@ -343,6 +349,45 @@
               </thead>
               <tbody id="empDetailTbody"></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: DÒNG TIỀN THEO THỜI GIAN -->
+      <div class="tab-pane fade" id="tab-cashflow">
+        <div class="card-executive p-4 mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <h6 class="fw-bold mb-0 text-slate-800">Dòng Tiền Phúc Lợi & Thưởng Theo Tháng — Chi Trong Tháng và Lũy Kế</h6>
+            <div class="form-check form-switch small mb-0">
+              <input class="form-check-input" type="checkbox" id="cfShowNew" checked onchange="renderCashflow()">
+              <label class="form-check-label" for="cfShowNew">Gồm tuyển mới</label>
+            </div>
+          </div>
+          <div class="small text-muted mb-3">Tính theo ngày chi trả khai báo ở từng phúc lợi; đã gồm tỷ lệ lạm phát. Không gồm lương cơ bản.</div>
+          <canvas id="cashflowChart" height="110"></canvas>
+        </div>
+        <div class="row g-3">
+          <div class="col-lg-5">
+            <div class="card-executive p-3">
+              <h6 class="fw-bold text-slate-800 mb-2">Tổng Hợp Theo Tháng</h6>
+              <div class="table-responsive">
+                <table class="table table-executive align-middle mb-0">
+                  <thead><tr><th>Tháng</th><th class="text-end">Chi trong tháng</th><th class="text-end">Lũy kế</th><th class="text-end">% năm</th></tr></thead>
+                  <tbody id="cfMonthTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-7">
+            <div class="card-executive p-3">
+              <h6 class="fw-bold text-slate-800 mb-2">Lịch Chi Chi Tiết Theo Ngày</h6>
+              <div class="table-responsive" style="max-height:480px; overflow:auto">
+                <table class="table table-executive align-middle mb-0">
+                  <thead><tr><th>Ngày chi</th><th>Khoản</th><th>Nguồn</th><th class="text-end">SL</th><th class="text-end">Số tiền</th><th class="text-end">Lũy kế</th></tr></thead>
+                  <tbody id="cfEventTbody"></tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -478,7 +523,7 @@
               </div>
               <div class="col-md-3">
                 <label class="form-label small">Chu Kỳ Chi Trả</label>
-                <select id="pl_ChuKy" class="form-select form-select-sm">
+                <select id="pl_ChuKy" class="form-select form-select-sm" onchange="updateCycleFields()">
                   <option value="Tháng">Tháng</option>
                   <option value="Quý">Quý</option>
                   <option value="Năm">Năm</option>
@@ -526,6 +571,20 @@
               <div class="col-md-6">
                 <label class="form-label small">Thâm Niên Tối Thiểu (Tháng)</label>
                 <input type="number" id="pl_ThamNien" class="form-control form-control-sm" value="0" min="0">
+              </div>
+            </div>
+
+            <div class="row g-2 mt-1">
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-dark">Ngày Chi Trả (1–31)</label>
+                <input type="number" id="pl_Ngay" class="form-control form-control-sm" value="1" min="1" max="31">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-dark" id="pl_ThangLabel">Tháng Chi Trả</label>
+                <select id="pl_Thang" class="form-select form-select-sm"></select>
+              </div>
+              <div class="col-md-4 d-flex align-items-end">
+                <div class="small text-muted" id="pl_NgayNote"></div>
               </div>
             </div>
 
@@ -669,6 +728,8 @@
     let currentBenefitTiers = [];
     let editingBenefitCode = '';
     let currentInflation = 0;
+    let currentCashflow = [];
+    let cashflowChartInst = null;
     let currentEmployees = [];
     let currentEmpDetails = [];
     let bModal, eModal, iModal;
@@ -759,6 +820,7 @@
           <td class="fw-semibold">${b.Ten_PhucLoi}${tiers.length ? ` <span class="badge bg-warning-subtle text-warning-emphasis">${tiers.length} bậc</span>` : ''}</td>
           <td class="fw-bold text-dark">${valStr}</td>
           <td><span class="badge bg-light text-dark border">${b.Chu_Ky}</span></td>
+          <td class="small">${payDateLabel(b)}</td>
           <td><span class="badge ${b.Doi_Tuong === 'Cơ hữu' ? 'bg-primary' : (b.Doi_Tuong === 'Dịch vụ' ? 'bg-info' : 'bg-secondary')}">${b.Doi_Tuong || 'All'}</span></td>
           <td>${b.Gioi_Tinh || 'All'}</td>
           <td>${b.Cap_Bac || 'All'}</td>
@@ -785,6 +847,45 @@
         .withSuccessHandler(() => loadInitialData())
         .withFailureHandler(err => { toggleLoading(false); alert("Lỗi xóa: " + err.message); })
         .deleteBenefit(b.Ma_PhucLoi);
+    }
+
+    function payDateLabel(b) {
+      let d = parseInt(b.Ngay_Chi_Tra) || 1;
+      let m = parseInt(b.Thang_Chi_Tra);
+      if (b.Chu_Ky === 'Tháng') return `Ngày ${d} hàng tháng`;
+      if (b.Chu_Ky === 'Quý') {
+        let start = (((m >= 1 && m <= 12) ? m : 3) - 1) % 3 + 1;
+        return `Ngày ${d} các tháng ${[0, 1, 2, 3].map(k => start + 3 * k).join(', ')}`;
+      }
+      if (b.Chu_Ky === 'Năm') return `Ngày ${d}/${(m >= 1 && m <= 12) ? m : 12} hàng năm`;
+      if (b.Chu_Ky === '1 lần') return 'Ngày kỷ niệm thâm niên';
+      return '';
+    }
+
+    function fillMonthSelect() {
+      let sel = document.getElementById('pl_Thang');
+      if (sel.options.length) return;
+      sel.innerHTML = '<option value="">Mặc định</option>' + Array.from({length: 12}, (_, i) => `<option value="${i + 1}">Tháng ${i + 1}</option>`).join('');
+    }
+
+    function updateCycleFields() {
+      let cycle = document.getElementById('pl_ChuKy').value;
+      let day = document.getElementById('pl_Ngay'), mon = document.getElementById('pl_Thang');
+      let label = document.getElementById('pl_ThangLabel'), note = document.getElementById('pl_NgayNote');
+      day.disabled = mon.disabled = false;
+      label.innerText = 'Tháng Chi Trả';
+      if (cycle === 'Tháng') {
+        mon.disabled = true; mon.value = '';
+        note.innerText = 'Chi vào ngày này của mỗi tháng.';
+      } else if (cycle === 'Quý') {
+        label.innerText = 'Tháng Chi Đầu Tiên';
+        note.innerText = 'Chi tháng này và cứ 3 tháng một lần (mặc định tháng 3, 6, 9, 12).';
+      } else if (cycle === 'Năm') {
+        note.innerText = 'Chi 1 lần/năm vào ngày/tháng này (mặc định 1/12).';
+      } else {
+        day.disabled = mon.disabled = true; mon.value = '';
+        note.innerText = 'Chi đúng ngày kỷ niệm thâm niên (ngày vào làm + số tháng Thâm Niên Tối Thiểu).';
+      }
     }
 
     function tiersOf(code) {
@@ -824,6 +925,9 @@
 
     function openBenefitModal() {
       editingBenefitCode = '';
+      fillMonthSelect();
+      document.getElementById('pl_Ngay').value = 1;
+      document.getElementById('pl_Thang').value = '';
       document.getElementById('tierTbody').innerHTML = '';
       document.getElementById('benefitModalTitle').innerText = "Thêm Chính Sách Phúc Lợi Mới";
       document.getElementById('pl_Ma').value = "";
@@ -838,6 +942,7 @@
       document.getElementById('pl_CapBac').value = "All";
       document.getElementById('pl_PhongBan').value = "All";
       document.getElementById('pl_ThamNien').value = 0;
+      updateCycleFields();
       bModal.show();
     }
 
@@ -857,6 +962,10 @@
       document.getElementById('pl_CapBac').value = b.Cap_Bac || "All";
       document.getElementById('pl_PhongBan').value = b.Phong_Ban || "All";
       document.getElementById('pl_ThamNien').value = b.Tham_Nien_Toi_Thieu_Thang || 0;
+      fillMonthSelect();
+      document.getElementById('pl_Ngay').value = parseInt(b.Ngay_Chi_Tra) || 1;
+      document.getElementById('pl_Thang').value = b.Thang_Chi_Tra || '';
+      updateCycleFields();
       document.getElementById('tierTbody').innerHTML = '';
       tiersOf(b.Ma_PhucLoi).forEach(t => addTierRow(t));
       bModal.show();
@@ -874,7 +983,9 @@
         Gioi_Tinh: document.getElementById('pl_GioiTinh').value,
         Cap_Bac: document.getElementById('pl_CapBac').value,
         Phong_Ban: document.getElementById('pl_PhongBan').value.trim(),
-        Tham_Nien_Toi_Thieu_Thang: document.getElementById('pl_ThamNien').value
+        Tham_Nien_Toi_Thieu_Thang: document.getElementById('pl_ThamNien').value,
+        Ngay_Chi_Tra: document.getElementById('pl_Ngay').value,
+        Thang_Chi_Tra: document.getElementById('pl_Thang').value
       };
 
       if (!data.Ma_PhucLoi || !data.Ten_PhucLoi || !data.Gia_Tri_Mac_Dinh) {
@@ -1224,6 +1335,8 @@
             updateKPIs(res.summary);
             renderCharts(res);
             renderEmpDetailsTable(res.employeeDetails);
+            currentCashflow = res.cashflow || [];
+            renderCashflow();
           } catch(err) {
             alert("Lỗi xử lý báo cáo: " + err.message);
           } finally {
@@ -1235,6 +1348,67 @@
           alert("Lỗi tính toán: " + err.message);
         })
         .calculateBudget(year, inflation);
+    }
+
+    function renderCashflow() {
+      let showNew = document.getElementById('cfShowNew').checked;
+      let events = currentCashflow.filter(e => showNew || e.source !== 'Tuyển mới');
+
+      let monthly = new Array(12).fill(0);
+      events.forEach(e => { monthly[parseInt(e.date.substr(5, 2), 10) - 1] += e.amount; });
+      let total = monthly.reduce((a, b) => a + b, 0);
+      let cum = [], run = 0;
+      monthly.forEach(v => { run += v; cum.push(run); });
+
+      let ctx = document.getElementById('cashflowChart').getContext('2d');
+      if (cashflowChartInst) cashflowChartInst.destroy();
+      cashflowChartInst = new Chart(ctx, {
+        data: {
+          labels: monthly.map((_, i) => 'T' + (i + 1)),
+          datasets: [
+            { type: 'line', label: 'Lũy kế', data: cum, borderColor: '#0f172a', backgroundColor: '#0f172a', tension: 0.2, pointRadius: 3, yAxisID: 'y' },
+            { type: 'bar', label: 'Chi trong tháng', data: monthly, backgroundColor: '#94a3b8', borderRadius: 4, yAxisID: 'y' }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${formatVND(c.parsed.y)}` } } },
+          scales: { y: { grid: { color: '#f1f5f9' }, ticks: { callback: v => (v / 1e6).toLocaleString('vi-VN') + ' tr' } }, x: { grid: { display: false } } }
+        }
+      });
+
+      let mt = document.getElementById('cfMonthTbody');
+      mt.innerHTML = '';
+      monthly.forEach((v, i) => {
+        let tr = document.createElement('tr');
+        tr.innerHTML = `<td>Tháng ${i + 1}</td><td class="text-end">${formatVND(v)}</td><td class="text-end fw-semibold">${formatVND(cum[i])}</td><td class="text-end text-muted">${total ? (cum[i] / total * 100).toFixed(1) : 0}%</td>`;
+        mt.appendChild(tr);
+      });
+      let trT = document.createElement('tr');
+      trT.className = 'fw-bold table-active';
+      trT.innerHTML = `<td>Cả năm</td><td class="text-end">${formatVND(total)}</td><td class="text-end">${formatVND(total)}</td><td class="text-end">100%</td>`;
+      mt.appendChild(trT);
+
+      let et = document.getElementById('cfEventTbody');
+      et.innerHTML = '';
+      if (events.length === 0) {
+        et.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Chưa có khoản chi nào</td></tr>';
+        return;
+      }
+      let acc = 0;
+      events.forEach(e => {
+        acc += e.amount;
+        let tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="text-nowrap">${formatDateDisplay(e.date)}</td>
+          <td><span class="badge-subtle">${esc(e.code)}</span> ${esc(e.name)}</td>
+          <td><span class="badge bg-light text-dark border">${esc(e.source)}</span></td>
+          <td class="text-end">${e.count}</td>
+          <td class="text-end fw-semibold">${formatVND(e.amount)}</td>
+          <td class="text-end text-muted">${formatVND(acc)}</td>`;
+        et.appendChild(tr);
+      });
     }
 
     function updateKPIs(s) {
