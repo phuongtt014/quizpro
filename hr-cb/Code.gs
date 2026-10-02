@@ -129,18 +129,33 @@ function saveBenefitTiers(maPL, tiers) {
 }
 
 // 3. THÊM / SỬA PHÚC LỢI
-function saveBenefit(b) {
+function saveBenefit(b, oldCode) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let shPL = ss.getSheetByName("DM_PhucLoi");
   if (!shPL) { setupDatabase(); shPL = ss.getSheetByName("DM_PhucLoi"); }
+
+  const newCode = String(b.Ma_PhucLoi).trim();
+  oldCode = String(oldCode || "").trim();
+  const lookupCode = oldCode || newCode;
 
   let data = shPL.getDataRange().getValues();
   let foundRowIndex = -1;
 
   for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]).trim() === String(b.Ma_PhucLoi).trim()) {
-      foundRowIndex = i + 1;
-      break;
+    const code = String(data[i][0]).trim();
+    if (code === lookupCode) foundRowIndex = i + 1;
+    // Đổi mã: không được trùng với mã của chính sách khác
+    if (oldCode && newCode !== oldCode && code === newCode) {
+      throw new Error("Mã " + newCode + " đã tồn tại, vui lòng chọn mã khác.");
+    }
+  }
+
+  // Đổi mã: cập nhật theo cả các bậc thưởng đang gắn với mã cũ
+  if (oldCode && newCode !== oldCode && foundRowIndex > 0) {
+    const shBac = ss.getSheetByName("DM_PhucLoi_Bac");
+    if (shBac && shBac.getLastRow() > 1) {
+      const rng = shBac.getRange(2, 1, shBac.getLastRow() - 1, 1);
+      rng.setValues(rng.getValues().map(r => [String(r[0]).trim() === oldCode ? newCode : r[0]]));
     }
   }
 
@@ -364,6 +379,7 @@ function calculateBudget(targetYear, inflationRate) {
   return {
     summary: {
       targetYear: targetYear,
+      inflationRate: parseFloat(inflationRate) || 0,
       totalBudget: totalExistingBudget + totalNewHireBudget,
       existingBudget: totalExistingBudget,
       newHireBudget: totalNewHireBudget,

@@ -404,6 +404,7 @@
             </div>
           </div>
           <h6 class="fw-bold text-dark fs-7 mb-2">Chi Tiết Các Khoản Phúc Lợi, BHXH & Thưởng Hưởng Trong Năm</h6>
+          <div class="small text-muted mb-2" id="popInflationNote"></div>
           <div class="table-responsive">
             <table class="table table-sm table-bordered align-middle text-sm" style="font-size:0.85rem">
               <thead class="table-secondary">
@@ -666,6 +667,8 @@
     let deptChartInst = null;
     let currentBenefits = [];
     let currentBenefitTiers = [];
+    let editingBenefitCode = '';
+    let currentInflation = 0;
     let currentEmployees = [];
     let currentEmpDetails = [];
     let bModal, eModal, iModal;
@@ -820,6 +823,7 @@
     }
 
     function openBenefitModal() {
+      editingBenefitCode = '';
       document.getElementById('tierTbody').innerHTML = '';
       document.getElementById('benefitModalTitle').innerText = "Thêm Chính Sách Phúc Lợi Mới";
       document.getElementById('pl_Ma').value = "";
@@ -841,7 +845,8 @@
       let b = currentBenefits[idx];
       document.getElementById('benefitModalTitle').innerText = "Chỉnh Sửa Phúc Lợi: " + b.Ma_PhucLoi;
       document.getElementById('pl_Ma').value = b.Ma_PhucLoi;
-      document.getElementById('pl_Ma').readOnly = true;
+      document.getElementById('pl_Ma').readOnly = false;
+      editingBenefitCode = b.Ma_PhucLoi;
       document.getElementById('pl_Ten').value = b.Ten_PhucLoi;
       document.getElementById('pl_Loai').value = b.Loai_Tinh_Toan;
       document.getElementById('pl_GiaTri').value = b.Gia_Tri_Mac_Dinh;
@@ -897,7 +902,7 @@
             .saveBenefitTiers(data.Ma_PhucLoi, tiers);
         })
         .withFailureHandler(err => { toggleLoading(false); alert("Lỗi: " + err.message); })
-        .saveBenefit(data);
+        .saveBenefit(data, editingBenefitCode);
     }
 
     // --- NHÂN VIÊN ---
@@ -1090,6 +1095,9 @@
         });
       }
 
+      document.getElementById('popInflationNote').innerHTML = currentInflation
+        ? `<i class="fa-solid fa-circle-info me-1"></i>Các số tiền dưới đây <b>đã cộng ${currentInflation}% tăng chi phí / lạm phát</b> (ô "Tỷ lệ lạm phát" ở đầu trang). Ví dụ mức nhập 50.000 sẽ hiển thị ${formatVND(50000 * (1 + currentInflation / 100))}. Đặt tỷ lệ này về 0 để xem đúng số gốc.`
+        : 'Các số tiền dưới đây là số gốc theo chính sách (tỷ lệ lạm phát = 0%).';
       document.getElementById('popTotalBenefits').innerText = formatVND(emp.Tong_PhucLoi_Thuong);
       document.getElementById('popTotalGrandCost').innerText = formatVND(emp.Tong_ChiPhi_Nam);
 
@@ -1230,6 +1238,7 @@
     }
 
     function updateKPIs(s) {
+      currentInflation = s.inflationRate || 0;
       document.getElementById('kpiTotal').innerText = formatVND(s.totalBudget);
       document.getElementById('kpiExisting').innerText = formatVND(s.existingBudget);
       document.getElementById('kpiNewHire').innerText = formatVND(s.newHireBudget);
