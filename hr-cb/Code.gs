@@ -337,6 +337,7 @@ function calculateBudget(targetYear, inflationRate, filters) {
   let deptBreakdown = {};
   let employeeDetails = [];
   let cashEvents = {};
+  let payrollMap = {}; // quỹ lương & số nhân sự theo phòng ban
 
   // A. Tính cho từng Nhân sự hiện tại
   employees.forEach(emp => {
@@ -383,6 +384,10 @@ function calculateBudget(targetYear, inflationRate, filters) {
         ChiTiet_KhoanChi: Object.values(benefitMap)
       });
 
+      let pr = getPayrollRow(payrollMap, emp.Phong_Ban);
+      pr.existingSalary += annualSalary;
+      pr.headcount += 1;
+
       totalExistingBudget += empBenefitTotal;
       deptBreakdown[emp.Phong_Ban] = (deptBreakdown[emp.Phong_Ban] || 0) + empBenefitTotal;
     }
@@ -394,6 +399,11 @@ function calculateBudget(targetYear, inflationRate, filters) {
     let startMonth = parseInt(plan.Thang_Du_Kien_Vao) || 1;
     totalNewHireCount += count;
     let planCost = 0;
+
+    // Quỹ lương tuyển mới: lương dự kiến x số tháng làm việc trong năm (từ tháng vào làm) x số người
+    let prNew = getPayrollRow(payrollMap, plan.Phong_Ban);
+    prNew.newHireCount += count;
+    prNew.newHireSalary += (parseFloat(plan.Luong_Dukien || plan.Luong_Co_Ban_Dukien) || 0) * (13 - Math.min(Math.max(startMonth, 1), 12)) * count;
 
     for (let i = 0; i < count; i++) {
       let mockEmp = {
@@ -431,6 +441,9 @@ function calculateBudget(targetYear, inflationRate, filters) {
       newHireBudget: totalNewHireBudget,
       totalEmployees: employees.filter(e => e.Trang_Thai === "Đang làm việc").length,
       totalNewHires: totalNewHireCount,
+      activeEmployees: employees.filter(e => e.Trang_Thai === "Đang làm việc").length,
+      avgBenefitPerExisting: (employees.filter(e => e.Trang_Thai === "Đang làm việc").length > 0)
+        ? (totalExistingBudget / employees.filter(e => e.Trang_Thai === "Đang làm việc").length) : 0,
       avgCostPerNewHire: totalNewHireCount > 0 ? (totalNewHireBudget / totalNewHireCount) : 0
     },
     categoryBreakdown: categoryBreakdown,
@@ -438,9 +451,16 @@ function calculateBudget(targetYear, inflationRate, filters) {
     // Danh sách đã sắp xếp: phúc lợi theo mã (PL01, PL02, ... PL10), phòng ban theo bảng chữ cái
     categoryList: Object.values(categoryMap).sort((a, b) => String(a.code).localeCompare(String(b.code), "en", { numeric: true })),
     deptList: Object.keys(deptBreakdown).sort((a, b) => String(a).localeCompare(String(b), "vi")).map(k => ({ name: k, amount: deptBreakdown[k] })),
+    deptPayroll: Object.keys(payrollMap).sort((a, b) => String(a).localeCompare(String(b), "vi")).map(k => Object.assign({ name: k }, payrollMap[k])),
     employeeDetails: employeeDetails,
     cashflow: Object.values(cashEvents).sort((a, b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : String(a.code).localeCompare(String(b.code))))
   };
+}
+
+function getPayrollRow(map, dept) {
+  const key = dept || "(Chưa có phòng ban)";
+  if (!map[key]) map[key] = { existingSalary: 0, headcount: 0, newHireSalary: 0, newHireCount: 0 };
+  return map[key];
 }
 
 function addCategory(map, b, amt) {

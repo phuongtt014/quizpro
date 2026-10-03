@@ -51,7 +51,7 @@
       border-radius: 24px;
       color: #ffffff;
       font-weight: 700;
-      font-size: 1.15rem;
+      font-size: 1rem;
       text-align: center;
       padding: 12px 8px;
       text-shadow: 0 1px 2px rgba(0,0,0,0.35);
@@ -107,6 +107,18 @@
       border-bottom: 1px solid var(--line);
     }
     .table-executive td { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+
+    .table-executive tfoot td {
+      font-weight: 700;
+      background-color: var(--soft);
+      border-top: 2px solid var(--green);
+      border-bottom: none;
+      color: var(--navy);
+    }
+    .legend-list { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; font-size: 0.8rem; }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-dot { width: 11px; height: 11px; border-radius: 2px; flex: none; }
+    .pill-teal  { background: radial-gradient(ellipse at center, #3a99ae 0%, #2a7d91 55%, #1d6070 100%); }
 
     .btn-executive {
       background-color: var(--green);
@@ -232,8 +244,8 @@
     </div>
 
     <!-- KPI Cards -->
-    <div class="row g-4 mb-4">
-      <div class="col-md-3">
+    <div class="row g-3 mb-4">
+      <div class="col-md">
         <div class="kpi-pill pill-green">Tổng Ngân Sách</div>
         <div class="kpi-card">
           <div class="kpi-value" id="kpiTotal">0 VNĐ</div>
@@ -241,7 +253,7 @@
           <div class="small text-muted mt-1" id="kpiYearLabel">Năm --</div>
         </div>
       </div>
-      <div class="col-md-3">
+      <div class="col-md">
         <div class="kpi-pill pill-terra">Nhân Sự Hiện Tại</div>
         <div class="kpi-card">
           <div class="kpi-value" id="kpiExisting">0 VNĐ</div>
@@ -249,7 +261,15 @@
           <div class="small text-muted mt-1" id="kpiExistingStaffCount">0 Nhân sự</div>
         </div>
       </div>
-      <div class="col-md-3">
+      <div class="col-md">
+        <div class="kpi-pill pill-teal">TB Phúc Lợi / NS Hiện Tại</div>
+        <div class="kpi-card">
+          <div class="kpi-value" id="kpiAvgExisting">0 VNĐ</div>
+          <div class="kpi-title mt-2">Phúc lợi bình quân / người</div>
+          <div class="small text-muted mt-1" id="kpiAvgExistingNote">Theo nhân sự đang làm việc</div>
+        </div>
+      </div>
+      <div class="col-md">
         <div class="kpi-pill pill-navy">Tuyển Mới</div>
         <div class="kpi-card">
           <div class="kpi-value" id="kpiNewHire">0 VNĐ</div>
@@ -257,7 +277,7 @@
           <div class="small text-muted mt-1" id="kpiNewHireCount">0 Chỉ tiêu mới</div>
         </div>
       </div>
-      <div class="col-md-3">
+      <div class="col-md">
         <div class="kpi-pill pill-brown">TB / Nhân Sự Mới</div>
         <div class="kpi-card">
           <div class="kpi-value" id="kpiAvgNewHire">0 VNĐ</div>
@@ -316,7 +336,15 @@
           <div class="col-md-5">
             <div class="card-executive p-4">
               <h6 class="fw-bold mb-3 text-slate-800">Phân Bổ Chi Phí Theo Khối / Phòng Ban</h6>
-              <div style="position:relative; height:340px"><canvas id="deptChart"></canvas></div>
+              <div style="position:relative; height:260px"><canvas id="deptChart"></canvas></div>
+              <div id="deptLegend" class="legend-list"></div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="card-executive p-4">
+              <h6 class="fw-bold mb-1 text-slate-800">Quỹ Lương & Số Lượng Nhân Sự Theo Phòng Ban</h6>
+              <div class="small text-muted mb-3">Cột: quỹ lương năm (nhân sự hiện tại = lương x 12 tháng; tuyển mới = lương dự kiến x số tháng làm việc trong năm, chưa gồm phúc lợi). Đường: số nhân sự (hiện tại + chỉ tiêu tuyển mới).</div>
+              <div style="position:relative; height:360px"><canvas id="payrollChart"></canvas></div>
             </div>
           </div>
         </div>
@@ -384,6 +412,7 @@
                 </tr>
               </thead>
               <tbody id="empTbody"></tbody>
+              <tfoot id="empTfoot"></tfoot>
             </table>
           </div>
         </div>
@@ -429,6 +458,7 @@
                 </tr>
               </thead>
               <tbody id="empDetailTbody"></tbody>
+              <tfoot id="empDetailTfoot"></tfoot>
             </table>
           </div>
         </div>
@@ -486,15 +516,15 @@
             <table class="table table-executive align-middle">
               <thead>
                 <tr>
-                  <th>Phòng Ban</th>
-                  <th>Vị Trí</th>
-                  <th>Cấp Bậc</th>
-                  <th>Giới Tính</th>
-                  <th>Đối Tượng</th>
-                  <th>SL Tuyển</th>
-                  <th>Lương Dự Kiến</th>
-                  <th>Lương BHXH Dự Kiến</th>
-                  <th>Tháng Vào</th>
+                  <th style="min-width:220px">Phòng Ban</th>
+                  <th style="min-width:200px">Vị Trí</th>
+                  <th style="min-width:150px">Cấp Bậc</th>
+                  <th style="min-width:110px">Giới Tính</th>
+                  <th style="min-width:120px">Đối Tượng</th>
+                  <th style="min-width:80px">SL Tuyển</th>
+                  <th style="min-width:140px">Lương Dự Kiến</th>
+                  <th style="min-width:140px">Lương BHXH Dự Kiến</th>
+                  <th style="min-width:80px">Tháng Vào</th>
                   <th>Thao Tác</th>
                 </tr>
               </thead>
@@ -800,6 +830,9 @@
     </div>
   </div>
 
+  <datalist id="dl-phongBan"></datalist>
+  <datalist id="dl-viTri"></datalist>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
@@ -822,6 +855,7 @@
     ];
     const PALETTE = ['#2a7d91', '#1ccbb3', '#f6b73c', '#ef8a5c', '#143f4c', '#0e6b5e', '#c1694a', '#7b5a1f', '#6fb7c6', '#8fe3d6', '#f9d58a', '#f6b99d'];
     let cashflowChartInst = null;
+    let payrollChartInst = null;
     let currentEmployees = [];
     let currentEmpDetails = [];
     let bModal, eModal, iModal;
@@ -1117,6 +1151,17 @@
       tbody.innerHTML = '';
       document.getElementById('empCountBadge').innerText = `${emps.length} Nhân sự`;
 
+      // Dòng tổng cộng (chỉ tính nhân sự đang làm việc)
+      let active = emps.filter(e => e.Trang_Thai === 'Đang làm việc');
+      let sum = (arr, f) => arr.reduce((a, e) => a + (parseFloat(f(e)) || 0), 0);
+      document.getElementById('empTfoot').innerHTML = emps.length ? `
+        <tr>
+          <td colspan="7">TỔNG CỘNG — ${active.length} đang làm việc / ${emps.length} hồ sơ</td>
+          <td>${formatVND(sum(active, e => e.Luong !== undefined ? e.Luong : e.Luong_Co_Ban))}</td>
+          <td>${formatVND(sum(active, e => e.Luong_Dong_BHXH))}</td>
+          <td colspan="3"></td>
+        </tr>` : '';
+
       emps.forEach((e, idx) => {
         let salaryVal = e.Luong !== undefined ? e.Luong : e.Luong_Co_Ban;
         let tr = document.createElement('tr');
@@ -1248,10 +1293,22 @@
       let tbody = document.getElementById('empDetailTbody');
       tbody.innerHTML = '';
 
+      let tfoot = document.getElementById('empDetailTfoot');
       if (filtered.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Không tìm thấy dữ liệu nhân sự phù hợp</td></tr>';
+        tfoot.innerHTML = '';
         return;
       }
+      let tot = f => filtered.reduce((a, d) => a + (parseFloat(d[f]) || 0), 0);
+      tfoot.innerHTML = `
+        <tr>
+          <td colspan="4">TỔNG CỘNG — ${filtered.length} nhân sự</td>
+          <td>${formatVND(tot('Luong_Thang'))}</td>
+          <td>${formatVND(tot('Luong_Nam'))}</td>
+          <td class="text-success">${formatVND(tot('Tong_PhucLoi_Thuong'))}</td>
+          <td class="text-danger">${formatVND(tot('Tong_ChiPhi_Nam'))}</td>
+          <td></td>
+        </tr>`;
 
       filtered.forEach((d, idx) => {
         let tr = document.createElement('tr');
@@ -1318,8 +1375,8 @@
         let salaryVal = p.Luong_Dukien !== undefined ? p.Luong_Dukien : p.Luong_Co_Ban_Dukien;
         let tr = document.createElement('tr');
         tr.innerHTML = `
-          <td><input type="text" class="form-control form-control-sm" value="${p.Phong_Ban}"></td>
-          <td><input type="text" class="form-control form-control-sm" value="${p.Vi_Tri}"></td>
+          <td><input type="text" class="form-control form-control-sm" list="dl-phongBan" value="${esc(p.Phong_Ban)}"></td>
+          <td><input type="text" class="form-control form-control-sm" list="dl-viTri" value="${esc(p.Vi_Tri)}"></td>
           <td>
             <select class="form-select form-select-sm">
               <option value="Nhân viên" ${p.Cap_Bac === 'Nhân viên' ? 'selected' : ''}>Nhân viên</option>
@@ -1358,8 +1415,8 @@
       let tbody = document.getElementById('newHireTbody');
       let tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><input type="text" class="form-control form-control-sm" value="Khối Mới"></td>
-        <td><input type="text" class="form-control form-control-sm" value="Chuyên viên"></td>
+        <td><input type="text" class="form-control form-control-sm" list="dl-phongBan" value="Khối Mới"></td>
+        <td><input type="text" class="form-control form-control-sm" list="dl-viTri" value="Chuyên viên"></td>
         <td>
           <select class="form-select form-select-sm">
             <option value="Nhân viên">Nhân viên</option>
@@ -1513,6 +1570,8 @@
       document.getElementById('kpiExisting').innerText = formatVND(s.existingBudget);
       document.getElementById('kpiNewHire').innerText = formatVND(s.newHireBudget);
       document.getElementById('kpiAvgNewHire').innerText = formatVND(s.avgCostPerNewHire);
+      document.getElementById('kpiAvgExisting').innerText = formatVND(s.avgBenefitPerExisting);
+      document.getElementById('kpiAvgExistingNote').innerText = `Trên ${s.activeEmployees || 0} nhân sự đang làm việc`;
 
       document.getElementById('kpiYearLabel').innerText = `Dự báo năm ${s.targetYear}`;
       document.getElementById('kpiExistingStaffCount').innerText = `${s.totalEmployees} Nhân sự hiện tại`;
@@ -1533,6 +1592,9 @@
       filterOptions.viTri = uniqSorted([...emps.map(e => e.Vi_Tri), ...plan.map(p => p.Vi_Tri)]);
       FILTER_DEFS.forEach(f => { filterSel[f.key] = filterSel[f.key].filter(v => filterOptions[f.key].includes(v)); });
       renderFilters();
+      ['phongBan', 'viTri'].forEach(k => {
+        document.getElementById('dl-' + k).innerHTML = filterOptions[k].map(o => `<option value="${esc(o)}"></option>`).join('');
+      });
     }
 
     function msLabel(key) {
@@ -1678,6 +1740,8 @@
         }
       });
 
+      renderPayrollChart(res.deptPayroll || []);
+
       // Phòng ban: sắp xếp theo bảng chữ cái
       let depts = (res.deptList || []).slice().sort((a, b) => a.name.localeCompare(b.name, 'vi'));
       let ctx2 = document.getElementById('deptChart').getContext('2d');
@@ -1693,8 +1757,53 @@
           maintainAspectRatio: false,
           cutout: '45%',
           plugins: {
-            legend: { position: 'bottom' },
+            legend: { display: false },
             tooltip: { callbacks: { label: c => `${c.label}: ${formatVND(c.parsed)}` } }
+          }
+        }
+      });
+
+      // Chú giải HTML (hiện đủ mọi phòng ban, không bị khung biểu đồ che)
+      let tot = depts.reduce((a, d) => a + d.amount, 0);
+      document.getElementById('deptLegend').innerHTML = depts.map((d, i) => `
+        <div class="legend-item"><span class="legend-dot" style="background:${PALETTE[i % PALETTE.length]}"></span>
+          <span>${esc(d.name)} <span class="text-muted">· ${tot ? (d.amount / tot * 100).toFixed(1) : 0}%</span></span></div>`).join('');
+    }
+
+    function renderPayrollChart(rows) {
+      rows = rows.slice().sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+      let labels = rows.map(r => r.name);
+      let ctx = document.getElementById('payrollChart').getContext('2d');
+      if (payrollChartInst) payrollChartInst.destroy();
+      payrollChartInst = new Chart(ctx, {
+        data: {
+          labels: labels,
+          datasets: [
+            { type: 'bar', label: 'Quỹ lương nhân sự hiện tại', data: rows.map(r => r.existingSalary), backgroundColor: '#2a7d91', stack: 's', yAxisID: 'y', order: 2 },
+            { type: 'bar', label: 'Quỹ lương tuyển mới', data: rows.map(r => r.newHireSalary), backgroundColor: '#1ccbb3', stack: 's', yAxisID: 'y', order: 2 },
+            { type: 'line', label: 'Số nhân sự (gồm tuyển mới)', data: rows.map(r => r.headcount + r.newHireCount), borderColor: '#ef8a5c', backgroundColor: '#ef8a5c', borderWidth: 3, pointRadius: 5, tension: 0.15, yAxisID: 'y1', order: 1 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+              callbacks: {
+                label: c => c.dataset.yAxisID === 'y1' ? `${c.dataset.label}: ${c.parsed.y} người` : `${c.dataset.label}: ${formatVND(c.parsed.y)}`,
+                afterBody: items => {
+                  let r = rows[items[0].dataIndex];
+                  return `Hiện tại: ${r.headcount} người | Tuyển mới: ${r.newHireCount} người`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: { stacked: true, grid: { display: false } },
+            y: { stacked: true, position: 'left', grid: { color: '#eef2f3' }, title: { display: true, text: 'Quỹ lương năm (triệu đồng)' }, ticks: { callback: v => (v / 1e6).toLocaleString('vi-VN') } },
+            y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: 'Số nhân sự' }, ticks: { precision: 0 } }
           }
         }
       });
