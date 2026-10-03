@@ -303,14 +303,24 @@ function parseDateVN(dateStr) {
 }
 
 // 5. TÍNH TOÁN DỰ BÁO NGÂN SÁCH & BẢNG KÊ CHI TIẾT TỪNG NHÂN SỰ
-function calculateBudget(targetYear, inflationRate) {
+function calculateBudget(targetYear, inflationRate, filters) {
   targetYear = parseInt(targetYear) || (new Date().getFullYear() + 1);
   const inflationFactor = 1 + ((parseFloat(inflationRate) || 0) / 100);
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const employees = getSheetDataAsJson(ss.getSheetByName("DB_NhanSu"));
+  filters = filters || {};
+  const allEmployees = getSheetDataAsJson(ss.getSheetByName("DB_NhanSu"));
   const benefits = loadBenefits(ss);
-  const newHirePlan = getSheetDataAsJson(ss.getSheetByName("KeHoach_TuyenDung"));
+  const allPlans = getSheetDataAsJson(ss.getSheetByName("KeHoach_TuyenDung"));
+
+  // Bộ lọc (mỗi nhóm chọn nhiều giá trị; để trống = không lọc). Dòng kế hoạch tuyển mới có
+  // Giới tính / Đối tượng = "All" thì khớp với mọi lựa chọn.
+  const employees = allEmployees.filter(e => matchFilters(filters, {
+    doiTuong: e.Doi_Tuong || "Cơ hữu", gioiTinh: e.Gioi_Tinh, phongBan: e.Phong_Ban, viTri: e.Vi_Tri
+  }));
+  const newHirePlan = allPlans.filter(p => matchFilters(filters, {
+    doiTuong: p.Doi_Tuong_Du_Kien || "Cơ hữu", gioiTinh: p.Gioi_Tinh_Du_Kien || "All", phongBan: p.Phong_Ban, viTri: p.Vi_Tri
+  }, true));
 
   // Gắn các bậc thưởng vào từng phúc lợi (nếu có)
   const tiers = getSheetDataAsJson(ss.getSheetByName("DM_PhucLoi_Bac"));
@@ -323,6 +333,7 @@ function calculateBudget(targetYear, inflationRate) {
   let totalNewHireCount = 0;
 
   let categoryBreakdown = {};
+  let categoryMap = {};
   let deptBreakdown = {};
   let employeeDetails = [];
   let cashEvents = {};
@@ -338,6 +349,7 @@ function calculateBudget(targetYear, inflationRate) {
         let amt = p.amount * inflationFactor;
         empBenefitTotal += amt;
         categoryBreakdown[p.benefit.Ten_PhucLoi] = (categoryBreakdown[p.benefit.Ten_PhucLoi] || 0) + amt;
+        addCategory(categoryMap, p.benefit, amt);
         addCashEvent(cashEvents, "Nhân sự hiện tại", p.benefit, p.date, amt);
 
         if (!benefitMap[p.benefit.Ma_PhucLoi]) {
@@ -401,6 +413,7 @@ function calculateBudget(targetYear, inflationRate) {
         let amt = p.amount * inflationFactor;
         planCost += amt;
         categoryBreakdown[p.benefit.Ten_PhucLoi] = (categoryBreakdown[p.benefit.Ten_PhucLoi] || 0) + amt;
+        addCategory(categoryMap, p.benefit, amt);
         addCashEvent(cashEvents, "Tuyển mới", p.benefit, p.date, amt);
       });
     }
@@ -416,15 +429,34 @@ function calculateBudget(targetYear, inflationRate) {
       totalBudget: totalExistingBudget + totalNewHireBudget,
       existingBudget: totalExistingBudget,
       newHireBudget: totalNewHireBudget,
-      totalEmployees: employees.length,
+      totalEmployees: employees.filter(e => e.Trang_Thai === "Đang làm việc").length,
       totalNewHires: totalNewHireCount,
       avgCostPerNewHire: totalNewHireCount > 0 ? (totalNewHireBudget / totalNewHireCount) : 0
     },
     categoryBreakdown: categoryBreakdown,
     deptBreakdown: deptBreakdown,
+    // Danh sách đã sắp xếp: phúc lợi theo mã (PL01, PL02, ... PL10), phòng ban theo bảng chữ cái
+    categoryList: Object.values(categoryMap).sort((a, b) => String(a.code).localeCompare(String(b.code), "en", { numeric: true })),
+    deptList: Object.keys(deptBreakdown).sort((a, b) => String(a).localeCompare(String(b), "vi")).map(k => ({ name: k, amount: deptBreakdown[k] })),
     employeeDetails: employeeDetails,
     cashflow: Object.values(cashEvents).sort((a, b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : String(a.code).localeCompare(String(b.code))))
   };
+}
+
+function addCategory(map, b, amt) {
+  const key = String(b.Ma_PhucLoi).trim();
+  if (!map[key]) map[key] = { code: key, name: b.Ten_PhucLoi, amount: 0 };
+  map[key].amount += amt;
+}
+
+// vals: {doiTuong, gioiTinh, phongBan, viTri}. allowAll: giá trị "All" (kế hoạch tuyển mới) khớp mọi lựa chọn
+function matchFilters(f, vals, allowAll) {
+  return ["doiTuong", "gioiTinh", "phongBan", "viTri"].every(k => {
+    const sel = f[k];
+    if (!sel || sel.length === 0) return true;
+    if (allowAll && vals[k] === "All") return true;
+    return sel.map(String).indexOf(String(vals[k])) >= 0;
+  });
 }
 
 // 6. Kiểm tra điều kiện Phúc lợi

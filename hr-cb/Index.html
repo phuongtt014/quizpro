@@ -5,92 +5,140 @@
   <title>Hệ Thống Ngân Sách Phúc Lợi & Chi Phí Nhân Sự</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     :root {
-      --slate-900: #0f172a;
-      --slate-800: #1e293b;
-      --slate-700: #334155;
-      --slate-600: #475569;
-      --slate-100: #f1f5f9;
-      --slate-50:  #f8fafc;
-      --border-color: #e2e8f0;
+      --ink: #14232b;
+      --muted: #5b6b73;
+      --line: #e3e8ea;
+      --soft: #eef6f5;
+      --green: #0e6b5e;
+      --green-dark: #0a5247;
+      --terra: #c1694a;
+      --navy: #143f4c;
+      --brown: #7b5a1f;
+      --teal: #2a7d91;
+      --mint: #1ccbb3;
+      --gold: #f6b73c;
+      --orange: #ef8a5c;
+      --accent: #d0883b;
     }
 
     body {
       font-family: 'Plus Jakarta Sans', sans-serif;
-      background-color: var(--slate-50);
-      color: var(--slate-800);
+      background-color: #ffffff;
+      color: var(--ink);
     }
 
     .app-header {
-      background-color: var(--slate-900);
-      border-bottom: 1px solid var(--slate-800);
+      background-color: #ffffff;
+      border-bottom: 2px solid var(--accent);
     }
+    .app-title { font-size: 1.7rem; font-weight: 800; color: #0b0b0b; letter-spacing: -0.3px; }
 
     .card-executive {
       background: #ffffff;
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      box-shadow: 0 4px 14px rgba(120, 70, 60, 0.14);
     }
 
-    .kpi-title {
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      color: var(--slate-600);
-    }
-
-    .kpi-value {
-      font-size: 1.4rem;
+    /* Thẻ KPI: pill màu + khung viền đen như mẫu */
+    .kpi-pill {
+      border: 1px solid #2b2b2b;
+      border-radius: 24px;
+      color: #ffffff;
       font-weight: 700;
-      color: var(--slate-900);
+      font-size: 1.15rem;
+      text-align: center;
+      padding: 12px 8px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+    }
+    .pill-green { background: radial-gradient(ellipse at center, #159079 0%, #0e6b5e 55%, #0a5247 100%); }
+    .pill-terra { background: radial-gradient(ellipse at center, #de8b6b 0%, #c1694a 55%, #a85536 100%); }
+    .pill-navy  { background: radial-gradient(ellipse at center, #1f5a6b 0%, #143f4c 55%, #0d2c36 100%); }
+    .pill-brown { background: radial-gradient(ellipse at center, #9a7430 0%, #7b5a1f 55%, #5f4414 100%); }
+
+    .kpi-card {
+      background: #ffffff;
+      border: 1px solid #1a1a1a;
+      border-radius: 6px;
+      text-align: center;
+      padding: 16px 10px;
+      margin-top: 18px;
+    }
+    .kpi-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .kpi-value {
+      font-size: 1.55rem;
+      font-weight: 800;
+      color: #0b0b0b;
     }
 
+    .nav-tabs-subtle { border-bottom: 1px solid var(--line); }
     .nav-tabs-subtle .nav-link {
       border: none;
-      color: var(--slate-600);
+      color: var(--muted);
       font-weight: 500;
-      padding: 0.75rem 1.25rem;
-      font-size: 0.875rem;
+      padding: 0.75rem 0.85rem;
+      font-size: 0.85rem;
+      white-space: nowrap;
     }
     .nav-tabs-subtle .nav-link.active {
-      color: var(--slate-900);
-      font-weight: 600;
-      border-bottom: 2px solid var(--slate-900);
+      color: var(--green);
+      font-weight: 700;
+      border-bottom: 3px solid var(--green);
       background: transparent;
     }
 
     .table-executive { font-size: 0.85rem; }
     .table-executive th {
-      background-color: var(--slate-100);
-      color: var(--slate-700);
-      font-weight: 600;
+      background-color: var(--soft);
+      color: var(--navy);
+      font-weight: 700;
       font-size: 0.75rem;
       text-transform: uppercase;
       padding: 10px 12px;
-      border-bottom: 1px solid var(--border-color);
+      border-bottom: 1px solid var(--line);
     }
-    .table-executive td { padding: 10px 12px; border-bottom: 1px solid var(--border-color); }
+    .table-executive td { padding: 10px 12px; border-bottom: 1px solid var(--line); }
 
     .btn-executive {
-      background-color: var(--slate-900);
+      background-color: var(--green);
       color: #ffffff;
-      font-weight: 500;
+      font-weight: 600;
       font-size: 0.875rem;
       border-radius: 6px;
       padding: 8px 16px;
       border: none;
     }
-    .btn-executive:hover { background-color: var(--slate-700); color: #ffffff; }
+    .btn-executive:hover { background-color: var(--green-dark); color: #ffffff; }
+
+    /* Đồng bộ màu các nút/nhãn Bootstrap theo bảng màu mới */
+    .btn-dark { background-color: var(--green); border-color: var(--green); }
+    .btn-dark:hover, .btn-dark:focus { background-color: var(--green-dark); border-color: var(--green-dark); }
+    .btn-outline-dark { color: var(--green); border-color: var(--green); }
+    .btn-outline-dark:hover { background-color: var(--green); border-color: var(--green); color: #fff; }
+    .btn-outline-secondary { color: var(--muted); }
+    .bg-dark { background-color: var(--navy) !important; }
+    .text-success { color: var(--green) !important; }
+    .text-danger { color: var(--terra) !important; }
+    .text-primary { color: var(--teal) !important; }
+    .bg-primary { background-color: var(--teal) !important; }
+    .bg-info { background-color: var(--mint) !important; color: #06362f !important; }
+    .btn-outline-danger { color: var(--terra); border-color: var(--terra); }
+    .btn-outline-danger:hover { background-color: var(--terra); border-color: var(--terra); color: #fff; }
+    .form-control:focus, .form-select:focus { border-color: var(--teal); box-shadow: 0 0 0 .2rem rgba(42,125,145,.2); }
 
     .badge-subtle {
-      background-color: var(--slate-100);
-      color: var(--slate-700);
-      font-weight: 500;
+      background-color: var(--soft);
+      color: var(--navy);
+      font-weight: 600;
       padding: 4px 8px;
       border-radius: 4px;
       font-size: 0.75rem;
@@ -106,6 +154,27 @@
       align-items: center;
       z-index: 9999;
     }
+
+    /* Bộ lọc đa lựa chọn */
+    .ms { position: relative; }
+    .ms-btn {
+      width: 100%; text-align: left; background: #fff; border: 1px solid #ced4da; border-radius: 6px;
+      padding: 4px 28px 4px 10px; font-size: 0.85rem; min-height: 31px; position: relative;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .ms-btn::after { content: "\f078"; font-family: "Font Awesome 6 Free"; font-weight: 900; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; color: var(--muted); }
+    .ms-btn.active { border-color: var(--green); background: var(--soft); font-weight: 600; color: var(--green-dark); }
+    .ms-panel {
+      display: none; position: absolute; z-index: 1050; top: 100%; left: 0; min-width: 100%; width: max-content; max-width: 340px;
+      background: #fff; border: 1px solid var(--line); border-radius: 6px; margin-top: 3px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 8px;
+    }
+    .ms.open .ms-panel { display: block; }
+    .ms-list { max-height: 240px; overflow-y: auto; margin-top: 6px; }
+    .ms-item { display: flex; gap: 8px; align-items: center; padding: 3px 4px; font-size: 0.85rem; cursor: pointer; border-radius: 4px; }
+    .ms-item:hover { background: var(--soft); }
+    .ms-actions { font-size: 0.75rem; }
+    .ms-actions a { color: var(--teal); cursor: pointer; text-decoration: none; margin-right: 10px; }
   </style>
 </head>
 <body>
@@ -113,20 +182,17 @@
   <!-- Loading State -->
   <div id="loading" class="loading-overlay">
     <div class="text-center">
-      <div class="spinner-border text-dark" style="width: 2.5rem; height: 2.5rem;" role="status"></div>
+      <div class="spinner-border" style="width: 2.5rem; height: 2.5rem; color: var(--green);" role="status"></div>
       <p class="mt-3 text-secondary small fw-medium">Đang đồng bộ & tính toán dữ liệu C&B...</p>
     </div>
   </div>
 
   <!-- Header -->
-  <header class="app-header py-3 px-4 text-white">
+  <header class="app-header py-3 px-4">
     <div class="d-flex justify-content-between align-items-center">
-      <div class="d-flex align-items-center gap-3">
-        <i class="fa-solid fa-chart-simple text-slate-400 fs-5"></i>
-        <span class="fw-semibold fs-6">DỰ BÁO NGÂN SÁCH PHÚC LỢI & CHI PHÍ NHÂN SỰ</span>
-      </div>
+      <span class="app-title">Dự Báo Ngân Sách Phúc Lợi & Chi Phí Nhân Sự</span>
       <div>
-        <button class="btn btn-sm btn-outline-light" onclick="initDB()">
+        <button class="btn btn-sm btn-outline-dark" onclick="initDB()">
           <i class="fa-solid fa-arrows-rotate me-1"></i> Reset DB Mẫu
         </button>
       </div>
@@ -152,36 +218,51 @@
           </button>
         </div>
       </div>
+      <hr class="my-3">
+      <div class="row g-3 align-items-end">
+        <div class="col-6 col-md-2"><label class="form-label small text-muted mb-1">Đối tượng</label><div class="ms" id="ms-doiTuong"></div></div>
+        <div class="col-6 col-md-2"><label class="form-label small text-muted mb-1">Giới tính</label><div class="ms" id="ms-gioiTinh"></div></div>
+        <div class="col-6 col-md-3"><label class="form-label small text-muted mb-1">Phòng ban</label><div class="ms" id="ms-phongBan"></div></div>
+        <div class="col-6 col-md-3"><label class="form-label small text-muted mb-1">Vị trí</label><div class="ms" id="ms-viTri"></div></div>
+        <div class="col-12 col-md-2">
+          <button class="btn btn-sm btn-outline-secondary w-100" onclick="clearFilters()"><i class="fa-solid fa-filter-circle-xmark me-1"></i> Xóa bộ lọc</button>
+        </div>
+      </div>
+      <div class="small mt-2" id="filterSummary" style="color: var(--green-dark)"></div>
     </div>
 
     <!-- KPI Cards -->
-    <div class="row g-3 mb-4">
+    <div class="row g-4 mb-4">
       <div class="col-md-3">
-        <div class="card-executive p-3">
-          <span class="kpi-title">Tổng Ngân Sách Dự Báo</span>
-          <div class="kpi-value mt-2" id="kpiTotal">0 VNĐ</div>
-          <span class="small text-muted" id="kpiYearLabel">Năm --</span>
+        <div class="kpi-pill pill-green">Tổng Ngân Sách</div>
+        <div class="kpi-card">
+          <div class="kpi-value" id="kpiTotal">0 VNĐ</div>
+          <div class="kpi-title mt-2">Dự báo toàn bộ</div>
+          <div class="small text-muted mt-1" id="kpiYearLabel">Năm --</div>
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card-executive p-3">
-          <span class="kpi-title">Ngân Sách Nhân Sự Hiện Tại</span>
-          <div class="kpi-value mt-2" id="kpiExisting">0 VNĐ</div>
-          <span class="small text-muted" id="kpiExistingStaffCount">0 Nhân sự</span>
+        <div class="kpi-pill pill-terra">Nhân Sự Hiện Tại</div>
+        <div class="kpi-card">
+          <div class="kpi-value" id="kpiExisting">0 VNĐ</div>
+          <div class="kpi-title mt-2">Ngân sách phúc lợi</div>
+          <div class="small text-muted mt-1" id="kpiExistingStaffCount">0 Nhân sự</div>
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card-executive p-3">
-          <span class="kpi-title">Ngân Sách Tuyển Mới</span>
-          <div class="kpi-value mt-2" id="kpiNewHire">0 VNĐ</div>
-          <span class="small text-muted" id="kpiNewHireCount">0 Chỉ tiêu mới</span>
+        <div class="kpi-pill pill-navy">Tuyển Mới</div>
+        <div class="kpi-card">
+          <div class="kpi-value" id="kpiNewHire">0 VNĐ</div>
+          <div class="kpi-title mt-2">Ngân sách tuyển mới</div>
+          <div class="small text-muted mt-1" id="kpiNewHireCount">0 Chỉ tiêu mới</div>
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card-executive p-3">
-          <span class="kpi-title">Chi Phí Phúc Lợi TB / NV Mới</span>
-          <div class="kpi-value mt-2" id="kpiAvgNewHire">0 VNĐ</div>
-          <span class="small text-muted">BHXH, Thưởng & Phúc Lợi</span>
+        <div class="kpi-pill pill-brown">TB / Nhân Sự Mới</div>
+        <div class="kpi-card">
+          <div class="kpi-value" id="kpiAvgNewHire">0 VNĐ</div>
+          <div class="kpi-title mt-2">Chi phí phúc lợi TB</div>
+          <div class="small text-muted mt-1">BHXH, Thưởng & Phúc Lợi</div>
         </div>
       </div>
     </div>
@@ -229,13 +310,13 @@
           <div class="col-md-7">
             <div class="card-executive p-4">
               <h6 class="fw-bold mb-3 text-slate-800">Cơ Cấu Chi Phí Phúc Lợi & Thưởng Hàng Năm</h6>
-              <canvas id="categoryChart" height="150"></canvas>
+              <div id="categoryWrap" style="position:relative; height:320px"><canvas id="categoryChart"></canvas></div>
             </div>
           </div>
           <div class="col-md-5">
             <div class="card-executive p-4">
               <h6 class="fw-bold mb-3 text-slate-800">Phân Bổ Chi Phí Theo Khối / Phòng Ban</h6>
-              <canvas id="deptChart" height="220"></canvas>
+              <div style="position:relative; height:340px"><canvas id="deptChart"></canvas></div>
             </div>
           </div>
         </div>
@@ -729,6 +810,17 @@
     let editingBenefitCode = '';
     let currentInflation = 0;
     let currentCashflow = [];
+    let planForFilters = [];
+    let filterOptions = { doiTuong: [], gioiTinh: [], phongBan: [], viTri: [] };
+    let filterSel = { doiTuong: [], gioiTinh: [], phongBan: [], viTri: [] };
+    let msOpenKey = null, msSnapshot = '';
+    const FILTER_DEFS = [
+      { key: 'doiTuong', label: 'Đối tượng', search: false },
+      { key: 'gioiTinh', label: 'Giới tính', search: false },
+      { key: 'phongBan', label: 'Phòng ban', search: true },
+      { key: 'viTri', label: 'Vị trí', search: true }
+    ];
+    const PALETTE = ['#2a7d91', '#1ccbb3', '#f6b73c', '#ef8a5c', '#143f4c', '#0e6b5e', '#c1694a', '#7b5a1f', '#6fb7c6', '#8fe3d6', '#f9d58a', '#f6b99d'];
     let cashflowChartInst = null;
     let currentEmployees = [];
     let currentEmpDetails = [];
@@ -779,10 +871,12 @@
           try {
             currentBenefits = data.benefits || [];
             currentBenefitTiers = data.benefitTiers || [];
+            planForFilters = data.newHirePlan || [];
             currentEmployees = data.employees || [];
             renderBenefitsTable(currentBenefits);
             renderEmployeesTable(currentEmployees);
             renderNewHireTable(data.newHirePlan || []);
+            buildFilterOptions();
             runCalculation();
           } catch(err) {
             alert("Lỗi hiển thị: " + err.message);
@@ -1320,7 +1414,7 @@
 
       toggleLoading(true);
       google.script.run
-        .withSuccessHandler(res => runCalculation())
+        .withSuccessHandler(res => { planForFilters = planArray; buildFilterOptions(); runCalculation(); })
         .withFailureHandler(err => { toggleLoading(false); alert("Lỗi: " + err.message); })
         .saveNewHirePlan(planArray);
     }
@@ -1334,6 +1428,7 @@
         .withSuccessHandler(res => {
           try {
             updateKPIs(res.summary);
+            renderFilterSummary();
             renderCharts(res);
             renderEmpDetailsTable(res.employeeDetails);
             currentCashflow = res.cashflow || [];
@@ -1348,7 +1443,7 @@
           toggleLoading(false);
           alert("Lỗi tính toán: " + err.message);
         })
-        .calculateBudget(year, inflation);
+        .calculateBudget(year, inflation, filterSel);
     }
 
     function renderCashflow() {
@@ -1367,8 +1462,8 @@
         data: {
           labels: monthly.map((_, i) => 'T' + (i + 1)),
           datasets: [
-            { type: 'line', label: 'Lũy kế', data: cum, borderColor: '#0f172a', backgroundColor: '#0f172a', tension: 0.2, pointRadius: 3, yAxisID: 'y' },
-            { type: 'bar', label: 'Chi trong tháng', data: monthly, backgroundColor: '#94a3b8', borderRadius: 4, yAxisID: 'y' }
+            { type: 'line', label: 'Lũy kế', data: cum, borderColor: '#143f4c', backgroundColor: '#143f4c', tension: 0.2, pointRadius: 3, yAxisID: 'y' },
+            { type: 'bar', label: 'Chi trong tháng', data: monthly, backgroundColor: '#1ccbb3', borderRadius: 4, yAxisID: 'y' }
           ]
         },
         options: {
@@ -1424,9 +1519,145 @@
       document.getElementById('kpiNewHireCount').innerText = `${s.totalNewHires} Chỉ tiêu mới`;
     }
 
+    // ---- Bộ lọc đa lựa chọn: Đối tượng / Giới tính / Phòng ban / Vị trí ----
+    function uniqSorted(arr) {
+      return [...new Set(arr.map(v => String(v == null ? '' : v).trim()).filter(v => v && v !== 'All'))]
+        .sort((a, b) => a.localeCompare(b, 'vi'));
+    }
+
+    function buildFilterOptions() {
+      let emps = currentEmployees, plan = planForFilters || [];
+      filterOptions.doiTuong = uniqSorted([...emps.map(e => e.Doi_Tuong || 'Cơ hữu'), ...plan.map(p => p.Doi_Tuong_Du_Kien)]);
+      filterOptions.gioiTinh = uniqSorted([...emps.map(e => e.Gioi_Tinh), ...plan.map(p => p.Gioi_Tinh_Du_Kien)]);
+      filterOptions.phongBan = uniqSorted([...emps.map(e => e.Phong_Ban), ...plan.map(p => p.Phong_Ban)]);
+      filterOptions.viTri = uniqSorted([...emps.map(e => e.Vi_Tri), ...plan.map(p => p.Vi_Tri)]);
+      FILTER_DEFS.forEach(f => { filterSel[f.key] = filterSel[f.key].filter(v => filterOptions[f.key].includes(v)); });
+      renderFilters();
+    }
+
+    function msLabel(key) {
+      let n = filterSel[key].length;
+      if (n === 0) return 'Tất cả';
+      if (n === 1) return filterSel[key][0];
+      return `${n} đã chọn`;
+    }
+
+    function renderFilters() {
+      FILTER_DEFS.forEach(f => {
+        let box = document.getElementById('ms-' + f.key);
+        let opts = filterOptions[f.key];
+        box.classList.remove('open');
+        box.innerHTML = `
+          <button type="button" class="ms-btn ${filterSel[f.key].length ? 'active' : ''}" data-ms-toggle="${f.key}" title="${esc(filterSel[f.key].join(', '))}">${esc(msLabel(f.key))}</button>
+          <div class="ms-panel">
+            ${f.search ? `<input type="text" class="form-control form-control-sm" placeholder="Tìm..." data-ms-search="${f.key}">` : ''}
+            <div class="ms-actions mt-2"><a data-ms-all="${f.key}">Chọn tất cả</a><a data-ms-none="${f.key}">Bỏ chọn</a></div>
+            <div class="ms-list">
+              ${opts.length ? opts.map(o => `
+                <label class="ms-item" data-ms-text="${esc(o.toLowerCase())}">
+                  <input type="checkbox" data-ms-opt="${f.key}" value="${esc(o)}" ${filterSel[f.key].includes(o) ? 'checked' : ''}>
+                  <span>${esc(o)}</span>
+                </label>`).join('') : '<div class="small text-muted p-2">Chưa có dữ liệu</div>'}
+            </div>
+          </div>`;
+      });
+    }
+
+    function refreshMsButton(key) {
+      let btn = document.querySelector(`#ms-${key} .ms-btn`);
+      btn.innerText = msLabel(key);
+      btn.title = filterSel[key].join(', ');
+      btn.classList.toggle('active', filterSel[key].length > 0);
+    }
+
+    function closeMs() {
+      if (!msOpenKey) return;
+      document.getElementById('ms-' + msOpenKey).classList.remove('open');
+      msOpenKey = null;
+      if (JSON.stringify(filterSel) !== msSnapshot) runCalculation();
+    }
+
+    function clearFilters() {
+      FILTER_DEFS.forEach(f => filterSel[f.key] = []);
+      renderFilters();
+      runCalculation();
+    }
+
+    function renderFilterSummary() {
+      let parts = FILTER_DEFS.filter(f => filterSel[f.key].length).map(f => `${f.label}: ${filterSel[f.key].join(', ')}`);
+      document.getElementById('filterSummary').innerHTML = parts.length
+        ? `<i class="fa-solid fa-filter me-1"></i>Đang lọc theo — ${esc(parts.join(' | '))}`
+        : '';
+    }
+
+    document.addEventListener('click', e => {
+      let t = e.target;
+      let toggle = t.closest('[data-ms-toggle]');
+      if (toggle) {
+        let key = toggle.getAttribute('data-ms-toggle');
+        if (msOpenKey === key) { closeMs(); return; }
+        closeMs();
+        msOpenKey = key;
+        msSnapshot = JSON.stringify(filterSel);
+        document.getElementById('ms-' + key).classList.add('open');
+        return;
+      }
+      let all = t.closest('[data-ms-all]'), none = t.closest('[data-ms-none]');
+      if (all || none) {
+        let key = (all || none).getAttribute(all ? 'data-ms-all' : 'data-ms-none');
+        let panel = document.getElementById('ms-' + key);
+        // "Chọn tất cả" chỉ áp dụng cho các mục đang hiển thị (sau khi tìm kiếm)
+        panel.querySelectorAll('.ms-item').forEach(it => {
+          if (it.style.display === 'none') return;
+          it.querySelector('input').checked = !!all;
+        });
+        filterSel[key] = [...panel.querySelectorAll('input[data-ms-opt]:checked')].map(i => i.value);
+        refreshMsButton(key);
+        return;
+      }
+      if (!t.closest('.ms-panel')) closeMs();
+    });
+
+    document.addEventListener('change', e => {
+      let cb = e.target.closest('input[data-ms-opt]');
+      if (!cb) return;
+      let key = cb.getAttribute('data-ms-opt');
+      filterSel[key] = [...document.querySelectorAll(`#ms-${key} input[data-ms-opt]:checked`)].map(i => i.value);
+      refreshMsButton(key);
+    });
+
+    document.addEventListener('input', e => {
+      let inp = e.target.closest('input[data-ms-search]');
+      if (!inp) return;
+      let kw = inp.value.toLowerCase().trim();
+      document.querySelectorAll(`#ms-${inp.getAttribute('data-ms-search')} .ms-item`).forEach(it => {
+        it.style.display = it.getAttribute('data-ms-text').includes(kw) ? '' : 'none';
+      });
+    });
+
+    // Hiển thị giá trị cuối thanh ngang (đơn vị triệu đồng)
+    const barValueLabels = {
+      id: 'barValueLabels',
+      afterDatasetsDraw(chart) {
+        let ctx = chart.ctx;
+        ctx.save();
+        ctx.fillStyle = '#14232b';
+        ctx.font = '600 11px "Plus Jakarta Sans", sans-serif';
+        ctx.textBaseline = 'middle';
+        chart.getDatasetMeta(0).data.forEach((bar, i) => {
+          let v = chart.data.datasets[0].data[i];
+          ctx.fillText((v / 1e6).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + ' tr', bar.x + 6, bar.y);
+        });
+        ctx.restore();
+      }
+    };
+
     function renderCharts(res) {
-      let catLabels = Object.keys(res.categoryBreakdown);
-      let catData = Object.values(res.categoryBreakdown);
+      // Phúc lợi: sắp xếp theo mã (PL01, PL02, ...)
+      let cats = (res.categoryList || []).slice().sort((a, b) => String(a.code).localeCompare(String(b.code), 'en', { numeric: true }));
+      document.getElementById('categoryWrap').style.height = Math.max(260, cats.length * 38 + 60) + 'px';
+      let catLabels = cats.map(c => `${c.code} · ${c.name}`);
+      let catData = cats.map(c => c.amount);
 
       let ctx1 = document.getElementById('categoryChart').getContext('2d');
       if (categoryChartInst) categoryChartInst.destroy();
@@ -1434,38 +1665,37 @@
         type: 'bar',
         data: {
           labels: catLabels,
-          datasets: [{
-            label: 'Chi phí (VNĐ)',
-            data: catData,
-            backgroundColor: '#334155',
-            borderRadius: 4
-          }]
+          datasets: [{ label: 'Chi phí (VNĐ)', data: catData, backgroundColor: '#2a7d91', borderRadius: 3 }]
         },
+        plugins: [barValueLabels],
         options: {
           indexAxis: 'y',
           responsive: true,
-          plugins: { legend: { display: false } },
-          scales: { x: { grid: { color: '#f1f5f9' } }, y: { grid: { display: false } } }
+          maintainAspectRatio: false,
+          layout: { padding: { right: 60 } },
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => formatVND(c.parsed.x) } } },
+          scales: { x: { grid: { color: '#eef2f3' }, ticks: { callback: v => (v / 1e6).toLocaleString('vi-VN') + ' tr' } }, y: { grid: { display: false } } }
         }
       });
 
-      let deptLabels = Object.keys(res.deptBreakdown);
-      let deptData = Object.values(res.deptBreakdown);
-
+      // Phòng ban: sắp xếp theo bảng chữ cái
+      let depts = (res.deptList || []).slice().sort((a, b) => a.name.localeCompare(b.name, 'vi'));
       let ctx2 = document.getElementById('deptChart').getContext('2d');
       if (deptChartInst) deptChartInst.destroy();
       deptChartInst = new Chart(ctx2, {
         type: 'doughnut',
         data: {
-          labels: deptLabels,
-          datasets: [{
-            data: deptData,
-            backgroundColor: ['#0f172a', '#334155', '#475569', '#64748b', '#94a3b8']
-          }]
+          labels: depts.map(d => d.name),
+          datasets: [{ data: depts.map(d => d.amount), backgroundColor: depts.map((_, i) => PALETTE[i % PALETTE.length]), borderColor: '#fff', borderWidth: 2 }]
         },
         options: {
           responsive: true,
-          plugins: { legend: { position: 'bottom' } }
+          maintainAspectRatio: false,
+          cutout: '45%',
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: { callbacks: { label: c => `${c.label}: ${formatVND(c.parsed)}` } }
+          }
         }
       });
     }
