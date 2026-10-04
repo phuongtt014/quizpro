@@ -125,6 +125,33 @@
     .policy-matrix td.pm-yes { background: #d9efeb; text-align: center; border-radius: 6px; border: 2px solid #fff; }
     .policy-matrix td.pm-no { background: #eceff0; text-align: center; color: #9aa6ab; border-radius: 6px; border: 2px solid #fff; }
     .pm-chip { display: inline-block; background: var(--soft); color: var(--navy); border-radius: 10px; padding: 1px 8px; font-size: 0.7rem; margin: 2px 3px 0 0; }
+    .export-bar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 12px; }
+    #printHeader { display: none; }
+
+    @media print {
+      @page { size: A4 landscape; margin: 10mm; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      body { background: #fff !important; }
+      .app-header, #mainTab, .export-bar, .loading-overlay, .filter-card, .btn, .ms, .modal,
+      #tab-employees .row.g-2, #tab-emp-details .row.g-2, #tab-policy #policyDimBtns { display: none !important; }
+      #printHeader { display: block !important; border-bottom: 2px solid var(--accent); padding-bottom: 6px; margin-bottom: 10px; }
+      .tab-content > .tab-pane { display: none !important; }
+      .tab-content > .tab-pane.active { display: block !important; opacity: 1 !important; }
+      .card-executive { box-shadow: none !important; border: 1px solid #d5dbde !important; break-inside: avoid; }
+      .table-responsive { overflow: visible !important; max-height: none !important; }
+      [style*="max-height"] { max-height: none !important; overflow: visible !important; }
+      .table-executive, .policy-matrix { font-size: 10px !important; }
+      .table-executive th, .table-executive td { padding: 4px 6px !important; }
+      tr { break-inside: avoid; }
+      thead { display: table-header-group; }
+      main.container-fluid { padding: 0 !important; }
+      body:not([data-print-tab="tab-dashboard"]) .kpi-row { display: none !important; }
+      .col-actions { display: none !important; }
+      .kpi-pill { font-size: 12px !important; padding: 7px 4px !important; }
+      .kpi-value { font-size: 1.15rem !important; }
+      .kpi-card { margin-top: 10px !important; padding: 8px 6px !important; }
+      .row { --bs-gutter-x: 0.75rem; }
+    }
     .legend-list { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; font-size: 0.8rem; }
     .legend-item { display: flex; align-items: center; gap: 6px; }
     .legend-dot { width: 11px; height: 11px; border-radius: 2px; flex: none; }
@@ -223,8 +250,14 @@
 
   <main class="container-fluid px-4 py-4">
 
+    <!-- Thông tin đầu trang khi in PDF -->
+    <div id="printHeader">
+      <div style="font-size:18px; font-weight:800" id="printTitle"></div>
+      <div style="font-size:11px; color:#444" id="printMeta"></div>
+    </div>
+
     <!-- Filter Control -->
-    <div class="card-executive p-3 mb-4">
+    <div class="card-executive p-3 mb-4 filter-card">
       <div class="row g-3 align-items-center">
         <div class="col-md-3">
           <label class="form-label small text-muted mb-1">Năm dự báo</label>
@@ -254,7 +287,7 @@
     </div>
 
     <!-- KPI Cards -->
-    <div class="row g-3 mb-4">
+    <div class="row g-3 mb-4 kpi-row">
       <div class="col-md">
         <div class="kpi-pill pill-green">Tổng Ngân Sách</div>
         <div class="kpi-card">
@@ -337,6 +370,12 @@
     </ul>
 
     <!-- Tab Contents -->
+    <div class="export-bar">
+      <span class="small text-muted"><i class="fa-solid fa-file-export me-1"></i>Xuất tab đang xem:</span>
+      <button class="btn btn-sm btn-outline-dark" onclick="exportCurrentTab('csv')"><i class="fa-solid fa-file-csv me-1"></i> CSV</button>
+      <button class="btn btn-sm btn-outline-dark" onclick="exportCurrentTab('pdf')"><i class="fa-solid fa-file-pdf me-1"></i> PDF</button>
+    </div>
+
     <div class="tab-content">
       
       <!-- TAB 1: DASHBOARD -->
@@ -419,7 +458,7 @@
                   <th>Giới Tính</th>
                   <th>Cấp Bậc</th>
                   <th>Thâm Niên</th>
-                  <th>Thao Tác</th>
+                  <th class="col-actions">Thao Tác</th>
                 </tr>
               </thead>
               <tbody id="benefitTbody"></tbody>
@@ -465,7 +504,7 @@
                   <th>Lương BHXH</th>
                   <th>ĐCH</th>
                   <th>Trạng Thái</th>
-                  <th>Thao Tác</th>
+                  <th class="col-actions">Thao Tác</th>
                 </tr>
               </thead>
               <tbody id="empTbody"></tbody>
@@ -511,7 +550,7 @@
                   <th>Lương Cả Năm</th>
                   <th>Tổng PL & Thưởng (Năm)</th>
                   <th>Tổng Chi Phí / Năm</th>
-                  <th>Thao Tác</th>
+                  <th class="col-actions">Thao Tác</th>
                 </tr>
               </thead>
               <tbody id="empDetailTbody"></tbody>
@@ -582,7 +621,7 @@
                   <th style="min-width:140px">Lương Dự Kiến</th>
                   <th style="min-width:140px">Lương BHXH Dự Kiến</th>
                   <th style="min-width:80px">Tháng Vào</th>
-                  <th>Thao Tác</th>
+                  <th class="col-actions">Thao Tác</th>
                 </tr>
               </thead>
               <tbody id="newHireTbody"></tbody>
@@ -920,6 +959,8 @@
     let editingBenefitCode = '';
     let currentInflation = 0;
     let currentCashflow = [];
+    let lastResult = null;
+    let shownEmpDetails = [];
     let planForFilters = [];
     let filterOptions = { doiTuong: [], gioiTinh: [], phongBan: [], viTri: [] };
     let filterSel = { doiTuong: [], gioiTinh: [], phongBan: [], viTri: [] };
@@ -1032,7 +1073,7 @@
           <td>${b.Gioi_Tinh || 'All'}</td>
           <td>${b.Cap_Bac || 'All'}</td>
           <td>${b.Tham_Nien_Toi_Thieu_Thang || 0} tháng</td>
-          <td>
+          <td class="col-actions">
             <button class="btn btn-sm btn-outline-dark py-0 px-2" onclick="editBenefit(${idx})">
               <i class="fa-solid fa-pen-to-square"></i> Sửa
             </button>
@@ -1121,7 +1162,7 @@
         <td><select class="form-select form-select-sm t-obj">${sel([['All','Tất cả'],['Cơ hữu','Cơ hữu'],['Dịch vụ','Dịch vụ']], t.Doi_Tuong)}</select></td>
         <td><select class="form-select form-select-sm t-level">${sel([['All','Tất cả'],['Nhân viên','Nhân viên'],['Quản lý cấp trung','QL cấp trung'],['Quản lý cấp cao','QL cấp cao']], t.Cap_Bac)}</select></td>
         <td><input type="number" class="form-control form-control-sm t-val" value="${esc(t.Gia_Tri)}" step="any"></td>
-        <td><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="this.closest('tr').remove()"><i class="fa-solid fa-trash"></i></button></td>
+        <td class="col-actions"><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="this.closest('tr').remove()"><i class="fa-solid fa-trash"></i></button></td>
       `;
       document.getElementById('tierTbody').appendChild(tr);
     }
@@ -1279,7 +1320,7 @@
           <td class="text-muted">${formatVND(e.Luong_Dong_BHXH)}</td>
           <td class="fw-bold text-primary">${e.DCH || 0}</td>
           <td><span class="badge ${e.Trang_Thai === 'Đang làm việc' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'}">${e.Trang_Thai}</span></td>
-          <td>
+          <td class="col-actions">
             <button class="btn btn-sm btn-outline-dark py-0 px-2" onclick="editEmp(${idx})">
               <i class="fa-solid fa-pen-to-square"></i> Sửa
             </button>
@@ -1430,6 +1471,7 @@
       });
 
       document.getElementById('countDetailBadge').innerText = `${filtered.length} Nhân sự`;
+      shownEmpDetails = filtered;
 
       let tbody = document.getElementById('empDetailTbody');
       tbody.innerHTML = '';
@@ -1462,7 +1504,7 @@
           <td>${formatVND(d.Luong_Nam)}</td>
           <td class="fw-bold text-success">${formatVND(d.Tong_PhucLoi_Thuong)}</td>
           <td class="fw-bold text-danger">${formatVND(d.Tong_ChiPhi_Nam)}</td>
-          <td>
+          <td class="col-actions">
             <button class="btn btn-sm btn-dark py-0 px-2" onclick="showItemizedModal('${d.Ma_NV}')">
               <i class="fa-solid fa-list me-1"></i> Bảng Kê
             </button>
@@ -1542,7 +1584,7 @@
           <td><input type="number" class="form-control form-control-sm" value="${salaryVal}"></td>
           <td><input type="number" class="form-control form-control-sm" value="${p.Luong_BHXH_Dukien}"></td>
           <td><input type="number" class="form-control form-control-sm" value="${p.Thang_Du_Kien_Vao}" min="1" max="12" style="width:65px"></td>
-          <td>
+          <td class="col-actions">
             <button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">
               <i class="fa-solid fa-trash"></i>
             </button>
@@ -1582,7 +1624,7 @@
         <td><input type="number" class="form-control form-control-sm" value="15000000"></td>
         <td><input type="number" class="form-control form-control-sm" value="7000000"></td>
         <td><input type="number" class="form-control form-control-sm" value="1" min="1" max="12" style="width:65px"></td>
-        <td>
+        <td class="col-actions">
           <button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">
             <i class="fa-solid fa-trash"></i>
           </button>
@@ -1631,6 +1673,7 @@
             renderEmpDetailsTable(res.employeeDetails);
             renderPolicyView();
             currentCashflow = res.cashflow || [];
+            lastResult = res;
             renderCashflow();
           } catch(err) {
             alert("Lỗi xử lý báo cáo: " + err.message);
@@ -1811,6 +1854,212 @@
             <div>${chips.map(c => `<span class="pm-chip">${esc(c)}</span>`).join('')}</div></td>${cells}</tr>`;
       }).join('') : `<tr><td colspan="${groups.length + 1}" class="text-center text-muted py-3">Chưa có chính sách phúc lợi</td></tr>`;
     }
+
+    // ================= XUẤT CSV / PDF =================
+    const TAB_LABELS = {
+      'tab-dashboard': 'Tổng quan chi phí',
+      'tab-policy': 'Chính sách theo đối tượng',
+      'tab-benefits': 'Cấu hình phúc lợi và điều kiện',
+      'tab-employees': 'Bảng mức lương và hồ sơ nhân sự',
+      'tab-emp-details': 'Chi tiết theo nhân sự',
+      'tab-cashflow': 'Dòng tiền theo thời gian',
+      'tab-newhire': 'Kế hoạch tuyển mới'
+    };
+
+    function activeTabId() {
+      let el = document.querySelector('.tab-content > .tab-pane.active');
+      return el ? el.id : 'tab-dashboard';
+    }
+
+    function filterSummaryText() {
+      let parts = FILTER_DEFS.filter(f => filterSel[f.key].length).map(f => `${f.label}: ${filterSel[f.key].join(', ')}`);
+      return parts.length ? parts.join(' | ') : 'Không lọc (toàn bộ)';
+    }
+
+    function exportCurrentTab(kind) {
+      let id = activeTabId();
+      if (kind === 'pdf') return exportPdf(id);
+      let sections = buildCsvSections(id);
+      if (!sections || !sections.length) { alert('Chưa có dữ liệu để xuất.'); return; }
+      downloadCsv(exportFileName(id, 'csv'), sectionsToCsv(sections));
+    }
+
+    function exportFileName(id, ext) {
+      let d = new Date(), p = n => String(n).padStart(2, '0');
+      let slug = normText(TAB_LABELS[id]).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      return `${slug}_${document.getElementById('targetYear').value}_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.${ext}`;
+    }
+
+    // ---- CSV (dấu ; để mở đúng trong Excel tiếng Việt; có BOM UTF-8) ----
+    function csvCell(v) {
+      if (v == null) return '';
+      let s;
+      if (typeof v === 'number') {
+        s = String(Number.isInteger(v) ? v : Math.round(v * 100) / 100).replace('.', ',');
+      } else {
+        s = String(v);
+        if (/^[=+\-@]/.test(s) && isNaN(Number(s.replace(',', '.')))) s = "'" + s; // tránh chèn công thức
+      }
+      return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }
+
+    function sectionsToCsv(sections) {
+      let lines = ['sep=;'];
+      sections.forEach(sec => {
+        if (sec.title) lines.push(csvCell(sec.title));
+        if (sec.headers) lines.push(sec.headers.map(csvCell).join(';'));
+        (sec.rows || []).forEach(r => lines.push(r.map(csvCell).join(';')));
+        lines.push('');
+      });
+      return lines.join('\r\n');
+    }
+
+    function downloadCsv(name, text) {
+      let blob = new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' });
+      let a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    }
+
+    function tableToSection(title, tableSel) {
+      let headers = [...document.querySelectorAll(`${tableSel} thead th`)].map(th => th.innerText.replace(/\s+/g, ' ').trim());
+      let rows = [...document.querySelectorAll(`${tableSel} tbody tr`)].map(tr =>
+        [...tr.children].map(td => td.innerText.trim().replace(/\n+/g, ' | ')));
+      return { title, headers, rows };
+    }
+
+    function collectNewHireRows() {
+      return [...document.querySelectorAll('#newHireTbody tr')].map(r => {
+        let i = r.querySelectorAll('input, select');
+        return [i[0].value, i[1].value, i[2].value, i[3].value, i[4].value, Number(i[5].value) || 0, Number(i[6].value) || 0, Number(i[7].value) || 0, Number(i[8].value) || 0];
+      });
+    }
+
+    function buildCsvSections(id) {
+      let year = document.getElementById('targetYear').value;
+      let infl = document.getElementById('inflationRate').value;
+      let info = { title: `${TAB_LABELS[id]} — năm ${year} (lạm phát chung ${infl}%) — Bộ lọc: ${filterSummaryText()}` };
+      let r = lastResult;
+
+      if (id === 'tab-dashboard') {
+        if (!r) return [];
+        let s = r.summary;
+        return [
+          info,
+          { title: 'Tổng hợp ngân sách (VNĐ)', headers: ['Chỉ tiêu', 'Giá trị'], rows: [
+            ['Tổng ngân sách dự báo', Math.round(s.totalBudget)],
+            ['Ngân sách nhân sự hiện tại', Math.round(s.existingBudget)],
+            ['TB phúc lợi / nhân sự hiện tại', Math.round(s.avgBenefitPerExisting || 0)],
+            ['Ngân sách tuyển mới', Math.round(s.newHireBudget)],
+            ['TB phúc lợi / nhân sự mới', Math.round(s.avgCostPerNewHire)],
+            ['Số nhân sự đang làm việc', s.activeEmployees || 0],
+            ['Chỉ tiêu tuyển mới', s.totalNewHires]] },
+          { title: 'Cơ cấu chi phí theo phúc lợi (VNĐ)', headers: ['Mã', 'Tên phúc lợi', 'Chi phí'],
+            rows: (r.categoryList || []).slice().sort((a, b) => natCmp(a.code, b.code)).map(c => [c.code, c.name, Math.round(c.amount)]) },
+          (() => {
+            let d = (r.deptList || []).slice().sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+            let tot = d.reduce((a, x) => a + x.amount, 0);
+            return { title: 'Phân bổ chi phí theo phòng ban (VNĐ)', headers: ['Phòng ban', 'Chi phí', 'Tỷ lệ %'],
+              rows: d.map(x => [x.name, Math.round(x.amount), tot ? Math.round(x.amount / tot * 1000) / 10 : 0]) };
+          })(),
+          { title: 'Quỹ lương & số nhân sự theo phòng ban (VNĐ)',
+            headers: ['Phòng ban', 'Nhân sự hiện tại', 'Quỹ lương hiện tại', 'Chỉ tiêu tuyển mới', 'Quỹ lương tuyển mới', 'Tổng nhân sự'],
+            rows: (r.deptPayroll || []).slice().sort((a, b) => a.name.localeCompare(b.name, 'vi')).map(x =>
+              [x.name, x.headcount, Math.round(x.existingSalary), x.newHireCount, Math.round(x.newHireSalary), x.headcount + x.newHireCount]) }
+        ];
+      }
+
+      if (id === 'tab-policy') {
+        return [info, tableToSection('Chính sách phúc lợi theo ' + ({ Doi_Tuong: 'đối tượng', Cap_Bac: 'cấp bậc', Gioi_Tinh: 'giới tính' })[policyDim], '#tab-policy .policy-matrix')];
+      }
+
+      if (id === 'tab-benefits') {
+        let list = currentBenefits.slice().sort((a, b) => natCmp(a.Ma_PhucLoi, b.Ma_PhucLoi));
+        return [
+          { title: `${TAB_LABELS[id]}` },
+          { title: 'Danh mục phúc lợi',
+            headers: ['Mã', 'Tên khoản', 'Loại tính toán', 'Giá trị / tỷ lệ', 'Căn cứ lương', 'Chu kỳ', 'Ngày chi trả', 'Tháng chi trả', 'Mức tăng riêng (%)', 'Đối tượng', 'Giới tính', 'Cấp bậc', 'Phòng ban', 'Thâm niên tối thiểu (tháng)'],
+            rows: list.map(b => [b.Ma_PhucLoi, b.Ten_PhucLoi, b.Loai_Tinh_Toan, Number(b.Gia_Tri_Mac_Dinh) || 0, b.Can_Cu_Luong, b.Chu_Ky,
+              parseInt(b.Ngay_Chi_Tra) || '', parseInt(b.Thang_Chi_Tra) || '', (b.Ty_Le_Tang === '' || b.Ty_Le_Tang == null) ? 'Chung' : Number(b.Ty_Le_Tang),
+              b.Doi_Tuong || 'All', b.Gioi_Tinh || 'All', b.Cap_Bac || 'All', b.Phong_Ban || 'All', Number(b.Tham_Nien_Toi_Thieu_Thang) || 0]) },
+          { title: 'Các bậc thưởng', headers: ['Mã phúc lợi', 'Tên bậc', 'Thâm niên từ (tháng)', 'Đến (tháng)', 'Đối tượng', 'Cấp bậc', 'Giá trị'],
+            rows: currentBenefitTiers.slice().sort((a, b) => natCmp(a.Ma_PhucLoi, b.Ma_PhucLoi)).map(t => [t.Ma_PhucLoi, t.Ten_Bac, Number(t.Tham_Nien_Tu_Thang) || 0, t.Tham_Nien_Den_Thang === '' ? 'Không giới hạn' : Number(t.Tham_Nien_Den_Thang), t.Doi_Tuong || 'All', t.Cap_Bac || 'All', Number(t.Gia_Tri) || 0]) }
+        ];
+      }
+
+      if (id === 'tab-employees') {
+        let kw = normText(document.getElementById('empSearch').value);
+        let list = currentEmployees.filter(e => !kw || normText(e.Ho_Ten).includes(kw) || normText(e.Ma_NV).includes(kw));
+        return [
+          { title: kw ? `${TAB_LABELS[id]} (kết quả tìm kiếm: ${document.getElementById('empSearch').value})` : TAB_LABELS[id] },
+          { headers: ['Mã NV', 'Họ tên', 'Phòng ban', 'Vị trí', 'Cấp bậc', 'Giới tính', 'Đối tượng', 'Ngày vào làm', 'Lương', 'Lương đóng BHXH', 'ĐCH', 'Trạng thái', 'Phúc lợi không được hưởng'],
+            rows: list.map(e => [e.Ma_NV, e.Ho_Ten, e.Phong_Ban, e.Vi_Tri, e.Cap_Bac, e.Gioi_Tinh, e.Doi_Tuong || 'Cơ hữu', formatDateDisplay(e.Ngay_Vao_Lam),
+              Number(e.Luong !== undefined ? e.Luong : e.Luong_Co_Ban) || 0, Number(e.Luong_Dong_BHXH) || 0, Number(e.DCH) || 0, e.Trang_Thai, e.PL_Loai_Tru || '']) }
+        ];
+      }
+
+      if (id === 'tab-emp-details') {
+        let list = shownEmpDetails;
+        return [
+          info,
+          { title: 'Tổng hợp theo nhân sự (VNĐ)', headers: ['Mã NV', 'Họ tên', 'Phòng ban', 'Vị trí', 'Cấp bậc', 'Đối tượng', 'Lương/tháng', 'Lương cả năm', 'Phúc lợi & thưởng (năm)', 'Tổng chi phí (năm)', 'Phúc lợi không được hưởng'],
+            rows: list.map(d => [d.Ma_NV, d.Ho_Ten, d.Phong_Ban, d.Vi_Tri, d.Cap_Bac, d.Doi_Tuong, Math.round(d.Luong_Thang), Math.round(d.Luong_Nam), Math.round(d.Tong_PhucLoi_Thuong), Math.round(d.Tong_ChiPhi_Nam), d.PL_Loai_Tru || '']) },
+          { title: 'Bảng kê từng khoản (VNĐ)', headers: ['Mã NV', 'Họ tên', 'Mã phúc lợi', 'Tên khoản', 'Chu kỳ', 'Mức tăng (%)', 'Thành tiền (năm)'],
+            rows: list.flatMap(d => (d.ChiTiet_KhoanChi || []).map(k => [d.Ma_NV, d.Ho_Ten, k.code, k.name, k.cycle, k.rate || 0, Math.round(k.total)])) }
+        ];
+      }
+
+      if (id === 'tab-cashflow') {
+        let showNew = document.getElementById('cfShowNew').checked;
+        let events = currentCashflow.filter(e => showNew || e.source !== 'Tuyển mới');
+        let monthly = new Array(12).fill(0);
+        events.forEach(e => { monthly[parseInt(e.date.substr(5, 2), 10) - 1] += e.amount; });
+        let total = monthly.reduce((a, b) => a + b, 0), run = 0;
+        let acc = 0;
+        return [
+          { title: info.title + (showNew ? '' : ' — không gồm tuyển mới') },
+          { title: 'Tổng hợp theo tháng (VNĐ)', headers: ['Tháng', 'Chi trong tháng', 'Lũy kế', '% cả năm'],
+            rows: monthly.map((v, i) => { run += v; return ['Tháng ' + (i + 1), Math.round(v), Math.round(run), total ? Math.round(run / total * 1000) / 10 : 0]; }) },
+          { title: 'Lịch chi chi tiết theo ngày (VNĐ)', headers: ['Ngày chi', 'Mã phúc lợi', 'Tên khoản', 'Nguồn', 'Số người', 'Số tiền', 'Lũy kế'],
+            rows: events.map(e => { acc += e.amount; return [formatDateDisplay(e.date), e.code, e.name, e.source, e.count, Math.round(e.amount), Math.round(acc)]; }) }
+        ];
+      }
+
+      if (id === 'tab-newhire') {
+        return [
+          { title: TAB_LABELS[id] },
+          { headers: ['Phòng ban', 'Vị trí', 'Cấp bậc', 'Giới tính', 'Đối tượng', 'Số lượng tuyển', 'Lương dự kiến', 'Lương BHXH dự kiến', 'Tháng vào'], rows: collectNewHireRows() }
+        ];
+      }
+      return [];
+    }
+
+    // ---- PDF: dùng hộp thoại in của trình duyệt (chọn "Lưu dưới dạng PDF") để giữ đúng tiếng Việt và biểu đồ ----
+    let titleBeforePrint = null;
+    function exportPdf(id) {
+      let year = document.getElementById('targetYear').value;
+      let infl = document.getElementById('inflationRate').value;
+      document.getElementById('printTitle').innerText = `${TAB_LABELS[id]} — năm ${year}`;
+      document.getElementById('printMeta').innerText =
+        `Lạm phát chung: ${infl}% | Bộ lọc: ${filterSummaryText()} | Xuất ngày ${new Date().toLocaleDateString('vi-VN')}`;
+      document.body.setAttribute('data-print-tab', id);
+      titleBeforePrint = document.title;
+      document.title = exportFileName(id, 'pdf').replace(/\.pdf$/, '');
+      setTimeout(() => window.print(), 100);
+    }
+
+    function resizeAllCharts() {
+      if (window.Chart && Chart.instances) Object.values(Chart.instances).forEach(c => { try { c.resize(); } catch (e) {} });
+    }
+    window.addEventListener('beforeprint', resizeAllCharts);
+    window.addEventListener('afterprint', () => {
+      document.body.removeAttribute('data-print-tab');
+      if (titleBeforePrint !== null) { document.title = titleBeforePrint; titleBeforePrint = null; }
+      resizeAllCharts();
+    });
 
     // ---- Bộ lọc đa lựa chọn: Đối tượng / Giới tính / Phòng ban / Vị trí ----
     function uniqSorted(arr) {
