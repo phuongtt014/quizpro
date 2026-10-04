@@ -80,15 +80,17 @@
       color: #0b0b0b;
     }
 
-    .nav-tabs-subtle { border-bottom: 1px solid var(--line); }
+    .nav-tabs-subtle { border-bottom: 1px solid var(--line); flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; }
+    .nav-tabs-subtle .nav-item { flex: none; }
     .nav-tabs-subtle .nav-link {
       border: none;
       color: var(--muted);
       font-weight: 500;
-      padding: 0.75rem 0.85rem;
-      font-size: 0.85rem;
+      padding: 0.75rem 0.55rem;
+      font-size: 0.82rem;
       white-space: nowrap;
     }
+    .nav-tabs-subtle .nav-link i { margin-right: 0.3rem !important; }
     .nav-tabs-subtle .nav-link.active {
       color: var(--green);
       font-weight: 700;
@@ -115,6 +117,14 @@
       border-bottom: none;
       color: var(--navy);
     }
+    .policy-matrix { font-size: 0.85rem; border-collapse: separate; border-spacing: 0 6px; }
+    .policy-matrix th { color: #fff; text-align: center; padding: 10px 8px; font-weight: 700; border-radius: 6px; }
+    .policy-matrix th.pm-first { background: transparent; color: var(--muted); text-align: left; text-transform: uppercase; font-size: 0.72rem; }
+    .policy-matrix td { padding: 8px 10px; vertical-align: middle; }
+    .policy-matrix td.pm-name { background: #fff; border-bottom: 1px solid var(--line); min-width: 260px; }
+    .policy-matrix td.pm-yes { background: #d9efeb; text-align: center; border-radius: 6px; border: 2px solid #fff; }
+    .policy-matrix td.pm-no { background: #eceff0; text-align: center; color: #9aa6ab; border-radius: 6px; border: 2px solid #fff; }
+    .pm-chip { display: inline-block; background: var(--soft); color: var(--navy); border-radius: 10px; padding: 1px 8px; font-size: 0.7rem; margin: 2px 3px 0 0; }
     .legend-list { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; font-size: 0.8rem; }
     .legend-item { display: flex; align-items: center; gap: 6px; }
     .legend-dot { width: 11px; height: 11px; border-radius: 2px; flex: none; }
@@ -295,6 +305,11 @@
         </button>
       </li>
       <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-policy">
+          <i class="fa-solid fa-table-cells-large me-2"></i>Chính Sách Theo Đối Tượng
+        </button>
+      </li>
+      <li class="nav-item">
         <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-benefits">
           <i class="fa-solid fa-list-check me-2"></i>Cấu Hình Phúc Lợi & Điều Kiện
         </button>
@@ -350,6 +365,37 @@
         </div>
       </div>
 
+      <!-- TAB: CHÍNH SÁCH THEO ĐỐI TƯỢNG (trực quan cho Ban TGĐ) -->
+      <div class="tab-pane fade" id="tab-policy">
+        <div class="card-executive p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <h6 class="fw-bold mb-0">Bản Đồ Chính Sách Phúc Lợi</h6>
+              <div class="small text-muted">Mỗi cột là một nhóm nhân sự; ô màu cho biết nhóm đó được hưởng khoản nào, mức nào, chi trả khi nào. Số nhân sự và chi phí theo bộ lọc hiện tại.</div>
+            </div>
+            <div class="btn-group btn-group-sm" id="policyDimBtns">
+              <button type="button" class="btn btn-outline-dark active" data-dim="Doi_Tuong" onclick="setPolicyDim('Doi_Tuong')">Theo Đối tượng</button>
+              <button type="button" class="btn btn-outline-dark" data-dim="Cap_Bac" onclick="setPolicyDim('Cap_Bac')">Theo Cấp bậc</button>
+              <button type="button" class="btn btn-outline-dark" data-dim="Gioi_Tinh" onclick="setPolicyDim('Gioi_Tinh')">Theo Giới tính</button>
+            </div>
+          </div>
+        </div>
+        <div class="row g-3 mb-3" id="policyCards"></div>
+        <div class="card-executive p-3">
+          <div class="table-responsive">
+            <table class="table policy-matrix align-middle mb-0">
+              <thead id="policyHead"></thead>
+              <tbody id="policyBody"></tbody>
+            </table>
+          </div>
+          <div class="small text-muted mt-3">
+            <span class="legend-dot d-inline-block me-1" style="background:#d9efeb"></span>Được hưởng &nbsp;
+            <span class="legend-dot d-inline-block me-1" style="background:#eceff0"></span>Không thuộc diện hưởng &nbsp;|&nbsp;
+            Điều kiện khác (giới tính, cấp bậc, phòng ban, thâm niên) ghi dưới tên khoản. Nhân sự thuộc trường hợp đặc biệt được loại trừ riêng trong hồ sơ.
+          </div>
+        </div>
+      </div>
+
       <!-- TAB 2: CẤU HÌNH PHÚC LỢI & ĐIỀU KIỆN -->
       <div class="tab-pane fade" id="tab-benefits">
         <div class="card-executive p-3">
@@ -368,6 +414,7 @@
                   <th>Mức Áp Dụng / Bậc Thưởng</th>
                   <th>Chu Kỳ</th>
                   <th>Ngày Chi Trả</th>
+                  <th>Mức Tăng</th>
                   <th>Đối Tượng</th>
                   <th>Giới Tính</th>
                   <th>Cấp Bậc</th>
@@ -568,17 +615,18 @@
                   <th>Mã PL</th>
                   <th>Tên Khoản Chi Phí / Thưởng</th>
                   <th>Chu Kỳ</th>
+                  <th class="text-end">Mức Tăng</th>
                   <th class="text-end">Tổng Thành Tiền (Năm)</th>
                 </tr>
               </thead>
               <tbody id="itemizedTbody"></tbody>
               <tfoot class="table-group-divider">
                 <tr class="fw-bold">
-                  <td colspan="3" class="text-end">TỔNG CỘNG PHÚC LỢI & THƯỞNG:</td>
+                  <td colspan="4" class="text-end">TỔNG CỘNG PHÚC LỢI & THƯỞNG:</td>
                   <td class="text-end text-success" id="popTotalBenefits">0 VNĐ</td>
                 </tr>
                 <tr class="fw-bold table-active">
-                  <td colspan="3" class="text-end">TỔNG CHI PHÍ DOANH NGHIỆP TRẢ (LƯƠNG + PL):</td>
+                  <td colspan="4" class="text-end">TỔNG CHI PHÍ DOANH NGHIỆP TRẢ (LƯƠNG + PL):</td>
                   <td class="text-end text-danger" id="popTotalGrandCost">0 VNĐ</td>
                 </tr>
               </tfoot>
@@ -696,6 +744,15 @@
               </div>
               <div class="col-md-4 d-flex align-items-end">
                 <div class="small text-muted" id="pl_NgayNote"></div>
+              </div>
+            </div>
+            <div class="row g-2 mt-1">
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-dark">Mức Tăng Dự Tính (%)</label>
+                <input type="number" id="pl_TyLeTang" class="form-control form-control-sm" step="any" placeholder="Để trống = dùng tỷ lệ chung">
+              </div>
+              <div class="col-md-8 d-flex align-items-end">
+                <div class="small text-muted">Mức tăng chi phí riêng của khoản này. <b>Để trống</b> = dùng "Tỷ lệ lạm phát" chung ở đầu trang; <b>nhập 0</b> = khoản này không tăng.</div>
               </div>
             </div>
 
@@ -820,6 +877,11 @@
                 <input type="number" id="emp_DCH" class="form-control form-control-sm" value="0" step="any">
               </div>
             </div>
+
+            <hr class="my-3 text-muted">
+            <h6 class="fw-bold fs-7 text-dark mb-1"><i class="fa-solid fa-user-slash me-1"></i> Trường Hợp Đặc Biệt — Không Được Hưởng Phúc Lợi</h6>
+            <div class="small text-muted mb-2">Tích chọn các khoản mà nhân sự này <b>không</b> được hưởng (dù đủ điều kiện chung). Các khoản này sẽ không được tính vào chi phí của người này.</div>
+            <div id="emp_Excl" class="border rounded p-2" style="max-height:170px; overflow:auto"></div>
           </form>
         </div>
         <div class="modal-footer">
@@ -910,6 +972,7 @@
             renderBenefitsTable(currentBenefits);
             renderEmployeesTable(currentEmployees);
             renderNewHireTable(data.newHirePlan || []);
+            renderPolicyView();
             buildFilterOptions();
             runCalculation();
           } catch(err) {
@@ -949,6 +1012,7 @@
           <td class="fw-bold text-dark">${valStr}</td>
           <td><span class="badge bg-light text-dark border">${b.Chu_Ky}</span></td>
           <td class="small">${payDateLabel(b)}</td>
+          <td class="small">${rateLabel(b)}</td>
           <td><span class="badge ${b.Doi_Tuong === 'Cơ hữu' ? 'bg-primary' : (b.Doi_Tuong === 'Dịch vụ' ? 'bg-info' : 'bg-secondary')}">${b.Doi_Tuong || 'All'}</span></td>
           <td>${b.Gioi_Tinh || 'All'}</td>
           <td>${b.Cap_Bac || 'All'}</td>
@@ -975,6 +1039,12 @@
         .withSuccessHandler(() => loadInitialData())
         .withFailureHandler(err => { toggleLoading(false); alert("Lỗi xóa: " + err.message); })
         .deleteBenefit(b.Ma_PhucLoi);
+    }
+
+    function rateLabel(b) {
+      let v = b.Ty_Le_Tang;
+      if (v === '' || v == null) return '<span class="text-muted">Chung</span>';
+      return parseFloat(v) === 0 ? '<span class="badge bg-light text-dark border">Không tăng</span>' : `<b>${v}%</b>`;
     }
 
     function payDateLabel(b) {
@@ -1057,6 +1127,7 @@
       fillMonthSelect();
       document.getElementById('pl_Ngay').value = 1;
       document.getElementById('pl_Thang').value = '';
+      document.getElementById('pl_TyLeTang').value = '';
       document.getElementById('tierTbody').innerHTML = '';
       document.getElementById('benefitModalTitle').innerText = "Thêm Chính Sách Phúc Lợi Mới";
       document.getElementById('pl_Ma').value = "";
@@ -1092,6 +1163,7 @@
       document.getElementById('pl_PhongBan').value = b.Phong_Ban || "All";
       document.getElementById('pl_ThamNien').value = b.Tham_Nien_Toi_Thieu_Thang || 0;
       fillMonthSelect();
+      document.getElementById('pl_TyLeTang').value = (b.Ty_Le_Tang === '' || b.Ty_Le_Tang == null) ? '' : b.Ty_Le_Tang;
       document.getElementById('pl_Ngay').value = parseInt(b.Ngay_Chi_Tra) || 1;
       document.getElementById('pl_Thang').value = parseInt((String(b.Thang_Chi_Tra == null ? '' : b.Thang_Chi_Tra).match(/\d+/) || [])[0]) || '';
       updateCycleFields();
@@ -1114,7 +1186,8 @@
         Phong_Ban: document.getElementById('pl_PhongBan').value.trim(),
         Tham_Nien_Toi_Thieu_Thang: document.getElementById('pl_ThamNien').value,
         Ngay_Chi_Tra: document.getElementById('pl_Ngay').value,
-        Thang_Chi_Tra: document.getElementById('pl_Thang').value
+        Thang_Chi_Tra: document.getElementById('pl_Thang').value,
+        Ty_Le_Tang: document.getElementById('pl_TyLeTang').value
       };
 
       if (!data.Ma_PhucLoi || !data.Ten_PhucLoi || !data.Gia_Tri_Mac_Dinh) {
@@ -1167,7 +1240,7 @@
         let tr = document.createElement('tr');
         tr.innerHTML = `
           <td><span class="badge-subtle">${e.Ma_NV}</span></td>
-          <td class="fw-semibold">${e.Ho_Ten}</td>
+          <td class="fw-semibold">${e.Ho_Ten}${e.PL_Loai_Tru ? `<br><small class="text-danger fw-normal" title="Trường hợp đặc biệt: không được hưởng"><i class="fa-solid fa-user-slash me-1"></i>Loại trừ: ${esc(e.PL_Loai_Tru)}</small>` : ''}</td>
           <td>${e.Phong_Ban}</td>
           <td>${e.Vi_Tri} <small class="text-muted">(${e.Cap_Bac})</small></td>
           <td>${e.Gioi_Tinh}</td>
@@ -1187,7 +1260,21 @@
       });
     }
 
+    function natCmp(a, b) { return String(a).localeCompare(String(b), 'en', { numeric: true }); }
+
+    function renderExclusionList(selected) {
+      let sel = String(selected || '').split(',').map(x => x.trim()).filter(x => x);
+      let box = document.getElementById('emp_Excl');
+      let list = currentBenefits.slice().sort((a, b) => natCmp(a.Ma_PhucLoi, b.Ma_PhucLoi));
+      box.innerHTML = list.length ? list.map(b => `
+        <label class="ms-item">
+          <input type="checkbox" class="excl-cb" value="${esc(b.Ma_PhucLoi)}" ${sel.includes(String(b.Ma_PhucLoi).trim()) ? 'checked' : ''}>
+          <span><span class="badge-subtle">${esc(b.Ma_PhucLoi)}</span> ${esc(b.Ten_PhucLoi)}</span>
+        </label>`).join('') : '<div class="small text-muted">Chưa có phúc lợi nào</div>';
+    }
+
     function openEmpModal() {
+      renderExclusionList('');
       let today = new Date();
       let dd = String(today.getDate()).padStart(2, '0');
       let mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -1213,6 +1300,7 @@
 
     function editEmp(idx) {
       let e = currentEmployees[idx];
+      renderExclusionList(e.PL_Loai_Tru);
       document.getElementById('empModalTitle').innerText = "Chỉnh Sửa Nhân Viên: " + e.Ma_NV;
       document.getElementById('emp_Ma').value = e.Ma_NV;
       document.getElementById('emp_Ma').readOnly = true;
@@ -1245,7 +1333,8 @@
         Luong: document.getElementById('emp_Luong').value,
         Luong_Dong_BHXH: document.getElementById('emp_LuongBH').value,
         DCH: document.getElementById('emp_DCH').value,
-        Trang_Thai: document.getElementById('emp_TrangThai').value
+        Trang_Thai: document.getElementById('emp_TrangThai').value,
+        PL_Loai_Tru: [...document.querySelectorAll('#emp_Excl .excl-cb:checked')].map(i => i.value).join(', ')
       };
 
       if (!data.Ma_NV || !data.Ho_Ten || !data.Luong) {
@@ -1344,7 +1433,7 @@
       tbody.innerHTML = '';
 
       if (!emp.ChiTiet_KhoanChi || emp.ChiTiet_KhoanChi.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Không có khoản phúc lợi / thưởng phát sinh</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Không có khoản phúc lợi / thưởng phát sinh</td></tr>';
       } else {
         emp.ChiTiet_KhoanChi.forEach(k => {
           let tr = document.createElement('tr');
@@ -1352,15 +1441,15 @@
             <td><span class="badge-subtle">${k.code}</span></td>
             <td class="fw-semibold">${k.name}</td>
             <td><span class="badge bg-light text-dark border">${k.cycle}</span></td>
+            <td class="text-end">${k.rate || 0}%</td>
             <td class="text-end fw-bold">${formatVND(k.total)}</td>
           `;
           tbody.appendChild(tr);
         });
       }
 
-      document.getElementById('popInflationNote').innerHTML = currentInflation
-        ? `<i class="fa-solid fa-circle-info me-1"></i>Các số tiền dưới đây <b>đã cộng ${currentInflation}% tăng chi phí / lạm phát</b> (ô "Tỷ lệ lạm phát" ở đầu trang). Ví dụ mức nhập 50.000 sẽ hiển thị ${formatVND(50000 * (1 + currentInflation / 100))}. Đặt tỷ lệ này về 0 để xem đúng số gốc.`
-        : 'Các số tiền dưới đây là số gốc theo chính sách (tỷ lệ lạm phát = 0%).';
+      let exNote = emp.PL_Loai_Tru ? `<div class="mt-1"><i class="fa-solid fa-user-slash me-1"></i>Trường hợp đặc biệt — <b>không được hưởng</b>: ${esc(emp.PL_Loai_Tru)}</div>` : '';
+      document.getElementById('popInflationNote').innerHTML = `<i class="fa-solid fa-circle-info me-1"></i>Số tiền đã gồm <b>mức tăng riêng của từng khoản</b> (cột "Mức Tăng"). Khoản chưa khai báo mức tăng dùng tỷ lệ chung ${currentInflation}%; khoản đặt 0% là không tăng.${exNote}`;
       document.getElementById('popTotalBenefits').innerText = formatVND(emp.Tong_PhucLoi_Thuong);
       document.getElementById('popTotalGrandCost').innerText = formatVND(emp.Tong_ChiPhi_Nam);
 
@@ -1488,6 +1577,7 @@
             renderFilterSummary();
             renderCharts(res);
             renderEmpDetailsTable(res.employeeDetails);
+            renderPolicyView();
             currentCashflow = res.cashflow || [];
             renderCashflow();
           } catch(err) {
@@ -1576,6 +1666,98 @@
       document.getElementById('kpiYearLabel').innerText = `Dự báo năm ${s.targetYear}`;
       document.getElementById('kpiExistingStaffCount').innerText = `${s.totalEmployees} Nhân sự hiện tại`;
       document.getElementById('kpiNewHireCount').innerText = `${s.totalNewHires} Chỉ tiêu mới`;
+    }
+
+    // ---- Tab trực quan: Chính sách phúc lợi theo nhóm nhân sự ----
+    let policyDim = 'Doi_Tuong';
+    const POLICY_DEFAULTS = {
+      Doi_Tuong: ['Cơ hữu', 'Dịch vụ'],
+      Cap_Bac: ['Nhân viên', 'Quản lý cấp trung', 'Quản lý cấp cao'],
+      Gioi_Tinh: ['Nam', 'Nữ']
+    };
+    const POLICY_COLORS = ['#0e6b5e', '#c1694a', '#143f4c', '#7b5a1f', '#2a7d91'];
+
+    function setPolicyDim(d) {
+      policyDim = d;
+      document.querySelectorAll('#policyDimBtns button').forEach(b => b.classList.toggle('active', b.getAttribute('data-dim') === d));
+      renderPolicyView();
+    }
+
+    function appliesTo(item, dim, g) {
+      let v = item[dim];
+      return !v || v === 'All' || v === g;
+    }
+
+    function benefitAmountText(b) {
+      let isPct = b.Loai_Tinh_Toan === 'Phần trăm lương';
+      let base = b.Can_Cu_Luong === 'Luong_Dong_BHXH' ? 'lương BHXH' : 'lương';
+      return v => isPct ? `${v}% ${base}` : formatVND(v);
+    }
+
+    function cycleText(b) {
+      let c = b.Chu_Ky === '1 lần' ? 'Một lần (kỷ niệm thâm niên)' : `Theo ${String(b.Chu_Ky || '').toLowerCase()}`;
+      let pd = payDateLabel(b);
+      return b.Chu_Ky === '1 lần' ? c : `${c} · ${pd}`;
+    }
+
+    function renderPolicyView() {
+      if (!document.getElementById('policyHead')) return;
+      let dim = policyDim;
+      let seen = currentEmployees.map(e => dim === 'Doi_Tuong' ? (e.Doi_Tuong || 'Cơ hữu') : e[dim]).filter(v => v);
+      let groups = [...new Set([...POLICY_DEFAULTS[dim], ...seen])];
+      let benefits = currentBenefits.slice().sort((a, b) => natCmp(a.Ma_PhucLoi, b.Ma_PhucLoi));
+      let dimOf = d => dim === 'Doi_Tuong' ? (d.Doi_Tuong || 'Cơ hữu') : d[dim];
+
+      // Thẻ tổng hợp từng nhóm
+      document.getElementById('policyCards').innerHTML = groups.map((g, i) => {
+        let color = POLICY_COLORS[i % POLICY_COLORS.length];
+        let n = benefits.filter(b => appliesTo(b, dim, g)).length;
+        let rows = currentEmpDetails.filter(d => dimOf(d) === g);
+        let total = rows.reduce((a, d) => a + (parseFloat(d.Tong_PhucLoi_Thuong) || 0), 0);
+        return `
+          <div class="col-md">
+            <div class="kpi-pill" style="background:${color}">${esc(g)}</div>
+            <div class="kpi-card">
+              <div class="kpi-value">${n} <span class="fs-6 fw-semibold">khoản</span></div>
+              <div class="kpi-title mt-1">phúc lợi được hưởng</div>
+              <div class="small text-muted mt-2">${rows.length} nhân sự · TB ${formatVND(rows.length ? total / rows.length : 0)}/người/năm</div>
+              <div class="small text-muted">Tổng chi phí ${formatVND(total)}</div>
+            </div>
+          </div>`;
+      }).join('');
+
+      // Ma trận khoản x nhóm
+      document.getElementById('policyHead').innerHTML = '<tr><th class="pm-first">Khoản phúc lợi / thưởng</th>' +
+        groups.map((g, i) => `<th style="background:${POLICY_COLORS[i % POLICY_COLORS.length]}">${esc(g)}</th>`).join('') + '</tr>';
+
+      let condLabels = { Doi_Tuong: 'Đối tượng', Gioi_Tinh: 'Giới tính', Cap_Bac: 'Cấp bậc' };
+      document.getElementById('policyBody').innerHTML = benefits.length ? benefits.map(b => {
+        let fmt = benefitAmountText(b);
+        let tiers = tiersOf(b.Ma_PhucLoi);
+        let chips = [];
+        Object.keys(condLabels).forEach(k => { if (k !== dim && b[k] && b[k] !== 'All') chips.push(b[k]); });
+        if (b.Phong_Ban && b.Phong_Ban !== 'All') chips.push(b.Phong_Ban);
+        if ((parseInt(b.Tham_Nien_Toi_Thieu_Thang) || 0) > 0) chips.push(`Thâm niên ≥ ${b.Tham_Nien_Toi_Thieu_Thang} tháng`);
+        let rate = (b.Ty_Le_Tang === '' || b.Ty_Le_Tang == null) ? '' : (parseFloat(b.Ty_Le_Tang) === 0 ? 'Không tăng' : `Tăng ${b.Ty_Le_Tang}%`);
+        if (rate) chips.push(rate);
+
+        let cells = groups.map(g => {
+          if (!appliesTo(b, dim, g)) return '<td class="pm-no">—</td>';
+          let own = tiers.filter(t => dim === 'Gioi_Tinh' || appliesTo(t, dim, g));
+          if (tiers.length && own.length === 0) return '<td class="pm-no">—</td>';
+          let body = tiers.length
+            ? own.slice().sort((a, c) => (parseInt(a.Tham_Nien_Tu_Thang) || 0) - (parseInt(c.Tham_Nien_Tu_Thang) || 0)).map(t => {
+                let to = (t.Tham_Nien_Den_Thang === '' || t.Tham_Nien_Den_Thang == null) ? '+' : `–${t.Tham_Nien_Den_Thang}`;
+                return `<div class="small">${t.Tham_Nien_Tu_Thang || 0}${to} tháng: <b>${fmt(t.Gia_Tri)}</b></div>`;
+              }).join('')
+            : `<div class="fw-bold">${fmt(b.Gia_Tri_Mac_Dinh)}</div>`;
+          return `<td class="pm-yes">${body}<div class="small text-muted">${esc(cycleText(b))}</div></td>`;
+        }).join('');
+
+        return `<tr>
+          <td class="pm-name"><span class="badge-subtle">${esc(b.Ma_PhucLoi)}</span> <b>${esc(b.Ten_PhucLoi)}</b>
+            <div>${chips.map(c => `<span class="pm-chip">${esc(c)}</span>`).join('')}</div></td>${cells}</tr>`;
+      }).join('') : `<tr><td colspan="${groups.length + 1}" class="text-center text-muted py-3">Chưa có chính sách phúc lợi</td></tr>`;
     }
 
     // ---- Bộ lọc đa lựa chọn: Đối tượng / Giới tính / Phòng ban / Vị trí ----
