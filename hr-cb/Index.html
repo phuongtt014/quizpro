@@ -440,6 +440,11 @@
               <i class="fa-solid fa-user-plus me-1"></i> Thêm Nhân Viên Mới
             </button>
           </div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-5">
+              <input type="text" id="empSearch" class="form-control form-control-sm" placeholder="🔍 Tìm theo họ tên hoặc mã nhân viên (không cần gõ dấu)..." oninput="renderEmployeesTable(currentEmployees)">
+            </div>
+          </div>
           <div class="table-responsive">
             <table class="table table-executive align-middle">
               <thead>
@@ -881,6 +886,11 @@
             <hr class="my-3 text-muted">
             <h6 class="fw-bold fs-7 text-dark mb-1"><i class="fa-solid fa-user-slash me-1"></i> Trường Hợp Đặc Biệt — Không Được Hưởng Phúc Lợi</h6>
             <div class="small text-muted mb-2">Tích chọn các khoản mà nhân sự này <b>không</b> được hưởng (dù đủ điều kiện chung). Các khoản này sẽ không được tính vào chi phí của người này.</div>
+            <div class="ms-actions mb-1">
+              <a onclick="setAllExclusions(true)"><i class="fa-solid fa-square-check me-1"></i>Chọn tất cả</a>
+              <a onclick="setAllExclusions(false)"><i class="fa-regular fa-square me-1"></i>Bỏ chọn tất cả</a>
+              <span class="text-muted ms-1" id="emp_ExclCount"></span>
+            </div>
             <div id="emp_Excl" class="border rounded p-2" style="max-height:170px; overflow:auto"></div>
           </form>
         </div>
@@ -1219,23 +1229,37 @@
     }
 
     // --- NHÂN VIÊN ---
-    function renderEmployeesTable(emps) {
+    // Bỏ dấu tiếng Việt để tìm kiếm "nguyen" ra "Nguyễn"
+    function normText(v) {
+      return String(v == null ? '' : v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
+    }
+
+    function renderEmployeesTable(allEmps) {
       let tbody = document.getElementById('empTbody');
       tbody.innerHTML = '';
-      document.getElementById('empCountBadge').innerText = `${emps.length} Nhân sự`;
+      let kw = normText((document.getElementById('empSearch') || {}).value);
+      // Giữ chỉ số gốc để nút "Sửa" mở đúng hồ sơ khi đang lọc
+      let rows = allEmps.map((e, idx) => ({ e, idx })).filter(r => !kw || normText(r.e.Ho_Ten).includes(kw) || normText(r.e.Ma_NV).includes(kw));
+      let emps = rows.map(r => r.e);
+      document.getElementById('empCountBadge').innerText = kw ? `${emps.length}/${allEmps.length} Nhân sự` : `${allEmps.length} Nhân sự`;
 
-      // Dòng tổng cộng (chỉ tính nhân sự đang làm việc)
+      // Dòng tổng cộng (chỉ tính nhân sự đang làm việc, theo kết quả đang hiển thị)
       let active = emps.filter(e => e.Trang_Thai === 'Đang làm việc');
       let sum = (arr, f) => arr.reduce((a, e) => a + (parseFloat(f(e)) || 0), 0);
       document.getElementById('empTfoot').innerHTML = emps.length ? `
         <tr>
-          <td colspan="7">TỔNG CỘNG — ${active.length} đang làm việc / ${emps.length} hồ sơ</td>
+          <td colspan="7">TỔNG CỘNG${kw ? ' (kết quả tìm kiếm)' : ''} — ${active.length} đang làm việc / ${emps.length} hồ sơ</td>
           <td>${formatVND(sum(active, e => e.Luong !== undefined ? e.Luong : e.Luong_Co_Ban))}</td>
           <td>${formatVND(sum(active, e => e.Luong_Dong_BHXH))}</td>
           <td colspan="3"></td>
         </tr>` : '';
 
-      emps.forEach((e, idx) => {
+      if (!emps.length) {
+        tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-3">Không tìm thấy nhân sự phù hợp</td></tr>';
+        return;
+      }
+
+      rows.forEach(({ e, idx }) => {
         let salaryVal = e.Luong !== undefined ? e.Luong : e.Luong_Co_Ban;
         let tr = document.createElement('tr');
         tr.innerHTML = `
@@ -1271,7 +1295,21 @@
           <input type="checkbox" class="excl-cb" value="${esc(b.Ma_PhucLoi)}" ${sel.includes(String(b.Ma_PhucLoi).trim()) ? 'checked' : ''}>
           <span><span class="badge-subtle">${esc(b.Ma_PhucLoi)}</span> ${esc(b.Ten_PhucLoi)}</span>
         </label>`).join('') : '<div class="small text-muted">Chưa có phúc lợi nào</div>';
+      updateExclCount();
     }
+
+    function updateExclCount() {
+      let all = document.querySelectorAll('#emp_Excl .excl-cb');
+      let n = document.querySelectorAll('#emp_Excl .excl-cb:checked').length;
+      document.getElementById('emp_ExclCount').innerText = all.length ? `(đã chọn ${n}/${all.length})` : '';
+    }
+
+    function setAllExclusions(on) {
+      document.querySelectorAll('#emp_Excl .excl-cb').forEach(cb => { cb.checked = on; });
+      updateExclCount();
+    }
+
+    document.addEventListener('change', e => { if (e.target.closest('#emp_Excl')) updateExclCount(); });
 
     function openEmpModal() {
       renderExclusionList('');
@@ -1366,12 +1404,12 @@
     }
 
     function filterEmpDetails() {
-      let kw = document.getElementById('searchEmpDetail').value.toLowerCase().trim();
+      let kw = normText(document.getElementById('searchEmpDetail').value);
       let selDept = document.getElementById('filterDeptDetail').value;
       let selObj = document.getElementById('filterObjDetail').value;
 
       let filtered = currentEmpDetails.filter(d => {
-        let matchKw = d.Ma_NV.toLowerCase().includes(kw) || d.Ho_Ten.toLowerCase().includes(kw);
+        let matchKw = !kw || normText(d.Ma_NV).includes(kw) || normText(d.Ho_Ten).includes(kw);
         let matchDept = (selDept === 'All') || (d.Phong_Ban === selDept);
         let matchObj = (selObj === 'All') || (d.Doi_Tuong === selObj);
         return matchKw && matchDept && matchObj;
