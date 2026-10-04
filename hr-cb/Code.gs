@@ -95,10 +95,10 @@ function loadEmployees(ss) {
   const list = getSheetDataAsJson(sh);
   if (!sh || list.length === 0) return list;
   const raw = sh.getDataRange().getValues();
-  raw.shift();
+  const exCol = headerIndex(raw.shift().map(h => String(h).trim()), "PL_Loai_Tru", 13);
   list.forEach((e, i) => {
     const r = raw[i] || [];
-    e.PL_Loai_Tru = String(r[13] == null ? "" : r[13]).trim();
+    e.PL_Loai_Tru = String(r[exCol] == null ? "" : r[exCol]).trim();
   });
   return list;
 }
@@ -146,6 +146,17 @@ function ensureEmployeeColumns(sh) {
     sh.getRange(1, need).setValue("PL_Loai_Tru");
     formatHeader(sh, need);
   }
+}
+
+// Ghi dữ liệu THEO TÊN TIÊU ĐỀ CỘT (không phụ thuộc thứ tự cột trên sheet).
+// values: {TenCot: giaTri}. Cột không có trong values: giữ nguyên ô cũ (sửa) hoặc để trống (thêm mới).
+function rowByHeaders(headers, values, existingRow) {
+  return headers.map((h, i) => Object.prototype.hasOwnProperty.call(values, h) ? values[h] : (existingRow ? existingRow[i] : ""));
+}
+
+function headerIndex(headers, name, fallback) {
+  const i = headers.indexOf(name);
+  return i >= 0 ? i : fallback;
 }
 
 function formatHeader(sheet, numCols) {
@@ -217,10 +228,12 @@ function saveBenefit(b, oldCode) {
   const lookupCode = oldCode || newCode;
 
   let data = shPL.getDataRange().getValues();
+  const headers = data[0].map(h => String(h).trim());
+  const codeCol = headerIndex(headers, "Ma_PhucLoi", 0);
   let foundRowIndex = -1;
 
   for (let i = 1; i < data.length; i++) {
-    const code = String(data[i][0]).trim();
+    const code = String(data[i][codeCol]).trim();
     if (code === lookupCode && foundRowIndex < 0) foundRowIndex = i + 1;
     // Đổi mã: không được trùng với mã của chính sách khác
     if (oldCode && newCode !== oldCode && code === newCode) {
@@ -237,33 +250,35 @@ function saveBenefit(b, oldCode) {
     }
     // Danh sách phúc lợi loại trừ của nhân sự cũng phải đổi theo mã mới
     const shNV = ss.getSheetByName("DB_NhanSu");
-    if (shNV && shNV.getMaxColumns() >= 14 && shNV.getLastRow() > 1) {
-      const rngNV = shNV.getRange(2, 14, shNV.getLastRow() - 1, 1);
+    const nvCol = shNV ? headerIndex(shNV.getRange(1, 1, 1, shNV.getLastColumn()).getValues()[0].map(h => String(h).trim()), "PL_Loai_Tru", 13) + 1 : 0;
+    if (shNV && shNV.getMaxColumns() >= nvCol && shNV.getLastRow() > 1) {
+      const rngNV = shNV.getRange(2, nvCol, shNV.getLastRow() - 1, 1);
       rngNV.setValues(rngNV.getValues().map(r => [String(r[0]).split(",").map(x => x.trim()).filter(x => x).map(x => x === oldCode ? newCode : x).join(", ")]));
     }
   }
 
-  let newRow = [
-    b.Ma_PhucLoi,
-    b.Ten_PhucLoi,
-    b.Loai_Tinh_Toan,
-    parseFloat(b.Gia_Tri_Mac_Dinh) || 0,
-    b.Can_Cu_Luong,
-    b.Chu_Ky,
-    b.Doi_Tuong || "All",
-    b.Gioi_Tinh || "All",
-    b.Cap_Bac || "All",
-    b.Phong_Ban || "All",
-    parseInt(b.Tham_Nien_Toi_Thieu_Thang) || 0,
-    Math.min(Math.max(parseInt(b.Ngay_Chi_Tra) || 1, 1), 31),
-    (parseInt(b.Thang_Chi_Tra) >= 1 && parseInt(b.Thang_Chi_Tra) <= 12) ? parseInt(b.Thang_Chi_Tra) : "",
-    cellToNum(b.Ty_Le_Tang)
-  ];
+  const values = {
+    Ma_PhucLoi: b.Ma_PhucLoi,
+    Ten_PhucLoi: b.Ten_PhucLoi,
+    Loai_Tinh_Toan: b.Loai_Tinh_Toan,
+    Gia_Tri_Mac_Dinh: parseFloat(b.Gia_Tri_Mac_Dinh) || 0,
+    Can_Cu_Luong: b.Can_Cu_Luong,
+    Chu_Ky: b.Chu_Ky,
+    Doi_Tuong: b.Doi_Tuong || "All",
+    Gioi_Tinh: b.Gioi_Tinh || "All",
+    Cap_Bac: b.Cap_Bac || "All",
+    Phong_Ban: b.Phong_Ban || "All",
+    Tham_Nien_Toi_Thieu_Thang: parseInt(b.Tham_Nien_Toi_Thieu_Thang) || 0,
+    Ngay_Chi_Tra: Math.min(Math.max(parseInt(b.Ngay_Chi_Tra) || 1, 1), 31),
+    Thang_Chi_Tra: (parseInt(b.Thang_Chi_Tra) >= 1 && parseInt(b.Thang_Chi_Tra) <= 12) ? parseInt(b.Thang_Chi_Tra) : "",
+    Ty_Le_Tang: cellToNum(b.Ty_Le_Tang)
+  };
 
   if (foundRowIndex > 0) {
-    shPL.getRange(foundRowIndex, 1, 1, 14).setValues([newRow]);
+    const newRow = rowByHeaders(headers, values, data[foundRowIndex - 1]);
+    shPL.getRange(foundRowIndex, 1, 1, headers.length).setValues([newRow]);
   } else {
-    shPL.appendRow(newRow);
+    shPL.appendRow(rowByHeaders(headers, values, null));
   }
   return "Đã lưu chính sách phúc lợi!";
 }
@@ -304,36 +319,41 @@ function saveEmployee(emp) {
   ensureEmployeeColumns(sh);
 
   let data = sh.getDataRange().getValues();
+  const headers = data[0].map(h => String(h).trim());
+  const idCol = headerIndex(headers, "Ma_NV", 0);
   let foundRowIndex = -1;
 
   for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]).trim() === String(emp.Ma_NV).trim()) {
+    if (String(data[i][idCol]).trim() === String(emp.Ma_NV).trim()) {
       foundRowIndex = i + 1;
       break;
     }
   }
 
-  let newRow = [
-    emp.Ma_NV,
-    emp.Ho_Ten,
-    emp.Phong_Ban,
-    emp.Vi_Tri,
-    emp.Cap_Bac,
-    emp.Khu_Vuc,
-    emp.Gioi_Tinh,
-    emp.Doi_Tuong || "Cơ hữu",
-    emp.Ngay_Vao_Lam,
-    parseFloat(emp.Luong || emp.Luong_Co_Ban) || 0,
-    parseFloat(emp.Luong_Dong_BHXH) || 0,
-    parseFloat(emp.DCH) || 0,
-    emp.Trang_Thai || "Đang làm việc",
-    String(emp.PL_Loai_Tru || "").split(",").map(x => x.trim()).filter(x => x).join(", ")
-  ];
+  const salary = parseFloat(emp.Luong || emp.Luong_Co_Ban) || 0;
+  const values = {
+    Ma_NV: emp.Ma_NV,
+    Ho_Ten: emp.Ho_Ten,
+    Phong_Ban: emp.Phong_Ban,
+    Vi_Tri: emp.Vi_Tri,
+    Cap_Bac: emp.Cap_Bac,
+    Khu_Vuc: emp.Khu_Vuc,
+    Gioi_Tinh: emp.Gioi_Tinh,
+    Doi_Tuong: emp.Doi_Tuong || "Cơ hữu",
+    Ngay_Vao_Lam: emp.Ngay_Vao_Lam,
+    Luong: salary,
+    Luong_Co_Ban: salary,
+    Luong_Dong_BHXH: parseFloat(emp.Luong_Dong_BHXH) || 0,
+    DCH: parseFloat(emp.DCH) || 0,
+    Trang_Thai: emp.Trang_Thai || "Đang làm việc",
+    PL_Loai_Tru: String(emp.PL_Loai_Tru || "").split(",").map(x => x.trim()).filter(x => x).join(", ")
+  };
 
   if (foundRowIndex > 0) {
-    sh.getRange(foundRowIndex, 1, 1, 14).setValues([newRow]);
+    const newRow = rowByHeaders(headers, values, data[foundRowIndex - 1]);
+    sh.getRange(foundRowIndex, 1, 1, headers.length).setValues([newRow]);
   } else {
-    sh.appendRow(newRow);
+    sh.appendRow(rowByHeaders(headers, values, null));
   }
   return "Đã lưu thông tin nhân sự!";
 }
@@ -671,26 +691,53 @@ function saveNewHirePlan(planArray) {
   let sh = ss.getSheetByName("KeHoach_TuyenDung");
   if (!sh) { setupDatabase(); sh = ss.getSheetByName("KeHoach_TuyenDung"); }
 
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(h => String(h).trim());
+
   if (sh.getLastRow() > 1) {
-    sh.getRange(2, 1, sh.getLastRow() - 1, 10).clearContent();
+    sh.getRange(2, 1, sh.getLastRow() - 1, headers.length).clearContent();
   }
 
   if (planArray && planArray.length > 0) {
-    let rows = planArray.map(p => [
-      p.Phong_Ban,
-      p.Vi_Tri,
-      p.Cap_Bac,
-      p.Khu_Vuc,
-      p.Gioi_Tinh_Du_Kien,
-      p.Doi_Tuong_Du_Kien,
-      p.So_Luong_Tuyen_Moi,
-      p.Luong_Dukien,
-      p.Luong_BHXH_Dukien,
-      p.Thang_Du_Kien_Vao
-    ]);
-    sh.getRange(2, 1, rows.length, 10).setValues(rows);
+    let rows = planArray.map(p => rowByHeaders(headers, {
+      Phong_Ban: p.Phong_Ban,
+      Vi_Tri: p.Vi_Tri,
+      Cap_Bac: p.Cap_Bac,
+      Khu_Vuc: p.Khu_Vuc,
+      Gioi_Tinh_Du_Kien: p.Gioi_Tinh_Du_Kien,
+      Doi_Tuong_Du_Kien: p.Doi_Tuong_Du_Kien,
+      So_Luong_Tuyen_Moi: p.So_Luong_Tuyen_Moi,
+      Luong_Dukien: p.Luong_Dukien,
+      Luong_Co_Ban_Dukien: p.Luong_Dukien,
+      Luong_BHXH_Dukien: p.Luong_BHXH_Dukien,
+      Thang_Du_Kien_Vao: p.Thang_Du_Kien_Vao
+    }, null));
+    sh.getRange(2, 1, rows.length, headers.length).setValues(rows);
   }
   return "Đã cập nhật Kế hoạch Tuyển dụng thành công!";
+}
+
+// Sửa dữ liệu đã bị lưu đảo cột Giới tính <-> Đối tượng (do bản cũ ghi theo vị trí cột).
+// Chỉ đổi những dòng mà ô Giới tính đang chứa "Cơ hữu"/"Dịch vụ" VÀ ô Đối tượng đang chứa "Nam"/"Nữ".
+function repairEmployeeColumns() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("DB_NhanSu");
+  if (!sh || sh.getLastRow() < 2) return "Không có dữ liệu nhân sự.";
+  const range = sh.getDataRange();
+  const data = range.getValues();
+  const headers = data[0].map(h => String(h).trim());
+  const gi = headers.indexOf("Gioi_Tinh"), di = headers.indexOf("Doi_Tuong");
+  if (gi < 0 || di < 0) throw new Error("Không tìm thấy cột Gioi_Tinh hoặc Doi_Tuong trong DB_NhanSu.");
+
+  const GENDERS = ["nam", "nữ", "nu"], OBJECTS = ["cơ hữu", "dịch vụ"];
+  const fixed = [];
+  for (let i = 1; i < data.length; i++) {
+    const g = String(data[i][gi]).trim().toLowerCase(), d = String(data[i][di]).trim().toLowerCase();
+    if (OBJECTS.indexOf(g) >= 0 && GENDERS.indexOf(d) >= 0) {
+      const tmp = data[i][gi]; data[i][gi] = data[i][di]; data[i][di] = tmp;
+      fixed.push(data[i][0]);
+    }
+  }
+  if (fixed.length > 0) range.setValues(data);
+  return fixed.length ? ("Đã sửa " + fixed.length + " dòng bị đảo Giới tính/Đối tượng: " + fixed.join(", ")) : "Không phát hiện dòng nào bị đảo cột Giới tính/Đối tượng.";
 }
 
 function getSheetDataAsJson(sheet) {

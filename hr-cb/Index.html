@@ -436,9 +436,14 @@
               <h6 class="fw-bold text-slate-800 d-inline me-2">Bảng Mức Lương & Hồ Sơ Nhân Sự</h6>
               <span class="badge-subtle" id="empCountBadge">0 NV</span>
             </div>
-            <button class="btn btn-sm btn-dark" onclick="openEmpModal()">
-              <i class="fa-solid fa-user-plus me-1"></i> Thêm Nhân Viên Mới
-            </button>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-outline-secondary" onclick="repairEmployees()" title="Sửa các dòng đã bị lưu đảo giữa cột Giới tính và Đối tượng">
+                <i class="fa-solid fa-screwdriver-wrench me-1"></i> Sửa lỗi đảo Giới tính / Đối tượng
+              </button>
+              <button class="btn btn-sm btn-dark" onclick="openEmpModal()">
+                <i class="fa-solid fa-user-plus me-1"></i> Thêm Nhân Viên Mới
+              </button>
+            </div>
           </div>
           <div class="row g-2 mb-3">
             <div class="col-md-5">
@@ -1310,6 +1315,15 @@
     }
 
     document.addEventListener('change', e => { if (e.target.closest('#emp_Excl')) updateExclCount(); });
+
+    function repairEmployees() {
+      if (!confirm('Hệ thống sẽ rà soát sheet DB_NhanSu và đổi lại các dòng đang bị đảo giữa Giới tính (Nam/Nữ) và Đối tượng (Cơ hữu/Dịch vụ).\nChỉ những dòng bị đảo rõ ràng mới được sửa. Tiếp tục?')) return;
+      toggleLoading(true);
+      google.script.run
+        .withSuccessHandler(msg => { alert(msg); loadInitialData(); })
+        .withFailureHandler(err => { toggleLoading(false); alert('Lỗi: ' + err.message); })
+        .repairEmployeeColumns();
+    }
 
     function openEmpModal() {
       renderExclusionList('');
