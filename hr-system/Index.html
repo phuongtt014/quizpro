@@ -777,19 +777,19 @@ File có <strong>3 cột</strong>:<br>
 </div>
 <div>
 <div style="font-size:.72rem;font-weight:600;color:var(--t2);margin-bottom:4px">Pháp Nhân Chính</div>
-<select class="fc" id="sal-phapnhan" style="width:170px"><option value="">-- Tất cả --</option></select>
+<select class="fc" id="sal-phapnhan" onchange="salServerFilterChanged()" style="width:170px"><option value="">-- Tất cả --</option></select>
 </div>
 <div>
 <div style="font-size:.72rem;font-weight:600;color:var(--t2);margin-bottom:4px">Đơn Vị Phòng</div>
-<select class="fc" id="sal-donvi" style="width:150px"><option value="">-- Tất cả --</option></select>
+<select class="fc" id="sal-donvi" onchange="salServerFilterChanged()" style="width:150px"><option value="">-- Tất cả --</option></select>
 </div>
 <div>
 <div style="font-size:.72rem;font-weight:600;color:var(--t2);margin-bottom:4px">Cơ Sở</div>
-<select class="fc" id="sal-coso" style="width:130px"><option value="">-- Tất cả --</option></select>
+<select class="fc" id="sal-coso" onchange="salServerFilterChanged()" style="width:130px"><option value="">-- Tất cả --</option></select>
 </div>
 <div>
 <div style="font-size:.72rem;font-weight:600;color:var(--t2);margin-bottom:4px">Trạng Thái</div>
-<select class="fc" id="sal-tt" style="width:160px">
+<select class="fc" id="sal-tt" onchange="salServerFilterChanged()" style="width:160px">
 <option value="Đang làm việc" selected>Đang làm việc</option>
 <option value="">Tất cả</option>
 <option value="Nghỉ việc">Nghỉ việc</option>
@@ -1088,6 +1088,7 @@ File có <strong>3 cột</strong>:<br>
 <button class="tab" id="tab-ap-all" onclick="swApTab('',this)">📋 Tất Cả</button>
 </div>
 <div class="tb" style="margin-bottom:10px">
+<div class="tbl"><input type="text" class="fc" id="ap-search" placeholder="🔍 Tìm tiêu đề, loại, người tạo/duyệt, tên hoặc MSNV nhân sự..." style="width:380px;max-width:100%" oninput="apSearch(this.value)"></div>
 <div class="tbr"><button class="btn bd2 bxs" title="Xóa chi phí bị ghi trùng" onclick="cleanupDuplicateCosts()">🧹 Xóa CP Trùng</button> <button class="btn bo bsm" onclick="loadApprovalsPage()">🔄</button></div>
 </div>
 <div id="ap-list"><div class="es"><div class="ei">⏳</div><h3>Đang tải...</h3></div></div>
@@ -3411,7 +3412,7 @@ function loadLogs(){
 </div>
 </div>
 <script>
-let G_AP={ currentRowIndex:null, filterTT:'Chờ duyệt', data:[] };
+let G_AP={ currentRowIndex:null, filterTT:'Chờ duyệt', data:[], kw:'' };
 let G_CR={ data:[], summary:{} };
 // ── APPROVER SELECTION ───────────────────────────────────────
 var G_APPROVERS = []; // cache danh sách người có thể phê duyệt
@@ -3523,35 +3524,59 @@ function loadApprovalsPage(){
     G_AP.data=r.data;renderApList();
   }).catch(e=>{hideL();toast(e.message,'error');});
 }
+// Chuẩn hoá để tìm không phân biệt hoa/thường và dấu tiếng Việt
+function apNorm(v){return String(v||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase();}
+function apSearch(v){ G_AP.kw=v; renderApList(); }
+function apHay(r){
+  const rows=r._data||[];
+  const emp=rows.map(e=>[e.maNV||e['Mã Nhân Viên'],e.hoTen||e['Họ Tên']].join(' ')).join(' ');
+  return apNorm([r.TIEU_DE,r.LOAI,r.NGUOI_TAO,r.NGAY_TAO,r.NGUOI_DUYET,r.LY_DO_TU_CHOI,r.TRANG_THAI,emp].join(' '));
+}
 function renderApList(){
   const el=$('ap-list');
-  const filtered=G_AP.filterTT?G_AP.data.filter(r=>r.TRANG_THAI===G_AP.filterTT):G_AP.data;
-  if(!filtered.length){el.innerHTML=`<div class="es"><div class="ei">📋</div><h3>Không có yêu cầu nào</h3></div>`;return;}
+  const kw=apNorm((G_AP.kw||'').trim());
+  const filtered=G_AP.data
+    .filter(r=>!G_AP.filterTT||r.TRANG_THAI===G_AP.filterTT)
+    .filter(r=>!kw||apHay(r).includes(kw));
+  if(!filtered.length){el.innerHTML=`<div class="es"><div class="ei">📋</div><h3>Không có yêu cầu nào</h3>${kw?'<p>Không có kết quả khớp từ khóa tìm kiếm</p>':''}</div>`;return;}
   const stCls={'Chờ duyệt':'bam','Đã duyệt':'bgr','Từ chối':'brd'};
-  el.innerHTML=filtered.map(r=>{
+  let sumCT=0,sumCD=0;
+  const body=filtered.map((r,i)=>{
     const rows=r._data||[];
-    const totCT=rows.reduce((s,e)=>s+(Number(e['_tienCT'])||0),0);
-    const totCD=rows.reduce((s,e)=>s+(Number(e['_tienCD'])||0),0);
-    return `<div class="dx-card" style="margin-bottom:10px">
-      <div class="dx-card-header">
-        <div>
-          <div style="font-size:.9rem;font-weight:800;color:var(--n8)">${esc(r.TIEU_DE)}</div>
-          <div style="font-size:.75rem;color:var(--tm);margin-top:3px">📅 ${esc(r.NGAY_TAO)} · 👤 ${esc(r.NGUOI_TAO)} · ${rows.length} NV</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="badge ${stCls[r.TRANG_THAI]||'bsl'}">${esc(r.TRANG_THAI)}</span>
-          <button class="btn bp bxs" onclick="openApDetail('${esc(r._ID||'')}',${r._rowIndex})">👁 Chi Tiết</button>
-        </div>
-      </div>
-      <div class="dx-data-grid" style="margin-top:8px">
-        <div class="dx-data-field"><div class="dk">Tiền CT</div><div class="dv" style="color:var(--gr)">${fmtNumberStr(totCT)}</div></div>
-        <div class="dx-data-field"><div class="dk">Tiền Chi CĐ</div><div class="dv" style="color:var(--vi)">${fmtNumberStr(totCD)}</div></div>
-        <div class="dx-data-field"><div class="dk">Tổng</div><div class="dv" style="font-weight:800;color:var(--n7)">${fmtNumberStr(totCT+totCD)}</div></div>
-        ${r.TRANG_THAI==='Đã duyệt'?`<div class="dx-data-field"><div class="dk">Người duyệt</div><div class="dv">${esc(r.NGUOI_DUYET||'')}</div></div>`:''}
-        ${r.TRANG_THAI==='Từ chối'?`<div class="dx-data-field"><div class="dk">Lý do</div><div class="dv" style="color:var(--rd)">${esc(r.LY_DO_TU_CHOI||'')}</div></div>`:''}
-      </div>
-    </div>`;
+    const totCT=rows.reduce((s,e)=>s+(Number(e['_tienCT']||e.tienCT)||0),0);
+    const totCD=rows.reduce((s,e)=>s+(Number(e['_tienCD']||e.tienCD)||0),0);
+    sumCT+=totCT; sumCD+=totCD;
+    const note=r.TRANG_THAI==='Đã duyệt'
+      ?`✅ ${esc(r.NGUOI_DUYET||'')}${r.NGAY_DUYET?'<div style="font-size:.7rem;color:var(--tm)">'+esc(r.NGAY_DUYET)+'</div>':''}`
+      :r.TRANG_THAI==='Từ chối'?`<span style="color:var(--rd)">❌ ${esc(r.LY_DO_TU_CHOI||'')}</span>`:'<span style="color:var(--tm)">—</span>';
+    return `<tr style="cursor:pointer" onclick="openApDetail('${esc(r._ID||'')}',${r._rowIndex})">
+      <td style="text-align:center;color:var(--tm);font-size:.72rem">${i+1}</td>
+      <td style="white-space:normal;min-width:200px"><strong style="color:var(--n8)">${esc(r.TIEU_DE)}</strong></td>
+      <td>${esc(r.LOAI||'—')}</td>
+      <td>${esc(r.NGAY_TAO)}</td>
+      <td>${esc(r.NGUOI_TAO)}</td>
+      <td style="text-align:center">${rows.length}</td>
+      <td style="text-align:right;color:var(--gr)">${fmtNumberStr(totCT)}</td>
+      <td style="text-align:right;color:var(--vi)">${fmtNumberStr(totCD)}</td>
+      <td style="text-align:right;font-weight:800;color:var(--n7)">${fmtNumberStr(totCT+totCD)}</td>
+      <td><span class="badge ${stCls[r.TRANG_THAI]||'bsl'}">${esc(r.TRANG_THAI)}</span></td>
+      <td style="white-space:normal;font-size:.76rem">${note}</td>
+      <td onclick="event.stopPropagation()"><button class="btn bp bxs" onclick="openApDetail('${esc(r._ID||'')}',${r._rowIndex})">👁 Chi Tiết</button></td>
+    </tr>`;
   }).join('');
+  el.innerHTML=`<div class="tc">
+    <div class="ti"><span>${filtered.length}/${G_AP.data.length} yêu cầu</span></div>
+    <div class="ts"><table>
+      <thead><tr><th style="text-align:center">#</th><th>Tiêu Đề</th><th>Loại</th><th>Ngày Tạo</th><th>Người Tạo</th>
+        <th style="text-align:center">Số NV</th><th style="text-align:right">Tiền CT</th><th style="text-align:right">Tiền Chi CĐ</th>
+        <th style="text-align:right">Tổng</th><th>Trạng Thái</th><th>Người Duyệt / Lý Do</th><th>Thao Tác</th></tr></thead>
+      <tbody>${body}
+        <tr style="background:var(--amb);font-weight:800"><td colspan="6" style="text-align:right">TỔNG CỘNG</td>
+        <td style="text-align:right;color:var(--gr)">${fmtNumberStr(sumCT)}</td>
+        <td style="text-align:right;color:var(--vi)">${fmtNumberStr(sumCD)}</td>
+        <td style="text-align:right">${fmtNumberStr(sumCT+sumCD)}</td><td colspan="3"></td></tr>
+      </tbody>
+    </table></div></div>`;
 }
 function openApDetail(id,rowIndex){
   const r=G_AP.data.find(x=>x._ID===id)||G_AP.data.find(x=>x._rowIndex===rowIndex);
@@ -3769,12 +3794,26 @@ function loadSalaryPage(){
     const today=new Date();
     $('sal-asof').value=`${String(today.getDate()).padStart(2,'0')}/${String(today.getMonth()+1).padStart(2,'0')}/${today.getFullYear()}`;
   }
-  const units=[...new Set(G.employees.map(e=>e['Đơn Vị']).filter(Boolean))].sort();
-  const bases=[...new Set(G.employees.map(e=>e['Cơ Sở']).filter(Boolean))].sort();
-  var dvPhongs=[...new Set(G.employees.map(function(e){return e['Đơn Vị Phòng']||e['Đơn Vị'];}).filter(Boolean))].sort();
-  var phapNhans=[...new Set(G.employees.map(function(e){return String(e['Pháp Nhân Chính']||'').trim();}).filter(Boolean))].sort();
-  fsel('sal-phapnhan',phapNhans); fsel('sal-donvi',dvPhongs); fsel('sal-coso',bases);
+  salFillFilters();
+  // G.employees chỉ được nạp khi mở tab Hồ sơ → nếu chưa có thì tự nạp để 3 bộ lọc có dữ liệu
+  if(!G.employees||!G.employees.length){
+    run('getAllEmployees').then(r=>{
+      if(r.success){ G.employees=r.data; G.filtered=[...r.data]; salFillFilters(); }
+      else toast(r.error,'error');
+    });
+  }
 }
+// Đổ lại 3 bộ lọc (giữ giá trị đang chọn); gộp giá trị từ nhân sự và từ danh mục cấu hình
+function salFillFilters(){
+  const emps=G.employees||[];
+  const uniq=(arr)=>[...new Set(arr.map(v=>String(v||'').trim()).filter(Boolean))].sort();
+  const cfg=(k)=>((G.configs&&G.configs[k]&&G.configs[k].values)||[]);
+  fsel('sal-phapnhan', uniq(emps.map(e=>e['Pháp Nhân Chính']).concat(cfg('phapNhanChinh'))));
+  fsel('sal-donvi',    uniq(emps.map(e=>e['Đơn Vị Phòng']||e['Đơn Vị'])));
+  fsel('sal-coso',     uniq(emps.map(e=>e['Cơ Sở']).concat(cfg('coSo'))));
+}
+// Đổi bộ lọc máy chủ → nếu báo cáo đang hiển thị thì tải lại ngay
+function salServerFilterChanged(){ if(G_SAL.reportData) runPayrollReport(); }
 function renderColPicker(){
   const el=$('sal-col-picker');
   if(!el) return;
