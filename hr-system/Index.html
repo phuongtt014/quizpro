@@ -814,6 +814,12 @@ File có <strong>3 cột</strong>:<br>
 <div class="tc">
 <div class="ti" style="display:flex;justify-content:space-between;align-items:center">
 <span id="sal-info">Chọn thời điểm và nhấn "Xem Báo Cáo"</span>
+<span style="display:flex;gap:10px;align-items:center;font-size:.76rem">
+<span id="sal-selcount" style="color:var(--t2)">Đã chọn: 0</span>
+<label style="display:flex;gap:4px;align-items:center;cursor:pointer;font-weight:600"><input type="checkbox" id="sal-onlysel" onchange="salToggleOnlySel(this.checked)"> Chỉ xem nhân sự đã chọn</label>
+<button class="btn bo bsm" onclick="salClearSel()">✖ Bỏ chọn</button>
+<button class="btn bo bsm" onclick="salClearFilters()">🧹 Xóa lọc cột</button>
+</span>
 </div>
 <div class="ts"><table id="sal-table"><thead id="sal-thead"></thead><tbody id="sal-tbody">
 <tr><td colspan="5"><div class="es"><div class="ei">💰</div><h3>Chọn thời điểm báo cáo để xem thu nhập</h3><p>Hệ thống sẽ tự động lấy hợp đồng đang hiệu lực + các khoản chính sách</p></div></td></tr>
@@ -3752,7 +3758,7 @@ function deleteCfgCategory(){
     else toast(r.error,'error');
   }).catch(e=>{hideL();toast(e.message,'error');});
 }
-const G_SAL = { selectedCols:[], allCols:[], reportData:null };
+const G_SAL = { selectedCols:[], allCols:[], reportData:null, sel:{}, colFilter:{}, onlySel:false };
 function loadSalaryPage(){
   const activeFlds = G.profileFields.filter(f=>f.active);
   G_SAL.allCols = activeFlds.map(f=>f.label);
@@ -3801,10 +3807,22 @@ async function runPayrollReport(){
     hideL();
     if(!r.success){toast(r.error,'error');return;}
     G_SAL.reportData=r;
-    $('sal-info').textContent=`${r.data.length} nhân sự · Tại ${asOf}`;
-    renderPayrollTable(r);
-    renderPayrollSummary(r);
+    renderPayrollTable(r); // đã gồm bảng, tổng hợp, số dòng (theo bộ lọc & lựa chọn)
   }catch(e){hideL();toast(e.message,'error');}
+}
+function salView(){
+  const r=G_SAL.reportData; if(!r) return [];
+  const infoCols=G_SAL.selectedCols;
+  const hdKeys=['__soHD','__loaiHD','__ngayHL','__ngayHH'];
+  const cf=G_SAL.colFilter;
+  const active=Object.keys(cf).filter(k=>cf[k]);
+  return r.data.filter(row=>{
+    if(G_SAL.onlySel && !G_SAL.sel[row['Mã Nhân Viên']]) return false;
+    return active.every(k=>{
+      if(!infoCols.includes(k) && !hdKeys.includes(k)) return true; // lọc của cột đã ẩn
+      return String(row[k]||'').toLowerCase().includes(cf[k].toLowerCase());
+    });
+  });
 }
 function renderPayrollTable(r){
   const infoCols  = G_SAL.selectedCols;
@@ -3816,8 +3834,9 @@ function renderPayrollTable(r){
   ];
   const moneyCols = (r.numberFields||[]).map(n => ({key:n, label:n}));
   const totalCol  = {key:'__tongThuNhap', label:'TỔNG THU NHẬP'};
-  const totalSpan = 1 + infoCols.length + hdInfoCols.length + moneyCols.length + 1;
+  const flt=(key)=>`<th style="padding:3px 4px;background:var(--n9)"><input type="text" class="fc" style="width:100%;min-width:70px;padding:3px 6px;font-size:.72rem" placeholder="Lọc..." value="${esc(G_SAL.colFilter[key]||'')}" data-k="${esc(key)}" oninput="salColFilter(this.dataset.k,this.value)"></th>`;
   $('sal-thead').innerHTML=`<tr>
+    <th style="background:var(--n9);text-align:center"><input type="checkbox" id="sal-chkall" title="Chọn / bỏ chọn tất cả dòng đang hiển thị" onchange="salSelAll(this.checked)"></th>
     <th style="background:var(--n9);text-align:center">#</th>
     ${infoCols.map(c=>`<th>${esc(c)}</th>`).join('')}
     ${hdInfoCols.map(c=>`<th style="background:#1a4a6b;white-space:nowrap">${esc(c.label)}</th>`).join('')}
@@ -3825,36 +3844,83 @@ function renderPayrollTable(r){
       ? moneyCols.map(c=>`<th style="background:var(--vi);white-space:nowrap;text-align:right">${esc(c.label)}</th>`).join('')
       : `<th style="background:var(--vi)">(Chưa có trường số trong HĐ)</th>`}
     <th style="background:var(--gr);white-space:nowrap;text-align:right">💰 ${esc(totalCol.label)}</th>
+  </tr>
+  <tr>
+    <th style="background:var(--n9)"></th><th style="background:var(--n9)"></th>
+    ${infoCols.map(c=>flt(c)).join('')}
+    ${hdInfoCols.map(c=>flt(c.key)).join('')}
+    ${moneyCols.length?moneyCols.map(()=>'<th style="background:var(--n9)"></th>').join(''):'<th style="background:var(--n9)"></th>'}
+    <th style="background:var(--n9)"></th>
   </tr>`;
-  if(!r.data.length){
+  renderPayrollBody();
+}
+// Vẽ lại phần thân + tổng hợp (không vẽ lại header để ô lọc không mất focus)
+function renderPayrollBody(){
+  const r=G_SAL.reportData; if(!r) return;
+  const view=salView();
+  const infoCols  = G_SAL.selectedCols;
+  const hdInfoCols = ['__soHD','__loaiHD','__ngayHL','__ngayHH'];
+  const moneyCols = (r.numberFields||[]);
+  const totalSpan = 2 + infoCols.length + hdInfoCols.length + Math.max(moneyCols.length,1) + 1;
+  $('sal-info').textContent=`${view.length}/${r.data.length} nhân sự · Tại ${r.asOfDate||''}`;
+  salUpdateSelUI(view);
+  if(!view.length){
     $('sal-tbody').innerHTML=`<tr><td colspan="${totalSpan}">
       <div class="es"><div class="ei">📊</div>
       <h3>Không có dữ liệu</h3>
-      <p>Không tìm thấy nhân sự phù hợp hoặc chưa có HĐ tại thời điểm này</p>
+      <p>Không tìm thấy nhân sự phù hợp (kiểm tra bộ lọc cột / chế độ "Chỉ xem đã chọn")</p>
       </div></td></tr>`;
+    renderPayrollSummary({...r,data:view});
     return;
   }
-  $('sal-tbody').innerHTML = r.data.map((row, i) => {
+  $('sal-tbody').innerHTML = view.map((row, i) => {
     const hasHD = row['__soHD'] && row['__soHD'] !== '(Chưa có HĐ)';
-    const rowBg  = hasHD ? '' : 'style="background:#fff8f0"';
+    const ma = row['Mã Nhân Viên']||'';
+    const checked = G_SAL.sel[ma];
+    const rowBg  = checked ? 'style="background:var(--n0)"' : (hasHD ? '' : 'style="background:#fff8f0"');
     return `<tr ${rowBg}>
+      <td style="text-align:center"><input type="checkbox" data-ma="${esc(ma)}" ${checked?'checked':''} onchange="salSelOne(this.dataset.ma,this.checked)"></td>
       <td style="color:var(--tm);font-size:.72rem;text-align:center">${i+1}</td>
       ${infoCols.map(c=>`<td>${esc(row[c]||'—')}</td>`).join('')}
-      ${hdInfoCols.map(c=>{
-        if(c.key==='__soHD')
-          return `<td><strong style="color:${hasHD?'var(--te)':'var(--rd)'}">${esc(row[c.key]||'—')}</strong></td>`;
-        return `<td style="font-size:.76rem;color:var(--tm)">${esc(row[c.key]||'—')}</td>`;
+      ${hdInfoCols.map(k=>{
+        if(k==='__soHD')
+          return `<td><strong style="color:${hasHD?'var(--te)':'var(--rd)'}">${esc(row[k]||'—')}</strong></td>`;
+        return `<td style="font-size:.76rem;color:var(--tm)">${esc(row[k]||'—')}</td>`;
       }).join('')}
       ${moneyCols.length
         ? moneyCols.map(c=>`<td style="text-align:right;background:var(--vib)">
-            <strong>${fmtNumberStr(row[c.key]||0)}</strong>
+            <strong>${fmtNumberStr(row[c]||0)}</strong>
           </td>`).join('')
         : '<td>—</td>'}
       <td style="text-align:right;background:var(--grb);font-weight:800;color:var(--gr);font-size:.88rem">
-        ${fmtNumberStr(row[totalCol.key]||0)}
+        ${fmtNumberStr(row['__tongThuNhap']||0)}
       </td>
     </tr>`;
   }).join('');
+  renderPayrollSummary({...r,data:view});
+}
+function salUpdateSelUI(view){
+  const n=Object.keys(G_SAL.sel).filter(k=>G_SAL.sel[k]).length;
+  const c=$('sal-selcount'); if(c) c.textContent='Đã chọn: '+n;
+  const all=$('sal-chkall');
+  if(all){
+    const v=view||salView();
+    const k=v.filter(x=>G_SAL.sel[x['Mã Nhân Viên']]).length;
+    all.checked=v.length>0&&k===v.length;
+    all.indeterminate=k>0&&k<v.length;
+  }
+}
+function salColFilter(key,val){ G_SAL.colFilter[key]=val.trim(); renderPayrollBody(); }
+function salClearFilters(){ G_SAL.colFilter={}; if(G_SAL.reportData) renderPayrollTable(G_SAL.reportData); }
+function salSelOne(ma,on){ if(on) G_SAL.sel[ma]=true; else delete G_SAL.sel[ma]; renderPayrollBody(); }
+function salSelAll(on){
+  salView().forEach(row=>{ const ma=row['Mã Nhân Viên']; if(on) G_SAL.sel[ma]=true; else delete G_SAL.sel[ma]; });
+  renderPayrollBody();
+}
+function salClearSel(){ G_SAL.sel={}; renderPayrollBody(); }
+function salToggleOnlySel(on){
+  if(on && !Object.keys(G_SAL.sel).length){ toast('Chưa chọn nhân sự nào','info'); $('sal-onlysel').checked=false; return; }
+  G_SAL.onlySel=on; renderPayrollBody();
 }
 function renderPayrollSummary(r){
   const el=$('sal-summary'), stats=$('sal-stats');
@@ -3885,13 +3951,15 @@ function renderPayrollSummary(r){
 function exportPayrollCSV(){
   if(!G_SAL.reportData||!G_SAL.reportData.data.length){toast('Chưa có dữ liệu báo cáo','error');return;}
   var r=G_SAL.reportData;
+  var view=salView();
+  if(!view.length){toast('Không có dòng nào để xuất','error');return;}
   var infoCols=G_SAL.selectedCols;
   var hdLabels=['Số HĐ/PL Hiệu Lực','Loại HĐ','Ngày Hiệu Lực','Ngày Hết Hạn'];
   var hdKeys=['__soHD','__loaiHD','__ngayHL','__ngayHH'];
   var moneyFields=r.numberFields||[];
   var allHeaders=infoCols.concat(hdLabels).concat(moneyFields).concat(['TỔNG THU NHẬP']);
   var headerRow=allHeaders.map(function(h){return '"'+h+'"';}).join(',');
-  var bodyRows=r.data.map(function(row){
+  var bodyRows=view.map(function(row){
     var ic=infoCols.map(function(col){return '"'+String(row[col]||'').replace(/"/g,'""')+'"';});
     var hk=hdKeys.map(function(k){return '"'+String(row[k]||'').replace(/"/g,'""')+'"';});
     var mf=moneyFields.map(function(f){return String(row[f]||0);});
