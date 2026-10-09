@@ -1142,7 +1142,29 @@ function saveOne_(t, ex, o, isNew, user) {
     update_(t, ex._row, o);
   }
 }
-function cleanNV_(o, user, maplMapObj) {
+/** {tên đã chuẩn hoá (thường, bỏ khoảng trắng dư) -> tên đúng theo danh mục Phòng ban} */
+function pbMap_() {
+  const m = {};
+  load_(T.PB).rows.forEach(function (r) { if (r.ten) m[normHeader_(r.ten)] = r.ten; });
+  return m;
+}
+/** Kiểm tra & chuẩn hoá giá trị "Đơn vị_Phòng ban" theo đúng danh mục đã cấu hình; báo lỗi nếu không khớp. */
+function checkPhongBan_(v, pbMapObj) {
+  if (!v) return '';
+  const pbm = pbMapObj || pbMap_();
+  const hit = pbm[normHeader_(v)];
+  if (!hit) throw new Error('Đơn vị_Phòng ban "' + v + '" không có trong danh mục. Vào Thiết lập → Phòng ban để thêm trước khi nhập.');
+  return hit;
+}
+/** Kiểm tra & chuẩn hoá giá trị "Tham gia công đoàn" (chỉ nhận Có/Không); báo lỗi nếu không khớp. */
+function checkCongDoan_(v) {
+  if (!v) return KHONG;
+  const s = normHeader_(v);
+  if (s === normHeader_(CO)) return CO;
+  if (s === normHeader_(KHONG)) return KHONG;
+  throw new Error('Tham gia công đoàn "' + v + '" không hợp lệ (chỉ nhận "' + CO + '" hoặc "' + KHONG + '").');
+}
+function cleanNV_(o, user, maplMapObj, pbMapObj) {
   const r = {};
   NV_COLS.forEach(function (c) { r[c[0]] = o[c[0]] === undefined || o[c[0]] === null ? '' : o[c[0]]; });
   r.maNV = String(r.maNV).trim();
@@ -1151,7 +1173,8 @@ function cleanNV_(o, user, maplMapObj) {
   if (!r.hoTen) throw new Error('Chưa nhập Họ và tên.');
   ['luongChinh', 'pcKN', 'pcCV', 'pcDH', 'pcKhac'].forEach(function (k) { r[k] = moneyNum_(r[k]); });
   r.luongDong = luongDong_(r);
-  r.congDoan = r.congDoan === CO ? CO : KHONG;
+  r.phongBan = checkPhongBan_(r.phongBan, pbMapObj);
+  r.congDoan = checkCongDoan_(r.congDoan);
   r.emailQL = String(r.emailQL || '').toLowerCase().trim();
   if (user.role === ROLE.NHAP) r.emailQL = user.email;
   const mm = maplMapObj || maplMap_();
@@ -1900,8 +1923,10 @@ function numberFormatsForCols_(cols) {
   return out;
 }
 
-/** Tạo Sheet tạm từ lưới dữ liệu trong bộ nhớ, xuất ra file rồi xóa Sheet tạm. */
-function makeGridFile_(fileName, grid, headerRow, numberFormats, format) {
+/** Tạo Sheet tạm từ lưới dữ liệu trong bộ nhớ, xuất ra file rồi xóa Sheet tạm.
+ *  extraSheets (tuỳ chọn): [{name, grid}] – các sheet tham khảo thêm (vd. Danh mục cho dropdown),
+ *  chỉ xuất hiện trong file Excel (.xlsx); khi xuất CSV chỉ sheet "Data" đầu tiên được lấy. */
+function makeGridFile_(fileName, grid, headerRow, numberFormats, format, extraSheets) {
   const width = Math.max.apply(null, grid.map(function (r) { return r.length; }).concat([1]));
   const norm = grid.map(function (r) { const a = r.slice(); while (a.length < width) a.push(''); return a; });
   const tmp = SpreadsheetApp.create(fileName);
@@ -1921,6 +1946,17 @@ function makeGridFile_(fileName, grid, headerRow, numberFormats, format) {
       sh.setFrozenRows(headerRow);
     }
     sh.autoResizeColumns(1, width);
+    (extraSheets || []).forEach(function (es) {
+      const ew = Math.max.apply(null, es.grid.map(function (r) { return r.length; }).concat([1]));
+      const en = es.grid.map(function (r) { const a = r.slice(); while (a.length < ew) a.push(''); return a; });
+      const esh = tmp.insertSheet(es.name);
+      if (esh.getMaxColumns() < ew) esh.insertColumnsAfter(esh.getMaxColumns(), ew - esh.getMaxColumns());
+      if (esh.getMaxRows() < en.length) esh.insertRowsAfter(esh.getMaxRows(), en.length - esh.getMaxRows());
+      esh.getRange(1, 1, en.length, ew).setNumberFormat('@').setValues(en).setFontFamily('Arial').setFontSize(10);
+      esh.getRange(1, 1, 1, ew).setFontWeight('bold').setBackground('#dbe5f1').setWrap(true);
+      esh.setFrozenRows(1);
+      esh.autoResizeColumns(1, ew);
+    });
     SpreadsheetApp.flush();
     return exportSpreadsheet_(tmp.getId(), fileName, format);
   } finally {
@@ -1942,7 +1978,27 @@ function apiTemplateNV(format) {
       pcKN: 0, pcCV: 500000, pcDH: 0, pcKhac: 0, luongDong: 12500000, maPL: 'CT', congDoan: KHONG, emailQL: '', ghiChu: 'Dòng ví dụ – xóa trước khi nhập' }
   ];
   const grid = [header].concat(mau.map(function (o) { return buildRow_(T.NV, header, o, null); }));
-  return makeGridFile_('Mau_DanhSachNhanVien', grid, 1, numberFormatsForCols_(T.NV.cols), format === 'csv' ? 'csv' : 'xlsx');
+  return makeGridFile_('Mau_DanhSachNhanVien', grid, 1, numberFormatsForCols_(T.NV.cols), format === 'csv' ? 'csv' : 'xlsx',
+    [{ name: 'Danh mục', grid: danhMucNVGrid_() }]);
+}
+/** Lưới "Danh mục" liệt kê đúng các giá trị hợp lệ của từng trường dropdown (Phòng ban, Mã phân loại, Tham gia
+ *  công đoàn) theo cấu hình hiện tại, để đính kèm vào file mẫu – nhập giá trị khác các danh mục này sẽ bị từ chối. */
+function danhMucNVGrid_() {
+  const pbRows = load_(T.PB).rows.map(function (r) { return r.ten; }).filter(String);
+  const plRows = load_(T.MAPL).rows.filter(function (r) { return r.ma; });
+  const cdRows = [CO, KHONG];
+  const n = Math.max(pbRows.length, plRows.length, cdRows.length, 1);
+  const grid = [['Đơn vị_Phòng ban (danh mục)', 'Mã phân loại (danh mục)', 'Mô tả mã phân loại', 'Tham gia công đoàn (danh mục)']];
+  for (let i = 0; i < n; i++) {
+    const pl = plRows[i];
+    grid.push([
+      pbRows[i] || '',
+      pl ? pl.ma : '',
+      pl ? (pl.moTa || '') + (pl.trangThai === TT_NGUNG ? ' (Ngừng áp dụng)' : '') : '',
+      cdRows[i] || ''
+    ]);
+  }
+  return grid;
 }
 
 /** Xuất danh sách nhân viên hiện tại (hồ sơ gốc hoặc một kỳ) */
@@ -2073,6 +2129,7 @@ function importNVGrid_(ky, mode, grid, source, onlyEmpty) {
     const latest = kys.length ? kys[0].ky : '';
     const applyToMaster = !ky || ky >= latest;
     const mm = maplMap_();
+    const pbm = pbMap_();
 
     const dNV = load_(T.NV);
     const dlRowsForKy = ky ? load_(T.DLKY).rows.filter(function (r) { return r.ky === ky; }) : [];
@@ -2087,7 +2144,7 @@ function importNVGrid_(ky, mode, grid, source, onlyEmpty) {
       try {
         const existing = ky ? dlByCode[code] : nvByCode[code];
         if (existing && !canSee_(user, existing)) throw new Error('Không có quyền sửa hồ sơ này (đã có người khác quản lý).');
-        const obj = cleanNV_(raw, user, mm);
+        const obj = cleanNV_(raw, user, mm, pbm);
         if (seen[obj.maNV]) throw new Error('Trùng Mã NV với dòng ' + seen[obj.maNV] + ' trong file.');
         seen[obj.maNV] = raw._line;
         cleaned.push({ line: raw._line, code: obj.maNV, obj: obj, existing: existing });
@@ -2142,6 +2199,7 @@ function importPartialNV_(user, ky, parsed, source, onlyEmpty) {
   const latest = kys.length ? kys[0].ky : '';
   const applyToMaster = !ky || ky >= latest;
   const mm = maplMap_();
+  const pbm = pbMap_();
   const dNV = load_(T.NV);
   const dlRowsForKy = ky ? load_(T.DLKY).rows.filter(function (r) { return r.ky === ky; }) : [];
   const nvByCode = {}; dNV.rows.forEach(function (r) { nvByCode[r.maNV] = r; });
@@ -2156,7 +2214,7 @@ function importPartialNV_(user, ky, parsed, source, onlyEmpty) {
       const target = ky ? dlByCode[code] : nvByCode[code];
       if (!target) throw new Error('Không tìm thấy Mã NV này (chế độ cập nhật 1 phần không tạo NV mới).');
       if (!canSee_(user, target)) throw new Error('Không có quyền sửa hồ sơ này (đã có người khác quản lý).');
-      const patch = mergeNVPartial_(target, raw, matched, user, mm, onlyEmpty);
+      const patch = mergeNVPartial_(target, raw, matched, user, mm, onlyEmpty, pbm);
       if (!patch) { skipped++; return; }
       if (ky) { const exD = dlByCode[code]; if (exD) update_(T.DLKY, exD._row, patch); }
       if (applyToMaster) { const exM = nvByCode[code]; if (exM) update_(T.NV, exM._row, patch); }
@@ -2171,7 +2229,7 @@ function importPartialNV_(user, ky, parsed, source, onlyEmpty) {
 }
 
 /** Tính patch (chỉ các trường cần đổi) khi cập nhật 1 phần cho một NV; trả về null nếu không có gì thay đổi. */
-function mergeNVPartial_(existing, raw, matchedKeys, user, mm, onlyEmpty) {
+function mergeNVPartial_(existing, raw, matchedKeys, user, mm, onlyEmpty, pbMapObj) {
   const patch = {};
   matchedKeys.forEach(function (k) {
     const v = raw[k];
@@ -2183,7 +2241,8 @@ function mergeNVPartial_(existing, raw, matchedKeys, user, mm, onlyEmpty) {
     patch[k] = v;
   });
   if (!Object.keys(patch).length) return null;
-  if (patch.congDoan !== undefined) patch.congDoan = patch.congDoan === CO ? CO : KHONG;
+  if (patch.phongBan !== undefined) patch.phongBan = checkPhongBan_(patch.phongBan, pbMapObj);
+  if (patch.congDoan !== undefined) patch.congDoan = checkCongDoan_(patch.congDoan);
   if (patch.emailQL !== undefined) {
     patch.emailQL = String(patch.emailQL || '').toLowerCase().trim();
     if (user.role === ROLE.NHAP) patch.emailQL = user.email;

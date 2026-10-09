@@ -435,7 +435,9 @@ function nvExport(format) {
 function nvImportForm() {
   const tabBtn = (k, t) => `<button class="${S.impTab === k ? 'active' : ''}" onclick="S.impTab='${k}';nvImportForm()">${t}</button>`;
   const body = `<div class="alert info">Dữ liệu cần có tối thiểu 2 cột <b>Mã NV</b> và <b>Họ và tên</b>, đặt tên cột giống file mẫu
-      (có thể thêm/bớt các cột khác, thứ tự cột tùy ý). Bấm <b>"⬇ File mẫu"</b> ở trên nếu chưa có.</div>
+      (có thể thêm/bớt các cột khác, thứ tự cột tùy ý). Bấm <b>"⬇ File mẫu"</b> ở trên nếu chưa có — file mẫu Excel có kèm sheet
+      <b>"Danh mục"</b> liệt kê đúng các giá trị hợp lệ cho <b>Đơn vị_Phòng ban</b>, <b>Mã phân loại</b>, <b>Tham gia công đoàn</b>.
+      Dòng có giá trị khác với danh mục đã cấu hình ở các trường này sẽ bị <b>từ chối nhập</b> (báo lỗi theo từng dòng).</div>
     <div class="tabs" style="margin-bottom:12px">${tabBtn('paste', 'Dán trực tiếp')}${tabBtn('file', 'Chọn file')}</div>
     <form id="impF" onsubmit="return false"><div class="form">
       ${S.impTab === 'file'

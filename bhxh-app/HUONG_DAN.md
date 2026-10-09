@@ -129,6 +129,8 @@ Màn hình **Nhân viên** có 4 nút:
 
 Người **Nhập liệu** chỉ nhập/xuất được hồ sơ mình quản lý (theo *Email NV quản lý hồ sơ*); nhân viên mới do họ nhập sẽ tự gán email của họ. **Admin** không bị giới hạn này. Không nhập được vào kỳ đã chốt.
 
+**Kiểm tra theo danh mục cấu hình:** các trường dạng dropdown trong NV_COLS — **Đơn vị_Phòng ban** (danh mục ở *Thiết lập → Phòng ban*), **Mã phân loại** (*Thiết lập → Mã phân loại*), và **Tham gia công đoàn** (chỉ nhận "Có"/"Không") — được kiểm tra khi nhập (cả 3 cách nhập). Giá trị gõ khác hoa/thường hoặc thừa khoảng trắng vẫn được nhận và tự chuẩn hoá về đúng chính tả trong danh mục; nhưng giá trị **không khớp với bất kỳ mục nào** trong danh mục sẽ bị **báo lỗi và từ chối nhập** dòng đó (không còn tự tạo thành lựa chọn mới ngoài danh mục như trước). File mẫu Excel (nút **"⬇ File mẫu (Excel)"**) có kèm sheet **"Danh mục"** liệt kê đầy đủ các giá trị hợp lệ hiện tại của 3 trường này để tham khảo khi điền; file mẫu CSV không mang được nhiều sheet nên không có phần này.
+
 **Nếu nhập file Excel (.xlsx) báo lỗi:** vào Apps Script, mục **Dịch vụ** (thanh bên trái) → bấm **+** → thêm **Drive API** (phiên bản v3) → Lưu. Hoặc lưu file dưới dạng **CSV** rồi nhập lại — CSV luôn hoạt động mà không cần bước này.
 
 **Các trường số tiền** (Mức lương chính, PC…, Mức tối đa, Lương đóng cũ/mới ở Truy thu) hiển thị có phân tách hàng ngàn khi nhập trên web app (gõ số, ứng dụng tự thêm dấu chấm).
