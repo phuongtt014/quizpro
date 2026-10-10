@@ -7,32 +7,75 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --brand:#2f5bea;--brand-dark:#2347c4;--brand-soft:#eaf0ff;
+  --brand:#5b47d6;--brand-dark:#4a38bd;--brand-soft:#eeecfc;
   --ink:#172033;--ink2:#4b566b;--ink3:#8591a5;
-  --bg:#f4f6fa;--card:#fff;--line:#e5e9f0;--line2:#d3dae6;
+  --bg:#eef0fa;--card:#fff;--line:#e5e9f0;--line2:#d3dae6;
   --ok:#0f9d6c;--ok-soft:#e3f6ee;--warn:#c47a06;--warn-soft:#fdf1da;--bad:#d6393b;--bad-soft:#fde9e9;--info:#0b86c4;--info-soft:#e1f2fb;--vio:#7c4fe0;--vio-soft:#efe9fd;
   --r:12px;--sh:0 1px 2px rgba(23,32,51,.05),0 4px 14px rgba(23,32,51,.05);
 }
 body{font-family:Inter,'Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;color:var(--ink);background:var(--bg);min-height:100vh;line-height:1.45}
 button,input,select,textarea{font:inherit;color:inherit}
-svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+svg.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
 
-/* header */
-.top{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50}
-.top-in{max-width:1380px;margin:0 auto;padding:0 20px;display:flex;align-items:center;gap:28px;height:60px}
-.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:-.2px;white-space:nowrap}
-.logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#2f5bea,#6b8bff);display:grid;place-items:center;color:#fff}
-.logo svg{width:18px;height:18px}
-.tabs{display:flex;gap:4px;flex:1;overflow-x:auto;scrollbar-width:none}
-.tab{display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:9px;border:0;background:none;color:var(--ink2);cursor:pointer;font-weight:500;white-space:nowrap;position:relative}
-.tab:hover{background:var(--bg);color:var(--ink)}
-.tab.on{background:var(--brand-soft);color:var(--brand)}
-.tab .cnt{background:var(--bad);color:#fff;border-radius:99px;font-size:11px;padding:0 6px;min-width:18px;text-align:center;line-height:18px;font-weight:600}
-.who{display:flex;align-items:center;gap:10px}
-.who select{border:1px solid var(--line2);border-radius:9px;padding:6px 8px;background:#fff;max-width:230px}
-.avatar{width:30px;height:30px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-weight:700;font-size:12px;flex:none}
-
-main{max-width:1380px;margin:0 auto;padding:24px 20px 60px}
+/* shell */
+.app{display:flex;min-height:100vh}
+.sb{width:250px;flex:none;background:linear-gradient(180deg,#5b47d6 0%,#4b39bd 100%);color:#fff;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:26px 16px 18px;overflow-y:auto}
+.sb-user{text-align:center;padding-bottom:18px;border-bottom:1px solid rgba(255,255,255,.25);margin-bottom:18px}
+.sb-av{width:84px;height:84px;border-radius:50%;margin:0 auto 10px;background:rgba(255,255,255,.18);border:3px solid rgba(255,255,255,.55);display:grid;place-items:center;font-size:28px;font-weight:700;letter-spacing:1px}
+.sb-name{font-weight:700;font-size:17px}
+.sb-role{font-size:13px;opacity:.8;margin-top:2px}
+.sb-nav{display:flex;flex-direction:column;gap:6px}
+.tab{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:11px;border:0;background:none;color:rgba(255,255,255,.78);cursor:pointer;font-weight:600;font-size:14.5px;text-align:left}
+.tab svg{width:19px;height:19px}
+.tab:hover{background:rgba(255,255,255,.1);color:#fff}
+.tab.on{background:rgba(255,255,255,.2);color:#fff;box-shadow:inset 3px 0 0 #fff}
+.tab .cnt{margin-left:auto;background:#ff6b7a;color:#fff;border-radius:99px;font-size:11px;padding:0 7px;min-width:19px;text-align:center;line-height:19px;font-weight:700}
+.sb-foot{margin-top:auto;padding-top:18px;font-size:12.5px;display:flex;flex-direction:column;gap:10px}
+.sb-foot label{opacity:.75;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px}
+.sb-foot select{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:9px;padding:7px 8px;width:100%}
+.sb-foot select option{color:#172033}
+.sb-btn{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:9px;padding:7px;cursor:pointer;font-weight:600;display:flex;gap:6px;align-items:center;justify-content:center}
+.sb-btn:hover{background:rgba(255,255,255,.24)}
+.sync{display:flex;align-items:center;gap:7px;opacity:.92;line-height:1.3}
+.sync i{width:8px;height:8px;border-radius:50%;background:#5ee0a0;flex:none}
+.sync.busy i{background:#ffd166}.sync.err i{background:#ff6b7a}
+.avatar{width:46px;height:46px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-weight:700;font-size:16px;flex:none}
+main{flex:1;min-width:0;max-width:1560px;padding:26px 28px 60px}
+.page-h h1{color:var(--brand)}
+.loading{display:grid;place-items:center;height:60vh;color:var(--ink3);gap:12px;text-align:center}
+.spin{width:34px;height:34px;border:4px solid #dcd8f7;border-top-color:var(--brand);border-radius:50%;animation:sp 1s linear infinite;margin:0 auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+/* dashboard */
+.pills{display:flex;gap:10px;flex-wrap:wrap}
+.pill{border:1px solid var(--line2);background:#fff;border-radius:10px;padding:9px 22px;cursor:pointer;font-weight:600;color:var(--ink)}
+.pill.on{color:var(--brand);box-shadow:inset 0 -3px 0 var(--brand)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:16px}
+.kpi{padding:18px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.kpi .t{color:var(--ink2);font-size:15px}
+.kpi b{display:block;font-size:38px;line-height:1.15;letter-spacing:-1px;margin-top:2px}
+.kpi small{color:var(--ink3);font-size:12px}
+.ring{width:76px;height:76px;flex:none}
+.dgrid{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:1000px){.dgrid{grid-template-columns:1fr}}
+.cc{padding:16px 18px;min-width:0}
+.cc-h{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.cc-h h3{font-size:16px;font-weight:600}
+.mini-seg{display:flex;gap:6px;flex-wrap:wrap}
+.mini-seg button{border:1px solid var(--line2);background:#fff;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:13px;color:var(--ink2)}
+.mini-seg button.on{color:var(--brand);border-color:var(--brand);box-shadow:inset 0 -2px 0 var(--brand);font-weight:600}
+.chart{width:100%;height:auto;display:block}
+.hb{display:flex;align-items:center;gap:10px;margin:9px 0}
+.hb-l{width:130px;text-align:right;color:var(--ink2);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:none}
+.hb-t{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+.hb-t i{display:block;height:22px;background:var(--brand);border-radius:3px;min-width:3px}
+.hb-t b{background:#eef0fa;border-radius:4px;padding:0 7px;font-size:13px;line-height:22px}
+.donut-w{display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center;padding:6px 0}
+.donut{width:190px;height:190px}
+.lg div{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:13px;color:var(--ink2)}
+.lg i{width:10px;height:10px;border-radius:50%;flex:none}
+.cb{position:relative;height:24px;min-width:90px}
+.cb i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;opacity:.55}
+.cb span{position:relative;display:block;text-align:right;padding-right:6px;line-height:24px;font-weight:500}
 .page-h{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
 .page-h h1{font-size:22px;letter-spacing:-.3px}
 .page-h p{color:var(--ink3);margin-top:2px}
@@ -159,17 +202,19 @@ label.f i{color:var(--bad);font-style:normal}
 .toast.err{background:var(--bad)}.toast.ok{background:var(--ok)}
 .mono{font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
 .letter{white-space:pre-wrap;line-height:1.6}
-@media(max-width:760px){.top-in{flex-wrap:wrap;height:auto;gap:8px 12px;padding:10px 16px}.who{margin-left:auto}.tabs{order:3;flex:1 0 100%}.brand span{display:none}}
-@media print{.top,.drawer,.ov{display:none}}
+@media(max-width:900px){.app{flex-direction:column}.sb{width:100%;height:auto;position:static;flex-direction:row;flex-wrap:wrap;align-items:center;padding:12px 14px;gap:8px 12px}.sb-user{display:flex;align-items:center;gap:10px;border:0;margin:0;padding:0;text-align:left}.sb-av{width:38px;height:38px;font-size:14px;margin:0;border-width:2px}.sb-name{font-size:14px}.sb-role{display:none}.sb-nav{flex-direction:row;order:3;width:100%;overflow-x:auto}.tab{padding:9px 12px;white-space:nowrap}.sb-foot{margin:0 0 0 auto;padding:0;flex-direction:row;align-items:center}.sb-foot select{width:auto;max-width:150px}.sb-foot label,.sync span{display:none}main{padding:18px 14px 50px}}
+@media print{.sb,.drawer,.ov{display:none}}
 </style>
 </head>
 <body>
-<header class="top"><div class="top-in">
-  <div class="brand"><div class="logo" id="logo"></div><span>HR Recruit</span></div>
-  <nav class="tabs" id="tabs"></nav>
-  <div class="who"><div class="avatar" id="av"></div><select id="whoSel" title="Chuyển người dùng (demo phân quyền)"></select></div>
-</div></header>
+<div class="app">
+<aside class="sb">
+  <div class="sb-user"><div class="sb-av" id="av"></div><div class="sb-name" id="sbName"></div><div class="sb-role" id="sbRole"></div></div>
+  <nav class="sb-nav" id="tabs"></nav>
+  <div class="sb-foot" id="sbFoot"></div>
+</aside>
 <main id="app"></main>
+</div>
 
 <div class="ov" id="ov"></div>
 <aside class="drawer" id="drawer"></aside>
@@ -206,17 +251,26 @@ const IC={
  grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
  list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'
 };
-const ic=n=>`<svg viewBox="0 0 24 24">${IC[n]||''}</svg>`;
+const ic=n=>`<svg class="i" viewBox="0 0 24 24">${IC[n]||''}</svg>`;
 function toast(m,t=''){const e=document.createElement('div');e.className='toast '+t;e.textContent=m;$('#toast').append(e);setTimeout(()=>e.remove(),3200)}
 
 /* file store (IndexedDB) */
-const idb=new Promise((res,rej)=>{const r=indexedDB.open('hr_recruit_files',1);r.onupgradeneeded=()=>r.result.createObjectStore('f');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+const idb=new Promise((res,rej)=>{try{const r=indexedDB.open('hr_recruit_files',1);r.onupgradeneeded=()=>r.result.createObjectStore('f');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}});idb.catch(()=>{});
 const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{const t=d.transaction('f',mode);const rq=fn(t.objectStore('f'));t.oncomplete=()=>res(rq&&rq.result);t.onerror=()=>rej(t.error)})};
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
-async function storeFile(file){const id=uid('f_');await fput(id,file);return{id,name:file.name,size:file.size,type:file.type,at:Date.now()}}
-async function openFile(meta,dl){const b=await fget(meta.id);if(!b){toast('Không tìm thấy tệp trên trình duyệt này','err');return}
+const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
+const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
+const MAXF=GS?10:15;
+const toB64=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(f)});
+async function storeFile(file){
+  if(GS)return gcall('api_upload',file.name,file.type||'application/octet-stream',await toB64(file));
+  const id=uid('f_');await fput(id,file);return{id,name:file.name,size:file.size,type:file.type,at:Date.now()}}
+async function delFile(m){try{if(!m||m.demo)return;if(GS)await gcall('api_deleteFile',m.id);else await fdel(m.id)}catch(e){}}
+async function openFile(meta,dl){
+  if(meta.url){window.open(meta.url,'_blank');return}
+  const b=await fget(meta.id);if(!b){toast('Không tìm thấy tệp trên trình duyệt này','err');return}
   const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.target='_blank';if(dl)a.download=meta.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000)}
 function pickFile(accept){return new Promise(res=>{const i=document.createElement('input');i.type='file';if(accept)i.accept=accept;i.onchange=()=>res(i.files[0]||null);i.click()})}
 const fsize=n=>n>1048576?(n/1048576).toFixed(1)+' MB':Math.ceil(n/1024)+' KB';
@@ -280,6 +334,10 @@ function seed(){
   const r3=mkReq(`ĐX-${y}-003`,'u1',{block:'Khối trường',dept:'Tổ Ngoại ngữ',position:'Giáo viên Tiếng Anh',qty:1,reqType:'Thay thế',neededBy:iso(45),salary:'Thoả thuận',reason:'Thay thế giáo viên nghỉ việc cuối học kỳ.'},'pending',{ago:2});
   const r4=mkReq(`ĐX-${y}-004`,'u2',{block:'Khối văn phòng',dept:'Công nghệ thông tin',position:'Nhân viên IT Helpdesk',qty:1,reqType:'Tuyển mới',reason:'Chưa có căn cứ định biên.'},'rejected',{ago:25,rejectReason:'Chưa nằm trong kế hoạch nhân sự năm, đề nghị bổ sung vào quý sau.'});
   r4.history.push({t:Date.now()-24*dayMs,by:'Trần Quốc Cường',text:'Từ chối: Chưa nằm trong kế hoạch nhân sự năm'});
+  const r5=mkReq(`ĐX-${y}-005`,'u1',{block:'Khối trường',dept:'Tổ Ngữ văn',position:'Giáo viên Ngữ văn',qty:2,reqType:'Bổ sung',neededBy:iso(40),salary:'12 – 17 triệu',reason:'Mở thêm lớp chuyên văn.'},'approved',{ago:40,approvedAt:Date.now()-36*dayMs,approvedBy:'Trần Quốc Cường',signed:{id:'demo',name:'DX-005-da-ky.pdf',size:98000,at:Date.now()-34*dayMs,demo:true}});
+  r5.history.push({t:Date.now()-36*dayMs,by:'Trần Quốc Cường',text:'Ban TGĐ phê duyệt'});
+  const r6=mkReq(`ĐX-${y}-006`,'u2',{block:'Khối văn phòng',dept:'Kế toán – Tài chính',position:'Kế toán tổng hợp',qty:1,reqType:'Thay thế',neededBy:iso(25),salary:'13 – 17 triệu',reason:'Thay thế nhân sự nghỉ thai sản.'},'approved',{ago:15,approvedAt:Date.now()-11*dayMs,approvedBy:'Trần Quốc Cường',signed:null});
+  r6.history.push({t:Date.now()-11*dayMs,by:'Trần Quốc Cường',text:'Ban TGĐ phê duyệt'});
   const mkC=(name,reqI,stage,x={})=>({id:uid('c_'),stage,createdAt:Date.now()-(x.ago||5)*dayMs,v:{name,phone:x.phone||'09'+Math.floor(10000000+Math.random()*8e7),email:x.email||name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/\s+/g,'.')+'@gmail.com',reqId:reqI?.id||'',source:x.source||'TopCV',exp:x.exp??2,edu:x.edu||'Đại học',expSalary:x.sal||''},screening:x.screening||null,interviews:x.interviews||[],offer:x.offer||null,history:[{t:Date.now()-(x.ago||5)*dayMs,by:'Lê Thị Bình',text:'Thêm ứng viên'}]});
   const cands=[
     mkC('Đỗ Minh Quân',r1,'new',{source:'Website trường',ago:1,exp:3,edu:'ĐH Sư phạm Toán'}),
@@ -288,6 +346,15 @@ function seed(){
     mkC('Lý Thanh Hương',r2,'offer',{ago:14,exp:2,source:'Facebook',screening:{date:iso(-12),by:'Lê Thị Bình',result:'Đạt – mời phỏng vấn',note:''},interviews:[{id:uid('i_'),name:'Vòng 1 – Trưởng bộ phận',date:iso(-9),time:'10:00',place:'Văn phòng',who:'Phạm Thu Hà',result:'Đạt',score:9,note:''}],offer:{status:'Đã gửi',salary:'12.000.000 đ/tháng',startDate:iso(10),deadline:iso(3),note:''}}),
     mkC('Bùi Anh Tuấn',r2,'hired',{ago:30,exp:3,screening:{date:iso(-28),by:'Lê Thị Bình',result:'Đạt – mời phỏng vấn',note:''},interviews:[{id:uid('i_'),name:'Vòng 1',date:iso(-25),time:'09:00',place:'Văn phòng',who:'Phạm Thu Hà',result:'Đạt',score:8,note:''}],offer:{status:'Chấp nhận',salary:'11.000.000 đ/tháng',startDate:iso(-5),deadline:iso(-15),note:''}}),
     mkC('Trương Gia Bảo',r1,'rejected',{ago:10,exp:1,screening:{date:iso(-9),by:'Lê Thị Bình',result:'Không phù hợp',note:'Chưa đủ kinh nghiệm giảng dạy.'}})];
+  let sd=7;const rnd=()=>(sd=(sd*9301+49297)%233280)/233280;
+  const names=['Nguyễn Hải Đăng','Trần Mai Anh','Lê Quốc Huy','Phạm Ngọc Diệp','Hoàng Minh Châu','Vũ Thu Trang','Đặng Khánh Linh','Bùi Đức Anh','Ngô Phương Thảo','Dương Tuấn Kiệt','Lý Bảo Ngọc','Phan Thanh Sơn','Đinh Hồng Nhung','Võ Gia Hân','Mai Văn Long','Tạ Thùy Dương','Hồ Quang Vinh','Chu Thị Hạnh','Cao Minh Trí','Lâm Yến Nhi','Trịnh Công Thành','Đoàn Kim Ngân','Lưu Hải Yến','Kiều Anh Đào','Nguyễn Đức Mạnh','Trần Bích Phương','Lê Thanh Tùng','Phạm Hà My'];
+  const srcs=['TopCV','TopCV','Facebook','Website trường','Giới thiệu nội bộ','Trực tiếp','LinkedIn'];const bag=['new','new','screening','screening','screening','interview','interview','interview','interview','offer','offer','hired','hired','hired','rejected','rejected','rejected','rejected','rejected'];
+  const why=['Không phù hợp chuyên môn','Kỳ vọng lương cao','Kỳ vọng lương cao','Nhận được offer tốt hơn','Vấn đề địa điểm','Ứng viên từ chối offer'];const pool=[r1,r2,r5,r6,r5,r1];
+  names.forEach(n=>{const st=bag[Math.floor(rnd()*bag.length)],ago=Math.floor(rnd()*268)+3;const c=mkC(n,pool[Math.floor(rnd()*pool.length)],st,{ago,source:srcs[Math.floor(rnd()*srcs.length)],exp:Math.floor(rnd()*8)});
+    if(['interview','offer','hired'].includes(st))c.interviews=[{id:uid('i_'),name:'Vòng 1',date:iso(-ago+5),time:'09:00',place:'Văn phòng',who:'Trưởng bộ phận',result:'Đạt',score:7+Math.floor(rnd()*3),note:''}];
+    if(st==='offer'||st==='hired')c.offer={status:st==='hired'?'Chấp nhận':'Đã gửi',salary:'',startDate:iso(10),deadline:iso(3),note:''};
+    cands.push(c)});
+  cands.forEach(c=>{if(c.stage==='hired')c.hiredAt=c.hiredAt||c.createdAt+(12+Math.floor(rnd()*20))*dayMs;if(c.stage==='rejected')c.rejectReason=why[Math.floor(rnd()*why.length)]});
   const jd=(a,b,c)=>`MÔ TẢ CÔNG VIỆC\n${a}\n\nYÊU CẦU\n${b}\n\nQUYỀN LỢI\n${c}`;
   const positions=[
     {id:uid('p_'),name:'Giáo viên Toán THCS',block:'Khối trường',dept:'Tổ Toán – Tin',jd:jd('- Giảng dạy môn Toán theo chương trình GDPT 2018\n- Chủ nhiệm lớp, bồi dưỡng học sinh\n- Tham gia sinh hoạt tổ chuyên môn','- Tốt nghiệp ĐH Sư phạm Toán trở lên\n- Có chứng chỉ nghiệp vụ sư phạm\n- Ưu tiên có kinh nghiệm ≥ 2 năm','- Lương thoả thuận theo năng lực\n- Thưởng cuối năm, BHXH đầy đủ\n- Môi trường chuyên nghiệp')},
@@ -299,17 +366,16 @@ function seed(){
     {id:uid('t_'),type:'Thư mời nhận việc',name:'Thư mời nhận việc (Offer)',subject:'[{{cong_ty}}] Thư mời nhận việc – {{vi_tri}}',body:'Kính gửi Anh/Chị {{ten_ung_vien}},\n\nChúc mừng Anh/Chị đã vượt qua các vòng tuyển chọn. {{cong_ty}} trân trọng mời Anh/Chị về làm việc với nội dung:\n- Vị trí: {{vi_tri}} – {{phong_ban}}\n- Mức lương: {{luong}}\n- Ngày nhận việc dự kiến: {{ngay_nhan_viec}}\n\nVui lòng phản hồi trước ngày {{han_phan_hoi}}. Chi tiết hồ sơ nhận việc sẽ được gửi sau khi Anh/Chị xác nhận.\n\nTrân trọng,\n{{nguoi_gui}}\nPhòng Nhân sự – {{cong_ty}}'},
     {id:uid('t_'),type:'Thư cảm ơn',name:'Cảm ơn sau phỏng vấn',subject:'[{{cong_ty}}] Cảm ơn Anh/Chị đã tham dự phỏng vấn',body:'Kính gửi Anh/Chị {{ten_ung_vien}},\n\nCảm ơn Anh/Chị đã dành thời gian trao đổi về vị trí {{vi_tri}}. Chúng tôi sẽ thông báo kết quả trong thời gian sớm nhất.\n\nTrân trọng,\n{{nguoi_gui}}\n{{cong_ty}}'},
     {id:uid('t_'),type:'Thư từ chối',name:'Thông báo chưa phù hợp',subject:'[{{cong_ty}}] Thông báo kết quả ứng tuyển {{vi_tri}}',body:'Kính gửi Anh/Chị {{ten_ung_vien}},\n\nCảm ơn Anh/Chị đã quan tâm đến vị trí {{vi_tri}}. Sau khi cân nhắc, rất tiếc hồ sơ của Anh/Chị chưa phù hợp với yêu cầu ở thời điểm hiện tại. Chúng tôi xin lưu hồ sơ để liên hệ khi có cơ hội phù hợp.\n\nChúc Anh/Chị nhiều thành công.\n\nTrân trọng,\n{{nguoi_gui}}\n{{cong_ty}}'}];
-  return{v:1,me:'u5',seq:4,
+  return{v:1,
     cfg:{company:'Trường & Công ty Giáo dục ABC',signDays:3,blocks:['Khối trường','Khối văn phòng'],depts,sources:['TopCV','Facebook','Website trường','Giới thiệu nội bộ','Trực tiếp','Khác'],roles,users,reqFields,candFields},
-    reqs:[r1,r2,r3,r4],cands,lib:{positions,templates,forms:[]}};
+    reqs:[r1,r2,r3,r4,r5,r6],cands,lib:{positions,templates,forms:[]}};
 }
 
 /* ============ state ============ */
 const KEY='hr_recruit_v1';
-let DB=(()=>{try{const s=localStorage.getItem(KEY);if(s)return JSON.parse(s)}catch(e){}return seed()})();
-function save(){try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){toast('Không lưu được: bộ nhớ trình duyệt đã đầy','err')}}
-const ui={tab:'dash',rf:'all',rq:'',rb:'',cv:'board',cq:'',creq:'',lt:'pos',lq:'',cf:'general',tplType:''};
-const me=()=>DB.cfg.users.find(u=>u.id===DB.me)||DB.cfg.users[0];
+let DB=null;const ENV={gs:GS,email:'',sheetUrl:''};
+const ui={tab:'dash',me:null,realMe:null,rf:'all',rq:'',rb:'',cv:'board',cq:'',creq:'',lt:'pos',lq:'',cf:'general',tplType:'',db:'',dim:'Nguồn',gran:'M',year:new Date().getFullYear()};
+const me=()=>DB.cfg.users.find(u=>u.id===ui.me)||DB.cfg.users[0];
 const roleOf=u=>DB.cfg.roles.find(r=>r.id===u.roleId)||DB.cfg.roles[0];
 const can=c=>{const r=roleOf(me());return r.id==='admin'||r.caps.includes(c)};
 const log=(o,text)=>{(o.history=o.history||[]).push({t:Date.now(),by:me().name,text})};
@@ -322,6 +388,78 @@ const userName=id=>(DB.cfg.users.find(u=>u.id===id)||{}).name||'—';
 const STATUS={pending:['Chờ TGĐ duyệt','b-warn'],approved:['Đã duyệt','b-ok'],rejected:['Từ chối','b-bad']};
 const badge=(t,c)=>`<span class="badge ${c}">${esc(t)}</span>`;
 const stageBadge=s=>`<span class="badge" style="background:${STG[s][2]}1f;color:${STG[s][2]}">${STG[s][1]}</span>`;
+
+/* ============ persistence (Google Sheet qua Apps Script / localStorage khi xem thử) ============ */
+const SHEET_NAMES={cfg:'ThietLap',reqs:'DeXuat',cands:'UngVien',lib:'ThuVien'};
+const COLS={
+ cfg:{head:['id','Mô tả'],items:()=>[{id:'cfg',row:['cfg','Cấu hình hệ thống (không sửa tay)'],data:DB.cfg}]},
+ reqs:{head:['id','Mã đề xuất','Vị trí','Phòng ban','Khối','Số lượng','Trạng thái','Người đề xuất','Ngày tạo','Ngày duyệt','Bản scan đã ký'],
+  items:()=>DB.reqs.map(r=>({id:r.id,row:[r.id,r.code,r.v.position,r.v.dept,r.v.block,r.v.qty,STATUS[r.status][0],userName(r.by),fmtD(r.at),r.approvedAt?fmtD(r.approvedAt):'',r.signed?(r.signed.url||r.signed.name):(r.status==='approved'?'THIẾU HỒ SƠ':'')],data:r}))},
+ cands:{head:['id','Họ tên','Vị trí','Giai đoạn','Điện thoại','Email','Nguồn','Số vòng PV','Offer','Lý do loại','Ngày nhận hồ sơ'],
+  items:()=>DB.cands.map(c=>({id:c.id,row:[c.id,c.v.name,posOf(c),STG[c.stage][1],c.v.phone||'',c.v.email||'',c.v.source||'',c.interviews.length,c.offer?c.offer.status:'',c.rejectReason||'',fmtD(c.createdAt)],data:c}))},
+ lib:{head:['id','Loại','Tên','Khối / Nhóm'],
+  items:()=>[...DB.lib.positions.map(x=>({_k:'positions',kl:'Vị trí & JD',g:x.block,x})),...DB.lib.templates.map(x=>({_k:'templates',kl:'Mẫu thư',g:x.type,x})),...DB.lib.forms.map(x=>({_k:'forms',kl:'Biểu mẫu',g:x.cat,x}))]
+   .map(o=>({id:o.x.id,row:[o.x.id,o.kl,o.x.name,o.g||''],data:{...o.x,_k:o._k}}))}
+};
+let snap={},saveTimer=null,chain=Promise.resolve(),lastLoad=0;
+const jstr=o=>JSON.stringify(o);
+function takeSnap(){snap={};Object.keys(COLS).forEach(c=>{snap[c]={};COLS[c].items().forEach(i=>snap[c][i.id]=jstr(i.data))})}
+function diffOps(){
+  const ops=[];
+  Object.keys(COLS).forEach(c=>{const cur={};COLS[c].items().forEach(i=>{cur[i.id]=1;const j=jstr(i.data);if(snap[c][i.id]!==j){ops.push({col:c,sheet:SHEET_NAMES[c],type:'put',id:i.id,head:COLS[c].head,row:i.row,data:j});}});
+    Object.keys(snap[c]).forEach(id=>{if(!cur[id])ops.push({col:c,sheet:SHEET_NAMES[c],type:'del',id})})});
+  return ops;
+}
+function setSync(st,msg){const e=$('#syncBox');if(e){e.className='sync '+(st==='ok'?'':st);e.innerHTML=`<i></i><span>${msg}</span>`}ui.sync=[st,msg]}
+const syncMsg=()=>ENV.gs?'Đã đồng bộ với Google Sheet':'Chế độ xem thử – lưu trên trình duyệt';
+function save(){
+  if(!ENV.gs){try{localStorage.setItem(KEY,jstr(DB))}catch(e){toast('Không lưu được: bộ nhớ trình duyệt đã đầy','err')}return}
+  clearTimeout(saveTimer);setSync('busy','Đang lưu vào Google Sheet…');saveTimer=setTimeout(flush,500);
+}
+function flush(){
+  saveTimer=null;const prev=jstr(snap);const ops=diffOps();
+  if(!ops.length){setSync('ok',syncMsg());return}
+  ops.forEach(o=>{if(o.type==='put')snap[o.col][o.id]=o.data;else delete snap[o.col][o.id]});
+  chain=chain.then(()=>gcall('api_sync',ops)).then(()=>{if(!saveTimer)setSync('ok',syncMsg())}).catch(e=>{snap=JSON.parse(prev);setSync('err','Lưu thất bại – bấm "Lưu lại"');toast('Lưu thất bại: '+(e&&e.message||e),'err')});
+}
+function rebuildLib(items){const L={positions:[],templates:[],forms:[]};(items||[]).forEach(i=>{const k=i._k;delete i._k;if(L[k])L[k].push(i)});return L}
+function normalize(){
+  const C=DB.cfg;C.rejectReasons=C.rejectReasons||['Không phù hợp chuyên môn','Kỳ vọng lương cao','Nhận được offer tốt hơn','Vấn đề địa điểm','Ứng viên từ chối offer','Lý do khác'];
+  C.users.forEach(u=>u.email=u.email||'');DB.reqs.forEach(r=>{r.history=r.history||[];r.v=r.v||{}});DB.cands.forEach(c=>{c.history=c.history||[];c.interviews=c.interviews||[];c.v=c.v||{}});
+  DB.lib=DB.lib||{};['positions','templates','forms'].forEach(k=>DB.lib[k]=DB.lib[k]||[]);
+}
+function seedDemo(){const d=seed();if(ENV.gs){const a=d.cfg.users.find(u=>u.roleId==='admin');a.email=ENV.email}return d}
+function freshDB(email){
+  const d=seed();d.reqs=[];d.cands=[];d.lib.positions=[];d.lib.forms=[];
+  d.cfg.users=[{id:uid('u'),name:email?email.split('@')[0]:'Quản trị',title:'Quản trị hệ thống',dept:'',roleId:'admin',email}];
+  d.cfg.company='Tên công ty của bạn';return d;
+}
+function pickUser(){
+  if(ENV.gs){const u=DB.cfg.users.find(x=>x.email&&x.email.toLowerCase()===ENV.email.toLowerCase());if(!u)return false;ui.realMe=ui.me=u.id;return true}
+  ui.realMe=ui.me=DB.cfg.users.find(u=>u.roleId==='admin').id;return true;
+}
+async function loadAll(){
+  if(ENV.gs){
+    const d=await gcall('api_load');ENV.email=d.email||'';ENV.sheetUrl=d.sheetUrl||'';
+    DB=d.cfg?{cfg:d.cfg,reqs:d.reqs,cands:d.cands,lib:rebuildLib(d.lib)}:freshDB(ENV.email);
+    normalize();takeSnap();if(!d.cfg){takeSnap();snap={cfg:{},reqs:{},cands:{},lib:{}};flush()}
+  }else{
+    try{const s=localStorage.getItem(KEY);if(s)DB=JSON.parse(s)}catch(e){}
+    if(!DB)DB=seed();normalize();takeSnap();
+  }
+  lastLoad=Date.now();
+}
+async function init(){
+  $('#app').innerHTML='<div class="loading"><div><div class="spin"></div><p style="margin-top:12px">Đang tải dữ liệu…</p></div></div>';
+  try{await loadAll()}catch(e){$('#app').innerHTML=`<div class="loading"><div><b>Không tải được dữ liệu</b><p class="muted">${esc(e&&e.message||e)}</p><button class="btn pri" style="margin-top:10px" data-act="reload">Thử lại</button></div></div>`;return}
+  if(!pickUser()){$('#tabs').innerHTML='';$('#app').innerHTML=`<div class="loading"><div><h2>Chưa được cấp quyền truy cập</h2><p class="muted" style="max-width:420px;margin-top:6px">Tài khoản <b>${esc(ENV.email||'(không xác định)')}</b> chưa có trong danh sách người dùng. Hãy nhờ quản trị viên thêm email này tại Thiết lập → Người dùng.</p></div></div>`;return}
+  ui.tab=can('report.view')?'dash':(can('req.create')||can('req.all')?'req':'lib');
+  render();setSync(...(ui.sync||['ok',syncMsg()]));
+}
+async function reloadData(silent){
+  if(!ENV.gs)return;
+  try{await loadAll();if(!pickUser()){init();return}render();if(!silent)toast('Đã làm mới dữ liệu từ Google Sheet','ok')}catch(e){if(!silent)toast('Không làm mới được: '+(e&&e.message||e),'err')}
+}
 
 /* ============ generic form ============ */
 function optsFor(f,vals){
@@ -376,14 +514,17 @@ function confirmBox(msg,fn,label='Xác nhận'){modal({title:'Xác nhận',html:
 
 /* ============ shell ============ */
 function renderShell(){
-  $('#logo').innerHTML=ic('brief');
-  const tabs=[['dash','Tổng quan','home',can('report.view')],['req','Đề xuất','clip',can('req.create')||can('req.all')],['cand','Ứng viên','users',can('cand.view')],['lib','Thư viện','book',can('lib.view')],['cfg','Thiết lập','gear',can('cfg.manage')]].filter(t=>t[3]);
+  const u=me();
+  $('#av').textContent=initials(u.name);$('#sbName').textContent=u.name;$('#sbRole').textContent=u.title||roleOf(u).name;
+  const tabs=[['dash','Tổng quan','grid',can('report.view')],['req','Đề xuất','clip',can('req.create')||can('req.all')],['cand','Ứng viên','users',can('cand.view')],['lib','Thư viện','book',can('lib.view')],['cfg','Thiết lập','gear',can('cfg.manage')]].filter(t=>t[3]);
   if(!tabs.find(t=>t[0]===ui.tab))ui.tab=tabs[0]?.[0]||'req';
-  const miss=DB.reqs.filter(needSign).length, pend=DB.reqs.filter(r=>r.status==='pending').length;
+  const miss=DB.reqs.filter(needSign).length,pend=DB.reqs.filter(r=>r.status==='pending').length;
   const cnt={req:can('req.approve')?pend:(can('req.sign')?miss:0)};
   $('#tabs').innerHTML=tabs.map(t=>`<button class="tab ${ui.tab===t[0]?'on':''}" data-act="tab" data-id="${t[0]}">${ic(t[2])}${t[1]}${cnt[t[0]]?`<span class="cnt">${cnt[t[0]]}</span>`:''}</button>`).join('');
-  $('#whoSel').innerHTML=DB.cfg.users.map(u=>`<option value="${u.id}" ${u.id===DB.me?'selected':''}>${esc(u.name)} · ${esc(roleOf(u).name)}</option>`).join('');
-  $('#av').textContent=initials(me().name);
+  const real=DB.cfg.users.find(x=>x.id===ui.realMe);const isAdm=real&&roleOf(real).id==='admin';
+  $('#sbFoot').innerHTML=(isAdm?`<label>Xem thử với vai trò</label><select data-who="1">${DB.cfg.users.map(x=>`<option value="${x.id}" ${x.id===ui.me?'selected':''}>${esc(x.name)} · ${esc(roleOf(x).name)}</option>`).join('')}</select>`:'')
+   +`<div class="sync" id="syncBox" data-act="retrySave" style="cursor:pointer"></div>`+(ENV.gs?`<button class="sb-btn" data-act="reload">${ic('download')}Làm mới dữ liệu</button>`:'');
+  const st=ui.sync||['ok',syncMsg()];setSync(st[0],st[1]);
 }
 function render(){
   const f=document.activeElement;const fid=f&&f.id,pos=f&&f.selectionStart;
@@ -398,29 +539,97 @@ const pageH=(t,s,actions='')=>`<div class="page-h"><div><h1>${t}</h1><p>${s}</p>
 const searchBox=(id,val,ph)=>`<div class="search">${ic('search')}<input type="text" id="${id}" data-bind="${id}" placeholder="${ph}" value="${esc(val)}"></div>`;
 
 /* ============ DASHBOARD ============ */
+const COL_OK='#0f9d6c',COL_BAD='#e8606a',COL_INFO='#3b8ee8',COL_BR='#5b47d6';
+const DONUT_COL=['#5b47d6','#8c7ae6','#bdb2f4','#2d3a52','#e8606a','#9aa3b8'];
+function ring(pct,color){const r=26,c=2*Math.PI*r,o=c*(1-Math.min(1,pct/100));
+  return`<svg class="ring" viewBox="0 0 64 64"><circle cx="32" cy="32" r="${r}" fill="none" stroke="#e8eaf4" stroke-width="6"/><circle cx="32" cy="32" r="${r}" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${o}" transform="rotate(-90 32 32)"/><text x="32" y="37" text-anchor="middle" font-size="14" font-weight="600" fill="#172033">${Math.round(pct)}%</text></svg>`}
+function areaChart(vals,labels,sub){
+  const W=640,H=250,L=34,R=14,T=14,B=sub?42:30;const max=Math.max(4,Math.ceil(Math.max(...vals,1)/4)*4);const n=vals.length;
+  const x=i=>L+(n<2?(W-L-R)/2:i*(W-L-R)/(n-1)),y=v=>T+(H-T-B)*(1-v/max);
+  const pts=vals.map((v,i)=>[x(i),y(v)]);
+  let d=`M${pts[0][0]},${pts[0][1]}`;for(let i=1;i<n;i++){const[a,b]=pts[i-1],[c,e]=pts[i],m=(a+c)/2;d+=` C${m},${b} ${m},${e} ${c},${e}`}
+  const base=H-B,avg=vals.reduce((a,b)=>a+b,0)/n;
+  let g='';for(let k=0;k<=4;k++){const v=max*k/4,yy=y(v);g+=`<line x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}" stroke="#e6e9f2"/><text x="${L-8}" y="${yy+4}" text-anchor="end" font-size="11" fill="#8591a5">${Math.round(v)}</text>`}
+  return`<svg class="chart" viewBox="0 0 ${W} ${H}">${g}
+  <path d="${d} L${x(n-1)},${base} L${x(0)},${base}Z" fill="#5b47d6" opacity=".12"/><path d="${d}" fill="none" stroke="#5b47d6" stroke-width="2.6" stroke-linecap="round"/>
+  <line x1="${L}" x2="${W-R}" y1="${y(avg)}" y2="${y(avg)}" stroke="#8591a5" stroke-dasharray="5 4"/><text x="${L+4}" y="${y(avg)-5}" font-size="11" fill="#5b6479">TB ${avg.toFixed(1)}</text>
+  ${pts.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="#fff" stroke="#5b47d6" stroke-width="2"><title>${labels[i]}: ${vals[i]} ứng viên</title></circle>`).join('')}
+  ${labels.map((l,i)=>`<text x="${x(i)}" y="${base+16}" text-anchor="middle" font-size="11.5" fill="#5b6479">${l}</text>${sub?`<text x="${x(i)}" y="${base+30}" text-anchor="middle" font-size="10.5" fill="#8591a5">${sub[i]||''}</text>`:''}`).join('')}</svg>`;
+}
+function hbars(rows,color){const max=Math.max(1,...rows.map(r=>r[1]));
+  return rows.map(r=>`<div class="hb"><div class="hb-l" title="${esc(r[0])}">${esc(r[0])}</div><div class="hb-t"><i style="width:calc(${r[1]/max*100}% - 40px);background:${r[2]||color||COL_BR}"></i><b>${r[1]}</b></div></div>`).join('')||'<div class="empty">Chưa có dữ liệu</div>'}
+function donut(parts){
+  const tot=parts.reduce((a,p)=>a+p[1],0);if(!tot)return'<div class="empty">Chưa có ứng viên bị loại</div>';
+  const r=70,c=2*Math.PI*r;let off=0;
+  const arcs=parts.map((p,i)=>{const len=p[1]/tot*c;const el=`<circle cx="100" cy="100" r="${r}" fill="none" stroke="${DONUT_COL[i%6]}" stroke-width="26" stroke-dasharray="${len} ${c-len}" stroke-dashoffset="${-off}" transform="rotate(-90 100 100)"><title>${esc(p[0])}: ${p[1]}</title></circle>`;off+=len;return el}).join('');
+  return`<div class="donut-w"><svg class="donut" viewBox="0 0 200 200">${arcs}<text x="100" y="98" text-anchor="middle" font-size="30" font-weight="700" fill="#172033">${tot}</text><text x="100" y="118" text-anchor="middle" font-size="12" fill="#8591a5">bị loại</text></svg>
+  <div class="lg">${parts.map((p,i)=>`<div><i style="background:${DONUT_COL[i%6]}"></i>${esc(p[0])} · <b>${p[1]}</b> (${(p[1]/tot*100).toFixed(1)}%)</div>`).join('')}</div></div>`;
+}
+const cellBar=(v,max,col)=>`<div class="cb"><i style="width:${max?v/max*100:0}%;background:${col}"></i><span>${v}</span></div>`;
 function vDash(){
-  const open=DB.reqs.filter(r=>r.status==='approved'&&hiredOf(r)<r.v.qty);
+  const blk=ui.db,reqOfC=c=>reqById(c.v.reqId);
+  const R=DB.reqs.filter(r=>!blk||r.v.block===blk);
+  const C=DB.cands.filter(c=>!blk||(reqOfC(c)&&reqOfC(c).v.block===blk));
+  const tot=C.length,hired=C.filter(c=>c.stage==='hired').length,rej=C.filter(c=>c.stage==='rejected').length,act=tot-hired-rej;
+  const toIv=C.filter(c=>['interview','offer','hired'].includes(c.stage)).length;
+  const pc=n=>tot?n/tot*100:0;
+  const open=R.filter(r=>r.status==='approved'&&hiredOf(r)<r.v.qty);
   const openQty=open.reduce((a,r)=>a+r.v.qty-hiredOf(r),0);
-  const active=DB.cands.filter(c=>!['hired','rejected'].includes(c.stage));
-  const miss=DB.reqs.filter(needSign);
+  const miss=R.filter(needSign);
+  const ht=C.filter(c=>c.stage==='hired'&&c.hiredAt);const avgDays=ht.length?Math.round(ht.reduce((a,c)=>a+(c.hiredAt-c.createdAt)/dayMs,0)/ht.length):0;
+  const kpi=(t,n,p,col,cap)=>`<div class="card kpi"><div><div class="t">${t}</div><b>${n}</b><small>${cap}</small></div>${ring(p,col)}</div>`;
   const stat=(n,l,ico,bg,fg)=>`<div class="card stat"><div class="ic" style="background:${bg};color:${fg}">${ic(ico)}</div><div><b>${n}</b><span>${l}</span></div></div>`;
-  const max=Math.max(1,...STAGES.map(s=>DB.cands.filter(c=>c.stage===s[0]).length));
-  const recent=[...DB.reqs.flatMap(r=>r.history.map(h=>({...h,tag:r.code}))),...DB.cands.flatMap(c=>c.history.map(h=>({...h,tag:c.v.name})))].sort((a,b)=>b.t-a.t).slice(0,8);
-  return pageH('Tổng quan tuyển dụng','Bức tranh nhanh về nhu cầu, ứng viên và hồ sơ còn thiếu.')+`
+  /* area chart */
+  const yr=+ui.year;const years=[...new Set([new Date().getFullYear(),...C.map(c=>new Date(c.createdAt).getFullYear())])].sort();
+  const mv=Array(12).fill(0);C.forEach(c=>{const d=new Date(c.createdAt);if(d.getFullYear()===yr)mv[d.getMonth()]++});
+  const MN=['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
+  const lastM=yr===new Date().getFullYear()?new Date().getMonth():11,lastQ=Math.floor(lastM/3);
+  const qv=[0,1,2,3].map(q=>mv[q*3]+mv[q*3+1]+mv[q*3+2]).slice(0,lastQ+1);
+  const chart=ui.gran==='Q'?areaChart(qv,['Quý 1','Quý 2','Quý 3','Quý 4'].slice(0,lastQ+1)):areaChart(mv.slice(0,lastM+1),MN.slice(0,lastM+1),['','Q1','','','Q2','','','Q3','','','Q4',''].slice(0,lastM+1));
+  /* dimension bars */
+  const dims={'Nguồn':c=>c.v.source,'Phòng ban':c=>reqOfC(c)?.v.dept,'Khối':c=>reqOfC(c)?.v.block,'Vị trí':c=>reqOfC(c)?.v.position,'Giai đoạn':c=>STG[c.stage][1]};
+  const cnt={};C.forEach(c=>{const k=dims[ui.dim](c)||'Chưa rõ';cnt[k]=(cnt[k]||0)+1});
+  const dimRows=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  /* funnel */
+  const funnel=STAGES.map(s=>[s[1],C.filter(c=>c.stage===s[0]).length,s[2]]);
+  /* reject reasons */
+  const rr={};C.filter(c=>c.stage==='rejected').forEach(c=>{const k=c.rejectReason||'Chưa ghi nhận';rr[k]=(rr[k]||0)+1});
+  const rrRows=Object.entries(rr).sort((a,b)=>b[1]-a[1]);
+  /* by position */
+  const byPos={};C.forEach(c=>{const k=posOf(c);const o=byPos[k]||(byPos[k]={t:0,h:0,a:0,r:0});o.t++;if(c.stage==='hired')o.h++;else if(c.stage==='rejected')o.r++;else o.a++});
+  const posRows=Object.entries(byPos).sort((a,b)=>b[1].t-a[1].t);const pmax=Math.max(1,...posRows.map(r=>r[1].t));
+  const recent=[...R.flatMap(r=>r.history.map(h=>({...h,tag:r.code}))),...C.flatMap(c=>c.history.map(h=>({...h,tag:c.v.name})))].sort((a,b)=>b.t-a.t).slice(0,7);
+  const seg=(key,opts)=>`<div class="mini-seg">${opts.map(o=>`<button class="${ui[key]===o[0]?'on':''}" data-act="set_${key}" data-id="${o[0]}">${o[1]}</button>`).join('')}</div>`;
+  return`<div class="page-h"><div><h1>Bảng điều khiển tuyển dụng</h1><p>Tổng hợp theo thời gian thực từ dữ liệu đề xuất và ứng viên</p></div>
+    <div class="pills">${[['','Tất cả khối'],...DB.cfg.blocks.map(b=>[b,b])].map(x=>`<button class="pill ${ui.db===x[0]?'on':''}" data-act="dblk" data-id="${esc(x[0])}">${esc(x[1])}</button>`).join('')}</div></div>
+  <div class="kpis">
+    ${kpi('Ứng viên',tot,pc(toIv),COL_BR,`${Math.round(pc(toIv))}% đã vào phỏng vấn`)}
+    ${kpi('Đã nhận việc',hired,pc(hired),COL_OK,'trên tổng ứng viên')}
+    ${kpi('Đang xử lý',act,pc(act),COL_INFO,'trên tổng ứng viên')}
+    ${kpi('Đã loại',rej,pc(rej),COL_BAD,'trên tổng ứng viên')}
+  </div>
   <div class="stats">
-    ${stat(DB.reqs.filter(r=>r.status==='pending').length,'Đề xuất chờ duyệt','clip','var(--warn-soft)','var(--warn)')}
-    ${stat(openQty,'Vị trí đang cần tuyển','brief','var(--brand-soft)','var(--brand)')}
-    ${stat(active.length,'Ứng viên đang xử lý','users','var(--vio-soft)','var(--vio)')}
+    ${stat(R.filter(r=>r.status==='pending').length,'Đề xuất chờ Ban TGĐ duyệt','clip','var(--warn-soft)','var(--warn)')}
+    ${stat(openQty,'Chỉ tiêu còn thiếu','brief','var(--brand-soft)','var(--brand)')}
     ${stat(miss.length,'Đề xuất thiếu bản ký','alert','var(--bad-soft)','var(--bad)')}
+    ${stat(avgDays?avgDays+' ngày':'—','Thời gian tuyển trung bình','check','var(--ok-soft)','var(--ok)')}
   </div>
-  ${miss.length?`<div class="alert bad" style="margin-bottom:16px">${ic('alert')}<div><b>${miss.length} đề xuất đã được duyệt nhưng chưa có bản scan đã ký.</b> Các hồ sơ này được ghi nhận vào báo cáo thiếu hồ sơ.</div><button class="btn sm grow-0" style="margin-left:auto" data-act="gomiss">Xem báo cáo</button></div>`:''}
-  <div class="grid2">
-    <div class="card"><div class="card-h">Phễu ứng viên</div><div class="pad">${STAGES.map(s=>{const n=DB.cands.filter(c=>c.stage===s[0]).length;return`<div class="bar-row"><div class="l">${s[1]}</div><div class="bar"><i style="width:${n/max*100}%;background:${s[2]}"></i></div><b>${n}</b></div>`}).join('')}</div></div>
-    <div class="card"><div class="card-h">Hoạt động gần đây</div><div class="pad tl">${recent.map(h=>`<div><b>${esc(h.tag)}</b> — ${esc(h.text)}<br><span class="muted small">${esc(h.by)} · ${fmtDT(h.t)}</span></div>`).join('')||'<span class="muted">Chưa có hoạt động</span>'}</div></div>
+  ${miss.length?`<div class="alert bad" style="margin-bottom:16px">${ic('alert')}<div><b>${miss.length} đề xuất đã được duyệt nhưng chưa có bản scan đã ký</b> — được ghi nhận vào báo cáo thiếu hồ sơ.</div><button class="btn sm" style="margin-left:auto" data-act="gomiss">Xem báo cáo</button></div>`:''}
+  <div class="dgrid">
+    <div class="card cc"><div class="cc-h"><h3>Hồ sơ ứng viên theo thời gian</h3><div class="row"><select style="width:auto;padding:5px 8px" data-bind="year">${years.map(y=>`<option ${y===yr?'selected':''}>${y}</option>`).join('')}</select>${seg('gran',[['M','Tháng'],['Q','Quý']])}</div></div>${chart}</div>
+    <div class="card cc"><div class="cc-h"><h3>Ứng viên theo</h3>${seg('dim',Object.keys(dims).map(k=>[k,k]))}</div>${hbars(dimRows)}</div>
   </div>
-  <div class="card" style="margin-top:16px"><div class="card-h">Đề xuất đang tuyển</div><div class="tbl-wrap"><table><thead><tr><th>Mã</th><th>Vị trí</th><th>Phòng ban</th><th>Tiến độ</th><th>Cần nhân sự</th></tr></thead><tbody>
-  ${open.map(r=>`<tr class="click" data-act="openReq" data-id="${r.id}"><td class="mono">${esc(r.code)}</td><td><b>${esc(r.v.position)}</b></td><td>${esc(r.v.dept)}<div class="muted small">${esc(r.v.block)}</div></td><td>${hiredOf(r)}/${r.v.qty} đã nhận · ${candsOf(r).filter(c=>!['hired','rejected'].includes(c.stage)).length} ứng viên đang xử lý</td><td>${fmtD(r.v.neededBy)}</td></tr>`).join('')||`<tr><td colspan="5" class="empty">Không có vị trí đang tuyển</td></tr>`}
-  </tbody></table></div></div>`;
+  <div class="dgrid">
+    <div class="card cc"><div class="cc-h"><h3>Phễu ứng viên theo giai đoạn</h3></div>${hbars(funnel)}</div>
+    <div class="card cc"><div class="cc-h"><h3>Lý do loại ứng viên</h3></div>${donut(rrRows)}</div>
+  </div>
+  <div class="card cc" style="margin-bottom:16px"><div class="cc-h"><h3>Chi tiết ứng viên theo vị trí</h3></div><div class="tbl-wrap"><table><thead><tr><th>Vị trí</th><th>Ứng viên</th><th>Đã nhận việc</th><th>Đang xử lý</th><th>Đã loại</th></tr></thead><tbody>
+    ${posRows.map(([k,o])=>`<tr><td><b>${esc(k)}</b></td><td>${cellBar(o.t,pmax,'#b6aaf2')}</td><td>${cellBar(o.h,pmax,'#7fd9b4')}</td><td>${cellBar(o.a,pmax,'#9cc8f5')}</td><td>${cellBar(o.r,pmax,'#f2a3aa')}</td></tr>`).join('')||'<tr><td colspan="5"><div class="empty">Chưa có dữ liệu</div></td></tr>'}</tbody></table></div></div>
+  <div class="dgrid">
+    <div class="card cc"><div class="cc-h"><h3>Chỉ tiêu đang tuyển</h3></div><div class="tbl-wrap"><table><thead><tr><th>Mã</th><th>Vị trí</th><th>Tiến độ</th><th>Cần nhân sự</th></tr></thead><tbody>
+    ${open.map(r=>`<tr class="click" data-act="openReq" data-id="${r.id}"><td class="mono">${esc(r.code)}</td><td><b>${esc(r.v.position)}</b><div class="muted small">${esc(r.v.dept)}</div></td><td>${hiredOf(r)}/${r.v.qty} đã nhận · ${candsOf(r).filter(c=>!['hired','rejected'].includes(c.stage)).length} đang xử lý</td><td>${fmtD(r.v.neededBy)}</td></tr>`).join('')||'<tr><td colspan="4"><div class="empty">Không có chỉ tiêu đang tuyển</div></td></tr>'}</tbody></table></div></div>
+    <div class="card cc"><div class="cc-h"><h3>Hoạt động gần đây</h3></div><div class="tl">${recent.map(h=>`<div><b>${esc(h.tag)}</b> — ${esc(h.text)}<br><span class="muted small">${esc(h.by)} · ${fmtDT(h.t)}</span></div>`).join('')||'<span class="muted">Chưa có hoạt động</span>'}</div></div>
+  </div>`;
 }
 
 /* ============ REQUESTS ============ */
@@ -456,7 +665,7 @@ function reqForm(r){
     buttons:[modalCancel,{label:r?'Lưu thay đổi':'Gửi đề xuất duyệt',cls:'pri',icon:'check',fn:()=>{
       const v=readForm($('#modal'),fields);if(!v)return false;
       if(r){r.v={...r.v,...v};log(r,'Cập nhật nội dung đề xuất')}
-      else{DB.seq=(DB.seq||0)+1;const n=DB.reqs.filter(x=>x.code.includes('-'+new Date().getFullYear()+'-')).length+1;
+      else{const yr=new Date().getFullYear();const n=Math.max(0,...DB.reqs.map(x=>{const m=x.code.match(new RegExp('-'+yr+'-(\\d+)$'));return m?+m[1]:0}))+1;
         const nr={id:uid('r_'),code:`ĐX-${new Date().getFullYear()}-${String(n).padStart(3,'0')}`,by:me().id,at:Date.now(),status:'pending',v,history:[],signed:null};log(nr,'Tạo đề xuất & gửi Ban TGĐ phê duyệt');DB.reqs.push(nr)}
       commit();toast(r?'Đã cập nhật':'Đã gửi đề xuất chờ Ban TGĐ phê duyệt','ok')}}]});
 }
@@ -548,6 +757,7 @@ function candDrawer(id){
     const resBadge=x=>badge(x||'—',x==='Đạt'||x==='Chấp nhận'||(x||'').startsWith('Đạt')?'b-ok':x==='Không đạt'||x==='Không phù hợp'||x==='Từ chối'?'b-bad':'b-warn');
     return`<div class="dr-h"><div class="avatar" style="width:46px;height:46px;font-size:16px">${initials(c.v.name)}</div><div class="grow"><h2 style="font-size:20px">${esc(c.v.name)}</h2><div class="muted">${esc(posOf(c))}${r?` · <a href="#" data-act="openReq" data-id="${r.id}" style="color:var(--brand)">${esc(r.code)}</a>`:''}</div></div>${stageBadge(c.stage)}<button class="btn ghost" data-act="dclose">${ic('x')}</button></div>
     <div class="dr-b">
+    ${c.stage==='rejected'?`<div class="alert bad">${ic('x')}<div><b>Đã loại.</b> Lý do: ${esc(c.rejectReason||'chưa ghi nhận')}</div></div>`:''}
     ${mv?`<div class="card sec"><div class="sec-h"><h3>Chuyển giai đoạn</h3></div><div class="row">${STAGES.map(s=>`<button class="btn sm ${c.stage===s[0]?'pri':''}" data-act="setStage" data-id="${c.id}" data-arg="${s[0]}">${s[1]}</button>`).join('')}</div></div>`:''}
     <div class="card sec"><div class="sec-h"><h3>${ic('users')}Thông tin ứng viên</h3>${ed?`<button class="btn sm" data-act="editCand" data-id="${c.id}">${ic('edit')}Sửa</button>`:''}</div><dl class="kv">
       ${fields.map(f=>{let v=c.v[f.k];if(f.t==='date')v=fmtD(v);return`<dt>${esc(f.l)}</dt><dd>${esc(v===''||v==null?'—':v)}</dd>`}).join('')}</dl></div>
@@ -567,6 +777,16 @@ function candDrawer(id){
     ${ed&&me().roleId==='admin'?`<button class="btn bad" data-act="delCand" data-id="${c.id}">${ic('trash')}Xoá ứng viên</button>`:''}
     </div>`;
   };
+}
+function moveStage(c,s,reason){
+  c.stage=s;if(s==='hired'){if(!c.hiredAt)c.hiredAt=Date.now()}else delete c.hiredAt;
+  if(s==='rejected')c.rejectReason=reason;else delete c.rejectReason;
+  log(c,'Chuyển giai đoạn → '+STG[s][1]+(reason?` (${reason})`:''));
+}
+function changeStage(c,s){
+  if(!c||c.stage===s)return;
+  if(s==='rejected'){modal({title:'Loại ứng viên: '+c.v.name,html:`<label class="f">Lý do loại <i>*</i></label><select id="rjr">${DB.cfg.rejectReasons.map(r=>`<option>${esc(r)}</option>`).join('')}</select>`,buttons:[modalCancel,{label:'Xác nhận loại',cls:'bad',fn:()=>{moveStage(c,'rejected',$('#rjr').value);commit()}}]});return}
+  moveStage(c,s);commit();
 }
 const R_SCREEN=['Chờ','Đạt – mời phỏng vấn','Không phù hợp'];
 const R_IV=['Chờ kết quả','Đạt','Cân nhắc','Không đạt'];
@@ -615,6 +835,7 @@ function tplModal(t){
     buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{const x=readForm($('#modal'),fields);if(!x)return false;if(t)Object.assign(t,x);else DB.lib.templates.push({id:uid('t_'),...x});commit();toast('Đã lưu mẫu thư','ok')}}]});
 }
 function sampleVars(){return{ten_ung_vien:'Nguyễn Văn A',vi_tri:'Giáo viên Toán THCS',phong_ban:'Tổ Toán – Tin',ngay_phong_van:fmtD(iso(3)),gio_phong_van:'09:00',dia_diem:'Phòng họp A',luong:'15.000.000 đ/tháng',ngay_nhan_viec:fmtD(iso(20)),han_phan_hoi:fmtD(iso(7)),nguoi_gui:me().name,cong_ty:DB.cfg.company}}
+function copyText(t){try{navigator.clipboard.writeText(t).catch(()=>0)}catch(e){}const ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;opacity:0';document.body.append(ta);ta.select();try{document.execCommand('copy')}catch(e){}ta.remove()}
 function letterModal(c,t){
   const v=c?letterVars(c):sampleVars();
   const subj=merge(t.subject,v),body=merge(t.body,v);
@@ -622,8 +843,8 @@ function letterModal(c,t){
   modal({title:c?`Soạn thư cho ${c.v.name}`:'Xem trước mẫu thư (dữ liệu mẫu)',wide:true,
     html:`${left.length?`<div class="alert warn" style="margin-bottom:12px">${ic('alert')}<div>Còn ${left.length} trường chưa có dữ liệu (${[...new Set(left)].join(', ')}). Hãy bổ sung thông tin ứng viên hoặc sửa trực tiếp bên dưới.</div></div>`:''}
     <label class="f">Tiêu đề</label><input type="text" id="lt_s" value="${esc(subj)}"><label class="f" style="margin-top:12px">Nội dung</label><textarea id="lt_b" style="min-height:300px">${esc(body)}</textarea>`,
-    buttons:[modalCancel,{label:'Sao chép',icon:'copy',fn:()=>{navigator.clipboard?.writeText($('#lt_s').value+'\n\n'+$('#lt_b').value);toast('Đã sao chép nội dung thư','ok');return false}},
-      ...(c?[{label:'Mở trong ứng dụng email',icon:'mail',fn:()=>{location.href=`mailto:${encodeURIComponent(c.v.email||'')}?subject=${encodeURIComponent($('#lt_s').value)}&body=${encodeURIComponent($('#lt_b').value)}`;return false}},
+    buttons:[modalCancel,{label:'Sao chép',icon:'copy',fn:()=>{copyText($('#lt_s').value+'\n\n'+$('#lt_b').value);toast('Đã sao chép nội dung thư','ok');return false}},
+      ...(c?[{label:'Mở trong ứng dụng email',icon:'mail',fn:()=>{const a=document.createElement('a');a.href=`mailto:${encodeURIComponent(c.v.email||'')}?subject=${encodeURIComponent($('#lt_s').value)}&body=${encodeURIComponent($('#lt_b').value)}`;a.target='_blank';document.body.append(a);a.click();a.remove();return false}},
       {label:'Ghi nhận đã gửi',cls:'pri',icon:'check',fn:()=>{log(c,`Đã gửi thư: ${t.name}`);commit();toast('Đã ghi nhận vào lịch sử ứng viên','ok')}}]:[])]});
 }
 
@@ -642,7 +863,8 @@ function cfgBody(){
     <div class="card pad" style="margin-top:14px"><h3 style="margin-bottom:10px">Phòng ban / Bộ phận</h3>
       ${C.blocks.map(b=>`<div style="margin-bottom:8px"><b class="small muted">${esc(b)}</b><div>${C.depts.map((d,i)=>d.block===b?`<span class="chip">${esc(d.name)}<button data-act="delDept" data-id="${i}">×</button></span>`:'').join('')||'<span class="muted small">Chưa có</span>'}</div></div>`).join('')}
       <div class="row" style="margin-top:8px"><input type="text" id="add_dept" placeholder="Tên phòng ban" style="max-width:240px"><select id="add_deptb" style="width:auto">${C.blocks.map(b=>`<option>${esc(b)}</option>`).join('')}</select><button class="btn" data-act="addDept">${ic('plus')}Thêm</button></div></div>
-    <div class="card pad" style="margin-top:14px"><h3 style="margin-bottom:10px">Nguồn ứng viên</h3>${chips('sources',C.sources)}</div>`;
+    <div class="card pad" style="margin-top:14px"><h3 style="margin-bottom:10px">Nguồn ứng viên</h3>${chips('sources',C.sources)}</div>
+    <div class="card pad" style="margin-top:14px"><h3 style="margin-bottom:10px">Lý do loại ứng viên</h3>${chips('rejectReasons',C.rejectReasons)}</div>`;
   }
   if(ui.cf==='reqf'||ui.cf==='candf'){
     const key=ui.cf==='reqf'?'reqFields':'candFields';const fs=C[key];
@@ -652,12 +874,12 @@ function cfgBody(){
       <td><input type="checkbox" class="chk" ${f.vis!==0&&f.vis!==false?'checked':''} ${f.lock?'disabled':''} data-act="fieldToggle" data-id="${key}" data-arg="${i}:vis"></td>
       <td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" data-act="fieldMove" data-id="${key}" data-arg="${i}:-1">${ic('up')}</button><button class="btn ghost sm" data-act="fieldMove" data-id="${key}" data-arg="${i}:1">${ic('down')}</button>${f.custom?`<button class="btn ghost sm" data-act="fieldEdit" data-id="${key}" data-arg="${i}">${ic('edit')}</button><button class="btn ghost sm" data-act="fieldDel" data-id="${key}" data-arg="${i}">${ic('trash')}</button>`:''}</td></tr>`).join('')}</tbody></table></div></div>`;
   }
-  if(ui.cf==='users')return`<div class="card"><div class="card-h"><span>Người dùng</span><button class="btn pri sm" data-act="userEdit" data-id="">${ic('plus')}Thêm người dùng</button></div><div class="tbl-wrap"><table><thead><tr><th>Họ tên</th><th>Chức danh</th><th>Phòng ban</th><th>Vai trò</th><th></th></tr></thead><tbody>${C.users.map(u=>`<tr><td><b>${esc(u.name)}</b></td><td>${esc(u.title)}</td><td>${esc(u.dept)}</td><td>${badge(roleOf(u).name,'b-info')}</td><td style="text-align:right"><button class="btn ghost sm" data-act="userEdit" data-id="${u.id}">${ic('edit')}</button><button class="btn ghost sm" data-act="userDel" data-id="${u.id}">${ic('trash')}</button></td></tr>`).join('')}</tbody></table></div></div>
+  if(ui.cf==='users')return`<div class="card"><div class="card-h"><span>Người dùng</span><button class="btn pri sm" data-act="userEdit" data-id="">${ic('plus')}Thêm người dùng</button></div><div class="tbl-wrap"><table><thead><tr><th>Họ tên</th><th>Email đăng nhập</th><th>Chức danh</th><th>Phòng ban</th><th>Vai trò</th><th></th></tr></thead><tbody>${C.users.map(u=>`<tr><td><b>${esc(u.name)}</b></td><td class="small">${esc(u.email||'—')}</td><td>${esc(u.title)}</td><td>${esc(u.dept)}</td><td>${badge(roleOf(u).name,'b-info')}</td><td style="text-align:right"><button class="btn ghost sm" data-act="userEdit" data-id="${u.id}">${ic('edit')}</button><button class="btn ghost sm" data-act="userDel" data-id="${u.id}">${ic('trash')}</button></td></tr>`).join('')}</tbody></table></div></div>
     <p class="muted small" style="margin-top:10px">Mẹo: dùng ô chọn người dùng ở góc trên bên phải để xem giao diện theo từng vai trò.</p>`;
   if(ui.cf==='perm')return`<div class="card"><div class="card-h"><span>Ma trận phân quyền</span><button class="btn sm" data-act="roleAdd">${ic('plus')}Thêm vai trò</button></div><div class="tbl-wrap"><table><thead><tr><th>Quyền</th>${C.roles.map(r=>`<th style="text-align:center">${esc(r.name)}${!r.locked?` <button class="btn ghost sm" data-act="roleDel" data-id="${r.id}" style="padding:0 4px">${ic('x')}</button>`:''}</th>`).join('')}</tr></thead><tbody>${CAPS.map(c=>`<tr><td>${esc(c[1])}</td>${C.roles.map(r=>`<td style="text-align:center"><input type="checkbox" class="chk" ${r.locked||r.caps.includes(c[0])?'checked':''} ${r.locked?'disabled':''} data-act="capToggle" data-id="${r.id}" data-arg="${c[0]}"></td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
     <div class="alert info" style="margin-top:14px">${ic('alert')}<div>Vai trò mặc định: <b>Người đề xuất</b> (chỉ thấy đề xuất của mình), <b>Nhân viên tuyển dụng</b>, <b>Ban Tổng giám đốc</b> (phê duyệt), <b>Quản trị</b> (toàn quyền, không chỉnh sửa được).</div></div>`;
-  return`<div class="card pad"><div class="row"><button class="btn" data-act="exportData">${ic('download')}Xuất sao lưu (JSON)</button><button class="btn" data-act="importData">${ic('upload')}Nhập sao lưu</button><button class="btn bad" data-act="resetDemo">Khôi phục dữ liệu mẫu</button><button class="btn bad" data-act="clearAll">Xoá toàn bộ dữ liệu</button></div>
-    <p class="muted small" style="margin-top:14px">Dữ liệu hiện được lưu ngay trên trình duyệt này (tệp đính kèm lưu trong IndexedDB). File sao lưu JSON không bao gồm tệp đính kèm. Để dùng chung nhiều người, cần gắn thêm máy chủ lưu trữ.</p></div>`;
+  return`<div class="card pad"><div class="row"><button class="btn" data-act="exportData">${ic('download')}Xuất sao lưu (JSON)</button><button class="btn" data-act="importData">${ic('upload')}Nhập sao lưu</button>${ENV.sheetUrl?`<button class="btn pri" data-act="openSheet">${ic('file')}Mở Google Sheet</button>`:''}<button class="btn bad" data-act="resetDemo">Nạp dữ liệu mẫu</button><button class="btn bad" data-act="clearAll">Xoá toàn bộ dữ liệu</button></div>
+    <p class="muted small" style="margin-top:14px">${ENV.gs?'Dữ liệu được lưu trong Google Sheet của bạn (các sheet DeXuat, UngVien, ThuVien, ThietLap); tệp đính kèm lưu trong thư mục Google Drive "HR Recruit – Tệp đính kèm". Không chỉnh sửa cột <b>data</b> bằng tay.':'Chế độ xem thử: dữ liệu chỉ lưu trên trình duyệt này. Triển khai Apps Script (xem HUONG-DAN.md) để lưu vào Google Sheet dùng chung.'} File sao lưu JSON không bao gồm tệp đính kèm.</p></div>`;
 }
 function fieldModal(key,i){
   const f=i==null?{l:'',t:'text',custom:1,vis:1,req:0}:DB.cfg[key][i];
@@ -679,6 +901,8 @@ const A={
  mbtn:id=>{const b=modalBtns[id];if(b.fn()!==false)closeModal()},
  dclose:()=>closeDrawer(),
  gomiss:()=>{ui.tab='req';ui.rf='missing';render()},
+ dblk:id=>{ui.db=id;render()},set_dim:id=>{ui.dim=id;render()},set_gran:id=>{ui.gran=id;render()},
+ reload:()=>reloadData(false),retrySave:()=>{if(ENV.gs)flush()},openSheet:()=>window.open(ENV.sheetUrl,'_blank'),
  rf:id=>{ui.rf=id;render()},
  cview:id=>{ui.cv=id;render()},
  lt:id=>{ui.lt=id;ui.lq='';render()},
@@ -694,20 +918,20 @@ const A={
  reject:id=>{const r=reqById(id);modal({title:'Từ chối đề xuất',html:`<label class="f">Lý do từ chối</label><textarea id="rj"></textarea>`,buttons:[modalCancel,{label:'Từ chối',cls:'bad',fn:()=>{r.status='rejected';r.rejectReason=$('#rj').value.trim();log(r,'Từ chối'+(r.rejectReason?': '+r.rejectReason:''));commit()}}]})},
  delReq:id=>confirmBox('Xoá đề xuất này? Hành động không thể hoàn tác.',()=>{DB.reqs=DB.reqs.filter(r=>r.id!==id);DB.cands.forEach(c=>{if(c.v.reqId===id)c.v.reqId=''});closeDrawer();commit()},'Xoá'),
  uploadSigned:async id=>{const r=reqById(id);const f=await pickFile('.pdf,image/*');if(!f)return;
-   if(f.size>15*1048576){toast('Tệp quá lớn (tối đa 15MB)','err');return}
-   try{if(r.signed&&!r.signed.demo)await fdel(r.signed.id);r.signed=await storeFile(f);log(r,'Tải lên bản scan đã ký: '+f.name);commit();toast('Đã lưu bản scan đã ký','ok')}catch(e){toast('Không lưu được tệp','err')}},
+   if(f.size>MAXF*1048576){toast(`Tệp quá lớn (tối đa ${MAXF}MB)`,'err');return}
+   try{toast('Đang tải tệp lên…');if(r.signed)await delFile(r.signed);r.signed=await storeFile(f);log(r,'Tải lên bản scan đã ký: '+f.name);commit();toast('Đã lưu bản scan đã ký','ok')}catch(e){toast('Không lưu được tệp','err')}},
  viewSigned:id=>openFile(reqById(id).signed),
  /* candidates */
  newCand:()=>candModal(),
  editCand:id=>candModal(DB.cands.find(c=>c.id===id)),
  openCand:id=>openDrawer(candDrawer(id)),
  delCand:id=>confirmBox('Xoá ứng viên này?',()=>{DB.cands=DB.cands.filter(c=>c.id!==id);closeDrawer();commit()},'Xoá'),
- setStage:(id,el)=>{const c=DB.cands.find(x=>x.id===id),s=el.dataset.arg;if(c.stage===s)return;c.stage=s;log(c,'Chuyển giai đoạn → '+STG[s][1]);commit()},
+ setStage:(id,el)=>changeStage(DB.cands.find(x=>x.id===id),el.dataset.arg),
  editScreen:id=>{const c=DB.cands.find(x=>x.id===id);mini('Ghi nhận sơ vấn',[{k:'date',l:'Ngày sơ vấn',t:'date'},{k:'by',l:'Người thực hiện',t:'text'},selF('result','Kết quả',R_SCREEN,1),{k:'note',l:'Nhận xét',t:'textarea',wide:1}],c.screening||{date:iso(),by:me().name,result:'Chờ'},v=>{c.screening=v;log(c,'Cập nhật sơ vấn: '+v.result);if(c.stage==='new')c.stage='screening'})},
  addRound:id=>{const c=DB.cands.find(x=>x.id===id);roundModal(c)},
  editRound:(id,el)=>{const c=DB.cands.find(x=>x.id===id);roundModal(c,c.interviews.find(i=>i.id===el.dataset.arg))},
  delRound:(id,el)=>{const c=DB.cands.find(x=>x.id===id);c.interviews=c.interviews.filter(i=>i.id!==el.dataset.arg);log(c,'Xoá một vòng phỏng vấn');commit()},
- editOffer:id=>{const c=DB.cands.find(x=>x.id===id);mini('Thư mời tuyển dụng',[selF('status','Trạng thái',R_OFFER),{k:'salary',l:'Mức lương đề nghị',t:'text'},{k:'startDate',l:'Ngày nhận việc',t:'date'},{k:'deadline',l:'Hạn phản hồi',t:'date'},{k:'note',l:'Ghi chú',t:'textarea',wide:1}],c.offer||{status:'Chưa gửi'},v=>{c.offer=v;log(c,'Cập nhật offer: '+v.status);if(v.status==='Chấp nhận'&&c.stage!=='hired'){c.stage='hired';log(c,'Chuyển giai đoạn → Đã nhận việc')}else if(['new','screening','interview'].includes(c.stage))c.stage='offer'})},
+ editOffer:id=>{const c=DB.cands.find(x=>x.id===id);mini('Thư mời tuyển dụng',[selF('status','Trạng thái',R_OFFER),{k:'salary',l:'Mức lương đề nghị',t:'text'},{k:'startDate',l:'Ngày nhận việc',t:'date'},{k:'deadline',l:'Hạn phản hồi',t:'date'},{k:'note',l:'Ghi chú',t:'textarea',wide:1}],c.offer||{status:'Chưa gửi'},v=>{c.offer=v;log(c,'Cập nhật offer: '+v.status);if(v.status==='Chấp nhận'&&c.stage!=='hired'){moveStage(c,'hired')}else if(['new','screening','interview'].includes(c.stage))c.stage='offer'})},
  sendLetter:(id,el)=>letterModal(DB.cands.find(x=>x.id===id),DB.lib.templates.find(t=>t.id===el.dataset.arg)),
  /* library */
  newPos:()=>posModal(),editPos:id=>posModal(DB.lib.positions.find(p=>p.id===id)),
@@ -718,11 +942,11 @@ const A={
  dupTpl:id=>{const t=DB.lib.templates.find(x=>x.id===id);DB.lib.templates.push({...t,id:uid('t_'),name:t.name+' (bản sao)'});commit();toast('Đã nhân bản','ok')},
  delTpl:id=>confirmBox('Xoá mẫu thư này?',()=>{DB.lib.templates=DB.lib.templates.filter(t=>t.id!==id);commit()},'Xoá'),
  insPh:id=>{const ta=$('#ff_body');const s=ta.selectionStart,t=`{{${id}}}`;ta.value=ta.value.slice(0,s)+t+ta.value.slice(ta.selectionEnd);ta.focus();ta.setSelectionRange(s+t.length,s+t.length)},
- newForm:async()=>{const f=await pickFile();if(!f)return;if(f.size>15*1048576){toast('Tệp quá lớn (tối đa 15MB)','err');return}
+ newForm:async()=>{const f=await pickFile();if(!f)return;if(f.size>MAXF*1048576){toast(`Tệp quá lớn (tối đa ${MAXF}MB)`,'err');return}
    const fields=[{k:'name',l:'Tên biểu mẫu',t:'text',req:1,wide:1},{k:'cat',l:'Nhóm',t:'select',opts:['Phiếu đánh giá phỏng vấn','Hồ sơ nhận việc','Hợp đồng','Quy trình','Khác']},{k:'desc',l:'Mô tả',t:'textarea',wide:1}];
-   modal({title:'Thêm biểu mẫu',html:formHTML(fields,{name:f.name.replace(/\.[^.]+$/,''),cat:'Khác'}),buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{const v=readForm($('#modal'),fields);if(!v)return false;storeFile(f).then(meta=>{DB.lib.forms.push({id:uid('fm_'),...v,file:meta});commit();toast('Đã thêm biểu mẫu','ok')}).catch(()=>toast('Không lưu được tệp','err'))}}]})},
+   modal({title:'Thêm biểu mẫu',html:formHTML(fields,{name:f.name.replace(/\.[^.]+$/,''),cat:'Khác'}),buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{const v=readForm($('#modal'),fields);if(!v)return false;toast('Đang tải tệp lên…');storeFile(f).then(meta=>{DB.lib.forms.push({id:uid('fm_'),...v,file:meta});commit();toast('Đã thêm biểu mẫu','ok')}).catch(()=>toast('Không lưu được tệp','err'))}}]})},
  dlForm:id=>openFile(DB.lib.forms.find(f=>f.id===id).file,true),
- delForm:id=>confirmBox('Xoá biểu mẫu này?',async()=>{const f=DB.lib.forms.find(x=>x.id===id);try{await fdel(f.file.id)}catch(e){}DB.lib.forms=DB.lib.forms.filter(x=>x.id!==id);commit()},'Xoá'),
+ delForm:id=>confirmBox('Xoá biểu mẫu này?',async()=>{const f=DB.lib.forms.find(x=>x.id===id);await delFile(f.file);DB.lib.forms=DB.lib.forms.filter(x=>x.id!==id);commit()},'Xoá'),
  /* settings */
  addItem:id=>{const i=$('#add_'+id);const v=i.value.trim();if(v&&!DB.cfg[id].includes(v)){DB.cfg[id].push(v);commit()}},
  delItem:(id,el)=>{DB.cfg[id].splice(+el.dataset.arg,1);commit()},
@@ -733,17 +957,17 @@ const A={
  fieldDel:(id,el)=>confirmBox('Xoá trường này? Dữ liệu đã nhập trong trường sẽ không còn hiển thị.',()=>{DB.cfg[id].splice(+el.dataset.arg,1);commit()},'Xoá'),
  fieldToggle:(id,el)=>{const[i,p]=el.dataset.arg.split(':');const f=DB.cfg[id][+i];f[p]=el.checked?1:0;if(p==='vis'&&!el.checked)f.req=0;commit()},
  fieldMove:(id,el)=>{const[i,d]=el.dataset.arg.split(':').map(Number);const a=DB.cfg[id];const j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];commit()},
- userEdit:id=>{const u=DB.cfg.users.find(x=>x.id===id)||{name:'',title:'',dept:'',roleId:DB.cfg.roles[0].id};
-   modal({title:id?'Sửa người dùng':'Thêm người dùng',html:`<div class="fgrid"><div class="wide"><label class="f">Họ tên *</label><input type="text" id="us_n" value="${esc(u.name)}"></div><div><label class="f">Chức danh</label><input type="text" id="us_t" value="${esc(u.title)}"></div><div><label class="f">Phòng ban</label><select id="us_d"><option value="">—</option>${[...DB.cfg.depts.map(d=>d.name),'Ban TGĐ'].map(d=>`<option ${d===u.dept?'selected':''}>${esc(d)}</option>`).join('')}</select></div><div class="wide"><label class="f">Vai trò</label><select id="us_r">${DB.cfg.roles.map(r=>`<option value="${r.id}" ${r.id===u.roleId?'selected':''}>${esc(r.name)}</option>`).join('')}</select></div></div>`,
+ userEdit:id=>{const u=DB.cfg.users.find(x=>x.id===id)||{name:'',email:'',title:'',dept:'',roleId:DB.cfg.roles[0].id};
+   modal({title:id?'Sửa người dùng':'Thêm người dùng',html:`<div class="fgrid"><div><label class="f">Họ tên *</label><input type="text" id="us_n" value="${esc(u.name)}"></div><div><label class="f">Email Google (dùng để đăng nhập)</label><input type="email" id="us_e" value="${esc(u.email||'')}" placeholder="ten@congty.edu.vn"></div><div><label class="f">Chức danh</label><input type="text" id="us_t" value="${esc(u.title)}"></div><div><label class="f">Phòng ban</label><select id="us_d"><option value="">—</option>${[...DB.cfg.depts.map(d=>d.name),'Ban TGĐ'].map(d=>`<option ${d===u.dept?'selected':''}>${esc(d)}</option>`).join('')}</select></div><div class="wide"><label class="f">Vai trò</label><select id="us_r">${DB.cfg.roles.map(r=>`<option value="${r.id}" ${r.id===u.roleId?'selected':''}>${esc(r.name)}</option>`).join('')}</select></div></div>`,
      buttons:[modalCancel,{label:'Lưu',cls:'pri',fn:()=>{const n=$('#us_n').value.trim();if(!n){$('#us_n').classList.add('err');return false}
-       const o={name:n,title:$('#us_t').value,dept:$('#us_d').value,roleId:$('#us_r').value};if(id)Object.assign(u,o);else DB.cfg.users.push({id:uid('u'),...o});commit()}}]})},
- userDel:id=>{if(id===DB.me){toast('Không thể xoá người dùng đang đăng nhập','err');return}confirmBox('Xoá người dùng này?',()=>{DB.cfg.users=DB.cfg.users.filter(u=>u.id!==id);commit()},'Xoá')},
+       const o={name:n,email:$('#us_e').value.trim().toLowerCase(),title:$('#us_t').value,dept:$('#us_d').value,roleId:$('#us_r').value};if(id)Object.assign(u,o);else DB.cfg.users.push({id:uid('u'),...o});commit()}}]})},
+ userDel:id=>{if(id===ui.realMe){toast('Không thể xoá người dùng đang đăng nhập','err');return}confirmBox('Xoá người dùng này?',()=>{DB.cfg.users=DB.cfg.users.filter(u=>u.id!==id);commit()},'Xoá')},
  capToggle:(id,el)=>{const r=DB.cfg.roles.find(x=>x.id===id),c=el.dataset.arg;r.caps=el.checked?[...new Set([...r.caps,c])]:r.caps.filter(x=>x!==c);save();renderShell()},
  roleAdd:()=>modal({title:'Thêm vai trò',html:`<label class="f">Tên vai trò</label><input type="text" id="rn">`,buttons:[modalCancel,{label:'Thêm',cls:'pri',fn:()=>{const n=$('#rn').value.trim();if(!n)return false;DB.cfg.roles.push({id:uid('role_'),name:n,caps:['lib.view']});commit()}}]}),
  roleDel:id=>{if(DB.cfg.users.some(u=>u.roleId===id)){toast('Vai trò đang được gán cho người dùng','err');return}DB.cfg.roles=DB.cfg.roles.filter(r=>r.id!==id);commit()},
  exportData:()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,1)],{type:'application/json'}));a.download='hr-recruit-backup-'+iso()+'.json';a.click()},
- importData:async()=>{const f=await pickFile('.json');if(!f)return;try{const d=JSON.parse(await f.text());if(!d.cfg||!d.reqs||!d.cands||!d.lib)throw 0;DB=d;commit();toast('Đã nhập dữ liệu','ok')}catch(e){toast('Tệp sao lưu không hợp lệ','err')}},
- resetDemo:()=>confirmBox('Khôi phục dữ liệu mẫu? Dữ liệu hiện tại sẽ bị thay thế.',()=>{DB=seed();commit()},'Khôi phục'),
+ importData:async()=>{const f=await pickFile('.json');if(!f)return;try{const d=JSON.parse(await f.text());if(!d.cfg||!d.reqs||!d.cands||!d.lib)throw 0;DB=d;normalize();if(ENV.gs&&!DB.cfg.users.some(u=>(u.email||'').toLowerCase()===ENV.email.toLowerCase()))DB.cfg.users.push({id:uid('u'),name:ENV.email.split('@')[0],title:'Quản trị',dept:'',roleId:'admin',email:ENV.email});pickUser();commit();toast('Đã nhập dữ liệu','ok')}catch(e){toast('Tệp sao lưu không hợp lệ','err')}},
+ resetDemo:()=>confirmBox('Nạp dữ liệu mẫu? Dữ liệu hiện tại sẽ bị thay thế.',()=>{DB=seedDemo();normalize();pickUser();ui.tab='dash';commit()},'Nạp dữ liệu mẫu'),
  clearAll:()=>confirmBox('Xoá TOÀN BỘ đề xuất, ứng viên và thư viện (giữ thiết lập)?',()=>{DB.reqs=[];DB.cands=[];DB.lib={positions:[],templates:[],forms:[]};commit()},'Xoá hết')
 };
 function roundModal(c,i){
@@ -763,12 +987,13 @@ document.addEventListener('click',ev=>{
 });
 document.addEventListener('change',ev=>{
   const el=ev.target;
-  if(el.tagName==='INPUT'&&el.dataset.act){A[el.dataset.act](el.dataset.id,el)}
+  if(el.dataset.who){ui.me=el.value;ui.tab=can('report.view')?'dash':(can('req.create')?'req':'lib');closeDrawer();render();toast('Đang xem với vai trò: '+roleOf(me()).name)}
+  else if(el.tagName==='INPUT'&&el.dataset.act){A[el.dataset.act](el.dataset.id,el)}
   else if(el.dataset.cfg){const k=el.dataset.cfg;DB.cfg[k]=el.type==='number'?Number(el.value):el.value;save()}
   else if(el.dataset.bind&&el.tagName==='SELECT'){ui[el.dataset.bind]=el.value;render()}
 });
 document.addEventListener('input',ev=>{const el=ev.target;if(el.dataset.bind&&el.tagName==='INPUT'){ui[el.dataset.bind]=el.value;render()}});
-$('#whoSel').onchange=e=>{DB.me=e.target.value;ui.tab=can('report.view')?'dash':(can('req.create')?'req':'lib');closeDrawer();save();render();toast('Đang xem với vai trò: '+roleOf(me()).name)};
+window.addEventListener('focus',()=>{if(ENV.gs&&DB&&Date.now()-lastLoad>120000&&!saveTimer&&!$('#mw').classList.contains('on'))reloadData(true)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('#mw').classList.contains('on'))closeModal();else closeDrawer()}});
 /* drag & drop kanban */
 let dragId=null;
@@ -776,9 +1001,9 @@ document.addEventListener('dragstart',e=>{const k=e.target.closest?.('.kc');if(k
 document.addEventListener('dragend',e=>{$$('.kc.drag').forEach(k=>k.classList.remove('drag'));$$('.col.over').forEach(c=>c.classList.remove('over'));dragId=null});
 document.addEventListener('dragover',e=>{const c=e.target.closest?.('.col');if(c&&dragId){e.preventDefault();$$('.col.over').forEach(x=>x!==c&&x.classList.remove('over'));c.classList.add('over')}});
 document.addEventListener('drop',e=>{const col=e.target.closest?.('.col');if(!col||!dragId)return;e.preventDefault();const c=DB.cands.find(x=>x.id===dragId);const s=col.dataset.stage;
-  if(c&&c.stage!==s&&can('cand.move')){c.stage=s;log(c,'Chuyển giai đoạn → '+STG[s][1]);commit()}});
+  if(c&&can('cand.move'))changeStage(c,s)});
 
-render();
+init();
 </script>
 </body>
 </html>
