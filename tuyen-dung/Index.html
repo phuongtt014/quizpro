@@ -42,6 +42,7 @@ svg.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stro
 .avatar{width:46px;height:46px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-weight:700;font-size:16px;flex:none}
 main{flex:1;min-width:0;max-width:1560px;padding:26px 28px 60px}
 .page-h h1{color:var(--brand)}
+.ro{opacity:.9}
 .loading{display:grid;place-items:center;height:60vh;color:var(--ink3);gap:12px;text-align:center}
 .spin{width:34px;height:34px;border:4px solid #dcd8f7;border-top-color:var(--brand);border-radius:50%;animation:sp 1s linear infinite;margin:0 auto}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -282,7 +283,7 @@ const CAPS=[
  ['req.create','Tạo đề xuất tuyển dụng'],['req.all','Xem đề xuất của mọi phòng ban'],['req.approve','Phê duyệt / từ chối đề xuất (Ban TGĐ)'],
  ['req.sign','Tải lên bản scan đã ký'],['cand.view','Xem ứng viên'],['cand.edit','Thêm / sửa ứng viên, ghi nhận sơ vấn – phỏng vấn'],
  ['cand.move','Chuyển giai đoạn, soạn thư mời / thư gửi ứng viên'],['lib.view','Xem thư viện'],['lib.edit','Chỉnh sửa thư viện'],
- ['report.view','Xem tổng quan & báo cáo'],['cfg.manage','Truy cập Thiết lập']
+ ['report.view','Xem tổng quan & báo cáo'],['cfg.manage','Xem Thiết lập (chỉ đọc)'],['cfg.edit','Chỉnh sửa Thiết lập (danh mục, trường, người dùng, phân quyền)']
 ];
 const TPL_TYPES=['Thư mời phỏng vấn','Thư mời nhận việc','Thư cảm ơn','Thư từ chối','Khác'];
 const PH=[['ten_ung_vien','Tên ứng viên'],['vi_tri','Vị trí'],['phong_ban','Phòng ban'],['ngay_phong_van','Ngày PV'],['gio_phong_van','Giờ PV'],['dia_diem','Địa điểm PV'],['luong','Mức lương'],['ngay_nhan_viec','Ngày nhận việc'],['han_phan_hoi','Hạn phản hồi'],['nguoi_gui','Người gửi'],['cong_ty','Công ty']];
@@ -327,17 +328,17 @@ function seed(){
     {k:'note',l:'Ghi chú',t:'textarea',vis:1,wide:1}];
   const mkReq=(code,u,v,st,extra={})=>({id:uid('r_'),code,by:u,at:Date.now()-(extra.ago||1)*dayMs,status:st,v,history:[{t:Date.now()-(extra.ago||1)*dayMs,by:users.find(x=>x.id===u).name,text:'Tạo đề xuất'}],...extra});
   const y=new Date().getFullYear();
-  const r1=mkReq(`ĐX-${y}-001`,'u1',{block:'Khối trường',dept:'Tổ Toán – Tin',position:'Giáo viên Toán THCS',qty:2,reqType:'Bổ sung',neededBy:iso(30),salary:'12 – 18 triệu',reason:'Tăng 2 lớp khối 7 từ năm học mới, GV hiện tại quá tải tiết dạy.'},'approved',{ago:12,approvedAt:Date.now()-9*dayMs,approvedBy:'Trần Quốc Cường',signed:null});
-  r1.history.push({t:Date.now()-9*dayMs,by:'Trần Quốc Cường',text:'Ban TGĐ phê duyệt'});
-  const r2=mkReq(`ĐX-${y}-002`,'u2',{block:'Khối văn phòng',dept:'Marketing – Tuyển sinh',position:'Chuyên viên Tuyển sinh',qty:1,reqType:'Tuyển mới',neededBy:iso(20),salary:'10 – 14 triệu',reason:'Mở rộng chỉ tiêu tuyển sinh, cần thêm nhân sự tư vấn.'},'approved',{ago:20,approvedAt:Date.now()-17*dayMs,approvedBy:'Trần Quốc Cường',signed:{id:'demo',name:'DX-002-da-ky.pdf',size:120000,at:Date.now()-15*dayMs,demo:true}});
-  r2.history.push({t:Date.now()-17*dayMs,by:'Trần Quốc Cường',text:'Ban TGĐ phê duyệt'},{t:Date.now()-15*dayMs,by:'Lê Thị Bình',text:'Tải lên bản scan đã ký'});
+  const r1=mkReq(`ĐX-${y}-001`,'u1',{block:'Khối trường',dept:'Tổ Toán – Tin',position:'Giáo viên Toán THCS',qty:2,reqType:'Bổ sung',neededBy:iso(30),salary:'12 – 18 triệu',reason:'Tăng 2 lớp khối 7 từ năm học mới, GV hiện tại quá tải tiết dạy.'},'approved',{ago:120,approvedAt:Date.now()-117*dayMs,approvedBy:'Trần Quốc Cường',signed:null});
+  r1.history.push({t:Date.now()-117*dayMs,by:'Trần Quốc Cường',text:'Ban TGĐ phê duyệt'});
+  const r2=mkReq(`ĐX-${y}-002`,'u2',{block:'Khối văn phòng',dept:'Marketing – Tuyển sinh',position:'Chuyên viên Tuyển sinh',qty:1,reqType:'Tuyển mới',neededBy:iso(20),salary:'10 – 14 triệu',reason:'Mở rộng chỉ tiêu tuyển sinh, cần thêm nhân sự tư vấn.'},'approved',{ago:200,approvedAt:Date.now()-197*dayMs,approvedBy:'Trần Quốc Cường',signed:{id:'demo',name:'DX-002-da-ky.pdf',size:120000,at:Date.now()-195*dayMs,demo:true}});
+  r2.history.push({t:Date.now()-197*dayMs,by:'Trần Quốc Cường',text:'Ban TGĐ phê duyệt'},{t:Date.now()-195*dayMs,by:'Lê Thị Bình',text:'Tải lên bản scan đã ký'});
   const r3=mkReq(`ĐX-${y}-003`,'u1',{block:'Khối trường',dept:'Tổ Ngoại ngữ',position:'Giáo viên Tiếng Anh',qty:1,reqType:'Thay thế',neededBy:iso(45),salary:'Thoả thuận',reason:'Thay thế giáo viên nghỉ việc cuối học kỳ.'},'pending',{ago:2});
   const r4=mkReq(`ĐX-${y}-004`,'u2',{block:'Khối văn phòng',dept:'Công nghệ thông tin',position:'Nhân viên IT Helpdesk',qty:1,reqType:'Tuyển mới',reason:'Chưa có căn cứ định biên.'},'rejected',{ago:25,rejectReason:'Chưa nằm trong kế hoạch nhân sự năm, đề nghị bổ sung vào quý sau.'});
   r4.history.push({t:Date.now()-24*dayMs,by:'Trần Quốc Cường',text:'Từ chối: Chưa nằm trong kế hoạch nhân sự năm'});
-  const r5=mkReq(`ĐX-${y}-005`,'u1',{block:'Khối trường',dept:'Tổ Ngữ văn',position:'Giáo viên Ngữ văn',qty:2,reqType:'Bổ sung',neededBy:iso(40),salary:'12 – 17 triệu',reason:'Mở thêm lớp chuyên văn.'},'approved',{ago:40,approvedAt:Date.now()-36*dayMs,approvedBy:'Trần Quốc Cường',signed:{id:'demo',name:'DX-005-da-ky.pdf',size:98000,at:Date.now()-34*dayMs,demo:true}});
-  r5.history.push({t:Date.now()-36*dayMs,by:'Trần Quốc Cường',text:'Ban TGĐ phê duyệt'});
-  const r6=mkReq(`ĐX-${y}-006`,'u2',{block:'Khối văn phòng',dept:'Kế toán – Tài chính',position:'Kế toán tổng hợp',qty:1,reqType:'Thay thế',neededBy:iso(25),salary:'13 – 17 triệu',reason:'Thay thế nhân sự nghỉ thai sản.'},'approved',{ago:15,approvedAt:Date.now()-11*dayMs,approvedBy:'Trần Quốc Cường',signed:null});
-  r6.history.push({t:Date.now()-11*dayMs,by:'Trần Quốc Cường',text:'Ban TGĐ phê duyệt'});
+  const r5=mkReq(`ĐX-${y}-005`,'u1',{block:'Khối trường',dept:'Tổ Ngữ văn',position:'Giáo viên Ngữ văn',qty:2,reqType:'Bổ sung',neededBy:iso(40),salary:'12 – 17 triệu',reason:'Mở thêm lớp chuyên văn.'},'approved',{ago:150,approvedAt:Date.now()-147*dayMs,approvedBy:'Trần Quốc Cường',signed:{id:'demo',name:'DX-005-da-ky.pdf',size:98000,at:Date.now()-145*dayMs,demo:true}});
+  r5.history.push({t:Date.now()-147*dayMs,by:'Trần Quốc Cường',text:'Ban TGĐ phê duyệt'});
+  const r6=mkReq(`ĐX-${y}-006`,'u2',{block:'Khối văn phòng',dept:'Kế toán – Tài chính',position:'Kế toán tổng hợp',qty:1,reqType:'Thay thế',neededBy:iso(25),salary:'13 – 17 triệu',reason:'Thay thế nhân sự nghỉ thai sản.'},'approved',{ago:95,approvedAt:Date.now()-92*dayMs,approvedBy:'Trần Quốc Cường',signed:null});
+  r6.history.push({t:Date.now()-92*dayMs,by:'Trần Quốc Cường',text:'Ban TGĐ phê duyệt'});
   const mkC=(name,reqI,stage,x={})=>({id:uid('c_'),stage,createdAt:Date.now()-(x.ago||5)*dayMs,v:{name,phone:x.phone||'09'+Math.floor(10000000+Math.random()*8e7),email:x.email||name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/\s+/g,'.')+'@gmail.com',reqId:reqI?.id||'',source:x.source||'TopCV',exp:x.exp??2,edu:x.edu||'Đại học',expSalary:x.sal||''},screening:x.screening||null,interviews:x.interviews||[],offer:x.offer||null,history:[{t:Date.now()-(x.ago||5)*dayMs,by:'Lê Thị Bình',text:'Thêm ứng viên'}]});
   const cands=[
     mkC('Đỗ Minh Quân',r1,'new',{source:'Website trường',ago:1,exp:3,edu:'ĐH Sư phạm Toán'}),
@@ -350,17 +351,17 @@ function seed(){
   const names=['Nguyễn Hải Đăng','Trần Mai Anh','Lê Quốc Huy','Phạm Ngọc Diệp','Hoàng Minh Châu','Vũ Thu Trang','Đặng Khánh Linh','Bùi Đức Anh','Ngô Phương Thảo','Dương Tuấn Kiệt','Lý Bảo Ngọc','Phan Thanh Sơn','Đinh Hồng Nhung','Võ Gia Hân','Mai Văn Long','Tạ Thùy Dương','Hồ Quang Vinh','Chu Thị Hạnh','Cao Minh Trí','Lâm Yến Nhi','Trịnh Công Thành','Đoàn Kim Ngân','Lưu Hải Yến','Kiều Anh Đào','Nguyễn Đức Mạnh','Trần Bích Phương','Lê Thanh Tùng','Phạm Hà My'];
   const srcs=['TopCV','TopCV','Facebook','Website trường','Giới thiệu nội bộ','Trực tiếp','LinkedIn'];const bag=['new','new','screening','screening','screening','interview','interview','interview','interview','offer','offer','hired','hired','hired','rejected','rejected','rejected','rejected','rejected'];
   const why=['Không phù hợp chuyên môn','Kỳ vọng lương cao','Kỳ vọng lương cao','Nhận được offer tốt hơn','Vấn đề địa điểm','Ứng viên từ chối offer'];const pool=[r1,r2,r5,r6,r5,r1];
-  names.forEach(n=>{const st=bag[Math.floor(rnd()*bag.length)],ago=Math.floor(rnd()*268)+3;const c=mkC(n,pool[Math.floor(rnd()*pool.length)],st,{ago,source:srcs[Math.floor(rnd()*srcs.length)],exp:Math.floor(rnd()*8)});
+  names.forEach(n=>{const st=bag[Math.floor(rnd()*bag.length)],ago=Math.floor(rnd()*268)+3;const rq=pool[Math.floor(rnd()*pool.length)];const c=mkC(n,rq,st,{ago,source:srcs[Math.floor(rnd()*srcs.length)],exp:Math.floor(rnd()*8)});
     if(['interview','offer','hired'].includes(st))c.interviews=[{id:uid('i_'),name:'Vòng 1',date:iso(-ago+5),time:'09:00',place:'Văn phòng',who:'Trưởng bộ phận',result:'Đạt',score:7+Math.floor(rnd()*3),note:''}];
     if(st==='offer'||st==='hired')c.offer={status:st==='hired'?'Chấp nhận':'Đã gửi',salary:'',startDate:iso(10),deadline:iso(3),note:''};
-    cands.push(c)});
-  cands.forEach(c=>{if(c.stage==='hired')c.hiredAt=c.hiredAt||c.createdAt+(12+Math.floor(rnd()*20))*dayMs;if(c.stage==='rejected')c.rejectReason=why[Math.floor(rnd()*why.length)]});
-  const jd=(a,b,c)=>`MÔ TẢ CÔNG VIỆC\n${a}\n\nYÊU CẦU\n${b}\n\nQUYỀN LỢI\n${c}`;
-  const positions=[
-    {id:uid('p_'),name:'Giáo viên Toán THCS',block:'Khối trường',dept:'Tổ Toán – Tin',jd:jd('- Giảng dạy môn Toán theo chương trình GDPT 2018\n- Chủ nhiệm lớp, bồi dưỡng học sinh\n- Tham gia sinh hoạt tổ chuyên môn','- Tốt nghiệp ĐH Sư phạm Toán trở lên\n- Có chứng chỉ nghiệp vụ sư phạm\n- Ưu tiên có kinh nghiệm ≥ 2 năm','- Lương thoả thuận theo năng lực\n- Thưởng cuối năm, BHXH đầy đủ\n- Môi trường chuyên nghiệp')},
-    {id:uid('p_'),name:'Giáo viên Tiếng Anh',block:'Khối trường',dept:'Tổ Ngoại ngữ',jd:jd('- Giảng dạy Tiếng Anh các khối lớp\n- Tổ chức hoạt động ngoại khoá','- Tốt nghiệp ĐH chuyên ngành Anh/Sư phạm Anh\n- IELTS ≥ 6.5 hoặc tương đương','- Lương cạnh tranh, phụ cấp chứng chỉ\n- Đào tạo nâng cao hằng năm')},
-    {id:uid('p_'),name:'Chuyên viên Tuyển sinh',block:'Khối văn phòng',dept:'Marketing – Tuyển sinh',jd:jd('- Tư vấn phụ huynh, học sinh\n- Phối hợp tổ chức sự kiện tuyển sinh\n- Báo cáo chỉ tiêu theo tuần','- Tốt nghiệp CĐ/ĐH\n- Kỹ năng giao tiếp tốt\n- Ưu tiên có kinh nghiệm giáo dục','- Lương + hoa hồng\n- Thưởng theo chỉ tiêu')},
-    {id:uid('p_'),name:'Nhân viên IT Helpdesk',block:'Khối văn phòng',dept:'Công nghệ thông tin',jd:jd('- Hỗ trợ người dùng, bảo trì thiết bị\n- Quản lý tài khoản hệ thống','- Hiểu biết mạng, Windows, Office 365\n- Cẩn thận, có trách nhiệm','- Lương thoả thuận\n- Chế độ theo quy định')}];
+    c.createdAt=rq.approvedAt+rnd()*(Date.now()-rq.approvedAt-2*dayMs);cands.push(c)});
+  const slaN={'Giáo viên Toán THCS':30,'Giáo viên Tiếng Anh':45,'Chuyên viên Tuyển sinh':25,'Nhân viên IT Helpdesk':30,'Giáo viên Ngữ văn':35,'Kế toán tổng hợp':30};
+  const allReqs=[r1,r2,r3,r4,r5,r6];
+  cands.forEach(c=>{const r=allReqs.find(x=>x.id===c.v.reqId);
+    if(c.stage==='hired'&&r&&r.approvedAt){const start=r.approvedAt+Math.round((slaN[r.v.position]||30)*(0.6+rnd()*0.9))*dayMs;c.createdAt=r.approvedAt+Math.floor((start-r.approvedAt)*0.3);c.hiredAt=start-3*dayMs;c.offer={...(c.offer||{}),status:'Chấp nhận',startDate:new Date(start).toISOString().slice(0,10)}}
+    if(c.stage==='rejected')c.rejectReason=why[Math.floor(rnd()*why.length)]});
+  const positions=[['GV-TOAN-THCS','Giáo viên Toán THCS',30],['GV-ANH','Giáo viên Tiếng Anh',45],['GV-VAN','Giáo viên Ngữ văn',35],['CV-TUYENSINH','Chuyên viên Tuyển sinh',25],['KT-TONGHOP','Kế toán tổng hợp',30],['IT-HELPDESK','Nhân viên IT Helpdesk',30]]
+    .map((x,i)=>({id:uid('p_'),code:x[0],name:x[1],slaDays:x[2],effective:iso(-330+i*15),status:'Đang áp dụng',file:null}));
   const templates=[
     {id:uid('t_'),type:'Thư mời phỏng vấn',name:'Mời phỏng vấn – chuẩn',subject:'[{{cong_ty}}] Thư mời phỏng vấn vị trí {{vi_tri}}',body:'Kính gửi Anh/Chị {{ten_ung_vien}},\n\nCảm ơn Anh/Chị đã quan tâm và ứng tuyển vị trí {{vi_tri}} tại {{phong_ban}} – {{cong_ty}}.\n\nSau khi xem xét hồ sơ, chúng tôi trân trọng mời Anh/Chị tham dự buổi phỏng vấn:\n- Thời gian: {{gio_phong_van}}, ngày {{ngay_phong_van}}\n- Địa điểm: {{dia_diem}}\n\nVui lòng phản hồi email này để xác nhận tham dự. Nếu cần hỗ trợ, Anh/Chị liên hệ trực tiếp với tôi.\n\nTrân trọng,\n{{nguoi_gui}}\nPhòng Nhân sự – {{cong_ty}}'},
     {id:uid('t_'),type:'Thư mời nhận việc',name:'Thư mời nhận việc (Offer)',subject:'[{{cong_ty}}] Thư mời nhận việc – {{vi_tri}}',body:'Kính gửi Anh/Chị {{ten_ung_vien}},\n\nChúc mừng Anh/Chị đã vượt qua các vòng tuyển chọn. {{cong_ty}} trân trọng mời Anh/Chị về làm việc với nội dung:\n- Vị trí: {{vi_tri}} – {{phong_ban}}\n- Mức lương: {{luong}}\n- Ngày nhận việc dự kiến: {{ngay_nhan_viec}}\n\nVui lòng phản hồi trước ngày {{han_phan_hoi}}. Chi tiết hồ sơ nhận việc sẽ được gửi sau khi Anh/Chị xác nhận.\n\nTrân trọng,\n{{nguoi_gui}}\nPhòng Nhân sự – {{cong_ty}}'},
@@ -397,8 +398,8 @@ const COLS={
   items:()=>DB.reqs.map(r=>({id:r.id,row:[r.id,r.code,r.v.position,r.v.dept,r.v.block,r.v.qty,STATUS[r.status][0],userName(r.by),fmtD(r.at),r.approvedAt?fmtD(r.approvedAt):'',r.signed?(r.signed.url||r.signed.name):(r.status==='approved'?'THIẾU HỒ SƠ':'')],data:r}))},
  cands:{head:['id','Họ tên','Vị trí','Giai đoạn','Điện thoại','Email','Nguồn','Số vòng PV','Offer','Lý do loại','Ngày nhận hồ sơ'],
   items:()=>DB.cands.map(c=>({id:c.id,row:[c.id,c.v.name,posOf(c),STG[c.stage][1],c.v.phone||'',c.v.email||'',c.v.source||'',c.interviews.length,c.offer?c.offer.status:'',c.rejectReason||'',fmtD(c.createdAt)],data:c}))},
- lib:{head:['id','Loại','Tên','Khối / Nhóm'],
-  items:()=>[...DB.lib.positions.map(x=>({_k:'positions',kl:'Vị trí & JD',g:x.block,x})),...DB.lib.templates.map(x=>({_k:'templates',kl:'Mẫu thư',g:x.type,x})),...DB.lib.forms.map(x=>({_k:'forms',kl:'Biểu mẫu',g:x.cat,x}))]
+ lib:{head:['id','Loại','Tên','Mã / Nhóm'],
+  items:()=>[...DB.lib.positions.map(x=>({_k:'positions',kl:'Vị trí',g:x.code,x})),...DB.lib.templates.map(x=>({_k:'templates',kl:'Mẫu thư',g:x.type,x})),...DB.lib.forms.map(x=>({_k:'forms',kl:'Biểu mẫu',g:x.cat,x}))]
    .map(o=>({id:o.x.id,row:[o.x.id,o.kl,o.x.name,o.g||''],data:{...o.x,_k:o._k}}))}
 };
 let snap={},saveTimer=null,chain=Promise.resolve(),lastLoad=0;
@@ -427,6 +428,7 @@ function normalize(){
   const C=DB.cfg;C.rejectReasons=C.rejectReasons||['Không phù hợp chuyên môn','Kỳ vọng lương cao','Nhận được offer tốt hơn','Vấn đề địa điểm','Ứng viên từ chối offer','Lý do khác'];
   C.users.forEach(u=>u.email=u.email||'');DB.reqs.forEach(r=>{r.history=r.history||[];r.v=r.v||{}});DB.cands.forEach(c=>{c.history=c.history||[];c.interviews=c.interviews||[];c.v=c.v||{}});
   DB.lib=DB.lib||{};['positions','templates','forms'].forEach(k=>DB.lib[k]=DB.lib[k]||[]);
+  DB.lib.positions.forEach(p=>{p.code=p.code||'';p.status=p.status||'Đang áp dụng';if(p.slaDays==null||p.slaDays==='')p.slaDays=30;p.effective=p.effective||'';p.file=p.file||null});
 }
 function seedDemo(){const d=seed();if(ENV.gs){const a=d.cfg.users.find(u=>u.roleId==='admin');a.email=ENV.email}return d}
 function freshDB(email){
@@ -466,7 +468,7 @@ function optsFor(f,vals){
   if(f.from==='blocks')return DB.cfg.blocks.map(x=>[x,x]);
   if(f.from==='depts')return DB.cfg.depts.filter(d=>!vals.block||d.block===vals.block).map(d=>[d.name,d.name]);
   if(f.from==='sources')return DB.cfg.sources.map(x=>[x,x]);
-  if(f.from==='positions')return DB.lib.positions.filter(p=>!vals.block||p.block===vals.block).map(p=>[p.name,p.name]);
+  if(f.from==='positions')return DB.lib.positions.filter(p=>p.status!=='Ngừng áp dụng').map(p=>[p.name,p.name]);
   if(f.from==='requests')return DB.reqs.filter(r=>r.status==='approved'||r.id===vals.reqId).map(r=>[r.id,`${r.code} · ${r.v.position} (${r.v.dept})`]);
   return(f.opts||[]).map(x=>[x,x]);
 }
@@ -493,7 +495,6 @@ function bindForm(root,fields){
   b.onchange=()=>{const vals={block:b.value};
     if(d){const cur=d.value;d.innerHTML='<option value="">— Chọn —</option>'+optsFor({from:'depts'},vals).map(o=>`<option ${o[0]==cur?'selected':''}>${esc(o[0])}</option>`).join('')}
     if(p){const dl=$('#dl_position');if(dl)dl.innerHTML=optsFor({from:'positions'},vals).map(o=>`<option value="${esc(o[0])}">`).join('')}};
-  if(p)p.onchange=()=>{const pos=DB.lib.positions.find(x=>x.name===p.value);if(pos){if(b&&!b.value){b.value=pos.block;b.onchange()}if(d&&!d.value)d.value=pos.dept}};
 }
 
 /* ============ modal / drawer ============ */
@@ -532,6 +533,7 @@ function render(){
   const v={dash:vDash,req:vReq,cand:vCand,lib:vLib,cfg:vCfg}[ui.tab];
   $('#app').innerHTML=v?v():'<div class="empty">Tài khoản này chưa được cấp quyền truy cập.</div>';
   renderDrawer();
+  $$('#app .ro input,#app .ro select,#app .ro textarea,#app .ro button').forEach(e=>e.disabled=true);
   if(fid){const n=document.getElementById(fid);if(n&&n.tagName==='INPUT'){n.focus();try{n.setSelectionRange(pos,pos)}catch(e){}}}
 }
 const commit=()=>{save();render()};
@@ -540,6 +542,15 @@ const searchBox=(id,val,ph)=>`<div class="search">${ic('search')}<input type="te
 
 /* ============ DASHBOARD ============ */
 const COL_OK='#0f9d6c',COL_BAD='#e8606a',COL_INFO='#3b8ee8',COL_BR='#5b47d6';
+const posByName=n=>DB.lib.positions.find(p=>(p.name||'').trim().toLowerCase()===String(n||'').trim().toLowerCase());
+const slaOf=r=>{const p=posByName(r.v.position);return p&&p.slaDays!==''&&p.slaDays!=null?+p.slaDays:null};
+const startOf=c=>c.offer&&c.offer.startDate?new Date(c.offer.startDate).getTime():c.hiredAt;
+const hireDays=(c,r)=>{if(!r||!r.approvedAt)return null;const t=startOf(c);return t?Math.max(0,Math.round((t-r.approvedAt)/dayMs)):null};
+function deadlineBadge(r){
+  const s=slaOf(r);if(r.status!=='approved'||s==null||!r.approvedAt||hiredOf(r)>=r.v.qty)return'<span class="muted">—</span>';
+  const left=Math.ceil((r.approvedAt+s*dayMs-Date.now())/dayMs);
+  return left>=0?badge(`Còn ${left} ngày`,left<=5?'b-warn':'b-ok'):badge(`Quá ${-left} ngày`,'b-bad');
+}
 const DONUT_COL=['#5b47d6','#8c7ae6','#bdb2f4','#2d3a52','#e8606a','#9aa3b8'];
 function ring(pct,color){const r=26,c=2*Math.PI*r,o=c*(1-Math.min(1,pct/100));
   return`<svg class="ring" viewBox="0 0 64 64"><circle cx="32" cy="32" r="${r}" fill="none" stroke="#e8eaf4" stroke-width="6"/><circle cx="32" cy="32" r="${r}" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${o}" transform="rotate(-90 32 32)"/><text x="32" y="37" text-anchor="middle" font-size="14" font-weight="600" fill="#172033">${Math.round(pct)}%</text></svg>`}
@@ -576,7 +587,12 @@ function vDash(){
   const open=R.filter(r=>r.status==='approved'&&hiredOf(r)<r.v.qty);
   const openQty=open.reduce((a,r)=>a+r.v.qty-hiredOf(r),0);
   const miss=R.filter(needSign);
-  const ht=C.filter(c=>c.stage==='hired'&&c.hiredAt);const avgDays=ht.length?Math.round(ht.reduce((a,c)=>a+(c.hiredAt-c.createdAt)/dayMs,0)/ht.length):0;
+  const kp=C.filter(c=>c.stage==='hired').map(c=>{const r=reqOfC(c);return{r,d:hireDays(c,r),sla:r?slaOf(r):null}}).filter(x=>x.d!=null);
+  const avgDays=kp.length?Math.round(kp.reduce((a,x)=>a+x.d,0)/kp.length):0;
+  const kpiSet=kp.filter(x=>x.sla!=null);const onTimePct=kpiSet.length?Math.round(kpiSet.filter(x=>x.d<=x.sla).length/kpiSet.length*100):null;
+  const overdue=open.filter(r=>{const s=slaOf(r);return s!=null&&r.approvedAt&&daysSince(r.approvedAt)>s}).length;
+  const kg={};kpiSet.forEach(x=>{const k=x.r.v.position;const o=kg[k]||(kg[k]={sla:x.sla,n:0,sum:0,ok:0});o.n++;o.sum+=x.d;if(x.d<=x.sla)o.ok++});
+  const kgRows=Object.entries(kg).sort((a,b)=>b[1].n-a[1].n);
   const kpi=(t,n,p,col,cap)=>`<div class="card kpi"><div><div class="t">${t}</div><b>${n}</b><small>${cap}</small></div>${ring(p,col)}</div>`;
   const stat=(n,l,ico,bg,fg)=>`<div class="card stat"><div class="ic" style="background:${bg};color:${fg}">${ic(ico)}</div><div><b>${n}</b><span>${l}</span></div></div>`;
   /* area chart */
@@ -612,7 +628,9 @@ function vDash(){
     ${stat(R.filter(r=>r.status==='pending').length,'Đề xuất chờ Ban TGĐ duyệt','clip','var(--warn-soft)','var(--warn)')}
     ${stat(openQty,'Chỉ tiêu còn thiếu','brief','var(--brand-soft)','var(--brand)')}
     ${stat(miss.length,'Đề xuất thiếu bản ký','alert','var(--bad-soft)','var(--bad)')}
-    ${stat(avgDays?avgDays+' ngày':'—','Thời gian tuyển trung bình','check','var(--ok-soft)','var(--ok)')}
+    ${stat(avgDays?avgDays+' ngày':'—','TB từ ngày duyệt đến ngày vào làm','brief','var(--info-soft)','var(--info)')}
+    ${stat(onTimePct==null?'—':onTimePct+'%','KPI đạt thời hạn tuyển','check','var(--ok-soft)','var(--ok)')}
+    ${stat(overdue,'Chỉ tiêu quá thời hạn','alert','var(--bad-soft)','var(--bad)')}
   </div>
   ${miss.length?`<div class="alert bad" style="margin-bottom:16px">${ic('alert')}<div><b>${miss.length} đề xuất đã được duyệt nhưng chưa có bản scan đã ký</b> — được ghi nhận vào báo cáo thiếu hồ sơ.</div><button class="btn sm" style="margin-left:auto" data-act="gomiss">Xem báo cáo</button></div>`:''}
   <div class="dgrid">
@@ -623,11 +641,13 @@ function vDash(){
     <div class="card cc"><div class="cc-h"><h3>Phễu ứng viên theo giai đoạn</h3></div>${hbars(funnel)}</div>
     <div class="card cc"><div class="cc-h"><h3>Lý do loại ứng viên</h3></div>${donut(rrRows)}</div>
   </div>
+  <div class="card cc" style="margin-bottom:16px"><div class="cc-h"><h3>KPI thời gian tuyển theo vị trí</h3><span class="muted small">Thực tế = từ ngày duyệt đến ngày nhân sự vào làm · so với thời hạn thiết lập ở Thư viện</span></div><div class="tbl-wrap"><table><thead><tr><th>Vị trí</th><th>Thời hạn (ngày)</th><th>TB thực tế (ngày)</th><th>Chênh lệch</th><th>Đã vào làm</th><th>Đạt thời hạn</th></tr></thead><tbody>
+    ${kgRows.map(([k,o])=>{const avg=Math.round(o.sum/o.n),diff=avg-o.sla,pct=Math.round(o.ok/o.n*100);return`<tr><td><b>${esc(k)}</b></td><td>${o.sla}</td><td>${avg}</td><td>${diff>0?badge('+'+diff+' ngày (chậm)','b-bad'):badge(diff+' ngày (nhanh)','b-ok')}</td><td>${o.n}</td><td>${badge(pct+'% ('+o.ok+'/'+o.n+')',pct>=80?'b-ok':pct>=50?'b-warn':'b-bad')}</td></tr>`}).join('')||'<tr><td colspan="6"><div class="empty">Chưa có nhân sự vào làm hoặc vị trí chưa thiết lập thời hạn</div></td></tr>'}</tbody></table></div></div>
   <div class="card cc" style="margin-bottom:16px"><div class="cc-h"><h3>Chi tiết ứng viên theo vị trí</h3></div><div class="tbl-wrap"><table><thead><tr><th>Vị trí</th><th>Ứng viên</th><th>Đã nhận việc</th><th>Đang xử lý</th><th>Đã loại</th></tr></thead><tbody>
     ${posRows.map(([k,o])=>`<tr><td><b>${esc(k)}</b></td><td>${cellBar(o.t,pmax,'#b6aaf2')}</td><td>${cellBar(o.h,pmax,'#7fd9b4')}</td><td>${cellBar(o.a,pmax,'#9cc8f5')}</td><td>${cellBar(o.r,pmax,'#f2a3aa')}</td></tr>`).join('')||'<tr><td colspan="5"><div class="empty">Chưa có dữ liệu</div></td></tr>'}</tbody></table></div></div>
   <div class="dgrid">
-    <div class="card cc"><div class="cc-h"><h3>Chỉ tiêu đang tuyển</h3></div><div class="tbl-wrap"><table><thead><tr><th>Mã</th><th>Vị trí</th><th>Tiến độ</th><th>Cần nhân sự</th></tr></thead><tbody>
-    ${open.map(r=>`<tr class="click" data-act="openReq" data-id="${r.id}"><td class="mono">${esc(r.code)}</td><td><b>${esc(r.v.position)}</b><div class="muted small">${esc(r.v.dept)}</div></td><td>${hiredOf(r)}/${r.v.qty} đã nhận · ${candsOf(r).filter(c=>!['hired','rejected'].includes(c.stage)).length} đang xử lý</td><td>${fmtD(r.v.neededBy)}</td></tr>`).join('')||'<tr><td colspan="4"><div class="empty">Không có chỉ tiêu đang tuyển</div></td></tr>'}</tbody></table></div></div>
+    <div class="card cc"><div class="cc-h"><h3>Chỉ tiêu đang tuyển</h3></div><div class="tbl-wrap"><table><thead><tr><th>Mã</th><th>Vị trí</th><th>Tiến độ</th><th>Cần nhân sự</th><th>Hạn theo vị trí</th></tr></thead><tbody>
+    ${open.map(r=>`<tr class="click" data-act="openReq" data-id="${r.id}"><td class="mono">${esc(r.code)}</td><td><b>${esc(r.v.position)}</b><div class="muted small">${esc(r.v.dept)}</div></td><td>${hiredOf(r)}/${r.v.qty} đã nhận · ${candsOf(r).filter(c=>!['hired','rejected'].includes(c.stage)).length} đang xử lý</td><td>${fmtD(r.v.neededBy)}</td><td>${deadlineBadge(r)}</td></tr>`).join('')||'<tr><td colspan="5"><div class="empty">Không có chỉ tiêu đang tuyển</div></td></tr>'}</tbody></table></div></div>
     <div class="card cc"><div class="cc-h"><h3>Hoạt động gần đây</h3></div><div class="tl">${recent.map(h=>`<div><b>${esc(h.tag)}</b> — ${esc(h.text)}<br><span class="muted small">${esc(h.by)} · ${fmtDT(h.t)}</span></div>`).join('')||'<span class="muted">Chưa có hoạt động</span>'}</div></div>
   </div>`;
 }
@@ -681,6 +701,7 @@ function reqDrawer(id){
     ${r.status==='pending'?`<div class="alert warn">${ic('clip')}<div>Đang chờ Ban Tổng giám đốc phê duyệt.</div></div>`:''}
     ${r.status==='rejected'?`<div class="alert bad">${ic('x')}<div><b>Đã bị từ chối.</b> ${esc(r.rejectReason||'')}</div></div>`:''}
     ${needSign(r)?`<div class="alert ${days>DB.cfg.signDays?'bad':'warn'}">${ic('alert')}<div><b>Thiếu bản scan đề xuất đã ký.</b> Đề xuất được duyệt ${days} ngày trước${days>DB.cfg.signDays?` — quá hạn ${days-DB.cfg.signDays} ngày`:''}. Đề xuất này được ghi vào báo cáo thiếu hồ sơ cho tới khi tải tệp lên.</div></div>`:''}
+    ${r.status==='approved'&&slaOf(r)!=null?`<div class="alert info">${ic('alert')}<div>Thời hạn tuyển của vị trí: <b>${slaOf(r)} ngày</b> kể từ ngày duyệt (${fmtD(r.approvedAt)}) → hạn ${fmtD(r.approvedAt+slaOf(r)*dayMs)}. ${deadlineBadge(r)}</div></div>`:''}
     <div class="row">
       ${r.status==='pending'&&can('req.approve')?`<button class="btn ok" data-act="approve" data-id="${r.id}">${ic('check')}Phê duyệt</button><button class="btn bad" data-act="reject" data-id="${r.id}">${ic('x')}Từ chối</button>`:''}
       ${r.status==='pending'&&(own||can('req.all')&&can('req.create'))?`<button class="btn" data-act="editReq" data-id="${r.id}">${ic('edit')}Sửa</button>`:''}
@@ -808,8 +829,9 @@ function vLib(){
   let body='',act='';
   if(ui.lt==='pos'){
     act=ed?`<button class="btn pri" data-act="newPos">${ic('plus')}Thêm vị trí</button>`:'';
-    const l=DB.lib.positions.filter(p=>!q||(p.name+p.dept+p.block).toLowerCase().includes(q));
-    body=`<div class="lib-grid">${l.map(p=>`<div class="card lib-card"><div class="row">${badge(p.block,p.block===DB.cfg.blocks[0]?'b-info':'b-vio')}<span class="muted small">${esc(p.dept)}</span></div><h4>${esc(p.name)}</h4><div class="pv">${esc(p.jd)}</div><div class="ft"><button class="btn sm" data-act="viewPos" data-id="${p.id}">${ic('eye')}Xem JD</button>${ed?`<button class="btn sm" data-act="editPos" data-id="${p.id}">${ic('edit')}Sửa</button><button class="btn sm bad" data-act="delPos" data-id="${p.id}">${ic('trash')}</button>`:''}</div></div>`).join('')||'<div class="empty">Chưa có vị trí</div>'}</div>`;
+    const l=DB.lib.positions.filter(p=>!q||(p.code+p.name).toLowerCase().includes(q));
+    body=`<div class="alert info" style="margin-bottom:14px">${ic('alert')}<div><b>Thời hạn tuyển</b> là số ngày chuẩn của vị trí, tính từ <b>ngày Ban TGĐ duyệt đề xuất</b> đến <b>ngày nhân sự vào làm</b>. Bảng điều khiển dùng số này để tính KPI tuyển dụng.</div></div>
+    <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Mã vị trí</th><th>Tên vị trí</th><th>Thời hạn tuyển</th><th>Ngày hiệu lực</th><th>Tình trạng</th><th>File scan đã duyệt</th><th></th></tr></thead><tbody>${l.map(p=>`<tr><td class="mono">${esc(p.code)}</td><td><b>${esc(p.name)}</b></td><td>${esc(p.slaDays)} ngày</td><td>${fmtD(p.effective)}</td><td>${badge(p.status,p.status==='Đang áp dụng'?'b-ok':'b-gray')}</td><td>${p.file?`<button class="btn sm" data-act="viewPosFile" data-id="${p.id}">${ic('eye')}Xem tệp</button>`:'<span class="badge b-warn">Chưa có</span>'}</td><td style="text-align:right;white-space:nowrap">${ed?`<button class="btn sm" data-act="editPos" data-id="${p.id}">${ic('edit')}</button> <button class="btn sm bad" data-act="delPos" data-id="${p.id}">${ic('trash')}</button>`:''}</td></tr>`).join('')||`<tr><td colspan="7"><div class="empty">Chưa có vị trí</div></td></tr>`}</tbody></table></div></div>`;
   }else if(ui.lt==='tpl'){
     act=ed?`<button class="btn pri" data-act="newTpl">${ic('plus')}Thêm mẫu thư</button>`:'';
     const l=DB.lib.templates.filter(t=>(!ui.tplType||t.type===ui.tplType)&&(!q||(t.name+t.body).toLowerCase().includes(q)));
@@ -824,9 +846,21 @@ function vLib(){
   <div class="row" style="margin-bottom:14px"><div class="seg">${tabs.map(t=>`<button class="${ui.lt===t[0]?'on':''}" data-act="lt" data-id="${t[0]}">${t[1]}<span class="n">${t[2]}</span></button>`).join('')}</div><div class="grow"></div>${searchBox('lq',ui.lq,'Tìm kiếm…')}</div>${body}`;
 }
 function posModal(p){
-  const v=p||{block:DB.cfg.blocks[0],dept:'',name:'',jd:'MÔ TẢ CÔNG VIỆC\n- \n\nYÊU CẦU\n- \n\nQUYỀN LỢI\n- '};
-  const fields=[{k:'name',l:'Tên vị trí',t:'text',req:1,wide:1},{k:'block',l:'Khối',t:'select',from:'blocks',req:1},{k:'dept',l:'Phòng ban',t:'select',from:'depts',req:1},{k:'jd',l:'Mô tả công việc (JD)',t:'textarea',wide:1}];
-  modal({title:p?'Sửa vị trí':'Thêm vị trí',wide:true,html:formHTML(fields,v),after:m=>{bindForm(m,fields);$('#ff_jd').style.minHeight='260px'},buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{const x=readForm($('#modal'),fields);if(!x)return false;if(p)Object.assign(p,x);else DB.lib.positions.push({id:uid('p_'),...x});commit();toast('Đã lưu vị trí','ok')}}]});
+  const v=p||{code:'',name:'',slaDays:30,effective:iso(),status:'Đang áp dụng'};
+  const fields=[{k:'code',l:'Mã vị trí',t:'text',req:1},{k:'name',l:'Tên vị trí',t:'text',req:1},{k:'slaDays',l:'Thời hạn tuyển (ngày, từ ngày duyệt đến ngày vào làm)',t:'number',req:1,wide:1},{k:'effective',l:'Ngày hiệu lực',t:'date',req:1},{k:'status',l:'Tình trạng',t:'select',opts:['Đang áp dụng','Ngừng áp dụng'],req:1}];
+  modal({title:p?'Sửa vị trí':'Thêm vị trí',html:formHTML(fields,v)+`<div style="margin-top:14px"><label class="f">File scan đã duyệt (PDF hoặc ảnh)</label>${p&&p.file?`<div class="small muted" style="margin-bottom:6px">Hiện có: ${esc(p.file.name)} — chọn tệp mới để thay thế</div>`:''}<input type="file" id="pf" accept=".pdf,image/*"></div>`,
+    buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{
+      const x=readForm($('#modal'),fields);if(!x)return false;
+      if(DB.lib.positions.some(o=>o!==p&&o.code.trim().toLowerCase()===String(x.code).trim().toLowerCase())){toast('Mã vị trí đã tồn tại','err');return false}
+      if(x.slaDays<0){toast('Thời hạn phải ≥ 0','err');return false}
+      const f=$('#pf').files[0];if(f&&f.size>MAXF*1048576){toast(`Tệp quá lớn (tối đa ${MAXF}MB)`,'err');return false}
+      (async()=>{try{
+        let file=p?p.file:null;
+        if(f){toast('Đang tải tệp lên…');const meta=await storeFile(f);if(file)await delFile(file);file=meta}
+        if(p){const old=p.name;Object.assign(p,x,{file});if(old!==x.name)DB.reqs.forEach(r=>{if(r.v.position===old)r.v.position=x.name})}
+        else DB.lib.positions.push({id:uid('p_'),...x,file});
+        closeModal();commit();toast('Đã lưu vị trí','ok')}catch(e){toast('Không lưu được tệp','err')}})();
+      return false}}]});
 }
 function tplModal(t){
   const v=t||{type:TPL_TYPES[0],name:'',subject:'',body:''};
@@ -850,8 +884,9 @@ function letterModal(c,t){
 
 /* ============ SETTINGS ============ */
 function vCfg(){
+  const ro=!can('cfg.edit');
   const subs=[['general','Thông tin chung'],['lists','Danh mục (khối, phòng ban, nguồn)'],['reqf','Trường – Đề xuất'],['candf','Trường – Ứng viên'],['users','Người dùng'],['perm','Phân quyền'],['data','Dữ liệu & sao lưu']];
-  return pageH('Thiết lập','Cấu hình trường dữ liệu, danh mục, người dùng và phân quyền.')+`<div class="side"><div class="snav">${subs.map(s=>`<button class="${ui.cf===s[0]?'on':''}" data-act="cf" data-id="${s[0]}">${s[1]}</button>`).join('')}</div><div>${cfgBody()}</div></div>`;
+  return pageH('Thiết lập','Cấu hình trường dữ liệu, danh mục, người dùng và phân quyền.')+`<div class="side"><div class="snav">${subs.map(s=>`<button class="${ui.cf===s[0]?'on':''}" data-act="cf" data-id="${s[0]}">${s[1]}</button>`).join('')}</div><div class="${ro?'ro':''}">${ro?`<div class="alert info" style="margin-bottom:14px">${ic('eye')}<div>Bạn chỉ có quyền <b>xem</b> Thiết lập. Chỉ quản trị (hoặc vai trò được cấp quyền “Chỉnh sửa Thiết lập”) mới thay đổi được.</div></div>`:''}${cfgBody()}</div></div>`;
 }
 function cfgBody(){
   const C=DB.cfg;
@@ -935,8 +970,8 @@ const A={
  sendLetter:(id,el)=>letterModal(DB.cands.find(x=>x.id===id),DB.lib.templates.find(t=>t.id===el.dataset.arg)),
  /* library */
  newPos:()=>posModal(),editPos:id=>posModal(DB.lib.positions.find(p=>p.id===id)),
- viewPos:id=>{const p=DB.lib.positions.find(x=>x.id===id);modal({title:p.name,wide:true,html:`<div class="row" style="margin-bottom:12px">${badge(p.block,'b-info')}<span class="muted">${esc(p.dept)}</span></div><div class="letter">${esc(p.jd)}</div>`,buttons:[{label:'Đóng',fn:()=>{}}]})},
- delPos:id=>confirmBox('Xoá vị trí này khỏi thư viện?',()=>{DB.lib.positions=DB.lib.positions.filter(p=>p.id!==id);commit()},'Xoá'),
+ viewPosFile:id=>openFile(DB.lib.positions.find(p=>p.id===id).file),
+ delPos:id=>confirmBox('Xoá vị trí này khỏi thư viện?',async()=>{const p=DB.lib.positions.find(x=>x.id===id);if(p&&p.file)await delFile(p.file);DB.lib.positions=DB.lib.positions.filter(x=>x.id!==id);commit()},'Xoá'),
  newTpl:()=>tplModal(),editTpl:id=>tplModal(DB.lib.templates.find(t=>t.id===id)),
  viewTpl:id=>letterModal(null,DB.lib.templates.find(t=>t.id===id)),
  dupTpl:id=>{const t=DB.lib.templates.find(x=>x.id===id);DB.lib.templates.push({...t,id:uid('t_'),name:t.name+' (bản sao)'});commit();toast('Đã nhân bản','ok')},
@@ -970,6 +1005,8 @@ const A={
  resetDemo:()=>confirmBox('Nạp dữ liệu mẫu? Dữ liệu hiện tại sẽ bị thay thế.',()=>{DB=seedDemo();normalize();pickUser();ui.tab='dash';commit()},'Nạp dữ liệu mẫu'),
  clearAll:()=>confirmBox('Xoá TOÀN BỘ đề xuất, ứng viên và thư viện (giữ thiết lập)?',()=>{DB.reqs=[];DB.cands=[];DB.lib={positions:[],templates:[],forms:[]};commit()},'Xoá hết')
 };
+const CFG_ACTS=['addItem','delItem','addDept','delDept','addField','fieldEdit','fieldDel','fieldToggle','fieldMove','userEdit','userDel','capToggle','roleAdd','roleDel','importData','resetDemo','clearAll'];
+CFG_ACTS.forEach(k=>{const f=A[k];A[k]=(...a)=>can('cfg.edit')?f(...a):toast('Bạn không có quyền chỉnh sửa Thiết lập','err')});
 function roundModal(c,i){
   const fields=[{k:'name',l:'Tên vòng',t:'text',req:1,wide:1},{k:'date',l:'Ngày',t:'date'},{k:'time',l:'Giờ',t:'time'},{k:'place',l:'Địa điểm / hình thức',t:'text',wide:1},{k:'who',l:'Người phỏng vấn',t:'text',wide:1},selF('result','Kết quả',R_IV),{k:'score',l:'Điểm (0–10)',t:'number'},{k:'note',l:'Nhận xét',t:'textarea',wide:1}];
   mini(i?'Sửa vòng phỏng vấn':'Thêm vòng phỏng vấn',fields,i||{name:'Vòng '+(c.interviews.length+1),result:'Chờ kết quả'},v=>{
@@ -989,7 +1026,7 @@ document.addEventListener('change',ev=>{
   const el=ev.target;
   if(el.dataset.who){ui.me=el.value;ui.tab=can('report.view')?'dash':(can('req.create')?'req':'lib');closeDrawer();render();toast('Đang xem với vai trò: '+roleOf(me()).name)}
   else if(el.tagName==='INPUT'&&el.dataset.act){A[el.dataset.act](el.dataset.id,el)}
-  else if(el.dataset.cfg){const k=el.dataset.cfg;DB.cfg[k]=el.type==='number'?Number(el.value):el.value;save()}
+  else if(el.dataset.cfg){if(!can('cfg.edit'))return;const k=el.dataset.cfg;DB.cfg[k]=el.type==='number'?Number(el.value):el.value;save()}
   else if(el.dataset.bind&&el.tagName==='SELECT'){ui[el.dataset.bind]=el.value;render()}
 });
 document.addEventListener('input',ev=>{const el=ev.target;if(el.dataset.bind&&el.tagName==='INPUT'){ui[el.dataset.bind]=el.value;render()}});
