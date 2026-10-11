@@ -38,3 +38,9 @@ Dán code mới vào `Code.gs` / `Index`, rồi **Triển khai → Quản lý b�
 - Tệp tải lên (tối đa 10MB) lưu ở thư mục Drive "HR Recruit – Tệp đính kèm", chia sẻ chế độ "mọi người trong tổ chức có liên kết đều xem được".
 - Hạn mức của Apps Script (dung lượng 50.000 ký tự/ô, số lần gọi/ngày) đủ cho quy mô tuyển dụng của một công ty/trường; nếu dữ liệu lên hàng chục nghìn ứng viên nên chuyển sang cơ sở dữ liệu chuyên dụng.
 - Mở `Index.html` trực tiếp bằng trình duyệt sẽ chạy ở **chế độ xem thử** (dữ liệu chỉ lưu trên trình duyệt đó, không kết nối Google Sheet).
+
+## Về file Index.html (dành cho người bảo trì)
+
+- `Index.html` là **bản triển khai**: phần JavaScript được mã hoá base64 (khối `hr-payload`) để Apps Script không làm sai lệch mã. **Không sửa tay** file này.
+- Mã nguồn đọc được nằm ở `src/Index.source.html`. Sau khi sửa nguồn, chạy `python3 build.py` để tạo lại `Index.html`.
+- Nếu màn hình báo "Ứng dụng không khởi động được", thông báo sẽ kèm dòng code gây lỗi để dễ chẩn đoán.
