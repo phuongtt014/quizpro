@@ -616,8 +616,11 @@ function vDash(){
   const posRows=Object.entries(byPos).sort((a,b)=>b[1].t-a[1].t);const pmax=Math.max(1,...posRows.map(r=>r[1].t));
   const recent=[...R.flatMap(r=>r.history.map(h=>({...h,tag:r.code}))),...C.flatMap(c=>c.history.map(h=>({...h,tag:c.v.name})))].sort((a,b)=>b.t-a.t).slice(0,7);
   const seg=(key,opts)=>`<div class="mini-seg">${opts.map(o=>`<button class="${ui[key]===o[0]?'on':''}" data-act="set_${key}" data-id="${o[0]}">${o[1]}</button>`).join('')}</div>`;
+  const isEmpty=!DB.reqs.length&&!DB.cands.length;
+  const welcome=isEmpty?`<div class="card pad" style="margin-bottom:16px;border-left:4px solid var(--brand)"><h3 style="margin-bottom:6px">Hệ thống đang trống – chưa có đề xuất hay ứng viên nào</h3><p class="muted" style="margin-bottom:12px">Đây là lần đầu sử dụng nên các biểu đồ chưa có số liệu. Bạn có thể bắt đầu nhập dữ liệu thật hoặc nạp dữ liệu mẫu để xem thử giao diện.</p><div class="row"><button class="btn pri" data-act="goNewReq">${ic('plus')}Tạo đề xuất đầu tiên</button>${can('cfg.edit')?`<button class="btn" data-act="resetDemo">Nạp dữ liệu mẫu để xem thử</button>`:''}${can('cfg.edit')?`<button class="btn" data-act="goUsers">Thêm người dùng</button>`:''}</div></div>`:'';
   return`<div class="page-h"><div><h1>Bảng điều khiển tuyển dụng</h1><p>Tổng hợp theo thời gian thực từ dữ liệu đề xuất và ứng viên</p></div>
     <div class="pills">${[['','Tất cả khối'],...DB.cfg.blocks.map(b=>[b,b])].map(x=>`<button class="pill ${ui.db===x[0]?'on':''}" data-act="dblk" data-id="${esc(x[0])}">${esc(x[1])}</button>`).join('')}</div></div>
+  ${welcome}
   <div class="kpis">
     ${kpi('Ứng viên',tot,pc(toIv),COL_BR,`${Math.round(pc(toIv))}% đã vào phỏng vấn`)}
     ${kpi('Đã nhận việc',hired,pc(hired),COL_OK,'trên tổng ứng viên')}
@@ -936,7 +939,7 @@ const A={
  mbtn:id=>{const b=modalBtns[id];if(b.fn()!==false)closeModal()},
  dclose:()=>closeDrawer(),
  gomiss:()=>{ui.tab='req';ui.rf='missing';render()},
- dblk:id=>{ui.db=id;render()},set_dim:id=>{ui.dim=id;render()},set_gran:id=>{ui.gran=id;render()},
+ dblk:id=>{ui.db=id;render()},goNewReq:()=>{ui.tab='req';render();if(can('req.create'))reqForm()},goUsers:()=>{ui.tab='cfg';ui.cf='users';render()},set_dim:id=>{ui.dim=id;render()},set_gran:id=>{ui.gran=id;render()},
  reload:()=>reloadData(false),retrySave:()=>{if(ENV.gs)flush()},openSheet:()=>window.open(ENV.sheetUrl,'_blank'),
  rf:id=>{ui.rf=id;render()},
  cview:id=>{ui.cv=id;render()},
@@ -1040,6 +1043,8 @@ document.addEventListener('dragover',e=>{const c=e.target.closest?.('.col');if(c
 document.addEventListener('drop',e=>{const col=e.target.closest?.('.col');if(!col||!dragId)return;e.preventDefault();const c=DB.cands.find(x=>x.id===dragId);const s=col.dataset.stage;
   if(c&&can('cand.move'))changeStage(c,s)});
 
+window.addEventListener('error',e=>{try{toast('Lỗi giao diện: '+e.message,'err')}catch(x){}});
+window.addEventListener('unhandledrejection',e=>{try{toast('Lỗi: '+((e.reason&&e.reason.message)||e.reason),'err')}catch(x){}});
 init();
 </script>
 </body>
