@@ -274,7 +274,7 @@ const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{co
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
-const APP_VER='v9 · 11/10/2026';
+const APP_VER='v10 · 11/10/2026';
 const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const MAXF=GS?10:15;
@@ -375,7 +375,9 @@ function seed(){
     if(c.stage==='hired'&&r&&r.approvedAt){const start=r.approvedAt+Math.round((slaN[r.v.position]||30)*(0.6+rnd()*0.9))*dayMs;c.createdAt=r.approvedAt+Math.floor((start-r.approvedAt)*0.3);c.hiredAt=start-3*dayMs;c.offer={...(c.offer||{}),status:'Chấp nhận',startDate:new Date(start).toISOString().slice(0,10)}}
     if(c.stage==='rejected')c.rejectReason=why[Math.floor(rnd()*why.length)]});
   const positions=[['GV-TOAN-THCS','Giáo viên Toán THCS',30],['GV-ANH','Giáo viên Tiếng Anh',45],['GV-VAN','Giáo viên Ngữ văn',35],['CV-TUYENSINH','Chuyên viên Tuyển sinh',25],['KT-TONGHOP','Kế toán tổng hợp',30],['IT-HELPDESK','Nhân viên IT Helpdesk',30]]
-    .map((x,i)=>({id:uid('p_'),code:x[0],name:x[1],slaDays:x[2],effective:iso(-330+i*15),status:'Đang áp dụng',file:null}));
+    .map((x,i)=>{const p={id:uid('p_'),code:x[0],name:x[1],slaDays:x[2],effective:iso(-330+i*15),status:'Đang áp dụng',file:null};
+      p.versions=[{id:uid('v_'),ver:1,file:null,effective:p.effective,slaDays:p.slaDays,note:'Bản đầu tiên',createdAt:Date.now()-330*dayMs,by:'Trần Thị Phương'}];return p});
+  positions[0].versions.push({id:uid('v_'),ver:2,file:null,effective:iso(-30),slaDays:28,note:'Rút ngắn thời hạn tuyển còn 28 ngày; bổ sung yêu cầu chứng chỉ nghiệp vụ sư phạm',createdAt:Date.now()-30*dayMs,by:'Trần Thị Phương'});
   const templates=[
     {id:uid('t_'),type:'Thư mời phỏng vấn',name:'Mời phỏng vấn – chuẩn',subject:'[{{cong_ty}}] Thư mời phỏng vấn vị trí {{vi_tri}}',body:'Kính gửi Anh/Chị {{ten_ung_vien}},\n\nCảm ơn Anh/Chị đã quan tâm và ứng tuyển vị trí {{vi_tri}} tại {{phong_ban}} – {{cong_ty}}.\n\nSau khi xem xét hồ sơ, chúng tôi trân trọng mời Anh/Chị tham dự buổi phỏng vấn:\n- Thời gian: {{gio_phong_van}}, ngày {{ngay_phong_van}}\n- Địa điểm: {{dia_diem}}\n\nVui lòng phản hồi email này để xác nhận tham dự. Nếu cần hỗ trợ, Anh/Chị liên hệ trực tiếp với tôi.\n\nTrân trọng,\n{{nguoi_gui}}\nPhòng Nhân sự – {{cong_ty}}'},
     {id:uid('t_'),type:'Thư mời nhận việc',name:'Thư mời nhận việc (Offer)',subject:'[{{cong_ty}}] Thư mời nhận việc – {{vi_tri}}',body:'Kính gửi Anh/Chị {{ten_ung_vien}},\n\nChúc mừng Anh/Chị đã vượt qua các vòng tuyển chọn. {{cong_ty}} trân trọng mời Anh/Chị về làm việc với nội dung:\n- Vị trí: {{vi_tri}} – {{phong_ban}}\n- Mức lương: {{luong}}\n- Ngày nhận việc dự kiến: {{ngay_nhan_viec}}\n\nVui lòng phản hồi trước ngày {{han_phan_hoi}}. Chi tiết hồ sơ nhận việc sẽ được gửi sau khi Anh/Chị xác nhận.\n\nTrân trọng,\n{{nguoi_gui}}\nPhòng Nhân sự – {{cong_ty}}'},
@@ -443,6 +445,7 @@ function normalize(){
   C.users.forEach(u=>u.email=u.email||'');DB.reqs.forEach(r=>{r.history=r.history||[];r.v=r.v||{}});DB.cands.forEach(c=>{c.history=c.history||[];c.interviews=c.interviews||[];c.v=c.v||{}});
   DB.lib=DB.lib||{};['positions','templates','forms'].forEach(k=>DB.lib[k]=DB.lib[k]||[]);
   DB.lib.positions.forEach(p=>{p.code=p.code||'';p.status=p.status||'Đang áp dụng';if(p.slaDays==null||p.slaDays==='')p.slaDays=30;p.effective=p.effective||'';p.file=p.file||null});
+  DB.lib.positions.forEach(p=>{if(!p.versions||!p.versions.length)p.versions=[{id:uid('v_'),ver:1,file:p.file||null,effective:p.effective||'',slaDays:p.slaDays,note:'Bản đầu tiên',createdAt:Date.now(),by:''}];syncPos(p)});
 }
 function seedDemo(){const d=seed();if(ENV.gs){const a=d.cfg.users.find(u=>u.roleId==='admin');a.email=ENV.email}return d}
 function freshDB(email){
@@ -558,7 +561,12 @@ const searchBox=(id,val,ph)=>`<div class="search">${ic('search')}<input type="te
 /* ============ DASHBOARD ============ */
 const COL_OK='#0f9d6c',COL_BAD='#e8606a',COL_INFO='#3b8ee8',COL_BR='#5b47d6';
 const posByName=n=>DB.lib.positions.find(p=>(p.name||'').trim().toLowerCase()===String(n||'').trim().toLowerCase());
-const slaOf=r=>{const p=posByName(r.v.position);return p&&p.slaDays!==''&&p.slaDays!=null?+p.slaDays:null};
+const todayIso=()=>iso(0);
+const verList=p=>[...(p.versions||[])].sort((a,b)=>(a.effective||'').localeCompare(b.effective||''));
+function posVer(p,at){const vs=verList(p);if(!vs.length)return null;const d=new Date(at||Date.now()).toISOString().slice(0,10);let cur=vs[0];vs.forEach(v=>{if((v.effective||'')<=d)cur=v});return cur}
+function syncPos(p){const v=posVer(p);if(v){p.file=v.file||null;p.effective=v.effective;p.slaDays=v.slaDays;p.curVer=v.ver}}
+const slaOf=r=>{const p=posByName(r.v.position);if(!p)return null;const v=posVer(p,r.approvedAt||Date.now());return v&&v.slaDays!==''&&v.slaDays!=null?+v.slaDays:null};
+const slaVerOf=r=>{const p=posByName(r.v.position);const v=p&&posVer(p,r.approvedAt||Date.now());return v?v.ver:null};
 const startOf=c=>c.offer&&c.offer.startDate?new Date(c.offer.startDate).getTime():c.hiredAt;
 const hireDays=(c,r)=>{if(!r||!r.approvedAt)return null;const t=startOf(c);return t?Math.max(0,Math.round((t-r.approvedAt)/dayMs)):null};
 function deadlineBadge(r){
@@ -719,7 +727,7 @@ function reqDrawer(id){
     ${r.status==='pending'?`<div class="alert warn">${ic('clip')}<div>Đang chờ Ban Tổng giám đốc phê duyệt.</div></div>`:''}
     ${r.status==='rejected'?`<div class="alert bad">${ic('x')}<div><b>Đã bị từ chối.</b> ${esc(r.rejectReason||'')}</div></div>`:''}
     ${needSign(r)?`<div class="alert ${days>DB.cfg.signDays?'bad':'warn'}">${ic('alert')}<div><b>Thiếu bản scan đề xuất đã ký.</b> Đề xuất được duyệt ${days} ngày trước${days>DB.cfg.signDays?` — quá hạn ${days-DB.cfg.signDays} ngày`:''}. Đề xuất này được ghi vào báo cáo thiếu hồ sơ cho tới khi tải tệp lên.</div></div>`:''}
-    ${r.status==='approved'&&slaOf(r)!=null?`<div class="alert info">${ic('alert')}<div>Thời hạn tuyển của vị trí: <b>${slaOf(r)} ngày</b> kể từ ngày duyệt (${fmtD(r.approvedAt)}) → hạn ${fmtD(r.approvedAt+slaOf(r)*dayMs)}. ${deadlineBadge(r)}</div></div>`:''}
+    ${r.status==='approved'&&slaOf(r)!=null?`<div class="alert info">${ic('alert')}<div>Thời hạn tuyển của vị trí (bản v${slaVerOf(r)}): <b>${slaOf(r)} ngày</b> kể từ ngày duyệt (${fmtD(r.approvedAt)}) → hạn ${fmtD(r.approvedAt+slaOf(r)*dayMs)}. ${deadlineBadge(r)}</div></div>`:''}
     <div class="row">
       ${r.status==='pending'&&can('req.approve')?`<button class="btn ok" data-act="approve" data-id="${r.id}">${ic('check')}Phê duyệt</button><button class="btn bad" data-act="reject" data-id="${r.id}">${ic('x')}Từ chối</button>`:''}
       ${r.status==='pending'&&(own||can('req.all')&&can('req.create'))?`<button class="btn" data-act="editReq" data-id="${r.id}">${ic('edit')}Sửa</button>`:''}
@@ -848,8 +856,8 @@ function vLib(){
   if(ui.lt==='pos'){
     act=ed?`<button class="btn" data-act="csv" data-id="positions">${ic('upload')}Nhập CSV</button><button class="btn pri" data-act="newPos">${ic('plus')}Thêm vị trí</button>`:'';
     const l=DB.lib.positions.filter(p=>!q||(p.code+p.name).toLowerCase().includes(q));
-    body=`<div class="alert info" style="margin-bottom:14px">${ic('alert')}<div><b>Thời hạn tuyển</b> là số ngày chuẩn của vị trí, tính từ <b>ngày Ban TGĐ duyệt đề xuất</b> đến <b>ngày nhân sự vào làm</b>. Bảng điều khiển dùng số này để tính KPI tuyển dụng.</div></div>
-    <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Mã vị trí</th><th>Tên vị trí</th><th>Thời hạn tuyển</th><th>Ngày hiệu lực</th><th>Tình trạng</th><th>File scan đã duyệt</th><th></th></tr></thead><tbody>${l.map(p=>`<tr><td class="mono">${esc(p.code)}</td><td><b>${esc(p.name)}</b></td><td>${esc(p.slaDays)} ngày</td><td>${fmtD(p.effective)}</td><td>${badge(p.status,p.status==='Đang áp dụng'?'b-ok':'b-gray')}</td><td>${p.file?`<button class="btn sm" data-act="viewPosFile" data-id="${p.id}">${ic('eye')}Xem tệp</button>`:'<span class="badge b-warn">Chưa có</span>'}</td><td style="text-align:right;white-space:nowrap">${ed?`<button class="btn sm" data-act="editPos" data-id="${p.id}">${ic('edit')}</button> <button class="btn sm bad" data-act="delPos" data-id="${p.id}">${ic('trash')}</button>`:''}</td></tr>`).join('')||`<tr><td colspan="7"><div class="empty">Chưa có vị trí</div></td></tr>`}</tbody></table></div></div>`;
+    body=`<div class="alert info" style="margin-bottom:14px">${ic('alert')}<div>Mỗi vị trí có nhiều <b>phiên bản</b> (file scan đã duyệt, ngày hiệu lực, thời hạn tuyển). Khi có bản mới, bấm <b>Bản mới</b>: bản cũ tự hết hiệu lực vào ngày hiệu lực của bản mới và vẫn được lưu để xem lại. <b>Thời hạn tuyển</b> tính từ ngày Ban TGĐ duyệt đến ngày nhân sự vào làm; mỗi đề xuất dùng bản có hiệu lực <b>tại ngày duyệt</b> để tính KPI.</div></div>
+    <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Mã vị trí</th><th>Tên vị trí</th><th>Bản hiện hành</th><th>Thời hạn tuyển</th><th>Hiệu lực từ</th><th>Tình trạng</th><th>File scan đã duyệt</th><th></th></tr></thead><tbody>${l.map(p=>{const vs=verList(p),up=vs.find(v=>(v.effective||'')>todayIso());return`<tr><td class="mono">${esc(p.code)}</td><td><b>${esc(p.name)}</b></td><td>${badge('v'+p.curVer,'b-info')}${up?` <span class="badge b-warn">Sắp có v${up.ver} từ ${fmtD(up.effective)}</span>`:''}<div class="muted small">${vs.length} phiên bản</div></td><td>${esc(p.slaDays)} ngày</td><td>${fmtD(p.effective)}</td><td>${badge(p.status,p.status==='Đang áp dụng'?'b-ok':'b-gray')}</td><td>${p.file?`<button class="btn sm" data-act="viewPosFile" data-id="${p.id}">${ic('eye')}Xem tệp</button>`:'<span class="badge b-warn">Chưa có</span>'}</td><td style="text-align:right;white-space:nowrap"><button class="btn sm" data-act="histPos" data-id="${p.id}">${ic('list')}Lịch sử</button>${ed?` <button class="btn sm pri" data-act="newVer" data-id="${p.id}">${ic('plus')}Bản mới</button> <button class="btn sm" data-act="editPos" data-id="${p.id}">${ic('edit')}Sửa</button> <button class="btn sm bad" data-act="delPos" data-id="${p.id}">${ic('trash')}</button>`:''}</td></tr>`}).join('')||`<tr><td colspan="8"><div class="empty">Chưa có vị trí</div></td></tr>`}</tbody></table></div></div>`;
   }else if(ui.lt==='tpl'){
     act=ed?`<button class="btn pri" data-act="newTpl">${ic('plus')}Thêm mẫu thư</button>`:'';
     const l=DB.lib.templates.filter(t=>(!ui.tplType||t.type===ui.tplType)&&(!q||(t.name+t.body).toLowerCase().includes(q)));
@@ -864,21 +872,50 @@ function vLib(){
   <div class="row" style="margin-bottom:14px"><div class="seg">${tabs.map(t=>`<button class="${ui.lt===t[0]?'on':''}" data-act="lt" data-id="${t[0]}">${t[1]}<span class="n">${t[2]}</span></button>`).join('')}</div><div class="grow"></div>${searchBox('lq',ui.lq,'Tìm kiếm…')}</div>${body}`;
 }
 function posModal(p){
+  const isNew=!p;
   const v=p||{code:'',name:'',slaDays:30,effective:iso(),status:'Đang áp dụng'};
-  const fields=[{k:'code',l:'Mã vị trí',t:'text',req:1},{k:'name',l:'Tên vị trí',t:'text',req:1},{k:'slaDays',l:'Thời hạn tuyển (ngày, từ ngày duyệt đến ngày vào làm)',t:'number',req:1,wide:1},{k:'effective',l:'Ngày hiệu lực',t:'date',req:1},{k:'status',l:'Tình trạng',t:'select',opts:['Đang áp dụng','Ngừng áp dụng'],req:1}];
-  modal({title:p?'Sửa vị trí':'Thêm vị trí',html:formHTML(fields,v)+`<div style="margin-top:14px"><label class="f">File scan đã duyệt (PDF hoặc ảnh)</label>${p&&p.file?`<div class="small muted" style="margin-bottom:6px">Hiện có: ${esc(p.file.name)} — chọn tệp mới để thay thế</div>`:''}<input type="file" id="pf" accept=".pdf,image/*"></div>`,
+  const fields=[{k:'code',l:'Mã vị trí',t:'text',req:1},{k:'name',l:'Tên vị trí',t:'text',req:1}];
+  if(isNew)fields.push({k:'slaDays',l:'Thời hạn tuyển (ngày, từ ngày duyệt đến ngày vào làm)',t:'number',req:1,wide:1},{k:'effective',l:'Ngày hiệu lực',t:'date',req:1});
+  fields.push({k:'status',l:'Tình trạng',t:'select',opts:['Đang áp dụng','Ngừng áp dụng'],req:1});
+  modal({title:isNew?'Thêm vị trí (phiên bản v1)':'Sửa thông tin vị trí',html:formHTML(fields,v)+(isNew?`<div style="margin-top:14px"><label class="f">File scan đã duyệt (PDF hoặc ảnh)</label><input type="file" id="pf" accept=".pdf,image/*"></div>`:`<div class="alert info" style="margin-top:14px">${ic('alert')}<div>Muốn đổi file scan, ngày hiệu lực hoặc thời hạn tuyển: dùng nút <b>Bản mới</b> để lưu lại lịch sử.</div></div>`),
     buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{
       const x=readForm($('#modal'),fields);if(!x)return false;
       if(DB.lib.positions.some(o=>o!==p&&o.code.trim().toLowerCase()===String(x.code).trim().toLowerCase())){toast('Mã vị trí đã tồn tại','err');return false}
-      if(x.slaDays<0){toast('Thời hạn phải ≥ 0','err');return false}
-      const f=$('#pf').files[0];if(f&&f.size>MAXF*1048576){toast(`Tệp quá lớn (tối đa ${MAXF}MB)`,'err');return false}
+      const f=isNew?$('#pf').files[0]:null;if(f&&f.size>MAXF*1048576){toast(`Tệp quá lớn (tối đa ${MAXF}MB)`,'err');return false}
       (async()=>{try{
-        let file=p?p.file:null;
-        if(f){toast('Đang tải tệp lên…');const meta=await storeFile(f);if(file)await delFile(file);file=meta}
-        if(p){const old=p.name;Object.assign(p,x,{file});if(old!==x.name)DB.reqs.forEach(r=>{if(r.v.position===old)r.v.position=x.name})}
-        else DB.lib.positions.push({id:uid('p_'),...x,file});
+        if(isNew){let file=null;if(f){toast('Đang tải tệp lên…');file=await storeFile(f)}
+          const np={id:uid('p_'),code:x.code,name:x.name,status:x.status,versions:[]};newVer(np,{file,effective:x.effective,slaDays:x.slaDays,note:'Bản đầu tiên'});syncPos(np);DB.lib.positions.push(np)}
+        else{const old=p.name;Object.assign(p,x);if(old!==x.name)DB.reqs.forEach(r=>{if(r.v.position===old)r.v.position=x.name})}
         closeModal();commit();toast('Đã lưu vị trí','ok')}catch(e){toast('Không lưu được tệp','err')}})();
       return false}}]});
+}
+function newVer(p,o){const v={id:uid('v_'),ver:Math.max(0,...(p.versions||[]).map(x=>x.ver))+1,file:null,effective:iso(),slaDays:30,note:'',createdAt:Date.now(),by:me().name,...o};(p.versions=p.versions||[]).push(v);return v}
+function verModal(p,vid){
+  const v=vid?p.versions.find(x=>x.id===vid):null,cur=posVer(p);
+  const vals=v?{effective:v.effective,slaDays:v.slaDays,note:v.note||''}:{effective:iso(),slaDays:cur?cur.slaDays:30,note:''};
+  const nextN=Math.max(0,...p.versions.map(x=>x.ver))+1;
+  const fields=[{k:'effective',l:'Ngày hiệu lực của bản này',t:'date',req:1},{k:'slaDays',l:'Thời hạn tuyển (ngày)',t:'number',req:1},{k:'note',l:'Nội dung thay đổi',t:'textarea',wide:1}];
+  modal({title:v?`Sửa bản v${v.ver} – ${p.name}`:`Phát hành bản mới v${nextN} – ${p.name}`,
+    html:formHTML(fields,vals)+`<div style="margin-top:14px"><label class="f">File scan đã duyệt (PDF hoặc ảnh)</label>${v&&v.file?`<div class="small muted" style="margin-bottom:6px">Hiện có: ${esc(v.file.name)} — chọn tệp mới để thay thế</div>`:''}<input type="file" id="vf" accept=".pdf,image/*"></div>${v?'':`<p class="small muted" style="margin-top:10px">Bản đang hiệu lực (v${cur?cur.ver:'-'}) sẽ tự hết hiệu lực vào ngày trước ngày hiệu lực của bản mới và vẫn được lưu trong lịch sử.</p>`}`,
+    buttons:[{label:'Quay lại',fn:()=>{setTimeout(()=>histModal(p),0)}},{label:v?'Lưu thay đổi':'Phát hành',cls:'pri',icon:'check',fn:()=>{
+      const x=readForm($('#modal'),fields);if(!x)return false;
+      if(p.versions.some(o=>o!==v&&(o.effective||'')===x.effective)){toast('Đã có một phiên bản khác cùng ngày hiệu lực','err');return false}
+      if(x.slaDays<0){toast('Thời hạn phải ≥ 0','err');return false}
+      const f=$('#vf').files[0];if(f&&f.size>MAXF*1048576){toast(`Tệp quá lớn (tối đa ${MAXF}MB)`,'err');return false}
+      (async()=>{try{
+        let file=v?v.file:null;if(f){toast('Đang tải tệp lên…');const meta=await storeFile(f);if(file)await delFile(file);file=meta}
+        if(v)Object.assign(v,{effective:x.effective,slaDays:x.slaDays,note:x.note,file});else newVer(p,{effective:x.effective,slaDays:x.slaDays,note:x.note,file});
+        syncPos(p);closeModal();commit();toast(v?'Đã cập nhật phiên bản':'Đã phát hành phiên bản mới'+(file?'':' (chưa có file scan)'),'ok');histModal(p)}catch(e){toast('Không lưu được tệp','err')}})();
+      return false}}]});
+}
+function histModal(p){
+  const vs=verList(p),cur=posVer(p),ed=can('lib.edit'),td=todayIso();
+  const rows=[...vs].reverse().map(v=>{const nx=vs[vs.indexOf(v)+1];
+    const st=(v.effective||'')>td?['Sắp hiệu lực','b-warn']:(v===cur?['Đang hiệu lực','b-ok']:['Hết hiệu lực','b-gray']);
+    const to=nx&&nx.effective?fmtD(new Date(new Date(nx.effective).getTime()-dayMs).toISOString().slice(0,10)):'nay';
+    return`<tr><td><b>v${v.ver}</b></td><td>${badge(st[0],st[1])}</td><td class="small">${fmtD(v.effective)} → ${to}</td><td>${esc(v.slaDays)} ngày</td><td class="small" style="white-space:pre-wrap">${esc(v.note||'—')}</td><td>${v.file?`<button class="btn sm" data-act="viewVerFile" data-id="${p.id}" data-arg="${v.id}">${ic('eye')}Xem</button>`:'<span class="badge b-warn">Chưa có</span>'}</td><td class="small muted">${esc(v.by||'')}<br>${fmtD(v.createdAt)}</td>${ed?`<td style="white-space:nowrap"><button class="btn sm" data-act="editVer" data-id="${p.id}" data-arg="${v.id}">${ic('edit')}</button> <button class="btn sm bad" data-act="delVer" data-id="${p.id}" data-arg="${v.id}">${ic('trash')}</button></td>`:''}</tr>`}).join('');
+  modal({title:`Lịch sử phiên bản – ${p.code} · ${p.name}`,wide:true,html:`<div class="tbl-wrap card"><table><thead><tr><th>Bản</th><th>Trạng thái</th><th>Hiệu lực</th><th>Thời hạn</th><th>Nội dung thay đổi</th><th>File scan</th><th>Người tạo</th>${ed?'<th></th>':''}</tr></thead><tbody>${rows}</tbody></table></div>`,
+    buttons:[{label:'Đóng',fn:()=>{}},...(ed?[{label:'Phát hành bản mới',cls:'pri',icon:'plus',fn:()=>{setTimeout(()=>verModal(p),0)}}]:[])]});
 }
 function tplModal(t){
   const v=t||{type:TPL_TYPES[0],name:'',subject:'',body:''};
@@ -1012,11 +1049,16 @@ function csvSpec(key){
       const ex=em&&C.users.find(x=>(x.email||'').toLowerCase()===em);
       const o={name:n,email:em,title:r[2]||'',dept:r[3]||'',roleId:role.id};
       if(ex){if(ex.id===ui.realMe)o.roleId=ex.roleId;Object.assign(ex,o);u++}else{C.users.push({id:uid('u'),...o});a++}});return`Đã thêm ${a}, cập nhật ${u}, bỏ qua ${s}`}};
-  if(key==='positions')return{title:'Vị trí',cols:['Mã vị trí','Tên vị trí','Thời hạn tuyển (ngày)','Ngày hiệu lực','Tình trạng'],example:[['GV-LY','Giáo viên Vật lý','30','01/09/2026','Đang áp dụng']],note:'Mã trùng sẽ được cập nhật (giữ nguyên file scan). Ngày dạng dd/mm/yyyy.',
-    apply(rows){let a=0,u=0,s=0;rows.forEach(r=>{const code=r[0],name=r[1];if(!code||!name){s++;return}
+  if(key==='positions')return{title:'Vị trí',cols:['Mã vị trí','Tên vị trí','Thời hạn tuyển (ngày)','Ngày hiệu lực','Tình trạng'],example:[['GV-LY','Giáo viên Vật lý','30','01/09/2026','Đang áp dụng']],note:'Mã mới → tạo vị trí (v1). Mã đã có: cập nhật tên/tình trạng; nếu thời hạn khác bản hiện hành thì tạo thêm phiên bản mới (từ ngày hiệu lực ghi trong file, mặc định hôm nay). File scan thêm bằng nút “Bản mới”. Ngày dạng dd/mm/yyyy.',
+    apply(rows){let a=0,u=0,s=0,nv=0;rows.forEach(r=>{const code=r[0],name=r[1];if(!code||!name){s++;return}
       const ex=DB.lib.positions.find(p=>p.code.toLowerCase()===code.toLowerCase());
-      const o={code,name,slaDays:r[2]!==undefined&&r[2]!==''&&!isNaN(+r[2])?+r[2]:(ex?ex.slaDays:30),effective:parseDateVN(r[3])||(ex?ex.effective:iso()),status:r[4]?(nrm(r[4]).includes('ngung')?'Ngừng áp dụng':'Đang áp dụng'):(ex?ex.status:'Đang áp dụng')};
-      if(ex){Object.assign(ex,o);u++}else{DB.lib.positions.push({id:uid('p_'),...o,file:null});a++}});return`Đã thêm ${a}, cập nhật ${u}, bỏ qua ${s}`}};
+      const sla=r[2]!==undefined&&r[2]!==''&&!isNaN(+r[2])?+r[2]:null,eff=parseDateVN(r[3]);
+      const status=r[4]?(nrm(r[4]).includes('ngung')?'Ngừng áp dụng':'Đang áp dụng'):null;
+      if(ex){ex.name=name;if(status)ex.status=status;const cur=posVer(ex);
+        if(sla!==null&&cur&&sla!==+cur.slaDays){const d=eff||iso();if(!ex.versions.some(v=>(v.effective||'')===d)){newVer(ex,{effective:d,slaDays:sla,note:'Cập nhật qua CSV'});nv++}}
+        syncPos(ex);u++}
+      else{const np={id:uid('p_'),code,name,status:status||'Đang áp dụng',versions:[]};newVer(np,{effective:eff||iso(),slaDays:sla===null?30:sla,note:'Nhập qua CSV'});syncPos(np);DB.lib.positions.push(np);a++}});
+      return`Đã thêm ${a}, cập nhật ${u}${nv?` (${nv} phiên bản mới)`:''}, bỏ qua ${s}`}};
   return null;
 }
 function csvOpen(key){
@@ -1094,8 +1136,14 @@ const A={
  sendLetter:(id,el)=>letterModal(DB.cands.find(x=>x.id===id),DB.lib.templates.find(t=>t.id===el.dataset.arg)),
  /* library */
  newPos:()=>posModal(),editPos:id=>posModal(DB.lib.positions.find(p=>p.id===id)),
+ newVer:id=>verModal(DB.lib.positions.find(p=>p.id===id)),histPos:id=>histModal(DB.lib.positions.find(p=>p.id===id)),
+ editVer:(id,el)=>verModal(DB.lib.positions.find(p=>p.id===id),el.dataset.arg),
+ delVer:(id,el)=>{const p=DB.lib.positions.find(x=>x.id===id),v=p.versions.find(x=>x.id===el.dataset.arg);
+   if(p.versions.length<=1){toast('Vị trí phải có ít nhất một phiên bản','err');return}
+   modal({title:'Xoá phiên bản',html:`<p>Xoá bản <b>v${v.ver}</b> (hiệu lực từ ${fmtD(v.effective)}) cùng file scan đính kèm? Không thể hoàn tác.</p>`,buttons:[{label:'Huỷ',fn:()=>{setTimeout(()=>histModal(p),0)}},{label:'Xoá',cls:'bad',fn:()=>{(async()=>{if(v.file)await delFile(v.file);p.versions=p.versions.filter(x=>x!==v);syncPos(p);closeModal();commit();histModal(p)})();return false}}]})},
  viewPosFile:id=>openFile(DB.lib.positions.find(p=>p.id===id).file),
- delPos:id=>confirmBox('Xoá vị trí này khỏi thư viện?',async()=>{const p=DB.lib.positions.find(x=>x.id===id);if(p&&p.file)await delFile(p.file);DB.lib.positions=DB.lib.positions.filter(x=>x.id!==id);commit()},'Xoá'),
+ viewVerFile:(id,el)=>openFile(DB.lib.positions.find(p=>p.id===id).versions.find(v=>v.id===el.dataset.arg).file),
+ delPos:id=>confirmBox('Xoá vị trí này cùng toàn bộ phiên bản và file scan?',async()=>{const p=DB.lib.positions.find(x=>x.id===id);if(p)for(const v of p.versions)if(v.file)await delFile(v.file);DB.lib.positions=DB.lib.positions.filter(x=>x.id!==id);commit()},'Xoá'),
  newTpl:()=>tplModal(),editTpl:id=>tplModal(DB.lib.templates.find(t=>t.id===id)),
  viewTpl:id=>letterModal(null,DB.lib.templates.find(t=>t.id===id)),
  dupTpl:id=>{const t=DB.lib.templates.find(x=>x.id===id);DB.lib.templates.push({...t,id:uid('t_'),name:t.name+' (bản sao)'});commit();toast('Đã nhân bản','ok')},

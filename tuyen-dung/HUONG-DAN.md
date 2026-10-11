@@ -44,3 +44,10 @@ Dán code mới vào `Code.gs` / `Index`, rồi **Triển khai → Quản lý b�
 - `Index.html` là **bản triển khai**: phần JavaScript được mã hoá base64 (khối `hr-payload`) để Apps Script không làm sai lệch mã. **Không sửa tay** file này.
 - Mã nguồn đọc được nằm ở `src/Index.source.html`. Sau khi sửa nguồn, chạy `python3 build.py` để tạo lại `Index.html`.
 - Nếu màn hình báo "Ứng dụng không khởi động được", thông báo sẽ kèm dòng code gây lỗi để dễ chẩn đoán.
+
+## Phiên bản vị trí & mô tả công việc
+
+- Mỗi vị trí (Thư viện → Vị trí) có nhiều **phiên bản**: file scan đã duyệt, ngày hiệu lực, thời hạn tuyển, nội dung thay đổi.
+- Có bản mới: bấm **Bản mới**. Bản cũ tự hết hiệu lực vào ngày hiệu lực của bản mới và vẫn được lưu (xem ở **Lịch sử**).
+- KPI thời gian tuyển của mỗi đề xuất dùng bản có hiệu lực **tại ngày Ban TGĐ duyệt**.
+- Dữ liệu vị trí cũ (một bản duy nhất) tự được chuyển thành phiên bản v1.
