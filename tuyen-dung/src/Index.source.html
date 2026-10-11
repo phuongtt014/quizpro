@@ -274,7 +274,7 @@ const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{co
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
-const APP_VER='v8 · 11/10/2026';
+const APP_VER='v9 · 11/10/2026';
 const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const MAXF=GS?10:15;
@@ -846,7 +846,7 @@ function vLib(){
   const tabs=[['pos','Vị trí & Mô tả công việc',DB.lib.positions.length],['tpl','Mẫu thư',DB.lib.templates.length],['form','Biểu mẫu tuyển dụng',DB.lib.forms.length]];
   let body='',act='';
   if(ui.lt==='pos'){
-    act=ed?`<button class="btn pri" data-act="newPos">${ic('plus')}Thêm vị trí</button>`:'';
+    act=ed?`<button class="btn" data-act="csv" data-id="positions">${ic('upload')}Nhập CSV</button><button class="btn pri" data-act="newPos">${ic('plus')}Thêm vị trí</button>`:'';
     const l=DB.lib.positions.filter(p=>!q||(p.code+p.name).toLowerCase().includes(q));
     body=`<div class="alert info" style="margin-bottom:14px">${ic('alert')}<div><b>Thời hạn tuyển</b> là số ngày chuẩn của vị trí, tính từ <b>ngày Ban TGĐ duyệt đề xuất</b> đến <b>ngày nhân sự vào làm</b>. Bảng điều khiển dùng số này để tính KPI tuyển dụng.</div></div>
     <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Mã vị trí</th><th>Tên vị trí</th><th>Thời hạn tuyển</th><th>Ngày hiệu lực</th><th>Tình trạng</th><th>File scan đã duyệt</th><th></th></tr></thead><tbody>${l.map(p=>`<tr><td class="mono">${esc(p.code)}</td><td><b>${esc(p.name)}</b></td><td>${esc(p.slaDays)} ngày</td><td>${fmtD(p.effective)}</td><td>${badge(p.status,p.status==='Đang áp dụng'?'b-ok':'b-gray')}</td><td>${p.file?`<button class="btn sm" data-act="viewPosFile" data-id="${p.id}">${ic('eye')}Xem tệp</button>`:'<span class="badge b-warn">Chưa có</span>'}</td><td style="text-align:right;white-space:nowrap">${ed?`<button class="btn sm" data-act="editPos" data-id="${p.id}">${ic('edit')}</button> <button class="btn sm bad" data-act="delPos" data-id="${p.id}">${ic('trash')}</button>`:''}</td></tr>`).join('')||`<tr><td colspan="7"><div class="empty">Chưa có vị trí</div></td></tr>`}</tbody></table></div></div>`;
@@ -903,7 +903,7 @@ function letterModal(c,t){
 /* ============ SETTINGS ============ */
 function vCfg(){
   const ro=!can('cfg.edit');
-  const subs=[['general','Thông tin chung'],['lists','Danh mục (khối, phòng ban, nguồn)'],['reqf','Trường – Đề xuất'],['candf','Trường – Ứng viên'],['users','Người dùng'],['perm','Phân quyền'],['data','Dữ liệu & sao lưu']];
+  const subs=[['general','Thông tin chung'],['lists','Danh mục'],['reqf','Trường – Đề xuất'],['candf','Trường – Ứng viên'],['users','Người dùng'],['perm','Phân quyền'],['data','Dữ liệu & sao lưu']];
   return pageH('Thiết lập','Cấu hình trường dữ liệu, danh mục, người dùng và phân quyền.')+`<div class="side"><div class="snav">${subs.map(s=>`<button class="${ui.cf===s[0]?'on':''}" data-act="cf" data-id="${s[0]}">${s[1]}</button>`).join('')}</div><div class="${ro?'ro':''}">${ro?`<div class="alert info" style="margin-bottom:14px">${ic('eye')}<div>Bạn chỉ có quyền <b>xem</b> Thiết lập. Chỉ quản trị (hoặc vai trò được cấp quyền “Chỉnh sửa Thiết lập”) mới thay đổi được.</div></div>`:''}${cfgBody()}</div></div>`;
 }
 function cfgBody(){
@@ -911,23 +911,20 @@ function cfgBody(){
   if(ui.cf==='general')return`<div class="card pad"><div class="fgrid"><div class="wide"><label class="f">Tên công ty / đơn vị (dùng trong thư & phiếu in)</label><input type="text" data-cfg="company" value="${esc(C.company)}"></div>
     <div><label class="f">Số ngày cho phép nộp bản ký sau khi duyệt</label><input type="number" min="0" data-cfg="signDays" value="${C.signDays}"></div></div><p class="muted small" style="margin-top:12px">Quá số ngày này, đề xuất thiếu bản ký sẽ hiển thị cảnh báo đỏ trong báo cáo.</p></div>`;
   if(ui.cf==='lists'){
-    const chips=(key,arr)=>`<div>${arr.map((x,i)=>`<span class="chip">${esc(x)}<button data-act="delItem" data-id="${key}" data-arg="${i}">×</button></span>`).join('')}</div><div class="row" style="margin-top:8px"><input type="text" id="add_${key}" placeholder="Thêm mới…" style="max-width:280px"><button class="btn" data-act="addItem" data-id="${key}">${ic('plus')}Thêm</button></div>`;
-    return`<div class="card pad"><h3 style="margin-bottom:10px">Khối</h3>${chips('blocks',C.blocks)}</div>
-    <div class="card pad" style="margin-top:14px"><h3 style="margin-bottom:10px">Phòng ban / Bộ phận</h3>
-      ${C.blocks.map(b=>`<div style="margin-bottom:8px"><b class="small muted">${esc(b)}</b><div>${C.depts.map((d,i)=>d.block===b?`<span class="chip">${esc(d.name)}<button data-act="delDept" data-id="${i}">×</button></span>`:'').join('')||'<span class="muted small">Chưa có</span>'}</div></div>`).join('')}
-      <div class="row" style="margin-top:8px"><input type="text" id="add_dept" placeholder="Tên phòng ban" style="max-width:240px"><select id="add_deptb" style="width:auto">${C.blocks.map(b=>`<option>${esc(b)}</option>`).join('')}</select><button class="btn" data-act="addDept">${ic('plus')}Thêm</button></div></div>
-    <div class="card pad" style="margin-top:14px"><h3 style="margin-bottom:10px">Nguồn ứng viên</h3>${chips('sources',C.sources)}</div>
-    <div class="card pad" style="margin-top:14px"><h3 style="margin-bottom:10px">Lý do loại ứng viên</h3>${chips('rejectReasons',C.rejectReasons)}</div>`;
+    const simple=(key)=>listCard({title:LIST_TITLES[key],imp:key,addAct:'itemAdd',addId:key,head:['#','Tên'],rows:C[key].map((x,i)=>`<tr><td class="muted" style="width:50px">${i+1}</td><td><b>${esc(x)}</b></td>${rowBtns('itemEdit','itemDel',key,i)}</tr>`)});
+    return listCard({title:'Khối',imp:'blocks',addAct:'itemAdd',addId:'blocks',head:['#','Tên khối','Số phòng ban'],rows:C.blocks.map((x,i)=>`<tr><td class="muted" style="width:50px">${i+1}</td><td><b>${esc(x)}</b></td><td>${C.depts.filter(d=>d.block===x).length}</td>${rowBtns('itemEdit','itemDel','blocks',i)}</tr>`)})
+     +listCard({title:'Phòng ban / Bộ phận',imp:'depts',addAct:'deptAdd',head:['#','Phòng ban','Khối'],rows:C.depts.map((d,i)=>`<tr><td class="muted" style="width:50px">${i+1}</td><td><b>${esc(d.name)}</b></td><td>${badge(d.block,d.block===C.blocks[0]?'b-info':'b-vio')}</td>${rowBtns('deptEdit','deptDel','',i)}</tr>`)})
+     +simple('sources')+simple('rejectReasons');
   }
   if(ui.cf==='reqf'||ui.cf==='candf'){
     const key=ui.cf==='reqf'?'reqFields':'candFields';const fs=C[key];
-    return`<div class="card"><div class="card-h"><span>${ui.cf==='reqf'?'Trường của biểu mẫu Đề xuất':'Trường của hồ sơ Ứng viên'}</span><button class="btn pri sm" data-act="addField" data-id="${key}">${ic('plus')}Thêm trường</button></div>
+    return`<div class="card"><div class="card-h"><span>${ui.cf==='reqf'?'Trường của biểu mẫu Đề xuất':'Trường của hồ sơ Ứng viên'}</span><div class="row"><button class="btn sm" data-act="csv" data-id="${key}">${ic('upload')}Nhập CSV</button><button class="btn pri sm" data-act="addField" data-id="${key}">${ic('plus')}Thêm trường</button></div></div>
     <div class="tbl-wrap"><table><thead><tr><th>Tên trường</th><th>Kiểu</th><th>Bắt buộc</th><th>Hiển thị</th><th></th></tr></thead><tbody>${fs.map((f,i)=>`<tr><td><b>${esc(f.l)}</b>${f.lock?' <span class="muted small">(hệ thống)</span>':''}${f.t==='select'&&f.opts?`<div class="muted small">${esc(f.opts.join(' · '))}</div>`:''}</td><td class="small">${esc((FTYPES.find(t=>t[0]===f.t)||[0,f.from?'Danh mục':f.t])[1])}</td>
       <td><input type="checkbox" class="chk" ${f.req?'checked':''} ${f.lock?'disabled':''} data-act="fieldToggle" data-id="${key}" data-arg="${i}:req"></td>
       <td><input type="checkbox" class="chk" ${f.vis!==0&&f.vis!==false?'checked':''} ${f.lock?'disabled':''} data-act="fieldToggle" data-id="${key}" data-arg="${i}:vis"></td>
-      <td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" data-act="fieldMove" data-id="${key}" data-arg="${i}:-1">${ic('up')}</button><button class="btn ghost sm" data-act="fieldMove" data-id="${key}" data-arg="${i}:1">${ic('down')}</button>${f.custom?`<button class="btn ghost sm" data-act="fieldEdit" data-id="${key}" data-arg="${i}">${ic('edit')}</button><button class="btn ghost sm" data-act="fieldDel" data-id="${key}" data-arg="${i}">${ic('trash')}</button>`:''}</td></tr>`).join('')}</tbody></table></div></div>`;
+      <td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" data-act="fieldMove" data-id="${key}" data-arg="${i}:-1">${ic('up')}</button><button class="btn ghost sm" data-act="fieldMove" data-id="${key}" data-arg="${i}:1">${ic('down')}</button><button class="btn sm" data-act="fieldEdit" data-id="${key}" data-arg="${i}">${ic('edit')}Sửa</button>${f.custom?` <button class="btn sm bad" data-act="fieldDel" data-id="${key}" data-arg="${i}">${ic('trash')}Xoá</button>`:''}</td></tr>`).join('')}</tbody></table></div></div>`;
   }
-  if(ui.cf==='users')return`<div class="card"><div class="card-h"><span>Người dùng</span><button class="btn pri sm" data-act="userEdit" data-id="">${ic('plus')}Thêm người dùng</button></div><div class="tbl-wrap"><table><thead><tr><th>Họ tên</th><th>Email đăng nhập</th><th>Chức danh</th><th>Phòng ban</th><th>Vai trò</th><th></th></tr></thead><tbody>${C.users.map(u=>`<tr><td><b>${esc(u.name)}</b></td><td class="small">${esc(u.email||'—')}</td><td>${esc(u.title)}</td><td>${esc(u.dept)}</td><td>${badge(roleOf(u).name,'b-info')}</td><td style="text-align:right"><button class="btn ghost sm" data-act="userEdit" data-id="${u.id}">${ic('edit')}</button><button class="btn ghost sm" data-act="userDel" data-id="${u.id}">${ic('trash')}</button></td></tr>`).join('')}</tbody></table></div></div>
+  if(ui.cf==='users')return`<div class="card"><div class="card-h"><span>Người dùng</span><div class="row"><button class="btn sm" data-act="csv" data-id="users">${ic('upload')}Nhập CSV</button><button class="btn pri sm" data-act="userEdit" data-id="">${ic('plus')}Thêm người dùng</button></div></div><div class="tbl-wrap"><table><thead><tr><th>Họ tên</th><th>Email đăng nhập</th><th>Chức danh</th><th>Phòng ban</th><th>Vai trò</th><th></th></tr></thead><tbody>${C.users.map(u=>`<tr><td><b>${esc(u.name)}</b></td><td class="small">${esc(u.email||'—')}</td><td>${esc(u.title)}</td><td>${esc(u.dept)}</td><td>${badge(roleOf(u).name,'b-info')}</td><td style="text-align:right;white-space:nowrap"><button class="btn sm" data-act="userEdit" data-id="${u.id}">${ic('edit')}Sửa</button> <button class="btn sm bad" data-act="userDel" data-id="${u.id}">${ic('trash')}Xoá</button></td></tr>`).join('')}</tbody></table></div></div>
     <p class="muted small" style="margin-top:10px">Mẹo: dùng ô chọn người dùng ở góc trên bên phải để xem giao diện theo từng vai trò.</p>`;
   if(ui.cf==='perm')return`<div class="card"><div class="card-h"><span>Ma trận phân quyền</span><button class="btn sm" data-act="roleAdd">${ic('plus')}Thêm vai trò</button></div><div class="tbl-wrap"><table><thead><tr><th>Quyền</th>${C.roles.map(r=>`<th style="text-align:center">${esc(r.name)}${!r.locked?` <button class="btn ghost sm" data-act="roleDel" data-id="${r.id}" style="padding:0 4px">${ic('x')}</button>`:''}</th>`).join('')}</tr></thead><tbody>${CAPS.map(c=>`<tr><td>${esc(c[1])}</td>${C.roles.map(r=>`<td style="text-align:center"><input type="checkbox" class="chk" ${r.locked||r.caps.includes(c[0])?'checked':''} ${r.locked?'disabled':''} data-act="capToggle" data-id="${r.id}" data-arg="${c[0]}"></td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
     <div class="alert info" style="margin-top:14px">${ic('alert')}<div>Vai trò mặc định: <b>Người đề xuất</b> (chỉ thấy đề xuất của mình), <b>Nhân viên tuyển dụng</b>, <b>Ban Tổng giám đốc</b> (phê duyệt), <b>Quản trị</b> (toàn quyền, không chỉnh sửa được).</div></div>`;
@@ -935,17 +932,125 @@ function cfgBody(){
     <p class="small" style="margin-top:14px"><b>Chẩn đoán:</b> phiên bản ${APP_VER} · chế độ ${ENV.gs?'Google Sheet':'xem thử'} · tài khoản ${esc(ENV.email||'—')} · đang có ${DB.reqs.length} đề xuất, ${DB.cands.length} ứng viên, ${DB.lib.positions.length} vị trí, ${DB.lib.templates.length} mẫu thư.</p>
     <p class="muted small" style="margin-top:8px">${ENV.gs?'Dữ liệu được lưu trong Google Sheet của bạn (các sheet DeXuat, UngVien, ThuVien, ThietLap); tệp đính kèm lưu trong thư mục Google Drive "HR Recruit – Tệp đính kèm". Không chỉnh sửa cột <b>data</b> bằng tay.':'Chế độ xem thử: dữ liệu chỉ lưu trên trình duyệt này. Triển khai Apps Script (xem HUONG-DAN.md) để lưu vào Google Sheet dùng chung.'} File sao lưu JSON không bao gồm tệp đính kèm.</p></div>`;
 }
+/* ===== Thiết lập: danh sách + nhập CSV ===== */
+const listCard=o=>`<div class="card" style="margin-bottom:16px"><div class="card-h"><span>${o.title} <span class="badge b-gray">${o.rows.length}</span></span><div class="row">${o.imp?`<button class="btn sm" data-act="csv" data-id="${o.imp}">${ic('upload')}Nhập CSV</button>`:''}<button class="btn pri sm" data-act="${o.addAct}" data-id="${o.addId||''}">${ic('plus')}Thêm</button></div></div>${o.desc?`<div class="small muted" style="padding:12px 18px 0">${o.desc}</div>`:''}<div class="tbl-wrap"><table><thead><tr>${o.head.map(h=>`<th>${h}</th>`).join('')}<th></th></tr></thead><tbody>${o.rows.join('')||`<tr><td colspan="${o.head.length+1}"><div class="empty">Chưa có dữ liệu – bấm “Thêm” hoặc “Nhập CSV”</div></td></tr>`}</tbody></table></div></div>`;
+const rowBtns=(edit,del,id,arg)=>`<td style="text-align:right;white-space:nowrap"><button class="btn sm" data-act="${edit}" data-id="${id}" data-arg="${arg}">${ic('edit')}Sửa</button> <button class="btn sm bad" data-act="${del}" data-id="${id}" data-arg="${arg}">${ic('trash')}Xoá</button></td>`;
+const LIST_TITLES={blocks:'Khối',sources:'Nguồn ứng viên',rejectReasons:'Lý do loại ứng viên'};
+function usedCount(key,v){
+  if(key==='blocks')return DB.cfg.depts.filter(d=>d.block===v).length+DB.reqs.filter(r=>r.v.block===v).length;
+  if(key==='sources')return DB.cands.filter(c=>c.v.source===v).length;
+  if(key==='rejectReasons')return DB.cands.filter(c=>c.rejectReason===v).length;
+  if(key==='depts')return DB.reqs.filter(r=>r.v.dept===v).length+DB.cfg.users.filter(u=>u.dept===v).length;
+  return 0;
+}
+function renameRef(key,o,n){
+  if(o===n)return;
+  if(key==='blocks'){DB.cfg.depts.forEach(d=>{if(d.block===o)d.block=n});DB.reqs.forEach(r=>{if(r.v.block===o)r.v.block=n})}
+  if(key==='sources')DB.cands.forEach(c=>{if(c.v.source===o)c.v.source=n});
+  if(key==='rejectReasons')DB.cands.forEach(c=>{if(c.rejectReason===o)c.rejectReason=n});
+  if(key==='depts'){DB.reqs.forEach(r=>{if(r.v.dept===o)r.v.dept=n});DB.cfg.users.forEach(u=>{if(u.dept===o)u.dept=n})}
+}
+function itemModal(key,i){
+  const arr=DB.cfg[key],old=i==null?'':arr[i];
+  modal({title:(i==null?'Thêm ':'Sửa ')+LIST_TITLES[key].toLowerCase(),html:`<label class="f">Tên <i>*</i></label><input type="text" id="it_v" value="${esc(old)}">${i!=null&&usedCount(key,old)?`<p class="small muted" style="margin-top:8px">Đang được dùng ở ${usedCount(key,old)} bản ghi — đổi tên sẽ cập nhật theo.</p>`:''}`,
+    buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{const v=$('#it_v').value.trim();if(!v){$('#it_v').classList.add('err');return false}
+      if(arr.some((x,j)=>j!==i&&x.toLowerCase()===v.toLowerCase())){toast('Giá trị đã tồn tại','err');return false}
+      if(i==null)arr.push(v);else{arr[i]=v;renameRef(key,old,v)}commit()}}]});
+}
+function deptModal(i){
+  const d=i==null?{name:'',block:DB.cfg.blocks[0]||''}:DB.cfg.depts[i];
+  modal({title:i==null?'Thêm phòng ban':'Sửa phòng ban',html:`<div class="fgrid"><div><label class="f">Tên phòng ban <i>*</i></label><input type="text" id="dp_n" value="${esc(d.name)}"></div><div><label class="f">Khối <i>*</i></label><select id="dp_b">${DB.cfg.blocks.map(b=>`<option ${b===d.block?'selected':''}>${esc(b)}</option>`).join('')}</select></div></div>`,
+    buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{const n=$('#dp_n').value.trim(),b=$('#dp_b').value;if(!n||!b){$('#dp_n').classList.add('err');return false}
+      if(DB.cfg.depts.some((x,j)=>j!==i&&x.name.toLowerCase()===n.toLowerCase())){toast('Phòng ban đã tồn tại','err');return false}
+      if(i==null)DB.cfg.depts.push({name:n,block:b});else{const old=d.name;d.name=n;d.block=b;renameRef('depts',old,n)}commit()}}]});
+}
+/* --- CSV --- */
+const nrm=s=>String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/Đ/g,'d').toLowerCase().trim();
+function parseCSV(text){
+  text=String(text).replace(/^﻿/,'');
+  const first=(text.split(/\r?\n/).find(l=>l.trim())||'');
+  const cnt=c=>first.split(c).length-1;
+  const d=[['\t',cnt('\t')],[';',cnt(';')],[',',cnt(',')]].sort((a,b)=>b[1]-a[1])[0];
+  const delim=d[1]>0?d[0]:',';
+  const rows=[];let row=[],cur='',q=false;
+  const pushRow=()=>{row.push(cur);cur='';if(row.some(x=>x.trim()!==''))rows.push(row);row=[]};
+  for(let i=0;i<text.length;i++){const ch=text[i];
+    if(q){if(ch==='"'){if(text[i+1]==='"'){cur+='"';i++}else q=false}else cur+=ch}
+    else if(ch==='"')q=true;
+    else if(ch===delim){row.push(cur);cur=''}
+    else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&text[i+1]==='\n')i++;pushRow()}
+    else cur+=ch}
+  pushRow();
+  return rows.map(r=>r.map(x=>x.trim()));
+}
+function parseDateVN(s){
+  s=String(s||'').trim();let m;
+  if((m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)))return`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  if((m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/)))return`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  return'';
+}
+const TRUTHY=['1','x','co','yes','true','y','bat buoc','v'];
+const TYPE_MAP={text:['text','van ban ngan','van ban','chu'],textarea:['textarea','van ban dai','mo ta','ghi chu'],number:['number','so'],date:['date','ngay'],select:['select','danh sach chon','danh sach','lua chon']};
+const typeFromText=s=>{const n=nrm(s);for(const k in TYPE_MAP)if(TYPE_MAP[k].includes(n))return k;return'text'};
+function csvSpec(key){
+  const C=DB.cfg;
+  const simple=(title,arr)=>({title,cols:['Tên'],example:[['Ví dụ 1'],['Ví dụ 2']],apply(rows){let a=0,s=0;rows.forEach(r=>{const v=r[0];if(!v||arr.some(x=>x.toLowerCase()===v.toLowerCase()))s++;else{arr.push(v);a++}});return`Đã thêm ${a}, bỏ qua ${s} (trùng hoặc trống)`}});
+  if(key==='blocks')return simple('Khối',C.blocks);
+  if(key==='sources')return simple('Nguồn ứng viên',C.sources);
+  if(key==='rejectReasons')return simple('Lý do loại ứng viên',C.rejectReasons);
+  if(key==='depts')return{title:'Phòng ban',cols:['Tên phòng ban','Khối'],example:[['Tổ Vật lý','Khối trường'],['Pháp chế','Khối văn phòng']],note:'Khối chưa có sẽ được tạo tự động.',apply(rows){let a=0,s=0,nb=0;rows.forEach(r=>{const n=r[0],b=r[1]||C.blocks[0];if(!n||!b){s++;return}
+    if(!C.blocks.some(x=>x.toLowerCase()===b.toLowerCase())){C.blocks.push(b);nb++}
+    const bb=C.blocks.find(x=>x.toLowerCase()===b.toLowerCase());
+    if(C.depts.some(d=>d.name.toLowerCase()===n.toLowerCase()))s++;else{C.depts.push({name:n,block:bb});a++}});return`Đã thêm ${a} phòng ban${nb?`, ${nb} khối mới`:''}, bỏ qua ${s}`}};
+  if(key==='reqFields'||key==='candFields')return{title:key==='reqFields'?'Trường – Đề xuất':'Trường – Ứng viên',cols:['Tên trường','Kiểu','Bắt buộc','Lựa chọn'],example:[['Số CCCD','Văn bản ngắn','Không',''],['Hình thức làm việc','Danh sách chọn','Có','Toàn thời gian|Bán thời gian']],
+    note:'Kiểu: Văn bản ngắn, Văn bản dài, Số, Ngày, Danh sách chọn. Lựa chọn cách nhau bằng dấu |.',
+    apply(rows){let a=0,s=0;rows.forEach(r=>{const l=r[0];if(!l||C[key].some(f=>nrm(f.l)===nrm(l))){s++;return}
+      let t=typeFromText(r[1]);const opts=(r[3]||'').split(/[|\n]/).map(x=>x.trim()).filter(Boolean);if(t==='select'&&!opts.length)t='text';
+      C[key].push({k:uid('c_'),l,t,req:TRUTHY.includes(nrm(r[2]))?1:0,vis:1,custom:1,opts:t==='select'?opts:undefined});a++});return`Đã thêm ${a} trường, bỏ qua ${s} (trùng hoặc trống)`}};
+  if(key==='users')return{title:'Người dùng',cols:['Họ tên','Email','Chức danh','Phòng ban','Vai trò'],example:[['Nguyễn Văn B','b@congty.edu.vn','Tổ trưởng','Tổ Ngữ văn','Người đề xuất']],note:'Email trùng sẽ được cập nhật. Vai trò theo tên đã tạo; không khớp sẽ dùng vai trò đầu tiên.',
+    apply(rows){let a=0,u=0,s=0;rows.forEach(r=>{const n=r[0];if(!n){s++;return}const em=(r[1]||'').toLowerCase();const role=C.roles.find(x=>nrm(x.name)===nrm(r[4])||x.id===r[4])||C.roles[0];
+      const ex=em&&C.users.find(x=>(x.email||'').toLowerCase()===em);
+      const o={name:n,email:em,title:r[2]||'',dept:r[3]||'',roleId:role.id};
+      if(ex){if(ex.id===ui.realMe)o.roleId=ex.roleId;Object.assign(ex,o);u++}else{C.users.push({id:uid('u'),...o});a++}});return`Đã thêm ${a}, cập nhật ${u}, bỏ qua ${s}`}};
+  if(key==='positions')return{title:'Vị trí',cols:['Mã vị trí','Tên vị trí','Thời hạn tuyển (ngày)','Ngày hiệu lực','Tình trạng'],example:[['GV-LY','Giáo viên Vật lý','30','01/09/2026','Đang áp dụng']],note:'Mã trùng sẽ được cập nhật (giữ nguyên file scan). Ngày dạng dd/mm/yyyy.',
+    apply(rows){let a=0,u=0,s=0;rows.forEach(r=>{const code=r[0],name=r[1];if(!code||!name){s++;return}
+      const ex=DB.lib.positions.find(p=>p.code.toLowerCase()===code.toLowerCase());
+      const o={code,name,slaDays:r[2]!==undefined&&r[2]!==''&&!isNaN(+r[2])?+r[2]:(ex?ex.slaDays:30),effective:parseDateVN(r[3])||(ex?ex.effective:iso()),status:r[4]?(nrm(r[4]).includes('ngung')?'Ngừng áp dụng':'Đang áp dụng'):(ex?ex.status:'Đang áp dụng')};
+      if(ex){Object.assign(ex,o);u++}else{DB.lib.positions.push({id:uid('p_'),...o,file:null});a++}});return`Đã thêm ${a}, cập nhật ${u}, bỏ qua ${s}`}};
+  return null;
+}
+function csvOpen(key){
+  const need=key==='positions'?'lib.edit':'cfg.edit';
+  if(!can(need)){toast('Bạn không có quyền nhập dữ liệu này','err');return}
+  const spec=csvSpec(key);if(!spec)return;
+  const getRows=()=>{let rows=parseCSV($('#csv_t').value);if(rows.length){const h=nrm(rows[0][0]),c0=nrm(spec.cols[0]);if(h&&(h===c0||c0.includes(h)||h.includes(c0)&&h.length<=c0.length+2))rows=rows.slice(1)}return rows};
+  modal({title:'Nhập CSV – '+spec.title,wide:true,
+    html:`<div class="alert info" style="margin-bottom:12px">${ic('alert')}<div>Dán dữ liệu từ Excel / Google Sheets hoặc chọn file .csv (phân cách bằng dấu phẩy, chấm phẩy hoặc Tab). Thứ tự cột: <b>${spec.cols.join(' · ')}</b>. Dòng tiêu đề sẽ tự được bỏ qua. ${spec.note||''}</div></div>
+    <div class="row" style="margin-bottom:8px"><button class="btn sm" id="csv_file">${ic('upload')}Chọn file CSV</button><button class="btn sm" id="csv_tpl">${ic('download')}Tải file mẫu</button></div>
+    <textarea id="csv_t" style="min-height:150px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px" placeholder="${esc([spec.cols.join('\t'),...spec.example.map(r=>r.join('\t'))].join('\n'))}"></textarea><div id="csv_pv" style="margin-top:12px"></div>`,
+    after:()=>{
+      const pv=()=>{const rows=getRows();$('#csv_pv').innerHTML=rows.length?`<div class="small muted" style="margin-bottom:6px">Xem trước ${Math.min(rows.length,8)}/${rows.length} dòng</div><div class="tbl-wrap card"><table><thead><tr>${spec.cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,8).map(r=>`<tr>${spec.cols.map((c,i)=>`<td class="small">${esc(r[i]||'')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:''};
+      $('#csv_t').oninput=pv;
+      $('#csv_file').onclick=async()=>{const f=await pickFile('.csv,.tsv,.txt,text/csv');if(!f)return;$('#csv_t').value=await f.text();pv()};
+      $('#csv_tpl').onclick=()=>{const t='﻿'+[spec.cols,...spec.example].map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/csv;charset=utf-8'}));a.download='mau-'+key+'.csv';a.click()};
+    },
+    buttons:[modalCancel,{label:'Nhập dữ liệu',cls:'pri',icon:'check',fn:()=>{const rows=getRows();if(!rows.length){toast('Chưa có dữ liệu để nhập','err');return false}const msg=spec.apply(rows);commit();toast(msg,'ok')}}]});
+}
 function fieldModal(key,i){
   const f=i==null?{l:'',t:'text',custom:1,vis:1,req:0}:DB.cfg[key][i];
-  modal({title:i==null?'Thêm trường mới':'Sửa trường',html:`<div class="fgrid"><div class="wide"><label class="f">Tên trường <i>*</i></label><input type="text" id="nf_l" value="${esc(f.l)}"></div>
-    <div><label class="f">Kiểu dữ liệu</label><select id="nf_t">${FTYPES.map(t=>`<option value="${t[0]}" ${f.t===t[0]?'selected':''}>${t[1]}</option>`).join('')}</select></div>
-    <div><label class="f">Bắt buộc</label><select id="nf_r"><option value="0">Không</option><option value="1" ${f.req?'selected':''}>Có</option></select></div>
-    <div class="wide"><label class="f">Các lựa chọn (mỗi dòng một giá trị – chỉ dùng cho kiểu "Danh sách chọn")</label><textarea id="nf_o">${esc((f.opts||[]).join('\n'))}</textarea></div></div>`,
+  const builtin=i!=null&&!f.custom,locked=!!f.lock;
+  modal({title:i==null?'Thêm trường mới':'Sửa trường: '+f.l,html:`<div class="fgrid"><div class="wide"><label class="f">Tên trường <i>*</i></label><input type="text" id="nf_l" value="${esc(f.l)}"></div>
+    <div><label class="f">Kiểu dữ liệu</label><select id="nf_t" ${builtin?'disabled':''}>${FTYPES.map(t=>`<option value="${t[0]}" ${f.t===t[0]?'selected':''}>${t[1]}</option>`).join('')}${builtin&&!FTYPES.some(t=>t[0]===f.t)?`<option selected>${esc(f.from?'Danh mục':f.t)}</option>`:''}</select></div>
+    <div><label class="f">Bắt buộc</label><select id="nf_r" ${locked?'disabled':''}><option value="0">Không</option><option value="1" ${f.req?'selected':''}>Có</option></select></div>
+    <div><label class="f">Hiển thị trong biểu mẫu</label><select id="nf_v" ${locked?'disabled':''}><option value="1">Có</option><option value="0" ${f.vis===0||f.vis===false?'selected':''}>Ẩn</option></select></div>
+    ${f.from||(builtin&&f.t!=='select')?'':`<div class="wide"><label class="f">Các lựa chọn (mỗi dòng một giá trị – chỉ dùng cho kiểu “Danh sách chọn”)</label><textarea id="nf_o">${esc((f.opts||[]).join('\n'))}</textarea></div>`}</div>
+    ${locked?'<p class="small muted" style="margin-top:10px">Trường hệ thống bắt buộc: chỉ đổi được tên hiển thị.</p>':''}`,
     buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{const l=$('#nf_l').value.trim();if(!l){$('#nf_l').classList.add('err');return false}
-      const t=$('#nf_t').value;const o=$('#nf_o').value.split('\n').map(s=>s.trim()).filter(Boolean);
-      const nf={...f,l,t,req:$('#nf_r').value==='1'?1:0,opts:t==='select'?o:undefined,k:f.k||uid('c_'),custom:1,vis:1};
-      if(t==='select'&&!o.length){toast('Vui lòng nhập các lựa chọn','err');return false}
-      if(i==null)DB.cfg[key].push(nf);else DB.cfg[key][i]=nf;commit()}}]});
+      const t=builtin?f.t:$('#nf_t').value;const oel=$('#nf_o');const o=oel?oel.value.split('\n').map(s=>s.trim()).filter(Boolean):(f.opts||[]);
+      if(t==='select'&&!f.from&&!o.length){toast('Vui lòng nhập các lựa chọn','err');return false}
+      const nf={...f,l,t,req:locked?f.req:($('#nf_r').value==='1'?1:0),vis:locked?f.vis:($('#nf_v').value==='1'?1:0),opts:t==='select'&&!f.from?o:f.opts,k:f.k||uid('c_')};
+      if(nf.vis===0)nf.req=0;
+      if(i==null){nf.custom=1;DB.cfg[key].push(nf)}else DB.cfg[key][i]=nf;commit()}}]});
 }
 
 /* ============ actions ============ */
@@ -1002,6 +1107,11 @@ const A={
  dlForm:id=>openFile(DB.lib.forms.find(f=>f.id===id).file,true),
  delForm:id=>confirmBox('Xoá biểu mẫu này?',async()=>{const f=DB.lib.forms.find(x=>x.id===id);await delFile(f.file);DB.lib.forms=DB.lib.forms.filter(x=>x.id!==id);commit()},'Xoá'),
  /* settings */
+ itemAdd:id=>itemModal(id),itemEdit:(id,el)=>itemModal(id,+el.dataset.arg),
+ itemDel:(id,el)=>{const i=+el.dataset.arg,v=DB.cfg[id][i],n=usedCount(id,v);confirmBox(`Xoá “${esc(v)}”?${n?` Đang được dùng ở ${n} bản ghi (dữ liệu cũ vẫn giữ nguyên giá trị).`:''}`,()=>{DB.cfg[id].splice(i,1);commit()},'Xoá')},
+ deptAdd:()=>deptModal(),deptEdit:(id,el)=>deptModal(+el.dataset.arg),
+ deptDel:(id,el)=>{const i=+el.dataset.arg,d=DB.cfg.depts[i],n=usedCount('depts',d.name);confirmBox(`Xoá phòng ban “${esc(d.name)}”?${n?` Đang được dùng ở ${n} bản ghi.`:''}`,()=>{DB.cfg.depts.splice(i,1);commit()},'Xoá')},
+ csv:id=>csvOpen(id),
  addItem:id=>{const i=$('#add_'+id);const v=i.value.trim();if(v&&!DB.cfg[id].includes(v)){DB.cfg[id].push(v);commit()}},
  delItem:(id,el)=>{DB.cfg[id].splice(+el.dataset.arg,1);commit()},
  addDept:()=>{const v=$('#add_dept').value.trim();if(v){DB.cfg.depts.push({name:v,block:$('#add_deptb').value});commit()}},
@@ -1024,7 +1134,7 @@ const A={
  resetDemo:()=>confirmBox('Nạp dữ liệu mẫu? Dữ liệu hiện tại sẽ bị thay thế.',()=>{DB=seedDemo();normalize();pickUser();ui.tab='dash';commit()},'Nạp dữ liệu mẫu'),
  clearAll:()=>confirmBox('Xoá TOÀN BỘ đề xuất, ứng viên và thư viện (giữ thiết lập)?',()=>{DB.reqs=[];DB.cands=[];DB.lib={positions:[],templates:[],forms:[]};commit()},'Xoá hết')
 };
-const CFG_ACTS=['addItem','delItem','addDept','delDept','addField','fieldEdit','fieldDel','fieldToggle','fieldMove','userEdit','userDel','capToggle','roleAdd','roleDel','importData','resetDemo','clearAll'];
+const CFG_ACTS=['itemAdd','itemEdit','itemDel','deptAdd','deptEdit','deptDel','addItem','delItem','addDept','delDept','addField','fieldEdit','fieldDel','fieldToggle','fieldMove','userEdit','userDel','capToggle','roleAdd','roleDel','importData','resetDemo','clearAll'];
 CFG_ACTS.forEach(k=>{const f=A[k];A[k]=(...a)=>can('cfg.edit')?f(...a):toast('Bạn không có quyền chỉnh sửa Thiết lập','err')});
 function roundModal(c,i){
   const fields=[{k:'name',l:'Tên vòng',t:'text',req:1,wide:1},{k:'date',l:'Ngày',t:'date'},{k:'time',l:'Giờ',t:'time'},{k:'place',l:'Địa điểm / hình thức',t:'text',wide:1},{k:'who',l:'Người phỏng vấn',t:'text',wide:1},selF('result','Kết quả',R_IV),{k:'score',l:'Điểm (0–10)',t:'number'},{k:'note',l:'Nhận xét',t:'textarea',wide:1}];
