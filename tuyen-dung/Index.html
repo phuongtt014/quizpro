@@ -261,6 +261,7 @@ const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{co
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
+const APP_VER='v5 · 11/10/2026';
 const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const MAXF=GS?10:15;
@@ -524,7 +525,7 @@ function renderShell(){
   $('#tabs').innerHTML=tabs.map(t=>`<button class="tab ${ui.tab===t[0]?'on':''}" data-act="tab" data-id="${t[0]}">${ic(t[2])}${t[1]}${cnt[t[0]]?`<span class="cnt">${cnt[t[0]]}</span>`:''}</button>`).join('');
   const real=DB.cfg.users.find(x=>x.id===ui.realMe);const isAdm=real&&roleOf(real).id==='admin';
   $('#sbFoot').innerHTML=(isAdm?`<label>Xem thử với vai trò</label><select data-who="1">${DB.cfg.users.map(x=>`<option value="${x.id}" ${x.id===ui.me?'selected':''}>${esc(x.name)} · ${esc(roleOf(x).name)}</option>`).join('')}</select>`:'')
-   +`<div class="sync" id="syncBox" data-act="retrySave" style="cursor:pointer"></div>`+(ENV.gs?`<button class="sb-btn" data-act="reload">${ic('download')}Làm mới dữ liệu</button>`:'');
+   +`<div class="sync" id="syncBox" data-act="retrySave" style="cursor:pointer"></div>`+(ENV.gs?`<button class="sb-btn" data-act="reload">${ic('download')}Làm mới dữ liệu</button>`:'')+`<div style="opacity:.6;font-size:11px">Phiên bản ${APP_VER}</div>`;
   const st=ui.sync||['ok',syncMsg()];setSync(st[0],st[1]);
 }
 function render(){
@@ -917,7 +918,8 @@ function cfgBody(){
   if(ui.cf==='perm')return`<div class="card"><div class="card-h"><span>Ma trận phân quyền</span><button class="btn sm" data-act="roleAdd">${ic('plus')}Thêm vai trò</button></div><div class="tbl-wrap"><table><thead><tr><th>Quyền</th>${C.roles.map(r=>`<th style="text-align:center">${esc(r.name)}${!r.locked?` <button class="btn ghost sm" data-act="roleDel" data-id="${r.id}" style="padding:0 4px">${ic('x')}</button>`:''}</th>`).join('')}</tr></thead><tbody>${CAPS.map(c=>`<tr><td>${esc(c[1])}</td>${C.roles.map(r=>`<td style="text-align:center"><input type="checkbox" class="chk" ${r.locked||r.caps.includes(c[0])?'checked':''} ${r.locked?'disabled':''} data-act="capToggle" data-id="${r.id}" data-arg="${c[0]}"></td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
     <div class="alert info" style="margin-top:14px">${ic('alert')}<div>Vai trò mặc định: <b>Người đề xuất</b> (chỉ thấy đề xuất của mình), <b>Nhân viên tuyển dụng</b>, <b>Ban Tổng giám đốc</b> (phê duyệt), <b>Quản trị</b> (toàn quyền, không chỉnh sửa được).</div></div>`;
   return`<div class="card pad"><div class="row"><button class="btn" data-act="exportData">${ic('download')}Xuất sao lưu (JSON)</button><button class="btn" data-act="importData">${ic('upload')}Nhập sao lưu</button>${ENV.sheetUrl?`<button class="btn pri" data-act="openSheet">${ic('file')}Mở Google Sheet</button>`:''}<button class="btn bad" data-act="resetDemo">Nạp dữ liệu mẫu</button><button class="btn bad" data-act="clearAll">Xoá toàn bộ dữ liệu</button></div>
-    <p class="muted small" style="margin-top:14px">${ENV.gs?'Dữ liệu được lưu trong Google Sheet của bạn (các sheet DeXuat, UngVien, ThuVien, ThietLap); tệp đính kèm lưu trong thư mục Google Drive "HR Recruit – Tệp đính kèm". Không chỉnh sửa cột <b>data</b> bằng tay.':'Chế độ xem thử: dữ liệu chỉ lưu trên trình duyệt này. Triển khai Apps Script (xem HUONG-DAN.md) để lưu vào Google Sheet dùng chung.'} File sao lưu JSON không bao gồm tệp đính kèm.</p></div>`;
+    <p class="small" style="margin-top:14px"><b>Chẩn đoán:</b> phiên bản ${APP_VER} · chế độ ${ENV.gs?'Google Sheet':'xem thử'} · tài khoản ${esc(ENV.email||'—')} · đang có ${DB.reqs.length} đề xuất, ${DB.cands.length} ứng viên, ${DB.lib.positions.length} vị trí, ${DB.lib.templates.length} mẫu thư.</p>
+    <p class="muted small" style="margin-top:8px">${ENV.gs?'Dữ liệu được lưu trong Google Sheet của bạn (các sheet DeXuat, UngVien, ThuVien, ThietLap); tệp đính kèm lưu trong thư mục Google Drive "HR Recruit – Tệp đính kèm". Không chỉnh sửa cột <b>data</b> bằng tay.':'Chế độ xem thử: dữ liệu chỉ lưu trên trình duyệt này. Triển khai Apps Script (xem HUONG-DAN.md) để lưu vào Google Sheet dùng chung.'} File sao lưu JSON không bao gồm tệp đính kèm.</p></div>`;
 }
 function fieldModal(key,i){
   const f=i==null?{l:'',t:'text',custom:1,vis:1,req:0}:DB.cfg[key][i];
