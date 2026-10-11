@@ -208,13 +208,24 @@ label.f i{color:var(--bad);font-style:normal}
 </style>
 </head>
 <body>
+<script>
+/* Chẩn đoán khởi động: chạy trước script chính */
+window.__errs=[];
+window.addEventListener('error',function(e){window.__errs.push((e.message||'lỗi')+(e.lineno?' (dòng '+e.lineno+')':''));bootFail()});
+function bootFail(){
+  if(window.__HR_OK)return;var a=document.getElementById('app');if(!a)return;
+  var m=window.__errs.length?'Lỗi: <code>'+window.__errs.join('; ').replace(/</g,'&lt;')+'</code>':'Script chính không chạy. Nguyên nhân thường gặp: file <b>Index</b> trong Apps Script bị dán <b>thiếu phần cuối</b> hoặc dán lẫn nội dung khác.';
+  a.innerHTML='<div style="padding:30px;max-width:640px"><h2>Ứng dụng không khởi động được</h2><p style="margin:10px 0">'+m+'</p><p>Hãy xoá toàn bộ nội dung file Index, dán lại <b>đầy đủ</b> từ <code>&lt;!DOCTYPE html&gt;</code> đến <code>&lt;/html&gt;</code> (file gốc ~120.000 ký tự), lưu và triển khai phiên bản mới.</p></div>';
+}
+setTimeout(bootFail,3000);
+</script>
 <div class="app">
 <aside class="sb">
   <div class="sb-user"><div class="sb-av" id="av"></div><div class="sb-name" id="sbName"></div><div class="sb-role" id="sbRole"></div></div>
   <nav class="sb-nav" id="tabs"></nav>
   <div class="sb-foot" id="sbFoot"></div>
 </aside>
-<main id="app"></main>
+<main id="app"><div class="loading"><div><div class="spin"></div><p style="margin-top:12px">Đang khởi động ứng dụng…</p></div></div></main>
 </div>
 
 <div class="ov" id="ov"></div>
@@ -261,7 +272,7 @@ const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{co
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
-const APP_VER='v5 · 11/10/2026';
+const APP_VER='v6 · 11/10/2026';
 const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const MAXF=GS?10:15;
@@ -453,6 +464,7 @@ async function loadAll(){
   lastLoad=Date.now();
 }
 async function init(){
+  window.__HR_OK=1;
   $('#app').innerHTML='<div class="loading"><div><div class="spin"></div><p style="margin-top:12px">Đang tải dữ liệu…</p></div></div>';
   try{await loadAll()}catch(e){$('#app').innerHTML=`<div class="loading"><div><b>Không tải được dữ liệu</b><p class="muted">${esc(e&&e.message||e)}</p><button class="btn pri" style="margin-top:10px" data-act="reload">Thử lại</button></div></div>`;return}
   if(!pickUser()){$('#tabs').innerHTML='';$('#app').innerHTML=`<div class="loading"><div><h2>Chưa được cấp quyền truy cập</h2><p class="muted" style="max-width:420px;margin-top:6px">Tài khoản <b>${esc(ENV.email||'(không xác định)')}</b> chưa có trong danh sách người dùng. Hãy nhờ quản trị viên thêm email này tại Thiết lập → Người dùng.</p></div></div>`;return}
