@@ -51,3 +51,11 @@ Dán code mới vào `Code.gs` / `Index`, rồi **Triển khai → Quản lý b�
 - Có bản mới: bấm **Bản mới**. Bản cũ tự hết hiệu lực vào ngày hiệu lực của bản mới và vẫn được lưu (xem ở **Lịch sử**).
 - KPI thời gian tuyển của mỗi đề xuất dùng bản có hiệu lực **tại ngày Ban TGĐ duyệt**.
 - Dữ liệu vị trí cũ (một bản duy nhất) tự được chuyển thành phiên bản v1.
+
+## MTCV trong đề xuất & kiểu dữ liệu URL / File
+
+- Khi tạo đề xuất, hệ thống kiểm tra vị trí đề xuất trong **Thư viện**:
+  - Vị trí có file MTCV scan **đang hiệu lực** → tự đính kèm, người đề xuất **bắt buộc bấm "Xác nhận sử dụng MTCV hiện tại"** mới gửi được.
+  - Chưa có file (hoặc vị trí chưa có trong Thư viện) → **bắt buộc tải file MTCV**. Ghi chú: file cần có ký số điện tử hoặc ký trực tiếp đến cấp Trưởng đơn vị (Khối văn phòng và Kinh doanh), đến cấp Hội đồng trực thuộc (Khối trường).
+- Thiết lập → Trường: có thêm kiểu **Liên kết (URL)** và **Tệp tải lên (File)** (CSV: cột Kiểu ghi `URL` hoặc `Tệp tải lên`).
+- Tệp dùng chung giữa Thư viện và đề xuất chỉ bị xoá khỏi Drive khi không còn bản ghi nào tham chiếu.

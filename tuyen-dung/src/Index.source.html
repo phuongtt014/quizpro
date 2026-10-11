@@ -100,8 +100,9 @@ main{flex:1;min-width:0;max-width:1560px;padding:26px 28px 60px}
 .badge{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
 .b-ok{background:var(--ok-soft);color:var(--ok)}.b-warn{background:var(--warn-soft);color:var(--warn)}.b-bad{background:var(--bad-soft);color:var(--bad)}.b-info{background:var(--info-soft);color:var(--info)}.b-vio{background:var(--vio-soft);color:var(--vio)}.b-gray{background:#eceff4;color:var(--ink2)}
 .muted{color:var(--ink3)}.small{font-size:12.5px}
-input[type=text],input[type=number],input[type=date],input[type=email],input[type=time],select,textarea{width:100%;padding:8px 11px;border:1px solid var(--line2);border-radius:9px;background:#fff;outline:none}
+input[type=text],input[type=number],input[type=date],input[type=email],input[type=time],input[type=url],select,textarea{width:100%;padding:8px 11px;border:1px solid var(--line2);border-radius:9px;background:#fff;outline:none}
 input:focus,select:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(47,91,234,.13)}
+input[type=file]{width:100%;padding:7px;border:1px dashed var(--line2);border-radius:9px;background:#fafbff}
 textarea{resize:vertical;min-height:80px}
 input.err,select.err,textarea.err{border-color:var(--bad);box-shadow:0 0 0 3px rgba(214,57,59,.12)}
 .search{position:relative;min-width:240px}
@@ -274,7 +275,7 @@ const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{co
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
-const APP_VER='v10 · 11/10/2026';
+const APP_VER='v11 · 11/10/2026';
 const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const MAXF=GS?10:15;
@@ -301,7 +302,7 @@ const CAPS=[
 ];
 const TPL_TYPES=['Thư mời phỏng vấn','Thư mời nhận việc','Thư cảm ơn','Thư từ chối','Khác'];
 const PH=[['ten_ung_vien','Tên ứng viên'],['vi_tri','Vị trí'],['phong_ban','Phòng ban'],['ngay_phong_van','Ngày PV'],['gio_phong_van','Giờ PV'],['dia_diem','Địa điểm PV'],['luong','Mức lương'],['ngay_nhan_viec','Ngày nhận việc'],['han_phan_hoi','Hạn phản hồi'],['nguoi_gui','Người gửi'],['cong_ty','Công ty']];
-const FTYPES=[['text','Văn bản ngắn'],['textarea','Văn bản dài'],['number','Số'],['date','Ngày'],['select','Danh sách chọn']];
+const FTYPES=[['text','Văn bản ngắn'],['textarea','Văn bản dài'],['number','Số'],['date','Ngày'],['select','Danh sách chọn'],['url','Liên kết (URL)'],['file','Tệp tải lên (File)']];
 
 /* ============ seed ============ */
 function seed(){
@@ -490,19 +491,35 @@ function optsFor(f,vals){
   if(f.from==='requests')return DB.reqs.filter(r=>r.status==='approved'||r.id===vals.reqId).map(r=>[r.id,`${r.code} · ${r.v.position} (${r.v.dept})`]);
   return(f.opts||[]).map(x=>[x,x]);
 }
+function valHTML(f,val,ctx){
+  if(val===''||val==null)return'—';
+  if(f.t==='date')return esc(fmtD(val));
+  if(f.t==='url'){const u=/^https?:\/\//i.test(val)?val:'https://'+val;return`<a href="${esc(u)}" target="_blank" rel="noopener" style="color:var(--brand)">${esc(val)}</a>`}
+  if(f.t==='file')return val&&val.name?`<button class="btn sm" data-act="openFld" data-id="${ctx.kind}:${ctx.id}" data-arg="${f.k}">${ic('eye')}${esc(val.name)}</button>`:'—';
+  return esc(val);
+}
+async function finishFiles(fields,v,old){const rel=[];for(const f of fields){if(f.t!=='file')continue;const x=v[f.k];if(x instanceof File){toast('Đang tải tệp lên…');const meta=await storeFile(x);if(old&&old[f.k])rel.push(old[f.k]);v[f.k]=meta}else v[f.k]=old?old[f.k]:undefined}return rel}
+const fileRefd=id=>JSON.stringify([DB.reqs,DB.cands,DB.lib]).includes('"id":"'+id+'"');
+async function releaseFile(m){if(!m||m.demo||!m.id)return;if(!fileRefd(m.id))await delFile(m)}
+function reqFiles(r){const a=[r.signed,r.jd&&r.jd.file];DB.cfg.reqFields.forEach(f=>{if(f.t==='file')a.push(r.v[f.k])});return a}
+function candFiles(c){return DB.cfg.candFields.filter(f=>f.t==='file').map(f=>c.v[f.k])}
 function fieldHTML(f,vals){
   const v=vals[f.k]??'';const id='ff_'+f.k;const rq=f.req?' <i>*</i>':'';
   let inp;
   if(f.t==='textarea')inp=`<textarea id="${id}" data-k="${f.k}">${esc(v)}</textarea>`;
   else if(f.t==='select'){inp=`<select id="${id}" data-k="${f.k}"><option value="">— Chọn —</option>${optsFor(f,vals).map(o=>`<option value="${esc(o[0])}" ${o[0]==v?'selected':''}>${esc(o[1])}</option>`).join('')}</select>`}
+  else if(f.t==='file'){const has=v&&v.name;inp=`<input type="file" id="${id}" data-k="${f.k}" data-has="${has?1:0}">${has?`<div class="small muted" style="margin-top:4px">Hiện có: ${esc(v.name)} — chọn tệp mới để thay thế</div>`:''}`}
   else if(f.t==='combo')inp=`<input type="text" id="${id}" data-k="${f.k}" value="${esc(v)}" list="dl_${f.k}" autocomplete="off"><datalist id="dl_${f.k}">${optsFor(f,vals).map(o=>`<option value="${esc(o[0])}">`).join('')}</datalist>`;
-  else inp=`<input type="${f.t}" id="${id}" data-k="${f.k}" value="${esc(v)}" ${f.t==='number'?'min="0" step="any"':''}>`;
+  else inp=`<input type="${f.t}" id="${id}" data-k="${f.k}" value="${esc(v)}" ${f.t==='number'?'min="0" step="any"':''}${f.t==='url'?' placeholder="https://"':''}>`;
   return`<div class="${f.wide||f.t==='textarea'?'wide':''}"><label class="f" for="${id}">${esc(f.l)}${rq}</label>${inp}</div>`;
 }
 const formHTML=(fields,vals)=>`<div class="fgrid">${fields.filter(f=>f.vis!==0&&f.vis!==false).map(f=>fieldHTML(f,vals)).join('')}</div>`;
 function readForm(root,fields){
   const out={};let ok=true;
-  fields.forEach(f=>{const el=$(`[data-k="${f.k}"]`,root);if(!el)return;let val=el.value.trim();if(f.t==='number'&&val!=='')val=Number(val);out[f.k]=val;
+  fields.forEach(f=>{const el=$(`[data-k="${f.k}"]`,root);if(!el)return;
+    if(f.t==='file'){const file=el.files&&el.files[0];if(file&&file.size>MAXF*1048576){toast(`Tệp quá lớn (tối đa ${MAXF}MB)`,'err');el.classList.add('err');ok=false;return}
+      out[f.k]=file||undefined;const bad=f.req&&!file&&el.dataset.has!=='1';el.classList.toggle('err',bad);if(bad)ok=false;return}
+    let val=el.value.trim();if(f.t==='url'&&val&&!/^https?:\/\//i.test(val))val='https://'+val;if(f.t==='number'&&val!=='')val=Number(val);out[f.k]=val;
     const bad=f.req&&(val===''||val==null);el.classList.toggle('err',bad);if(bad)ok=false});
   if(!ok)toast('Vui lòng nhập các trường bắt buộc (*)','err');
   return ok?out:null;
@@ -703,17 +720,72 @@ function vReq(){
     <td>${r.status!=='approved'?'<span class="muted">—</span>':r.signed?badge('Đã có','b-ok'):badge(days>DB.cfg.signDays?`Thiếu · quá ${days-DB.cfg.signDays} ngày`:'Thiếu hồ sơ',days>DB.cfg.signDays?'b-bad':'b-warn')}</td></tr>`}).join('')||`<tr><td colspan="8"><div class="empty">${ic('clip')}<div>Không có đề xuất phù hợp</div></div></td></tr>`}
   </tbody></table></div></div>`;
 }
+function jdInfo(position,block){
+  const p=posByName(position);
+  if(!String(position||'').trim())return{empty:true};
+  if(!p)return{reason:'Vị trí này chưa có trong Thư viện'};
+  if(p.status==='Ngừng áp dụng')return{p,reason:'Vị trí đã ngừng áp dụng trong Thư viện'};
+  const ver=posVer(p);
+  if(!ver||(ver.effective||'')>todayIso())return{p,reason:'Vị trí chưa có bản MTCV nào đang hiệu lực'};
+  if(!ver.file)return{p,ver,reason:`Bản MTCV v${ver.ver} của vị trí chưa có file scan đã duyệt`};
+  return{p,ver,file:ver.file};
+}
+const signRule=block=>!block?'đến cấp Trưởng đơn vị (Khối văn phòng và Kinh doanh) hoặc đến cấp Hội đồng trực thuộc (Khối trường)':(/trường/i.test(block)?'đến cấp Hội đồng trực thuộc (Khối trường)':'đến cấp Trưởng đơn vị (Khối văn phòng và Kinh doanh)');
 function reqForm(r){
   const vals=r?{...r.v}:{};
   if(!r&&!vals.dept){const u=me();const d=DB.cfg.depts.find(x=>x.name===u.dept);if(d){vals.dept=d.name;vals.block=d.block}}
   const fields=DB.cfg.reqFields;
-  modal({title:r?`Sửa đề xuất ${r.code}`:'Tạo đề xuất tuyển dụng',wide:true,html:formHTML(fields,vals),after:m=>bindForm(m,fields),
+  const prevJd=r&&r.jd||null;
+  let jdOk=!!(prevJd&&prevJd.mode==='library'&&prevJd.confirmedAt),sig='';
+  const draw=(force)=>{
+    const box=$('#jdBox');if(!box)return;
+    const pos=$('#ff_position'),blk=$('#ff_block');const info=jdInfo(pos?pos.value:'',blk?blk.value:'');
+    const sg=[info.empty?'e':'',info.p&&info.p.id,info.ver&&info.ver.id,info.file?1:0,blk?blk.value:''].join('|');
+    if(!force&&sg===sig)return;
+    if(sg!==sig&&sig!==''&&!(prevJd&&info.ver&&prevJd.verId===info.ver.id))jdOk=false;
+    sig=sg;
+    if(info.empty){box.innerHTML=`<div class="alert info">${ic('alert')}<div>Chọn <b>Vị trí cần tuyển</b> để hệ thống kiểm tra MTCV (mô tả công việc) đã duyệt trong Thư viện.</div></div>`;return}
+    if(info.file){box.innerHTML=`<div class="card sec" style="border-left:4px solid var(--ok)"><div class="sec-h"><h3>${ic('file')}MTCV đính kèm tự động từ Thư viện</h3><button class="btn sm" data-act="viewVerFile" data-id="${info.p.id}" data-arg="${info.ver.id}">${ic('eye')}Xem file MTCV</button></div>
+      <div>Vị trí <b>${esc(info.p.name)}</b> — bản MTCV <b>v${info.ver.ver}</b> đang hiệu lực từ ${fmtD(info.ver.effective)} (${esc(info.file.name)}). Hệ thống sẽ đính kèm file này vào đề xuất.</div>
+      <div class="row" style="margin-top:12px"><button class="btn ${jdOk?'ok':'pri'}" id="jd_btn">${jdOk?ic('check')+'Đã xác nhận sử dụng MTCV hiện tại':'Xác nhận sử dụng MTCV hiện tại để tuyển dụng'}</button></div>
+      <p class="small muted" style="margin-top:8px">Bắt buộc bấm xác nhận trước khi gửi. Đề xuất dùng đúng bản MTCV hiện hành ở trên, không điều chỉnh.</p></div>`;
+      $('#jd_btn').onclick=()=>{jdOk=!jdOk;draw(true)};return}
+    const had=prevJd&&prevJd.mode==='upload'&&prevJd.file;
+    box.innerHTML=`<div class="card sec" style="border-left:4px solid var(--warn)"><div class="sec-h"><h3>${ic('upload')}Bắt buộc tải file MTCV kèm theo</h3></div>
+      <p style="margin-bottom:10px">${esc(info.reason)}. Vui lòng tải lên file MTCV của vị trí đề xuất.</p>
+      <div class="alert warn" style="margin-bottom:10px">${ic('alert')}<div><b>Ghi chú:</b> File cần có ký số điện tử hoặc ký trực tiếp ${signRule(blk?blk.value:'')}.</div></div>
+      ${had?`<div class="small muted" style="margin-bottom:6px">Hiện có: ${esc(prevJd.file.name)} — chọn tệp mới để thay thế</div>`:''}
+      <input type="file" id="jd_file" accept=".pdf,image/*,.doc,.docx"></div>`;
+  };
+  modal({title:r?`Sửa đề xuất ${r.code}`:'Tạo đề xuất tuyển dụng',wide:true,html:formHTML(fields,vals)+`<div id="jdBox" style="margin-top:16px"></div>`,
+    after:m=>{bindForm(m,fields);const pos=$('#ff_position'),blk=$('#ff_block');if(pos){pos.addEventListener('input',()=>draw());pos.addEventListener('change',()=>draw())}if(blk)blk.addEventListener('change',()=>setTimeout(draw,0));draw(true)},
     buttons:[modalCancel,{label:r?'Lưu thay đổi':'Gửi đề xuất duyệt',cls:'pri',icon:'check',fn:()=>{
       const v=readForm($('#modal'),fields);if(!v)return false;
-      if(r){r.v={...r.v,...v};log(r,'Cập nhật nội dung đề xuất')}
-      else{const yr=new Date().getFullYear();const n=Math.max(0,...DB.reqs.map(x=>{return x.code.startsWith('ĐX-'+yr+'-')?(+x.code.split('-').pop()||0):0}))+1;
-        const nr={id:uid('r_'),code:`ĐX-${new Date().getFullYear()}-${String(n).padStart(3,'0')}`,by:me().id,at:Date.now(),status:'pending',v,history:[],signed:null};log(nr,'Tạo đề xuất & gửi Ban TGĐ phê duyệt');DB.reqs.push(nr)}
-      commit();toast(r?'Đã cập nhật':'Đã gửi đề xuất chờ Ban TGĐ phê duyệt','ok')}}]});
+      const info=jdInfo(v.position,v.block);let jd,pending=null;
+      if(info.file){
+        if(!jdOk){toast('Vui lòng bấm “Xác nhận sử dụng MTCV hiện tại” trước khi gửi','err');return false}
+        jd={mode:'library',posId:info.p.id,verId:info.ver.id,ver:info.ver.ver,effective:info.ver.effective,file:info.file,confirmedAt:(prevJd&&prevJd.verId===info.ver.id&&prevJd.confirmedAt)||Date.now(),confirmedBy:(prevJd&&prevJd.verId===info.ver.id&&prevJd.confirmedBy)||me().name}
+      }else{
+        const fi=$('#jd_file'),f=fi&&fi.files[0];const had=prevJd&&prevJd.mode==='upload'&&prevJd.file;
+        if(!f&&!had){if(fi)fi.classList.add('err');toast('Chưa có MTCV đã duyệt trong Thư viện: bắt buộc tải file MTCV kèm theo','err');return false}
+        if(f&&f.size>MAXF*1048576){toast(`Tệp quá lớn (tối đa ${MAXF}MB)`,'err');return false}
+        pending=f||null;jd={mode:'upload',file:had&&!f?prevJd.file:null,uploadedBy:me().name,uploadedAt:Date.now()};
+      }
+      (async()=>{try{
+        const rel=await finishFiles(fields,v,r&&r.v);
+        if(pending){toast('Đang tải MTCV lên…');jd.file=await storeFile(pending);if(prevJd&&prevJd.mode==='upload'&&prevJd.file)rel.push(prevJd.file)}
+        if(prevJd&&prevJd.mode==='upload'&&prevJd.file&&jd.mode!=='upload')rel.push(prevJd.file);
+        if(r){r.v={...r.v,...v};r.jd=jd;log(r,'Cập nhật nội dung đề xuất')}
+        else{const yr=new Date().getFullYear();const n=Math.max(0,...DB.reqs.map(x=>{return x.code.startsWith('ĐX-'+yr+'-')?(+x.code.split('-').pop()||0):0}))+1;
+          const nr={id:uid('r_'),code:`ĐX-${yr}-${String(n).padStart(3,'0')}`,by:me().id,at:Date.now(),status:'pending',v,jd,history:[],signed:null};log(nr,'Tạo đề xuất & gửi Ban TGĐ phê duyệt'+(jd.mode==='library'?` (xác nhận MTCV v${jd.ver})`:' (kèm file MTCV)'));DB.reqs.push(nr)}
+        closeModal();commit();toast(r?'Đã cập nhật':'Đã gửi đề xuất chờ Ban TGĐ phê duyệt','ok');rel.forEach(releaseFile)}catch(e){toast('Không lưu được tệp','err')}})();
+      return false}}]});
+}
+function jdView(r){
+  const j=r.jd;if(!j)return'<span class="muted">Chưa có thông tin MTCV (đề xuất tạo trước khi có tính năng này).</span>';
+  const btn=j.file?`<button class="btn sm" data-act="openJd" data-id="${r.id}">${ic('eye')}Xem file MTCV</button>`:'';
+  if(j.mode==='library')return`<div class="row"><div class="grow">MTCV hiện hành trong Thư viện: <b>v${esc(j.ver)}</b> (hiệu lực từ ${fmtD(j.effective)})<div class="muted small">Đã xác nhận bởi ${esc(j.confirmedBy||'—')} lúc ${fmtDT(j.confirmedAt)}</div></div>${btn}</div>`;
+  return`<div class="row"><div class="grow">File MTCV do người đề xuất tải lên (vị trí chưa có MTCV đã duyệt trong Thư viện)<div class="muted small">${esc(j.uploadedBy||'')} · ${j.uploadedAt?fmtDT(j.uploadedAt):''} · cần có ký số điện tử hoặc ký trực tiếp ${signRule(r.v.block)}</div></div>${btn}</div>`;
 }
 function reqDrawer(id){
   return()=>{
@@ -735,8 +807,9 @@ function reqDrawer(id){
       ${(r.status==='pending'&&own)||me().roleId==='admin'?`<button class="btn bad" data-act="delReq" data-id="${r.id}">${ic('trash')}Xoá</button>`:''}
     </div>
     <div class="card sec"><div class="sec-h"><h3>${ic('clip')}Nội dung đề xuất</h3></div><dl class="kv">
-      ${fields.map(f=>{let v=r.v[f.k];if(f.t==='date')v=fmtD(v);return`<dt>${esc(f.l)}</dt><dd>${esc(v===''||v==null?'—':v)}</dd>`}).join('')}
+      ${fields.map(f=>`<dt>${esc(f.l)}</dt><dd>${valHTML(f,r.v[f.k],{kind:'req',id:r.id})}</dd>`).join('')}
     </dl></div>
+    <div class="card sec"><div class="sec-h"><h3>${ic('file')}MTCV đính kèm</h3></div>${jdView(r)}</div>
     ${r.status==='approved'?`<div class="card sec"><div class="sec-h"><h3>${ic('file')}Bản scan đã ký</h3>
       ${can('req.sign')?`<button class="btn sm ${r.signed?'':'pri'}" data-act="uploadSigned" data-id="${r.id}">${ic('upload')}${r.signed?'Thay tệp':'Tải lên bản scan'}</button>`:''}</div>
       ${r.signed?`<div class="row"><div class="grow"><b>${esc(r.signed.name)}</b><div class="muted small">${fsize(r.signed.size)} · tải lên ${fmtDT(r.signed.at)}</div></div>${r.signed.demo?'<span class="muted small">(tệp mẫu)</span>':`<button class="btn sm" data-act="viewSigned" data-id="${r.id}">${ic('eye')}Xem</button>`}</div>`:'<div class="muted">Chưa có tệp. Hãy in phiếu → ký → scan → tải lên (PDF hoặc ảnh).</div>'}</div>
@@ -791,9 +864,12 @@ function candModal(c){
   const fields=DB.cfg.candFields;const vals=c?{...c.v}:{reqId:ui.creq};
   modal({title:c?'Sửa thông tin ứng viên':'Thêm ứng viên',wide:true,html:formHTML(fields,vals),buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{
     const v=readForm($('#modal'),fields);if(!v)return false;
-    if(c){c.v={...c.v,...v};log(c,'Cập nhật thông tin ứng viên')}
-    else{const n={id:uid('c_'),stage:'new',createdAt:Date.now(),v,screening:null,interviews:[],offer:null,history:[]};log(n,'Thêm ứng viên');DB.cands.push(n)}
-    commit();toast('Đã lưu','ok')}}]});
+    (async()=>{try{
+      const rel=await finishFiles(fields,v,c&&c.v);
+      if(c){c.v={...c.v,...v};log(c,'Cập nhật thông tin ứng viên')}
+      else{const n={id:uid('c_'),stage:'new',createdAt:Date.now(),v,screening:null,interviews:[],offer:null,history:[]};log(n,'Thêm ứng viên');DB.cands.push(n)}
+      closeModal();commit();toast('Đã lưu','ok');rel.forEach(releaseFile)}catch(e){toast('Không lưu được tệp','err')}})();
+    return false}}]});
 }
 function candDrawer(id){
   return()=>{
@@ -807,7 +883,7 @@ function candDrawer(id){
     ${c.stage==='rejected'?`<div class="alert bad">${ic('x')}<div><b>Đã loại.</b> Lý do: ${esc(c.rejectReason||'chưa ghi nhận')}</div></div>`:''}
     ${mv?`<div class="card sec"><div class="sec-h"><h3>Chuyển giai đoạn</h3></div><div class="row">${STAGES.map(s=>`<button class="btn sm ${c.stage===s[0]?'pri':''}" data-act="setStage" data-id="${c.id}" data-arg="${s[0]}">${s[1]}</button>`).join('')}</div></div>`:''}
     <div class="card sec"><div class="sec-h"><h3>${ic('users')}Thông tin ứng viên</h3>${ed?`<button class="btn sm" data-act="editCand" data-id="${c.id}">${ic('edit')}Sửa</button>`:''}</div><dl class="kv">
-      ${fields.map(f=>{let v=c.v[f.k];if(f.t==='date')v=fmtD(v);return`<dt>${esc(f.l)}</dt><dd>${esc(v===''||v==null?'—':v)}</dd>`}).join('')}</dl></div>
+      ${fields.map(f=>`<dt>${esc(f.l)}</dt><dd>${valHTML(f,c.v[f.k],{kind:'cand',id:c.id})}</dd>`).join('')}</dl></div>
 
     <div class="card sec"><div class="sec-h"><h3>${ic('clip')}1 · Sơ vấn</h3>${ed?`<button class="btn sm" data-act="editScreen" data-id="${c.id}">${ic('edit')}${sc?'Cập nhật':'Ghi nhận'}</button>`:''}</div>
       ${sc?`<dl class="kv"><dt>Ngày sơ vấn</dt><dd>${fmtD(sc.date)}</dd><dt>Người thực hiện</dt><dd>${esc(sc.by||'—')}</dd><dt>Kết quả</dt><dd>${resBadge(sc.result)}</dd><dt>Nhận xét</dt><dd>${esc(sc.note||'—')}</dd></dl>`:'<span class="muted">Chưa ghi nhận sơ vấn.</span>'}</div>
@@ -903,9 +979,9 @@ function verModal(p,vid){
       if(x.slaDays<0){toast('Thời hạn phải ≥ 0','err');return false}
       const f=$('#vf').files[0];if(f&&f.size>MAXF*1048576){toast(`Tệp quá lớn (tối đa ${MAXF}MB)`,'err');return false}
       (async()=>{try{
-        let file=v?v.file:null;if(f){toast('Đang tải tệp lên…');const meta=await storeFile(f);if(file)await delFile(file);file=meta}
+        let file=v?v.file:null,oldF=null;if(f){toast('Đang tải tệp lên…');const meta=await storeFile(f);oldF=file;file=meta}
         if(v)Object.assign(v,{effective:x.effective,slaDays:x.slaDays,note:x.note,file});else newVer(p,{effective:x.effective,slaDays:x.slaDays,note:x.note,file});
-        syncPos(p);closeModal();commit();toast(v?'Đã cập nhật phiên bản':'Đã phát hành phiên bản mới'+(file?'':' (chưa có file scan)'),'ok');histModal(p)}catch(e){toast('Không lưu được tệp','err')}})();
+        syncPos(p);closeModal();commit();releaseFile(oldF);toast(v?'Đã cập nhật phiên bản':'Đã phát hành phiên bản mới'+(file?'':' (chưa có file scan)'),'ok');histModal(p)}catch(e){toast('Không lưu được tệp','err')}})();
       return false}}]});
 }
 function histModal(p){
@@ -1027,7 +1103,7 @@ function parseDateVN(s){
   return'';
 }
 const TRUTHY=['1','x','co','yes','true','y','bat buoc','v'];
-const TYPE_MAP={text:['text','van ban ngan','van ban','chu'],textarea:['textarea','van ban dai','mo ta','ghi chu'],number:['number','so'],date:['date','ngay'],select:['select','danh sach chon','danh sach','lua chon']};
+const TYPE_MAP={url:['url','link','lien ket','duong dan'],file:['file','tep','tep tai len','tai lieu'],text:['text','van ban ngan','van ban','chu'],textarea:['textarea','van ban dai','mo ta','ghi chu'],number:['number','so'],date:['date','ngay'],select:['select','danh sach chon','danh sach','lua chon']};
 const typeFromText=s=>{const n=nrm(s);for(const k in TYPE_MAP)if(TYPE_MAP[k].includes(n))return k;return'text'};
 function csvSpec(key){
   const C=DB.cfg;
@@ -1040,7 +1116,7 @@ function csvSpec(key){
     const bb=C.blocks.find(x=>x.toLowerCase()===b.toLowerCase());
     if(C.depts.some(d=>d.name.toLowerCase()===n.toLowerCase()))s++;else{C.depts.push({name:n,block:bb});a++}});return`Đã thêm ${a} phòng ban${nb?`, ${nb} khối mới`:''}, bỏ qua ${s}`}};
   if(key==='reqFields'||key==='candFields')return{title:key==='reqFields'?'Trường – Đề xuất':'Trường – Ứng viên',cols:['Tên trường','Kiểu','Bắt buộc','Lựa chọn'],example:[['Số CCCD','Văn bản ngắn','Không',''],['Hình thức làm việc','Danh sách chọn','Có','Toàn thời gian|Bán thời gian']],
-    note:'Kiểu: Văn bản ngắn, Văn bản dài, Số, Ngày, Danh sách chọn. Lựa chọn cách nhau bằng dấu |.',
+    note:'Kiểu: Văn bản ngắn, Văn bản dài, Số, Ngày, Danh sách chọn, Liên kết (URL), Tệp tải lên. Lựa chọn cách nhau bằng dấu |.',
     apply(rows){let a=0,s=0;rows.forEach(r=>{const l=r[0];if(!l||C[key].some(f=>nrm(f.l)===nrm(l))){s++;return}
       let t=typeFromText(r[1]);const opts=(r[3]||'').split(/[|\n]/).map(x=>x.trim()).filter(Boolean);if(t==='select'&&!opts.length)t='text';
       C[key].push({k:uid('c_'),l,t,req:TRUTHY.includes(nrm(r[2]))?1:0,vis:1,custom:1,opts:t==='select'?opts:undefined});a++});return`Đã thêm ${a} trường, bỏ qua ${s} (trùng hoặc trống)`}};
@@ -1117,16 +1193,18 @@ const A={
  exportMiss:()=>exportMiss(),
  approve:id=>{const r=reqById(id);r.status='approved';r.approvedAt=Date.now();r.approvedBy=me().name;log(r,'Ban TGĐ phê duyệt');commit();toast('Đã phê duyệt. Cần tải lên bản scan đã ký.','ok')},
  reject:id=>{const r=reqById(id);modal({title:'Từ chối đề xuất',html:`<label class="f">Lý do từ chối</label><textarea id="rj"></textarea>`,buttons:[modalCancel,{label:'Từ chối',cls:'bad',fn:()=>{r.status='rejected';r.rejectReason=$('#rj').value.trim();log(r,'Từ chối'+(r.rejectReason?': '+r.rejectReason:''));commit()}}]})},
- delReq:id=>confirmBox('Xoá đề xuất này? Hành động không thể hoàn tác.',()=>{DB.reqs=DB.reqs.filter(r=>r.id!==id);DB.cands.forEach(c=>{if(c.v.reqId===id)c.v.reqId=''});closeDrawer();commit()},'Xoá'),
+  openFld:(id,el)=>{const[k,rid]=id.split(':');const rec=k==='req'?reqById(rid):DB.cands.find(c=>c.id===rid);if(rec&&rec.v[el.dataset.arg])openFile(rec.v[el.dataset.arg])},
+ openJd:id=>{const r=reqById(id);if(r&&r.jd&&r.jd.file)openFile(r.jd.file)},
+ delReq:id=>confirmBox('Xoá đề xuất này? Hành động không thể hoàn tác.',()=>{const old=reqById(id);DB.reqs=DB.reqs.filter(r=>r.id!==id);DB.cands.forEach(c=>{if(c.v.reqId===id)c.v.reqId=''});closeDrawer();commit();if(old)reqFiles(old).forEach(releaseFile)},'Xoá'),
  uploadSigned:async id=>{const r=reqById(id);const f=await pickFile('.pdf,image/*');if(!f)return;
    if(f.size>MAXF*1048576){toast(`Tệp quá lớn (tối đa ${MAXF}MB)`,'err');return}
-   try{toast('Đang tải tệp lên…');if(r.signed)await delFile(r.signed);r.signed=await storeFile(f);log(r,'Tải lên bản scan đã ký: '+f.name);commit();toast('Đã lưu bản scan đã ký','ok')}catch(e){toast('Không lưu được tệp','err')}},
+   try{toast('Đang tải tệp lên…');const oldS=r.signed;r.signed=await storeFile(f);releaseFile(oldS);log(r,'Tải lên bản scan đã ký: '+f.name);commit();toast('Đã lưu bản scan đã ký','ok')}catch(e){toast('Không lưu được tệp','err')}},
  viewSigned:id=>openFile(reqById(id).signed),
  /* candidates */
  newCand:()=>candModal(),
  editCand:id=>candModal(DB.cands.find(c=>c.id===id)),
  openCand:id=>openDrawer(candDrawer(id)),
- delCand:id=>confirmBox('Xoá ứng viên này?',()=>{DB.cands=DB.cands.filter(c=>c.id!==id);closeDrawer();commit()},'Xoá'),
+ delCand:id=>confirmBox('Xoá ứng viên này?',()=>{const old=DB.cands.find(c=>c.id===id);DB.cands=DB.cands.filter(c=>c.id!==id);closeDrawer();commit();if(old)candFiles(old).forEach(releaseFile)},'Xoá'),
  setStage:(id,el)=>changeStage(DB.cands.find(x=>x.id===id),el.dataset.arg),
  editScreen:id=>{const c=DB.cands.find(x=>x.id===id);mini('Ghi nhận sơ vấn',[{k:'date',l:'Ngày sơ vấn',t:'date'},{k:'by',l:'Người thực hiện',t:'text'},selF('result','Kết quả',R_SCREEN,1),{k:'note',l:'Nhận xét',t:'textarea',wide:1}],c.screening||{date:iso(),by:me().name,result:'Chờ'},v=>{c.screening=v;log(c,'Cập nhật sơ vấn: '+v.result);if(c.stage==='new')c.stage='screening'})},
  addRound:id=>{const c=DB.cands.find(x=>x.id===id);roundModal(c)},
@@ -1140,10 +1218,10 @@ const A={
  editVer:(id,el)=>verModal(DB.lib.positions.find(p=>p.id===id),el.dataset.arg),
  delVer:(id,el)=>{const p=DB.lib.positions.find(x=>x.id===id),v=p.versions.find(x=>x.id===el.dataset.arg);
    if(p.versions.length<=1){toast('Vị trí phải có ít nhất một phiên bản','err');return}
-   modal({title:'Xoá phiên bản',html:`<p>Xoá bản <b>v${v.ver}</b> (hiệu lực từ ${fmtD(v.effective)}) cùng file scan đính kèm? Không thể hoàn tác.</p>`,buttons:[{label:'Huỷ',fn:()=>{setTimeout(()=>histModal(p),0)}},{label:'Xoá',cls:'bad',fn:()=>{(async()=>{if(v.file)await delFile(v.file);p.versions=p.versions.filter(x=>x!==v);syncPos(p);closeModal();commit();histModal(p)})();return false}}]})},
+   modal({title:'Xoá phiên bản',html:`<p>Xoá bản <b>v${v.ver}</b> (hiệu lực từ ${fmtD(v.effective)}) cùng file scan đính kèm? Không thể hoàn tác.</p>`,buttons:[{label:'Huỷ',fn:()=>{setTimeout(()=>histModal(p),0)}},{label:'Xoá',cls:'bad',fn:()=>{(async()=>{p.versions=p.versions.filter(x=>x!==v);syncPos(p);closeModal();commit();await releaseFile(v.file);histModal(p)})();return false}}]})},
  viewPosFile:id=>openFile(DB.lib.positions.find(p=>p.id===id).file),
  viewVerFile:(id,el)=>openFile(DB.lib.positions.find(p=>p.id===id).versions.find(v=>v.id===el.dataset.arg).file),
- delPos:id=>confirmBox('Xoá vị trí này cùng toàn bộ phiên bản và file scan?',async()=>{const p=DB.lib.positions.find(x=>x.id===id);if(p)for(const v of p.versions)if(v.file)await delFile(v.file);DB.lib.positions=DB.lib.positions.filter(x=>x.id!==id);commit()},'Xoá'),
+ delPos:id=>confirmBox('Xoá vị trí này cùng toàn bộ phiên bản và file scan?',async()=>{const p=DB.lib.positions.find(x=>x.id===id);DB.lib.positions=DB.lib.positions.filter(x=>x.id!==id);commit();if(p)for(const v of p.versions)await releaseFile(v.file)},'Xoá'),
  newTpl:()=>tplModal(),editTpl:id=>tplModal(DB.lib.templates.find(t=>t.id===id)),
  viewTpl:id=>letterModal(null,DB.lib.templates.find(t=>t.id===id)),
  dupTpl:id=>{const t=DB.lib.templates.find(x=>x.id===id);DB.lib.templates.push({...t,id:uid('t_'),name:t.name+' (bản sao)'});commit();toast('Đã nhân bản','ok')},
@@ -1153,7 +1231,7 @@ const A={
    const fields=[{k:'name',l:'Tên biểu mẫu',t:'text',req:1,wide:1},{k:'cat',l:'Nhóm',t:'select',opts:['Phiếu đánh giá phỏng vấn','Hồ sơ nhận việc','Hợp đồng','Quy trình','Khác']},{k:'desc',l:'Mô tả',t:'textarea',wide:1}];
    modal({title:'Thêm biểu mẫu',html:formHTML(fields,{name:f.name.replace(/\.[^.]+$/,''),cat:'Khác'}),buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{const v=readForm($('#modal'),fields);if(!v)return false;toast('Đang tải tệp lên…');storeFile(f).then(meta=>{DB.lib.forms.push({id:uid('fm_'),...v,file:meta});commit();toast('Đã thêm biểu mẫu','ok')}).catch(()=>toast('Không lưu được tệp','err'))}}]})},
  dlForm:id=>openFile(DB.lib.forms.find(f=>f.id===id).file,true),
- delForm:id=>confirmBox('Xoá biểu mẫu này?',async()=>{const f=DB.lib.forms.find(x=>x.id===id);await delFile(f.file);DB.lib.forms=DB.lib.forms.filter(x=>x.id!==id);commit()},'Xoá'),
+ delForm:id=>confirmBox('Xoá biểu mẫu này?',async()=>{const f=DB.lib.forms.find(x=>x.id===id);DB.lib.forms=DB.lib.forms.filter(x=>x.id!==id);commit();await releaseFile(f.file)},'Xoá'),
  /* settings */
  itemAdd:id=>itemModal(id),itemEdit:(id,el)=>itemModal(id,+el.dataset.arg),
  itemDel:(id,el)=>{const i=+el.dataset.arg,v=DB.cfg[id][i],n=usedCount(id,v);confirmBox(`Xoá “${esc(v)}”?${n?` Đang được dùng ở ${n} bản ghi (dữ liệu cũ vẫn giữ nguyên giá trị).`:''}`,()=>{DB.cfg[id].splice(i,1);commit()},'Xoá')},
