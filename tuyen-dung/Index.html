@@ -236,7 +236,7 @@ setTimeout(bootFail,3000);
 <script>
 /* ============ helpers ============ */
 const $=(s,r=document)=>r.querySelector(s);
-const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const qa=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=p=>p+Math.random().toString(36).slice(2,9);
 const dayMs=864e5;
@@ -272,7 +272,7 @@ const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{co
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
-const APP_VER='v6 · 11/10/2026';
+const APP_VER='v7 · 11/10/2026';
 const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const MAXF=GS?10:15;
@@ -546,7 +546,7 @@ function render(){
   const v={dash:vDash,req:vReq,cand:vCand,lib:vLib,cfg:vCfg}[ui.tab];
   $('#app').innerHTML=v?v():'<div class="empty">Tài khoản này chưa được cấp quyền truy cập.</div>';
   renderDrawer();
-  $$('#app .ro input,#app .ro select,#app .ro textarea,#app .ro button').forEach(e=>e.disabled=true);
+  qa('#app .ro input,#app .ro select,#app .ro textarea,#app .ro button').forEach(e=>e.disabled=true);
   if(fid){const n=document.getElementById(fid);if(n&&n.tagName==='INPUT'){n.focus();try{n.setSelectionRange(pos,pos)}catch(e){}}}
 }
 const commit=()=>{save();render()};
@@ -701,7 +701,7 @@ function reqForm(r){
     buttons:[modalCancel,{label:r?'Lưu thay đổi':'Gửi đề xuất duyệt',cls:'pri',icon:'check',fn:()=>{
       const v=readForm($('#modal'),fields);if(!v)return false;
       if(r){r.v={...r.v,...v};log(r,'Cập nhật nội dung đề xuất')}
-      else{const yr=new Date().getFullYear();const n=Math.max(0,...DB.reqs.map(x=>{const m=x.code.match(new RegExp('-'+yr+'-(\\d+)$'));return m?+m[1]:0}))+1;
+      else{const yr=new Date().getFullYear();const n=Math.max(0,...DB.reqs.map(x=>{return x.code.startsWith('ĐX-'+yr+'-')?(+x.code.split('-').pop()||0):0}))+1;
         const nr={id:uid('r_'),code:`ĐX-${new Date().getFullYear()}-${String(n).padStart(3,'0')}`,by:me().id,at:Date.now(),status:'pending',v,history:[],signed:null};log(nr,'Tạo đề xuất & gửi Ban TGĐ phê duyệt');DB.reqs.push(nr)}
       commit();toast(r?'Đã cập nhật':'Đã gửi đề xuất chờ Ban TGĐ phê duyệt','ok')}}]});
 }
@@ -1052,8 +1052,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('#mw').classLi
 /* drag & drop kanban */
 let dragId=null;
 document.addEventListener('dragstart',e=>{const k=e.target.closest?.('.kc');if(k){dragId=k.dataset.id;k.classList.add('drag');e.dataTransfer.effectAllowed='move'}});
-document.addEventListener('dragend',e=>{$$('.kc.drag').forEach(k=>k.classList.remove('drag'));$$('.col.over').forEach(c=>c.classList.remove('over'));dragId=null});
-document.addEventListener('dragover',e=>{const c=e.target.closest?.('.col');if(c&&dragId){e.preventDefault();$$('.col.over').forEach(x=>x!==c&&x.classList.remove('over'));c.classList.add('over')}});
+document.addEventListener('dragend',e=>{qa('.kc.drag').forEach(k=>k.classList.remove('drag'));qa('.col.over').forEach(c=>c.classList.remove('over'));dragId=null});
+document.addEventListener('dragover',e=>{const c=e.target.closest?.('.col');if(c&&dragId){e.preventDefault();qa('.col.over').forEach(x=>x!==c&&x.classList.remove('over'));c.classList.add('over')}});
 document.addEventListener('drop',e=>{const col=e.target.closest?.('.col');if(!col||!dragId)return;e.preventDefault();const c=DB.cands.find(x=>x.id===dragId);const s=col.dataset.stage;
   if(c&&can('cand.move'))changeStage(c,s)});
 
