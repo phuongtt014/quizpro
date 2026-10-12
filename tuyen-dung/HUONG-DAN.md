@@ -66,3 +66,9 @@ Dán code mới vào `Code.gs` / `Index`, rồi **Triển khai → Quản lý b�
 - Trường hệ thống (không bắt buộc) đổi được kiểu dữ liệu; trường bắt buộc (khối, phòng ban, vị trí, số lượng, tên ứng viên, đề xuất ứng tuyển) và trường lấy từ Danh mục thì cố định kiểu.
 - Sau mỗi lần lưu **Thiết lập**, ứng dụng tự đọc lại Google Sheet để đối chiếu; nếu không khớp sẽ tự lưu lại một lần và báo đỏ ở góc dưới thanh bên trái nếu vẫn không được.
 - Xem **Thiết lập → Dữ liệu & sao lưu → Chẩn đoán** để biết thời điểm lưu gần nhất và lỗi gần nhất.
+
+## Xử lý khi báo "Thiết lập chưa được ghi vào Google Sheet"
+
+1. Cập nhật **cả hai** file: `Code.gs` (bản mới tự dọn dòng trùng mã và đọc/ghi thống nhất) và `Index`, rồi Triển khai phiên bản mới.
+2. Vào **Thiết lập → Dữ liệu & sao lưu → Kiểm tra Google Sheet** để xem số dòng từng sheet, mã bị trùng và kích thước ô dữ liệu.
+3. Bấm vào dòng cảnh báo đỏ ở thanh bên để gửi lại Thiết lập.

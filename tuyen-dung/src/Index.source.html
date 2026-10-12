@@ -275,7 +275,7 @@ const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{co
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
-const APP_VER='v12 · 12/10/2026';
+const APP_VER='v13 · 12/10/2026';
 const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const MAXF=GS?10:15;
@@ -421,6 +421,9 @@ const COLS={
 };
 let snap={},saveTimer=null,chain=Promise.resolve(),lastLoad=0,inflight=0,lastErr='',lastSaveAt=0,verifyTimer=null,verifyRetry=0;
 const jstr=o=>JSON.stringify(o);
+const canon=o=>Array.isArray(o)?o.map(canon):(o&&typeof o==='object'?Object.keys(o).sort().reduce((a,k)=>{if(o[k]!==undefined)a[k]=canon(o[k]);return a},{}):o);
+const cstr=o=>JSON.stringify(canon(o));
+function diffKeys(a,b){a=a||{};b=b||{};return[...new Set([...Object.keys(a),...Object.keys(b)])].filter(k=>cstr(a[k])!==cstr(b[k])).map(k=>{const x=a[k],y=b[k];return Array.isArray(x)||Array.isArray(y)?`${k} (màn hình ${Array.isArray(x)?x.length:'-'} mục, Sheet ${Array.isArray(y)?y.length:'-'} mục)`:k})}
 function takeSnap(){snap={};Object.keys(COLS).forEach(c=>{snap[c]={};COLS[c].items().forEach(i=>snap[c][i.id]=jstr(i.data))})}
 function diffOps(){
   const ops=[];
@@ -449,9 +452,9 @@ function scheduleVerify(){clearTimeout(verifyTimer);verifyTimer=setTimeout(verif
 async function verifyCfg(){
   if(saveTimer||inflight){scheduleVerify();return}
   try{const d=await gcall('api_load');if(saveTimer||inflight)return;
-    if(d.cfg&&jstr(d.cfg)===jstr(DB.cfg)){verifyRetry=0;return}
+    if(d.cfg&&cstr(d.cfg)===cstr(DB.cfg)){verifyRetry=0;return}
     if(verifyRetry<1){verifyRetry++;snap.cfg={};flush();return}
-    lastErr='Google Sheet không khớp Thiết lập trên màn hình';setSync('err','Cảnh báo: Thiết lập chưa được ghi vào Google Sheet');toast('Thiết lập chưa được ghi vào Google Sheet. Hãy chụp màn hình báo cho quản trị.','err');verifyRetry=0;
+    lastErr='Google Sheet không khớp Thiết lập trên màn hình: '+(d.cfg?diffKeys(DB.cfg,d.cfg).join('; ')||'khác biệt nhỏ':'Sheet chưa có Thiết lập')+'. Hãy cập nhật Code.gs bản mới rồi bấm “Kiểm tra Google Sheet” ở Thiết lập → Dữ liệu.';setSync('err','Cảnh báo: Thiết lập chưa được ghi vào Google Sheet');toast('Thiết lập chưa được ghi vào Google Sheet. Hãy chụp màn hình báo cho quản trị.','err');verifyRetry=0;
   }catch(e){}
 }
 function rebuildLib(items){const L={positions:[],templates:[],forms:[]};(items||[]).forEach(i=>{const k=i._k;delete i._k;if(L[k])L[k].push(i)});return L}
@@ -1067,7 +1070,7 @@ function cfgBody(){
     <p class="muted small" style="margin-top:10px">Mẹo: dùng ô chọn người dùng ở góc trên bên phải để xem giao diện theo từng vai trò.</p>`;
   if(ui.cf==='perm')return`<div class="card"><div class="card-h"><span>Ma trận phân quyền</span><button class="btn sm" data-act="roleAdd">${ic('plus')}Thêm vai trò</button></div><div class="tbl-wrap"><table><thead><tr><th>Quyền</th>${C.roles.map(r=>`<th style="text-align:center">${esc(r.name)}${!r.locked?` <button class="btn ghost sm" data-act="roleDel" data-id="${r.id}" style="padding:0 4px">${ic('x')}</button>`:''}</th>`).join('')}</tr></thead><tbody>${CAPS.map(c=>`<tr><td>${esc(c[1])}</td>${C.roles.map(r=>`<td style="text-align:center"><input type="checkbox" class="chk" ${r.locked||r.caps.includes(c[0])?'checked':''} ${r.locked?'disabled':''} data-act="capToggle" data-id="${r.id}" data-arg="${c[0]}"></td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
     <div class="alert info" style="margin-top:14px">${ic('alert')}<div>Vai trò mặc định: <b>Người đề xuất</b> (chỉ thấy đề xuất của mình), <b>Nhân viên tuyển dụng</b>, <b>Ban Tổng giám đốc</b> (phê duyệt), <b>Quản trị</b> (toàn quyền, không chỉnh sửa được).</div></div>`;
-  return`<div class="card pad"><div class="row"><button class="btn" data-act="exportData">${ic('download')}Xuất sao lưu (JSON)</button><button class="btn" data-act="importData">${ic('upload')}Nhập sao lưu</button>${ENV.sheetUrl?`<button class="btn pri" data-act="openSheet">${ic('file')}Mở Google Sheet</button>`:''}<button class="btn bad" data-act="resetDemo">Nạp dữ liệu mẫu</button><button class="btn bad" data-act="clearAll">Xoá toàn bộ dữ liệu</button></div>
+  return`<div class="card pad"><div class="row"><button class="btn" data-act="exportData">${ic('download')}Xuất sao lưu (JSON)</button><button class="btn" data-act="importData">${ic('upload')}Nhập sao lưu</button>${ENV.sheetUrl?`<button class="btn pri" data-act="openSheet">${ic('file')}Mở Google Sheet</button>`:''}${ENV.gs?`<button class="btn" data-act="diagSheet">${ic('search')}Kiểm tra Google Sheet</button>`:''}<button class="btn bad" data-act="resetDemo">Nạp dữ liệu mẫu</button><button class="btn bad" data-act="clearAll">Xoá toàn bộ dữ liệu</button></div>
     <p class="small" style="margin-top:14px"><b>Chẩn đoán:</b> phiên bản ${APP_VER} · chế độ ${ENV.gs?'Google Sheet':'xem thử'} · tài khoản ${esc(ENV.email||'—')} · lần lưu gần nhất: ${lastSaveAt?fmtDT(lastSaveAt):'—'}${lastErr?` · <span style="color:var(--bad)">lỗi gần nhất: ${esc(lastErr)}</span>`:''} · đang có ${DB.reqs.length} đề xuất, ${DB.cands.length} ứng viên, ${DB.lib.positions.length} vị trí, ${DB.lib.templates.length} mẫu thư.</p>
     <p class="muted small" style="margin-top:8px">${ENV.gs?'Dữ liệu được lưu trong Google Sheet của bạn (các sheet DeXuat, UngVien, ThuVien, ThietLap); tệp đính kèm lưu trong thư mục Google Drive "HR Recruit – Tệp đính kèm". Không chỉnh sửa cột <b>data</b> bằng tay.':'Chế độ xem thử: dữ liệu chỉ lưu trên trình duyệt này. Triển khai Apps Script (xem HUONG-DAN.md) để lưu vào Google Sheet dùng chung.'} File sao lưu JSON không bao gồm tệp đính kèm.</p></div>`;
 }
@@ -1205,7 +1208,8 @@ const A={
  dclose:()=>closeDrawer(),
  gomiss:()=>{ui.tab='req';ui.rf='missing';render()},
  dblk:id=>{ui.db=id;render()},goNewReq:()=>{ui.tab='req';render();if(can('req.create'))reqForm()},goUsers:()=>{ui.tab='cfg';ui.cf='users';render()},set_dim:id=>{ui.dim=id;render()},set_gran:id=>{ui.gran=id;render()},
- reload:()=>reloadData(false),retrySave:()=>{if(ENV.gs)flush()},openSheet:()=>window.open(ENV.sheetUrl,'_blank'),
+ reload:()=>reloadData(false),retrySave:()=>{if(!ENV.gs)return;if(ui.sync&&ui.sync[0]==='err'){snap.cfg={};verifyRetry=0}flush()},
+ diagSheet:async()=>{try{const d=await gcall('api_diag');modal({title:'Kiểm tra Google Sheet',wide:true,html:`<p class="small muted" style="margin-bottom:10px">Tài khoản: <b>${esc(d.email||'—')}</b></p><div class="tbl-wrap card"><table><thead><tr><th>Sheet</th><th>Tồn tại</th><th>Số dòng</th><th>Mã bị trùng</th><th>Ô dữ liệu lớn nhất</th></tr></thead><tbody>${Object.keys(d.sheets).map(k=>{const x=d.sheets[k];return`<tr><td><b>${esc(x.name)}</b></td><td>${x.exists?'Có':badge('Chưa có','b-warn')}</td><td>${x.rows??'—'}</td><td>${x.dup&&x.dup.length?badge(x.dup.length+' mã trùng: '+x.dup.slice(0,3).join(', '),'b-bad'):'Không'}</td><td>${x.maxLen?x.maxLen.toLocaleString('vi-VN')+' / 50.000 ký tự':'—'}</td></tr>`}).join('')}</tbody></table></div><p class="small muted" style="margin-top:10px">Mã trùng sẽ được Code.gs bản mới tự dọn ở lần lưu kế tiếp. Ô dữ liệu gần 50.000 ký tự có thể khiến việc lưu thất bại.</p>`,buttons:[{label:'Đóng',fn:()=>{}}]})}catch(e){toast('Không gọi được api_diag – hãy cập nhật Code.gs bản mới và triển khai lại: '+(e&&e.message||e),'err')}},openSheet:()=>window.open(ENV.sheetUrl,'_blank'),
  rf:id=>{ui.rf=id;render()},
  cview:id=>{ui.cv=id;render()},
  lt:id=>{ui.lt=id;ui.lq='';render()},

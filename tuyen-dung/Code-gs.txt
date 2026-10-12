@@ -39,10 +39,16 @@ function readCol_(col) {
   const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
   const dc = head.indexOf('data');
   if (dc < 0) return [];
-  const vals = sh.getRange(2, dc + 1, sh.getLastRow() - 1, 1).getValues();
-  const out = [];
+  const vals = sh.getRange(2, 1, sh.getLastRow() - 1, dc + 1).getValues();
+  const order = [], byId = {};
   vals.forEach(function (r) {
-    try { if (r[0]) out.push(JSON.parse(r[0])); } catch (e) { /* bỏ qua dòng lỗi */ }
+    const id = String(r[0]);
+    if (!(id in byId)) order.push(id);
+    byId[id] = r[dc]; // nếu trùng mã: lấy dòng CUỐI (dòng mà thao tác ghi hướng tới)
+  });
+  const out = [];
+  order.forEach(function (id) {
+    try { if (byId[id]) out.push(JSON.parse(byId[id])); } catch (e) { /* bỏ qua dòng lỗi */ }
   });
   return out;
 }
@@ -110,8 +116,15 @@ function api_sync(ops) {
       const dc = head.indexOf('data');
       const last = sh.getLastRow();
       const ids = last > 1 ? sh.getRange(2, 1, last - 1, 1).getValues().map(function (r) { return String(r[0]); }) : [];
-      const pos = {};
-      ids.forEach(function (id, i) { pos[id] = i + 2; });
+      const pos = {}, rowsById = {};
+      ids.forEach(function (id, i) {
+        pos[id] = i + 2; // dòng cuối cùng của mỗi mã
+        (rowsById[id] = rowsById[id] || []).push(i + 2);
+      });
+      const toDelete = [];
+      Object.keys(rowsById).forEach(function (id) { // dọn các dòng trùng mã (giữ dòng cuối)
+        rowsById[id].slice(0, -1).forEach(function (r) { toDelete.push(r); });
+      });
 
       const appends = [];
       list.forEach(function (op) {
@@ -134,14 +147,15 @@ function api_sync(ops) {
         sh.getRange(start, 1, appends.length, w).setNumberFormat('@').setValues(appends);
       }
 
-      const dels = list.filter(function (o) { return o.type === 'del'; })
-        .map(function (o) { return pos[o.id]; })
-        .filter(function (r) { return r && r > 1; })
+      list.filter(function (o) { return o.type === 'del'; }).forEach(function (o) {
+        (rowsById[o.id] || []).forEach(function (r) { toDelete.push(r); });
+      });
+      const dels = toDelete.filter(function (r, i) { return r > 1 && toDelete.indexOf(r) === i; })
         .sort(function (a, b) { return b - a; });
       dels.forEach(function (r) { sh.deleteRow(r); });
     });
     SpreadsheetApp.flush();
-    return { ok: true };
+    return { ok: true, ops: ops.length };
   } finally {
     lock.releaseLock();
   }
@@ -171,4 +185,32 @@ function api_deleteFile(id) {
   assertCanWrite_([]);
   try { DriveApp.getFileById(id).setTrashed(true); } catch (e) { /* đã xoá */ }
   return true;
+}
+
+/** Chẩn đoán: số dòng, mã trùng, kích thước dữ liệu lớn nhất của từng sheet. */
+function api_diag() {
+  const out = { email: who_(), sheets: {} };
+  Object.keys(SHEETS).forEach(function (col) {
+    const sh = ss_().getSheetByName(SHEETS[col]);
+    if (!sh) { out.sheets[col] = { name: SHEETS[col], exists: false }; return; }
+    const last = sh.getLastRow();
+    const info = { name: SHEETS[col], exists: true, rows: Math.max(0, last - 1), dup: [], maxLen: 0 };
+    if (last > 1) {
+      const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+      const dc = head.indexOf('data');
+      info.hasData = dc >= 0;
+      if (dc >= 0) {
+        const vals = sh.getRange(2, 1, last - 1, dc + 1).getValues();
+        const seen = {};
+        vals.forEach(function (r) {
+          const id = String(r[0]);
+          if (seen[id] && info.dup.indexOf(id) < 0) info.dup.push(id);
+          seen[id] = true;
+          info.maxLen = Math.max(info.maxLen, String(r[dc] || '').length);
+        });
+      }
+    }
+    out.sheets[col] = info;
+  });
+  return out;
 }
