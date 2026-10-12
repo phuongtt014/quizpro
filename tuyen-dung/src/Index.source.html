@@ -275,7 +275,7 @@ const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{co
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
-const APP_VER='v14 · 12/10/2026';
+const APP_VER='v15 · 12/10/2026';
 const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const MAXF=GS?10:15;
@@ -460,12 +460,18 @@ async function verifyCfg(){
 function rebuildLib(items){const L={positions:[],templates:[],forms:[]};(items||[]).forEach(i=>{const k=i._k;delete i._k;if(L[k])L[k].push(i)});return L}
 function normalize(){
   const C=DB.cfg;C.migr=C.migr||{};if(!C.migr.export){C.roles.forEach(r=>{if(['recruiter','approver'].includes(r.id)&&!r.caps.includes('data.export'))r.caps.push('data.export')});C.migr.export=1}
+  if(!Array.isArray(C.signers))C.signers=defaultSigners();C.signCols=C.signCols||4;if(C.signFooter==null)C.signFooter='';
   C.rejectReasons=C.rejectReasons||['Không phù hợp chuyên môn','Kỳ vọng lương cao','Nhận được offer tốt hơn','Vấn đề địa điểm','Ứng viên từ chối offer','Lý do khác'];
   C.users.forEach(u=>u.email=u.email||'');DB.reqs.forEach(r=>{r.history=r.history||[];r.v=r.v||{}});DB.cands.forEach(c=>{c.history=c.history||[];c.interviews=c.interviews||[];c.v=c.v||{}});
   DB.lib=DB.lib||{};['positions','templates','forms'].forEach(k=>DB.lib[k]=DB.lib[k]||[]);
   DB.lib.positions.forEach(p=>{p.code=p.code||'';p.status=p.status||'Đang áp dụng';if(p.slaDays==null||p.slaDays==='')p.slaDays=30;p.effective=p.effective||'';p.file=p.file||null});
   DB.lib.positions.forEach(p=>{if(!p.versions||!p.versions.length)p.versions=[{id:uid('v_'),ver:1,file:p.file||null,effective:p.effective||'',slaDays:p.slaDays,note:'Bản đầu tiên',createdAt:Date.now(),by:''}];syncPos(p)});
 }
+function defaultSigners(){return[
+  {id:uid('sg'),title:'Người đề xuất',name:'{{nguoi_de_xuat}}',note:'(Ký, ghi rõ họ tên)',showDate:1,block:''},
+  {id:uid('sg'),title:'Trưởng bộ phận',name:'',note:'(Ký, ghi rõ họ tên)',showDate:1,block:''},
+  {id:uid('sg'),title:'Phòng Nhân sự',name:'',note:'(Ký, ghi rõ họ tên)',showDate:1,block:''},
+  {id:uid('sg'),title:'Ban Tổng giám đốc',name:'',note:'(Ký, đóng dấu)',showDate:1,block:''}]}
 function seedDemo(){const d=seed();if(ENV.gs){const a=d.cfg.users.find(u=>u.roleId==='admin');a.email=ENV.email}return d}
 function freshDB(email){
   const d=seed();d.reqs=[];d.cands=[];d.lib.positions=[];d.lib.forms=[];
@@ -857,12 +863,20 @@ function reqDrawer(id){
     </div>`;
   };
 }
+function signHTML(block,reqName){
+  const C=DB.cfg;const list=(C.signers||[]).filter(x=>!x.block||x.block===block);
+  if(!list.length)return'';
+  const cols=Math.min(6,Math.max(1,+C.signCols||4));
+  const cell=x=>`<div style="text-align:center;padding:0 6px"><div style="font-weight:700">${esc(x.title)}</div>${x.note?`<div style="font-style:italic;font-size:.9em">${esc(x.note)}</div>`:''}<div style="height:90px"></div><div style="font-weight:700;min-height:1.2em">${esc((x.name||'').split('{{nguoi_de_xuat}}').join(reqName||''))}</div>${x.showDate?`<div style="margin-top:6px;font-size:.92em">Ngày ký: ...../....../........</div>`:''}</div>`;
+  return`<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:20px 8px;margin-top:26px">${list.map(cell).join('')}</div>${C.signFooter?`<p style="margin-top:18px;font-style:italic;font-size:.9em;white-space:pre-wrap">${esc(C.signFooter)}</p>`:''}`;
+}
 function printReq(r){
   const w=window.open('','_blank');if(!w){toast('Trình duyệt chặn cửa sổ in','err');return}
-  const rows=DB.cfg.reqFields.filter(f=>f.vis!==0).map(f=>`<tr><td style="width:32%;color:#555">${esc(f.l)}</td><td>${esc(f.t==='date'?fmtD(r.v[f.k]):f.t==='number'?fmtNum(r.v[f.k]):f.t==='file'?(r.v[f.k]&&r.v[f.k].name||''):(r.v[f.k]??''))}</td></tr>`).join('');
-  w.document.write(`<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><title>${esc(r.code)}</title><style>body{font-family:'Times New Roman',serif;max-width:760px;margin:30px auto;font-size:15px;color:#000}h1{text-align:center;font-size:20px;margin:6px 0}td{border:1px solid #999;padding:8px 10px;vertical-align:top;white-space:pre-wrap}table{border-collapse:collapse;width:100%;margin:18px 0}.sig{display:grid;grid-template-columns:repeat(4,1fr);text-align:center;margin-top:30px;gap:8px}.sig div{height:130px}.c{text-align:center}</style></head><body>
+  const rows=DB.cfg.reqFields.filter(f=>f.vis!==0).map(f=>`<tr><td style="width:32%;color:#555">${esc(f.l)}</td><td>${esc(f.t==='date'?fmtD(r.v[f.k]):f.t==='number'?fmtNum(r.v[f.k]):f.t==='file'?(r.v[f.k]&&r.v[f.k].name||''):(r.v[f.k]??''))}</td></tr>`).join('')
+    +(r.jd?`<tr><td style="width:32%;color:#555">MTCV đính kèm</td><td>${esc(r.jd.mode==='library'?`Bản MTCV v${r.jd.ver} trong Thư viện (đã xác nhận)`:'File MTCV do người đề xuất tải lên')}</td></tr>`:'');
+  w.document.write(`<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><title>${esc(r.code)}</title><style>body{font-family:'Times New Roman',serif;max-width:780px;margin:30px auto;font-size:15px;color:#000}h1{text-align:center;font-size:20px;margin:6px 0}td{border:1px solid #999;padding:8px 10px;vertical-align:top;white-space:pre-wrap}table{border-collapse:collapse;width:100%;margin:18px 0}.c{text-align:center}</style></head><body>
   <div class="c"><b>${esc(DB.cfg.company).toUpperCase()}</b></div><h1>PHIẾU ĐỀ XUẤT TUYỂN DỤNG</h1><div class="c">Số: ${esc(r.code)} · Ngày ${fmtD(r.at)}</div>
-  <table>${rows}</table><div class="sig"><div><b>Người đề xuất</b><br><i>(Ký, ghi rõ họ tên)</i><br><br><br><br>${esc(userName(r.by))}</div><div><b>Trưởng bộ phận</b><br><i>(Ký, ghi rõ họ tên)</i></div><div><b>Phòng Nhân sự</b><br><i>(Ký, ghi rõ họ tên)</i></div><div><b>Ban Tổng giám đốc</b><br><i>(Ký, đóng dấu)</i></div></div>
+  <table>${rows}</table>${signHTML(r.v.block,userName(r.by))}
   <script>setTimeout(()=>print(),300)<\/script></body></html>`);w.document.close();
 }
 function exportMiss(){
@@ -1054,7 +1068,7 @@ function letterModal(c,t){
 /* ============ SETTINGS ============ */
 function vCfg(){
   const ro=!can('cfg.edit');
-  const subs=[['general','Thông tin chung'],['lists','Danh mục'],['reqf','Trường – Đề xuất'],['candf','Trường – Ứng viên'],['users','Người dùng'],['perm','Phân quyền'],['data','Dữ liệu & sao lưu']];
+  const subs=[['general','Thông tin chung'],['lists','Danh mục'],['reqf','Trường – Đề xuất'],['candf','Trường – Ứng viên'],['sign','Chữ ký phiếu đề xuất'],['users','Người dùng'],['perm','Phân quyền'],['data','Dữ liệu & sao lưu']];
   return pageH('Thiết lập','Cấu hình trường dữ liệu, danh mục, người dùng và phân quyền.')+`<div class="side"><div class="snav">${subs.map(s=>`<button class="${ui.cf===s[0]?'on':''}" data-act="cf" data-id="${s[0]}">${s[1]}</button>`).join('')}</div><div class="${ro?'ro':''}">${ro?`<div class="alert info" style="margin-bottom:14px">${ic('eye')}<div>Bạn chỉ có quyền <b>xem</b> Thiết lập. Chỉ quản trị (hoặc vai trò được cấp quyền “Chỉnh sửa Thiết lập”) mới thay đổi được.</div></div>`:''}${cfgBody()}</div></div>`;
 }
 function cfgBody(){
@@ -1074,6 +1088,14 @@ function cfgBody(){
       <td><input type="checkbox" class="chk" ${f.req?'checked':''} ${f.lock?'disabled':''} data-act="fieldToggle" data-id="${key}" data-arg="${i}:req"></td>
       <td><input type="checkbox" class="chk" ${f.vis!==0&&f.vis!==false?'checked':''} ${f.lock?'disabled':''} data-act="fieldToggle" data-id="${key}" data-arg="${i}:vis"></td>
       <td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" data-act="fieldMove" data-id="${key}" data-arg="${i}:-1">${ic('up')}</button><button class="btn ghost sm" data-act="fieldMove" data-id="${key}" data-arg="${i}:1">${ic('down')}</button><button class="btn sm" data-act="fieldEdit" data-id="${key}" data-arg="${i}">${ic('edit')}Sửa</button>${f.custom?` <button class="btn sm bad" data-act="fieldDel" data-id="${key}" data-arg="${i}">${ic('trash')}Xoá</button>`:''}</td></tr>`).join('')}</tbody></table></div></div>`;
+  }
+  if(ui.cf==='sign'){
+    const list=C.signers||[];
+    return`<div class="card"><div class="card-h"><span>Chữ ký cuối phiếu đề xuất <span class="badge b-gray">${list.length}</span></span><div class="row"><button class="btn sm" data-act="signPreview">${ic('eye')}Xem trước</button><button class="btn sm" data-act="signReset">Khôi phục mặc định</button><button class="btn pri sm" data-act="signEdit" data-id="">${ic('plus')}Thêm người ký</button></div></div>
+      <div class="small muted" style="padding:12px 18px 0">Khối chữ ký in ở cuối phiếu đề xuất, theo thứ tự bên dưới. Mỗi người gồm <b>Chức danh</b>, <b>Họ và tên</b> (để trống nếu ký tay) và dòng <b>Ngày ký: ...../....../........</b>. Có thể giới hạn người ký theo từng khối (ví dụ Hội đồng trực thuộc cho Khối trường).</div>
+      <div class="tbl-wrap"><table><thead><tr><th>#</th><th>Chức danh</th><th>Họ và tên</th><th>Ghi chú dưới chức danh</th><th>Ngày ký</th><th>Áp dụng cho</th><th></th></tr></thead><tbody>${list.map((x,i)=>`<tr><td class="muted" style="width:44px">${i+1}</td><td><b>${esc(x.title)}</b></td><td>${esc(x.name==='{{nguoi_de_xuat}}'?'(Tự điền: người đề xuất)':(x.name||'—'))}</td><td class="small">${esc(x.note||'—')}</td><td>${x.showDate?badge('Có','b-ok'):badge('Không','b-gray')}</td><td>${x.block?badge(x.block,'b-vio'):'Tất cả khối'}</td><td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" data-act="signMove" data-id="${i}" data-arg="-1">${ic('up')}</button><button class="btn ghost sm" data-act="signMove" data-id="${i}" data-arg="1">${ic('down')}</button> <button class="btn sm" data-act="signEdit" data-id="${i}">${ic('edit')}Sửa</button> <button class="btn sm bad" data-act="signDel" data-id="${i}">${ic('trash')}Xoá</button></td></tr>`).join('')||`<tr><td colspan="7"><div class="empty">Chưa có người ký – bấm “Thêm người ký”</div></td></tr>`}</tbody></table></div>
+      <div class="pad" style="border-top:1px solid var(--line)"><div class="fgrid"><div><label class="f">Số cột chữ ký trên mỗi hàng</label><select data-cfg="signCols">${[2,3,4,5,6].map(n=>`<option value="${n}" ${(+C.signCols||4)===n?'selected':''}>${n} cột</option>`).join('')}</select></div>
+      <div class="wide"><label class="f">Ghi chú cuối phiếu (tuỳ chọn, ví dụ yêu cầu về ký số / ký trực tiếp)</label><textarea data-cfg="signFooter" placeholder="VD: Phiếu cần có ký số điện tử hoặc ký trực tiếp đến cấp Trưởng đơn vị.">${esc(C.signFooter||'')}</textarea></div></div></div></div>`;
   }
   if(ui.cf==='users')return`<div class="card"><div class="card-h"><span>Người dùng</span><div class="row">${exportBtn('cfg:users',1)}<button class="btn sm" data-act="csv" data-id="users">${ic('upload')}Nhập CSV</button><button class="btn pri sm" data-act="userEdit" data-id="">${ic('plus')}Thêm người dùng</button></div></div><div class="tbl-wrap"><table><thead><tr><th>Họ tên</th><th>Email đăng nhập</th><th>Chức danh</th><th>Phòng ban</th><th>Vai trò</th><th></th></tr></thead><tbody>${C.users.map(u=>`<tr><td><b>${esc(u.name)}</b></td><td class="small">${esc(u.email||'—')}</td><td>${esc(u.title)}</td><td>${esc(u.dept)}</td><td>${badge(roleOf(u).name,'b-info')}</td><td style="text-align:right;white-space:nowrap"><button class="btn sm" data-act="userEdit" data-id="${u.id}">${ic('edit')}Sửa</button> <button class="btn sm bad" data-act="userDel" data-id="${u.id}">${ic('trash')}Xoá</button></td></tr>`).join('')}</tbody></table></div></div>
     <p class="muted small" style="margin-top:10px">Mẹo: dùng ô chọn người dùng ở góc trên bên phải để xem giao diện theo từng vai trò.</p>`;
@@ -1265,6 +1287,21 @@ function csvOpen(key){
     },
     buttons:[modalCancel,{label:'Nhập dữ liệu',cls:'pri',icon:'check',fn:()=>{const rows=getRows();if(!rows.length){toast('Chưa có dữ liệu để nhập','err');return false}const msg=spec.apply(rows);commit();toast(msg,'ok')}}]});
 }
+function signModal(i){
+  const x=i==null?{title:'',name:'',note:'(Ký, ghi rõ họ tên)',showDate:1,block:''}:DB.cfg.signers[i];
+  modal({title:i==null?'Thêm người ký':'Sửa người ký',html:`<div class="fgrid"><div class="wide"><label class="f">Chức danh / vị trí <i>*</i></label><input type="text" id="sg_t" value="${esc(x.title)}" placeholder="VD: Trưởng đơn vị, Hội đồng trực thuộc, Tổng giám đốc"></div>
+    <div class="wide"><label class="f">Họ và tên</label><input type="text" id="sg_n" value="${esc(x.name)}" placeholder="Để trống nếu ký tay. Gõ {{nguoi_de_xuat}} để tự điền tên người đề xuất"></div>
+    <div class="wide"><label class="f">Ghi chú dưới chức danh</label><input type="text" id="sg_o" value="${esc(x.note||'')}" placeholder="VD: (Ký, ghi rõ họ tên)"></div>
+    <div><label class="f">In dòng “Ngày ký: ...../....../........”</label><select id="sg_d"><option value="1" ${x.showDate?'selected':''}>Có</option><option value="0" ${x.showDate?'':'selected'}>Không</option></select></div>
+    <div><label class="f">Áp dụng cho</label><select id="sg_b"><option value="">Tất cả khối</option>${DB.cfg.blocks.map(b=>`<option ${b===x.block?'selected':''}>${esc(b)}</option>`).join('')}</select></div></div>`,
+    buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{const t=$('#sg_t').value.trim();if(!t){$('#sg_t').classList.add('err');return false}
+      const o={title:t,name:$('#sg_n').value.trim(),note:$('#sg_o').value.trim(),showDate:$('#sg_d').value==='1'?1:0,block:$('#sg_b').value};
+      if(i==null)DB.cfg.signers.push({id:uid('sg'),...o});else Object.assign(x,o);commit()}}]});
+}
+function signPreviewModal(){
+  const draw=()=>{$('#sg_pv').innerHTML=`<div style="font-family:'Times New Roman',serif;background:#fff;border:1px solid var(--line);border-radius:10px;padding:22px"><div style="text-align:center"><b>${esc(DB.cfg.company).toUpperCase()}</b></div><div style="text-align:center;font-weight:700;font-size:18px;margin:6px 0">PHIẾU ĐỀ XUẤT TUYỂN DỤNG</div><div class="muted" style="text-align:center">… nội dung phiếu …</div>${signHTML($('#sg_pb').value,'Nguyễn Văn A')||'<div class="muted" style="margin-top:20px">Chưa có người ký áp dụng cho khối này.</div>'}</div>`};
+  modal({title:'Xem trước khối chữ ký',wide:true,html:`<div class="row" style="margin-bottom:12px"><label class="f" style="margin:0">Khối:</label><select id="sg_pb" style="width:auto">${DB.cfg.blocks.map(b=>`<option>${esc(b)}</option>`).join('')}</select></div><div id="sg_pv"></div>`,after:()=>{$('#sg_pb').onchange=draw;draw()},buttons:[{label:'Đóng',fn:()=>{}}]});
+}
 function fieldModal(key,i){
   const f=i==null?{l:'',t:'text',custom:1,vis:1,req:0}:DB.cfg[key][i];
   const builtin=i!=null&&!f.custom,locked=!!f.lock,typeLocked=locked||(builtin&&!!f.from);
@@ -1347,6 +1384,11 @@ const A={
  dlForm:id=>openFile(DB.lib.forms.find(f=>f.id===id).file,true),
  delForm:id=>confirmBox('Xoá biểu mẫu này?',async()=>{const f=DB.lib.forms.find(x=>x.id===id);DB.lib.forms=DB.lib.forms.filter(x=>x.id!==id);commit();await releaseFile(f.file)},'Xoá'),
  /* settings */
+ signEdit:id=>signModal(id===''?null:+id),
+ signDel:id=>{const x=DB.cfg.signers[+id];confirmBox(`Xoá người ký “${esc(x.title)}”?`,()=>{DB.cfg.signers.splice(+id,1);commit()},'Xoá')},
+ signMove:(id,el)=>{const i=+id,d=+el.dataset.arg,a=DB.cfg.signers,j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];commit()},
+ signPreview:()=>signPreviewModal(),
+ signReset:()=>confirmBox('Khôi phục danh sách chữ ký mặc định (4 người ký)? Danh sách hiện tại sẽ bị thay thế.',()=>{DB.cfg.signers=defaultSigners();commit()},'Khôi phục'),
  itemAdd:id=>itemModal(id),itemEdit:(id,el)=>itemModal(id,+el.dataset.arg),
  itemDel:(id,el)=>{const i=+el.dataset.arg,v=DB.cfg[id][i],n=usedCount(id,v);confirmBox(`Xoá “${esc(v)}”?${n?` Đang được dùng ở ${n} bản ghi (dữ liệu cũ vẫn giữ nguyên giá trị).`:''}`,()=>{DB.cfg[id].splice(i,1);commit()},'Xoá')},
  deptAdd:()=>deptModal(),deptEdit:(id,el)=>deptModal(+el.dataset.arg),
@@ -1374,7 +1416,7 @@ const A={
  resetDemo:()=>confirmBox('Nạp dữ liệu mẫu? Dữ liệu hiện tại sẽ bị thay thế.',()=>{DB=seedDemo();normalize();pickUser();ui.tab='dash';commit()},'Nạp dữ liệu mẫu'),
  clearAll:()=>confirmBox('Xoá TOÀN BỘ đề xuất, ứng viên và thư viện (giữ thiết lập)?',()=>{DB.reqs=[];DB.cands=[];DB.lib={positions:[],templates:[],forms:[]};commit()},'Xoá hết')
 };
-const CFG_ACTS=['itemAdd','itemEdit','itemDel','deptAdd','deptEdit','deptDel','addItem','delItem','addDept','delDept','addField','fieldEdit','fieldDel','fieldToggle','fieldMove','userEdit','userDel','capToggle','roleAdd','roleDel','importData','resetDemo','clearAll'];
+const CFG_ACTS=['signEdit','signDel','signMove','signReset','itemAdd','itemEdit','itemDel','deptAdd','deptEdit','deptDel','addItem','delItem','addDept','delDept','addField','fieldEdit','fieldDel','fieldToggle','fieldMove','userEdit','userDel','capToggle','roleAdd','roleDel','importData','resetDemo','clearAll'];
 CFG_ACTS.forEach(k=>{const f=A[k];A[k]=(...a)=>can('cfg.edit')?f(...a):toast('Bạn không có quyền chỉnh sửa Thiết lập','err')});
 function roundModal(c,i){
   const fields=[{k:'name',l:'Tên vòng',t:'text',req:1,wide:1},{k:'date',l:'Ngày',t:'date'},{k:'time',l:'Giờ',t:'time'},{k:'place',l:'Địa điểm / hình thức',t:'text',wide:1},{k:'who',l:'Người phỏng vấn',t:'text',wide:1},selF('result','Kết quả',R_IV),{k:'score',l:'Điểm (0–10)',t:'number'},{k:'note',l:'Nhận xét',t:'textarea',wide:1}];

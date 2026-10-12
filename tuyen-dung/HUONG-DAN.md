@@ -82,3 +82,8 @@ Dán code mới vào `Code.gs` / `Index`, rồi **Triển khai → Quản lý b�
   - **Thư viện:** vị trí (danh sách hoặc lịch sử phiên bản), mẫu thư, biểu mẫu.
   - **Thiết lập:** từng bảng (khối, phòng ban, nguồn, lý do loại, trường, người dùng, phân quyền). Khối, phòng ban, nguồn, lý do loại, người dùng có thể nhập lại bằng **Nhập CSV**.
 - File mở được bằng Excel / Google Sheets (UTF-8). Số điện thoại và mã bắt đầu bằng 0 được giữ nguyên; giá trị bắt đầu bằng `=`, `+`, `-`, `@` được thêm dấu `'` để tránh bị hiểu là công thức.
+
+## Chữ ký cuối phiếu đề xuất
+
+- Thiết lập → **Chữ ký phiếu đề xuất**: thêm / sửa / xoá / sắp xếp người ký. Mỗi người có **Chức danh**, **Họ và tên** (để trống nếu ký tay; gõ `{{nguoi_de_xuat}}` để tự điền tên người đề xuất), ghi chú dưới chức danh, dòng **Ngày ký: ...../....../........** và phạm vi áp dụng (tất cả khối hoặc một khối).
+- Chọn số cột chữ ký mỗi hàng (2–6) và thêm ghi chú cuối phiếu. Nút **Xem trước** hiển thị theo từng khối; nút **In phiếu đề xuất** dùng đúng cấu hình này.
