@@ -275,7 +275,7 @@ const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{co
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
-const APP_VER='v11 · 11/10/2026';
+const APP_VER='v12 · 12/10/2026';
 const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const MAXF=GS?10:15;
@@ -419,7 +419,7 @@ const COLS={
   items:()=>[...DB.lib.positions.map(x=>({_k:'positions',kl:'Vị trí',g:x.code,x})),...DB.lib.templates.map(x=>({_k:'templates',kl:'Mẫu thư',g:x.type,x})),...DB.lib.forms.map(x=>({_k:'forms',kl:'Biểu mẫu',g:x.cat,x}))]
    .map(o=>({id:o.x.id,row:[o.x.id,o.kl,o.x.name,o.g||''],data:{...o.x,_k:o._k}}))}
 };
-let snap={},saveTimer=null,chain=Promise.resolve(),lastLoad=0;
+let snap={},saveTimer=null,chain=Promise.resolve(),lastLoad=0,inflight=0,lastErr='',lastSaveAt=0,verifyTimer=null,verifyRetry=0;
 const jstr=o=>JSON.stringify(o);
 function takeSnap(){snap={};Object.keys(COLS).forEach(c=>{snap[c]={};COLS[c].items().forEach(i=>snap[c][i.id]=jstr(i.data))})}
 function diffOps(){
@@ -436,9 +436,23 @@ function save(){
 }
 function flush(){
   saveTimer=null;const prev=jstr(snap);const ops=diffOps();
-  if(!ops.length){setSync('ok',syncMsg());return}
+  if(!ops.length){if(!inflight)setSync('ok',syncMsg());return}
   ops.forEach(o=>{if(o.type==='put')snap[o.col][o.id]=o.data;else delete snap[o.col][o.id]});
-  chain=chain.then(()=>gcall('api_sync',ops)).then(()=>{if(!saveTimer)setSync('ok',syncMsg())}).catch(e=>{snap=JSON.parse(prev);setSync('err','Lưu thất bại – bấm "Lưu lại"');toast('Lưu thất bại: '+(e&&e.message||e),'err')});
+  const hasCfg=ops.some(o=>o.col==='cfg');
+  inflight++;
+  chain=chain.then(()=>gcall('api_sync',ops)).then(()=>{lastSaveAt=Date.now();lastErr='';if(hasCfg)scheduleVerify();if(!saveTimer&&inflight<=1)setSync('ok',syncMsg())})
+    .catch(e=>{snap=JSON.parse(prev);const m=String(e&&e.message||e);lastErr=m;setSync('err','Lưu thất bại: '+m.slice(0,90)+' – bấm để thử lại');toast('Lưu thất bại: '+m,'err')})
+    .then(()=>{inflight--});
+}
+/* Sau khi lưu Thiết lập, đọc lại từ Google Sheet để chắc chắn dữ liệu đã được ghi */
+function scheduleVerify(){clearTimeout(verifyTimer);verifyTimer=setTimeout(verifyCfg,2500)}
+async function verifyCfg(){
+  if(saveTimer||inflight){scheduleVerify();return}
+  try{const d=await gcall('api_load');if(saveTimer||inflight)return;
+    if(d.cfg&&jstr(d.cfg)===jstr(DB.cfg)){verifyRetry=0;return}
+    if(verifyRetry<1){verifyRetry++;snap.cfg={};flush();return}
+    lastErr='Google Sheet không khớp Thiết lập trên màn hình';setSync('err','Cảnh báo: Thiết lập chưa được ghi vào Google Sheet');toast('Thiết lập chưa được ghi vào Google Sheet. Hãy chụp màn hình báo cho quản trị.','err');verifyRetry=0;
+  }catch(e){}
 }
 function rebuildLib(items){const L={positions:[],templates:[],forms:[]};(items||[]).forEach(i=>{const k=i._k;delete i._k;if(L[k])L[k].push(i)});return L}
 function normalize(){
@@ -479,7 +493,7 @@ async function init(){
 }
 async function reloadData(silent){
   if(!ENV.gs)return;
-  try{await loadAll();if(!pickUser()){init();return}render();if(!silent)toast('Đã làm mới dữ liệu từ Google Sheet','ok')}catch(e){if(!silent)toast('Không làm mới được: '+(e&&e.message||e),'err')}
+  try{if(saveTimer){clearTimeout(saveTimer);flush()}await chain;await loadAll();if(!pickUser()){init();return}render();if(!silent)toast('Đã làm mới dữ liệu từ Google Sheet','ok')}catch(e){if(!silent)toast('Không làm mới được: '+(e&&e.message||e),'err')}
 }
 
 /* ============ generic form ============ */
@@ -491,9 +505,20 @@ function optsFor(f,vals){
   if(f.from==='requests')return DB.reqs.filter(r=>r.status==='approved'||r.id===vals.reqId).map(r=>[r.id,`${r.code} · ${r.v.position} (${r.v.dept})`]);
   return(f.opts||[]).map(x=>[x,x]);
 }
+const fmtInt=t=>t.replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+function fmtNum(v){if(v===''||v==null)return'';const n=Number(v);if(!isFinite(n))return String(v);const[a,b]=String(n).split('.');return(n<0?'-':'')+fmtInt(a.replace('-',''))+(b?','+b:'')}
+const numInput=v=>{if(v===''||v==null||typeof v==='object')return'';return isFinite(Number(v))?fmtNum(v):''};
+function parseNum(t){t=String(t).trim();if(t==='')return'';const n=Number(t.replace(/\./g,'').replace(',','.'));return isFinite(n)?n:NaN}
+function formatNumInput(el){
+  const raw=el.value,pos=el.selectionStart;const before=raw.slice(0,pos).replace(/[^\d,]/g,'').length;
+  const t=raw.replace(/[^\d,]/g,'');const ci=t.indexOf(',');let ip=ci<0?t:t.slice(0,ci);const dp=ci<0?'':t.slice(ci+1).replace(/,/g,'');
+  ip=ip.replace(/^0+(?=\d)/,'');const out=fmtInt(ip)+(ci<0?'':','+dp);el.value=out;
+  let n=0,i=0;for(;i<out.length&&n<before;i++){if(/[\d,]/.test(out[i]))n++}try{el.setSelectionRange(i,i)}catch(e){}
+}
 function valHTML(f,val,ctx){
   if(val===''||val==null)return'—';
   if(f.t==='date')return esc(fmtD(val));
+  if(f.t==='number')return esc(fmtNum(val));
   if(f.t==='url'){const u=/^https?:\/\//i.test(val)?val:'https://'+val;return`<a href="${esc(u)}" target="_blank" rel="noopener" style="color:var(--brand)">${esc(val)}</a>`}
   if(f.t==='file')return val&&val.name?`<button class="btn sm" data-act="openFld" data-id="${ctx.kind}:${ctx.id}" data-arg="${f.k}">${ic('eye')}${esc(val.name)}</button>`:'—';
   return esc(val);
@@ -510,7 +535,8 @@ function fieldHTML(f,vals){
   else if(f.t==='select'){inp=`<select id="${id}" data-k="${f.k}"><option value="">— Chọn —</option>${optsFor(f,vals).map(o=>`<option value="${esc(o[0])}" ${o[0]==v?'selected':''}>${esc(o[1])}</option>`).join('')}</select>`}
   else if(f.t==='file'){const has=v&&v.name;inp=`<input type="file" id="${id}" data-k="${f.k}" data-has="${has?1:0}">${has?`<div class="small muted" style="margin-top:4px">Hiện có: ${esc(v.name)} — chọn tệp mới để thay thế</div>`:''}`}
   else if(f.t==='combo')inp=`<input type="text" id="${id}" data-k="${f.k}" value="${esc(v)}" list="dl_${f.k}" autocomplete="off"><datalist id="dl_${f.k}">${optsFor(f,vals).map(o=>`<option value="${esc(o[0])}">`).join('')}</datalist>`;
-  else inp=`<input type="${f.t}" id="${id}" data-k="${f.k}" value="${esc(v)}" ${f.t==='number'?'min="0" step="any"':''}${f.t==='url'?' placeholder="https://"':''}>`;
+  else if(f.t==='number')inp=`<input type="text" inputmode="decimal" data-num="1" autocomplete="off" id="${id}" data-k="${f.k}" value="${esc(numInput(v))}" placeholder="0">`;
+  else inp=`<input type="${f.t}" id="${id}" data-k="${f.k}" value="${esc(v)}" ${f.t==='url'?' placeholder="https://"':''}>`;
   return`<div class="${f.wide||f.t==='textarea'?'wide':''}"><label class="f" for="${id}">${esc(f.l)}${rq}</label>${inp}</div>`;
 }
 const formHTML=(fields,vals)=>`<div class="fgrid">${fields.filter(f=>f.vis!==0&&f.vis!==false).map(f=>fieldHTML(f,vals)).join('')}</div>`;
@@ -519,7 +545,7 @@ function readForm(root,fields){
   fields.forEach(f=>{const el=$(`[data-k="${f.k}"]`,root);if(!el)return;
     if(f.t==='file'){const file=el.files&&el.files[0];if(file&&file.size>MAXF*1048576){toast(`Tệp quá lớn (tối đa ${MAXF}MB)`,'err');el.classList.add('err');ok=false;return}
       out[f.k]=file||undefined;const bad=f.req&&!file&&el.dataset.has!=='1';el.classList.toggle('err',bad);if(bad)ok=false;return}
-    let val=el.value.trim();if(f.t==='url'&&val&&!/^https?:\/\//i.test(val))val='https://'+val;if(f.t==='number'&&val!=='')val=Number(val);out[f.k]=val;
+    let val=el.value.trim();if(f.t==='url'&&val&&!/^https?:\/\//i.test(val))val='https://'+val;if(f.t==='number'){const n=parseNum(val);if(Number.isNaN(n)){el.classList.add('err');toast(`“${f.l}” phải là số`,'err');ok=false;return}val=n}out[f.k]=val;
     const bad=f.req&&(val===''||val==null);el.classList.toggle('err',bad);if(bad)ok=false});
   if(!ok)toast('Vui lòng nhập các trường bắt buộc (*)','err');
   return ok?out:null;
@@ -716,7 +742,7 @@ function vReq(){
   ${missing?`<div class="alert warn" style="margin-bottom:14px">${ic('alert')}<div><b>Báo cáo thiếu hồ sơ:</b> các đề xuất đã được Ban TGĐ duyệt nhưng chưa tải lên bản scan có chữ ký. Quá hạn ${DB.cfg.signDays} ngày sẽ được đánh dấu đỏ.</div></div>`:''}
   <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Mã</th><th>Vị trí</th><th>Phòng ban / Khối</th><th>SL</th><th>Người đề xuất</th><th>Ngày tạo</th><th>Trạng thái</th><th>Bản ký</th></tr></thead><tbody>
   ${list.map(r=>{const days=r.approvedAt?daysSince(r.approvedAt):0;
-    return`<tr class="click" data-act="openReq" data-id="${r.id}"><td class="mono">${esc(r.code)}</td><td><b>${esc(r.v.position)}</b><div class="muted small">${esc(r.v.reqType||'')}</div></td><td>${esc(r.v.dept)}<div class="muted small">${esc(r.v.block)}</div></td><td>${r.status==='approved'?`${hiredOf(r)}/`:''}${r.v.qty}</td><td>${esc(userName(r.by))}</td><td>${fmtD(r.at)}</td><td>${badge(...STATUS[r.status])}</td>
+    return`<tr class="click" data-act="openReq" data-id="${r.id}"><td class="mono">${esc(r.code)}</td><td><b>${esc(r.v.position)}</b><div class="muted small">${esc(r.v.reqType||'')}</div></td><td>${esc(r.v.dept)}<div class="muted small">${esc(r.v.block)}</div></td><td>${r.status==='approved'?`${hiredOf(r)}/`:''}${fmtNum(r.v.qty)}</td><td>${esc(userName(r.by))}</td><td>${fmtD(r.at)}</td><td>${badge(...STATUS[r.status])}</td>
     <td>${r.status!=='approved'?'<span class="muted">—</span>':r.signed?badge('Đã có','b-ok'):badge(days>DB.cfg.signDays?`Thiếu · quá ${days-DB.cfg.signDays} ngày`:'Thiếu hồ sơ',days>DB.cfg.signDays?'b-bad':'b-warn')}</td></tr>`}).join('')||`<tr><td colspan="8"><div class="empty">${ic('clip')}<div>Không có đề xuất phù hợp</div></div></td></tr>`}
   </tbody></table></div></div>`;
 }
@@ -821,7 +847,7 @@ function reqDrawer(id){
 }
 function printReq(r){
   const w=window.open('','_blank');if(!w){toast('Trình duyệt chặn cửa sổ in','err');return}
-  const rows=DB.cfg.reqFields.filter(f=>f.vis!==0).map(f=>`<tr><td style="width:32%;color:#555">${esc(f.l)}</td><td>${esc(f.t==='date'?fmtD(r.v[f.k]):(r.v[f.k]??''))}</td></tr>`).join('');
+  const rows=DB.cfg.reqFields.filter(f=>f.vis!==0).map(f=>`<tr><td style="width:32%;color:#555">${esc(f.l)}</td><td>${esc(f.t==='date'?fmtD(r.v[f.k]):f.t==='number'?fmtNum(r.v[f.k]):f.t==='file'?(r.v[f.k]&&r.v[f.k].name||''):(r.v[f.k]??''))}</td></tr>`).join('');
   w.document.write(`<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><title>${esc(r.code)}</title><style>body{font-family:'Times New Roman',serif;max-width:760px;margin:30px auto;font-size:15px;color:#000}h1{text-align:center;font-size:20px;margin:6px 0}td{border:1px solid #999;padding:8px 10px;vertical-align:top;white-space:pre-wrap}table{border-collapse:collapse;width:100%;margin:18px 0}.sig{display:grid;grid-template-columns:repeat(4,1fr);text-align:center;margin-top:30px;gap:8px}.sig div{height:130px}.c{text-align:center}</style></head><body>
   <div class="c"><b>${esc(DB.cfg.company).toUpperCase()}</b></div><h1>PHIẾU ĐỀ XUẤT TUYỂN DỤNG</h1><div class="c">Số: ${esc(r.code)} · Ngày ${fmtD(r.at)}</div>
   <table>${rows}</table><div class="sig"><div><b>Người đề xuất</b><br><i>(Ký, ghi rõ họ tên)</i><br><br><br><br>${esc(userName(r.by))}</div><div><b>Trưởng bộ phận</b><br><i>(Ký, ghi rõ họ tên)</i></div><div><b>Phòng Nhân sự</b><br><i>(Ký, ghi rõ họ tên)</i></div><div><b>Ban Tổng giám đốc</b><br><i>(Ký, đóng dấu)</i></div></div>
@@ -1042,7 +1068,7 @@ function cfgBody(){
   if(ui.cf==='perm')return`<div class="card"><div class="card-h"><span>Ma trận phân quyền</span><button class="btn sm" data-act="roleAdd">${ic('plus')}Thêm vai trò</button></div><div class="tbl-wrap"><table><thead><tr><th>Quyền</th>${C.roles.map(r=>`<th style="text-align:center">${esc(r.name)}${!r.locked?` <button class="btn ghost sm" data-act="roleDel" data-id="${r.id}" style="padding:0 4px">${ic('x')}</button>`:''}</th>`).join('')}</tr></thead><tbody>${CAPS.map(c=>`<tr><td>${esc(c[1])}</td>${C.roles.map(r=>`<td style="text-align:center"><input type="checkbox" class="chk" ${r.locked||r.caps.includes(c[0])?'checked':''} ${r.locked?'disabled':''} data-act="capToggle" data-id="${r.id}" data-arg="${c[0]}"></td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
     <div class="alert info" style="margin-top:14px">${ic('alert')}<div>Vai trò mặc định: <b>Người đề xuất</b> (chỉ thấy đề xuất của mình), <b>Nhân viên tuyển dụng</b>, <b>Ban Tổng giám đốc</b> (phê duyệt), <b>Quản trị</b> (toàn quyền, không chỉnh sửa được).</div></div>`;
   return`<div class="card pad"><div class="row"><button class="btn" data-act="exportData">${ic('download')}Xuất sao lưu (JSON)</button><button class="btn" data-act="importData">${ic('upload')}Nhập sao lưu</button>${ENV.sheetUrl?`<button class="btn pri" data-act="openSheet">${ic('file')}Mở Google Sheet</button>`:''}<button class="btn bad" data-act="resetDemo">Nạp dữ liệu mẫu</button><button class="btn bad" data-act="clearAll">Xoá toàn bộ dữ liệu</button></div>
-    <p class="small" style="margin-top:14px"><b>Chẩn đoán:</b> phiên bản ${APP_VER} · chế độ ${ENV.gs?'Google Sheet':'xem thử'} · tài khoản ${esc(ENV.email||'—')} · đang có ${DB.reqs.length} đề xuất, ${DB.cands.length} ứng viên, ${DB.lib.positions.length} vị trí, ${DB.lib.templates.length} mẫu thư.</p>
+    <p class="small" style="margin-top:14px"><b>Chẩn đoán:</b> phiên bản ${APP_VER} · chế độ ${ENV.gs?'Google Sheet':'xem thử'} · tài khoản ${esc(ENV.email||'—')} · lần lưu gần nhất: ${lastSaveAt?fmtDT(lastSaveAt):'—'}${lastErr?` · <span style="color:var(--bad)">lỗi gần nhất: ${esc(lastErr)}</span>`:''} · đang có ${DB.reqs.length} đề xuất, ${DB.cands.length} ứng viên, ${DB.lib.positions.length} vị trí, ${DB.lib.templates.length} mẫu thư.</p>
     <p class="muted small" style="margin-top:8px">${ENV.gs?'Dữ liệu được lưu trong Google Sheet của bạn (các sheet DeXuat, UngVien, ThuVien, ThietLap); tệp đính kèm lưu trong thư mục Google Drive "HR Recruit – Tệp đính kèm". Không chỉnh sửa cột <b>data</b> bằng tay.':'Chế độ xem thử: dữ liệu chỉ lưu trên trình duyệt này. Triển khai Apps Script (xem HUONG-DAN.md) để lưu vào Google Sheet dùng chung.'} File sao lưu JSON không bao gồm tệp đính kèm.</p></div>`;
 }
 /* ===== Thiết lập: danh sách + nhập CSV ===== */
@@ -1156,17 +1182,17 @@ function csvOpen(key){
 }
 function fieldModal(key,i){
   const f=i==null?{l:'',t:'text',custom:1,vis:1,req:0}:DB.cfg[key][i];
-  const builtin=i!=null&&!f.custom,locked=!!f.lock;
+  const builtin=i!=null&&!f.custom,locked=!!f.lock,typeLocked=locked||(builtin&&!!f.from);
   modal({title:i==null?'Thêm trường mới':'Sửa trường: '+f.l,html:`<div class="fgrid"><div class="wide"><label class="f">Tên trường <i>*</i></label><input type="text" id="nf_l" value="${esc(f.l)}"></div>
-    <div><label class="f">Kiểu dữ liệu</label><select id="nf_t" ${builtin?'disabled':''}>${FTYPES.map(t=>`<option value="${t[0]}" ${f.t===t[0]?'selected':''}>${t[1]}</option>`).join('')}${builtin&&!FTYPES.some(t=>t[0]===f.t)?`<option selected>${esc(f.from?'Danh mục':f.t)}</option>`:''}</select></div>
+    <div><label class="f">Kiểu dữ liệu</label><select id="nf_t" ${typeLocked?'disabled':''}>${FTYPES.map(t=>`<option value="${t[0]}" ${f.t===t[0]?'selected':''}>${t[1]}</option>`).join('')}${typeLocked&&!FTYPES.some(t=>t[0]===f.t)?`<option selected>${esc(f.from?'Danh mục':f.t)}</option>`:''}</select>${typeLocked?`<div class="small muted" style="margin-top:4px">${locked?'Trường hệ thống bắt buộc – không đổi kiểu.':'Trường lấy từ Danh mục – quản lý ở mục Danh mục.'}</div>`:`<div class="small muted" style="margin-top:4px">Đổi kiểu không xoá dữ liệu cũ; giá trị cũ không hợp kiểu mới sẽ hiện nguyên văn và để trống khi sửa.</div>`}</div>
     <div><label class="f">Bắt buộc</label><select id="nf_r" ${locked?'disabled':''}><option value="0">Không</option><option value="1" ${f.req?'selected':''}>Có</option></select></div>
     <div><label class="f">Hiển thị trong biểu mẫu</label><select id="nf_v" ${locked?'disabled':''}><option value="1">Có</option><option value="0" ${f.vis===0||f.vis===false?'selected':''}>Ẩn</option></select></div>
-    ${f.from||(builtin&&f.t!=='select')?'':`<div class="wide"><label class="f">Các lựa chọn (mỗi dòng một giá trị – chỉ dùng cho kiểu “Danh sách chọn”)</label><textarea id="nf_o">${esc((f.opts||[]).join('\n'))}</textarea></div>`}</div>
+    ${f.from||typeLocked?'':`<div class="wide"><label class="f">Các lựa chọn (mỗi dòng một giá trị – chỉ dùng cho kiểu “Danh sách chọn”)</label><textarea id="nf_o">${esc((f.opts||[]).join('\n'))}</textarea></div>`}</div>
     ${locked?'<p class="small muted" style="margin-top:10px">Trường hệ thống bắt buộc: chỉ đổi được tên hiển thị.</p>':''}`,
     buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{const l=$('#nf_l').value.trim();if(!l){$('#nf_l').classList.add('err');return false}
-      const t=builtin?f.t:$('#nf_t').value;const oel=$('#nf_o');const o=oel?oel.value.split('\n').map(s=>s.trim()).filter(Boolean):(f.opts||[]);
+      const t=typeLocked?f.t:$('#nf_t').value;const oel=$('#nf_o');const o=oel?oel.value.split('\n').map(s=>s.trim()).filter(Boolean):(f.opts||[]);
       if(t==='select'&&!f.from&&!o.length){toast('Vui lòng nhập các lựa chọn','err');return false}
-      const nf={...f,l,t,req:locked?f.req:($('#nf_r').value==='1'?1:0),vis:locked?f.vis:($('#nf_v').value==='1'?1:0),opts:t==='select'&&!f.from?o:f.opts,k:f.k||uid('c_')};
+      const nf={...f,l,t,req:locked?f.req:($('#nf_r').value==='1'?1:0),vis:locked?f.vis:($('#nf_v').value==='1'?1:0),opts:f.from?f.opts:(t==='select'?o:undefined),k:f.k||uid('c_')};
       if(nf.vis===0)nf.req=0;
       if(i==null){nf.custom=1;DB.cfg[key].push(nf)}else DB.cfg[key][i]=nf;commit()}}]});
 }
@@ -1284,8 +1310,10 @@ document.addEventListener('change',ev=>{
   else if(el.dataset.cfg){if(!can('cfg.edit'))return;const k=el.dataset.cfg;DB.cfg[k]=el.type==='number'?Number(el.value):el.value;save()}
   else if(el.dataset.bind&&el.tagName==='SELECT'){ui[el.dataset.bind]=el.value;render()}
 });
-document.addEventListener('input',ev=>{const el=ev.target;if(el.dataset.bind&&el.tagName==='INPUT'){ui[el.dataset.bind]=el.value;render()}});
-window.addEventListener('focus',()=>{if(ENV.gs&&DB&&Date.now()-lastLoad>120000&&!saveTimer&&!$('#mw').classList.contains('on'))reloadData(true)});
+document.addEventListener('input',ev=>{const el=ev.target;if(el.dataset&&el.dataset.num){formatNumInput(el);return}if(el.dataset.bind&&el.tagName==='INPUT'){ui[el.dataset.bind]=el.value;render()}});
+window.addEventListener('focus',()=>{if(ENV.gs&&DB&&Date.now()-lastLoad>120000&&!saveTimer&&!inflight&&!$('#mw').classList.contains('on'))reloadData(true)});
+window.addEventListener('beforeunload',e=>{if(ENV.gs&&(saveTimer||inflight)){e.preventDefault();e.returnValue=''}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&ENV.gs&&saveTimer){clearTimeout(saveTimer);flush()}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('#mw').classList.contains('on'))closeModal();else closeDrawer()}});
 /* drag & drop kanban */
 let dragId=null;

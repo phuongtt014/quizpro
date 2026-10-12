@@ -59,3 +59,10 @@ Dán code mới vào `Code.gs` / `Index`, rồi **Triển khai → Quản lý b�
   - Chưa có file (hoặc vị trí chưa có trong Thư viện) → **bắt buộc tải file MTCV**. Ghi chú: file cần có ký số điện tử hoặc ký trực tiếp đến cấp Trưởng đơn vị (Khối văn phòng và Kinh doanh), đến cấp Hội đồng trực thuộc (Khối trường).
 - Thiết lập → Trường: có thêm kiểu **Liên kết (URL)** và **Tệp tải lên (File)** (CSV: cột Kiểu ghi `URL` hoặc `Tệp tải lên`).
 - Tệp dùng chung giữa Thư viện và đề xuất chỉ bị xoá khỏi Drive khi không còn bản ghi nào tham chiếu.
+
+## Kiểu dữ liệu số & độ tin cậy khi lưu
+
+- Trường kiểu **Số** hiển thị có dấu chấm phân tách hàng nghìn (ví dụ `2.000.000`), dấu phẩy cho phần thập phân (`1.500,75`). Dữ liệu lưu dạng số thuần.
+- Trường hệ thống (không bắt buộc) đổi được kiểu dữ liệu; trường bắt buộc (khối, phòng ban, vị trí, số lượng, tên ứng viên, đề xuất ứng tuyển) và trường lấy từ Danh mục thì cố định kiểu.
+- Sau mỗi lần lưu **Thiết lập**, ứng dụng tự đọc lại Google Sheet để đối chiếu; nếu không khớp sẽ tự lưu lại một lần và báo đỏ ở góc dưới thanh bên trái nếu vẫn không được.
+- Xem **Thiết lập → Dữ liệu & sao lưu → Chẩn đoán** để biết thời điểm lưu gần nhất và lỗi gần nhất.
