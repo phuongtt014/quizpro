@@ -94,3 +94,9 @@ Dán code mới vào `Code.gs` / `Index`, rồi **Triển khai → Quản lý b�
 - Logo tự được cắt viền trắng và thu nhỏ (giữ dưới ~36.000 ký tự để không vượt giới hạn ô Google Sheet).
 - Có biểu mẫu mới: **Ban hành mẫu mới** (lần ban hành tự tăng, chọn ngày hiệu lực). Mẫu cũ được giữ lại; mỗi đề xuất ghi nhớ mẫu đang áp dụng lúc lập (đề xuất còn chờ duyệt được cập nhật theo mẫu hiện hành khi sửa) và in theo mẫu đó.
 - Khối chữ ký ở cuối phiếu cấu hình tại Thiết lập → Chữ ký phiếu đề xuất.
+
+## Người ký trong đề xuất & bố cục chữ ký
+
+- Khi tạo/sửa đề xuất có mục **"Người ký trên phiếu đề xuất"**: người đề xuất điều chỉnh họ tên từng người ký (để trống nếu ký tay). Danh sách chức danh lấy theo khối đã chọn ở Thiết lập → Chữ ký phiếu đề xuất. Tên đã nhập được lưu theo từng đề xuất và in trên phiếu.
+- **Số cột chữ ký tối đa** mỗi hàng: các hàng được chia đều và canh giữa theo chiều ngang giấy (ví dụ 4 người ký, tối đa 3 cột → 2 + 2; 5 người → 3 + 2 canh giữa).
+- Mẫu phiếu: **Tên đơn vị trên phiếu** để trống = không hiển thị.

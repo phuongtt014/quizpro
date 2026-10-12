@@ -275,7 +275,7 @@ const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{co
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
-const APP_VER='v16 · 12/10/2026';
+const APP_VER='v17 · 12/10/2026';
 const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const MAXF=GS?10:15;
@@ -781,14 +781,16 @@ function reqForm(r){
   if(!r&&!vals.dept){const u=me();const d=DB.cfg.depts.find(x=>x.name===u.dept);if(d){vals.dept=d.name;vals.block=d.block}}
   const fields=DB.cfg.reqFields;
   const prevJd=r&&r.jd||null;
-  let jdOk=!!(prevJd&&prevJd.mode==='library'&&prevJd.confirmedAt),sig='';
+  let jdOk=!!(prevJd&&prevJd.mode==='library'&&prevJd.confirmedAt),sig='',sigCore='';
   const draw=(force)=>{
     const box=$('#jdBox');if(!box)return;
     const pos=$('#ff_position'),blk=$('#ff_block');const info=jdInfo(pos?pos.value:'',blk?blk.value:'');
-    const sg=[info.empty?'e':'',info.p&&info.p.id,info.ver&&info.ver.id,info.file?1:0,blk?blk.value:''].join('|');
+    const core=[info.empty?'e':'',info.p&&info.p.id,info.ver&&info.ver.id,info.file?1:0].join('|');
+    const sg=core+'|'+(blk?blk.value:'');
     if(!force&&sg===sig)return;
-    if(sg!==sig&&sig!==''&&!(prevJd&&info.ver&&prevJd.verId===info.ver.id))jdOk=false;
-    sig=sg;
+    if(!force&&core===sigCore&&$('#jd_rule')){$('#jd_rule').textContent=signRule(blk?blk.value:'');sig=sg;return}   // chỉ đổi khối: giữ nguyên ô tải file / nút xác nhận
+    if(core!==sigCore&&sigCore!==''&&!(prevJd&&info.ver&&prevJd.verId===info.ver.id))jdOk=false;
+    sig=sg;sigCore=core;
     if(info.empty){box.innerHTML=`<div class="alert info">${ic('alert')}<div>Chọn <b>Vị trí cần tuyển</b> để hệ thống kiểm tra MTCV (mô tả công việc) đã duyệt trong Thư viện.</div></div>`;return}
     if(info.file){box.innerHTML=`<div class="card sec" style="border-left:4px solid var(--ok)"><div class="sec-h"><h3>${ic('file')}MTCV đính kèm tự động từ Thư viện</h3><button class="btn sm" data-act="viewVerFile" data-id="${info.p.id}" data-arg="${info.ver.id}">${ic('eye')}Xem file MTCV</button></div>
       <div>Vị trí <b>${esc(info.p.name)}</b> — bản MTCV <b>v${info.ver.ver}</b> đang hiệu lực từ ${fmtD(info.ver.effective)} (${esc(info.file.name)}). Hệ thống sẽ đính kèm file này vào đề xuất.</div>
@@ -798,14 +800,24 @@ function reqForm(r){
     const had=prevJd&&prevJd.mode==='upload'&&prevJd.file;
     box.innerHTML=`<div class="card sec" style="border-left:4px solid var(--warn)"><div class="sec-h"><h3>${ic('upload')}Bắt buộc tải file MTCV kèm theo</h3></div>
       <p style="margin-bottom:10px">${esc(info.reason)}. Vui lòng tải lên file MTCV của vị trí đề xuất.</p>
-      <div class="alert warn" style="margin-bottom:10px">${ic('alert')}<div><b>Ghi chú:</b> File cần có ký số điện tử hoặc ký trực tiếp ${signRule(blk?blk.value:'')}.</div></div>
+      <div class="alert warn" style="margin-bottom:10px">${ic('alert')}<div><b>Ghi chú:</b> File cần có ký số điện tử hoặc ký trực tiếp <span id="jd_rule">${signRule(blk?blk.value:'')}</span>.</div></div>
       ${had?`<div class="small muted" style="margin-bottom:6px">Hiện có: ${esc(prevJd.file.name)} — chọn tệp mới để thay thế</div>`:''}
       <input type="file" id="jd_file" accept=".pdf,image/*,.doc,.docx"></div>`;
   };
-  modal({title:r?`Sửa đề xuất ${r.code}`:'Tạo đề xuất tuyển dụng',wide:true,html:formHTML(fields,vals)+`<div id="jdBox" style="margin-top:16px"></div>`,
-    after:m=>{bindForm(m,fields);const pos=$('#ff_position'),blk=$('#ff_block');if(pos){pos.addEventListener('input',()=>draw());pos.addEventListener('change',()=>draw())}if(blk)blk.addEventListener('change',()=>setTimeout(draw,0));draw(true)},
+  const signNames=r&&r.signerNames?{...r.signerNames}:{};
+  const drawSign=keep=>{
+    const box=$('#signBox');if(!box)return;
+    if(keep)qa('#signBox [data-sg]').forEach(i=>{signNames[i.dataset.sg]=i.value});
+    const blk=$('#ff_block');const list=signersFor(blk?blk.value:'');const reqName=r?userName(r.by):me().name;
+    if(!list.length){box.innerHTML='';return}
+    box.innerHTML=`<div class="card sec"><div class="sec-h"><h3>${ic('edit')}Người ký trên phiếu đề xuất</h3></div><p class="small muted" style="margin-bottom:10px">Điều chỉnh họ và tên người ký sẽ in trên phiếu. Để trống nếu ký tay. Danh sách người ký thiết lập ở Thiết lập → Chữ ký phiếu đề xuất.</p><div class="fgrid">${list.map(x=>`<div><label class="f">${esc(x.title)}</label><input type="text" data-sg="${esc(x.id)}" value="${esc(signNameOf(x,reqName,signNames))}" placeholder="Họ và tên người ký"></div>`).join('')}</div></div>`;
+  };
+  modal({title:r?`Sửa đề xuất ${r.code}`:'Tạo đề xuất tuyển dụng',wide:true,html:formHTML(fields,vals)+`<div id="jdBox" style="margin-top:16px"></div><div id="signBox" style="margin-top:16px"></div>`,
+    after:m=>{bindForm(m,fields);const pos=$('#ff_position'),blk=$('#ff_block');if(pos){pos.addEventListener('input',()=>draw());pos.addEventListener('change',()=>draw())}if(blk)blk.addEventListener('change',()=>setTimeout(()=>{draw();drawSign(true)},0));draw(true);drawSign(false)},
     buttons:[modalCancel,{label:r?'Lưu thay đổi':'Gửi đề xuất duyệt',cls:'pri',icon:'check',fn:()=>{
       const v=readForm($('#modal'),fields);if(!v)return false;
+      qa('#signBox [data-sg]').forEach(i=>{signNames[i.dataset.sg]=i.value.trim()});
+      const sn={};signersFor(v.block).forEach(x=>{if(Object.prototype.hasOwnProperty.call(signNames,x.id))sn[x.id]=signNames[x.id]});
       const info=jdInfo(v.position,v.block);let jd,pending=null;
       if(info.file){
         if(!jdOk){toast('Vui lòng bấm “Xác nhận sử dụng MTCV hiện tại” trước khi gửi','err');return false}
@@ -820,9 +832,9 @@ function reqForm(r){
         const rel=await finishFiles(fields,v,r&&r.v);
         if(pending){toast('Đang tải MTCV lên…');jd.file=await storeFile(pending);if(prevJd&&prevJd.mode==='upload'&&prevJd.file)rel.push(prevJd.file)}
         if(prevJd&&prevJd.mode==='upload'&&prevJd.file&&jd.mode!=='upload')rel.push(prevJd.file);
-        if(r){r.v={...r.v,...v};r.jd=jd;if(r.status==='pending')r.form=formSnap();log(r,'Cập nhật nội dung đề xuất')}
+        if(r){r.v={...r.v,...v};r.jd=jd;r.signerNames=sn;if(r.status==='pending')r.form=formSnap();log(r,'Cập nhật nội dung đề xuất')}
         else{const yr=new Date().getFullYear();const n=Math.max(0,...DB.reqs.map(x=>{return x.code.startsWith('ĐX-'+yr+'-')?(+x.code.split('-').pop()||0):0}))+1;
-          const nr={id:uid('r_'),code:`ĐX-${yr}-${String(n).padStart(3,'0')}`,by:me().id,at:Date.now(),status:'pending',v,jd,form:formSnap(),history:[],signed:null};log(nr,'Tạo đề xuất & gửi Ban TGĐ phê duyệt'+(jd.mode==='library'?` (xác nhận MTCV v${jd.ver})`:' (kèm file MTCV)'));DB.reqs.push(nr)}
+          const nr={id:uid('r_'),code:`ĐX-${yr}-${String(n).padStart(3,'0')}`,by:me().id,at:Date.now(),status:'pending',v,jd,form:formSnap(),signerNames:sn,history:[],signed:null};log(nr,'Tạo đề xuất & gửi Ban TGĐ phê duyệt'+(jd.mode==='library'?` (xác nhận MTCV v${jd.ver})`:' (kèm file MTCV)'));DB.reqs.push(nr)}
         closeModal();commit();toast(r?'Đã cập nhật':'Đã gửi đề xuất chờ Ban TGĐ phê duyệt','ok');rel.forEach(releaseFile)}catch(e){toast('Không lưu được tệp','err')}})();
       return false}}]});
 }
@@ -855,6 +867,7 @@ function reqDrawer(id){
       ${fields.map(f=>`<dt>${esc(f.l)}</dt><dd>${valHTML(f,r.v[f.k],{kind:'req',id:r.id})}</dd>`).join('')}
     </dl></div>
     <div class="card sec"><div class="sec-h"><h3>${ic('file')}MTCV đính kèm</h3></div>${jdView(r)}</div>
+    ${signersFor(r.v.block).length?`<div class="card sec"><div class="sec-h"><h3>${ic('edit')}Người ký trên phiếu</h3></div><dl class="kv">${signersFor(r.v.block).map(x=>`<dt>${esc(x.title)}</dt><dd>${esc(signNameOf(x,userName(r.by),r.signerNames)||'(ký tay)')}</dd>`).join('')}</dl></div>`:''}
     ${r.status==='approved'?`<div class="card sec"><div class="sec-h"><h3>${ic('file')}Bản scan đã ký</h3>
       ${can('req.sign')?`<button class="btn sm ${r.signed?'':'pri'}" data-act="uploadSigned" data-id="${r.id}">${ic('upload')}${r.signed?'Thay tệp':'Tải lên bản scan'}</button>`:''}</div>
       ${r.signed?`<div class="row"><div class="grow"><b>${esc(r.signed.name)}</b><div class="muted small">${fsize(r.signed.size)} · tải lên ${fmtDT(r.signed.at)}</div></div>${r.signed.demo?'<span class="muted small">(tệp mẫu)</span>':`<button class="btn sm" data-act="viewSigned" data-id="${r.id}">${ic('eye')}Xem</button>`}</div>`:'<div class="muted">Chưa có tệp. Hãy in phiếu → ký → scan → tải lên (PDF hoặc ảnh).</div>'}</div>
@@ -864,12 +877,16 @@ function reqDrawer(id){
     </div>`;
   };
 }
-function signHTML(block,reqName){
-  const C=DB.cfg;const list=(C.signers||[]).filter(x=>!x.block||x.block===block);
+function signNameOf(x,reqName,ov){return(ov&&Object.prototype.hasOwnProperty.call(ov,x.id))?ov[x.id]:(x.name||'').split('{{nguoi_de_xuat}}').join(reqName||'')}
+function signersFor(block){return(DB.cfg.signers||[]).filter(x=>!x.block||x.block===block)}
+function signHTML(block,reqName,ov){
+  const C=DB.cfg;const list=signersFor(block);
   if(!list.length)return'';
   const cols=Math.min(6,Math.max(1,+C.signCols||4));
-  const cell=x=>`<div style="text-align:center;padding:0 6px"><div style="font-weight:700">${esc(x.title)}</div>${x.note?`<div style="font-style:italic;font-size:.9em">${esc(x.note)}</div>`:''}<div style="height:90px"></div><div style="font-weight:700;height:1.8em;line-height:1.8em">${esc((x.name||'').split('{{nguoi_de_xuat}}').join(reqName||''))}</div>${x.showDate?`<div style="margin-top:6px;font-size:.92em">Ngày ký: ...../....../........</div>`:''}</div>`;
-  return`<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:20px 8px;margin-top:26px">${list.map(cell).join('')}</div>${C.signFooter?`<p style="margin-top:18px;font-style:italic;font-size:.9em;white-space:pre-wrap">${esc(C.signFooter)}</p>`:''}`;
+  const rows=Math.ceil(list.length/cols),per=Math.ceil(list.length/rows);   // chia đều các hàng
+  const w=(100/per).toFixed(4);
+  const cell=x=>`<div style="flex:0 0 ${w}%;max-width:${w}%;box-sizing:border-box;text-align:center;padding:0 6px;page-break-inside:avoid;break-inside:avoid"><div style="font-weight:700">${esc(x.title)}</div>${x.note?`<div style="font-style:italic;font-size:.9em">${esc(x.note)}</div>`:''}<div style="height:90px"></div><div style="font-weight:700;height:1.8em;line-height:1.8em">${esc(signNameOf(x,reqName,ov))}</div>${x.showDate?`<div style="margin-top:6px;font-size:.92em">Ngày ký: ...../....../........</div>`:''}</div>`;
+  return`<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:22px 0;margin-top:26px">${list.map(cell).join('')}</div>${C.signFooter?`<p style="margin-top:18px;font-style:italic;font-size:.9em;white-space:pre-wrap">${esc(C.signFooter)}</p>`:''}`;
 }
 /* ===== Mẫu phiếu đề xuất (Thư viện): số hiệu, ngày hiệu lực, lần ban hành, logo ===== */
 function defaultFormTpl(){return{id:'frm_default',code:'BM.NS.01',issue:'01',effective:'2000-01-01',title:'PHIẾU ĐỀ XUẤT TUYỂN DỤNG',org:'',sub:'',accent:'#A91D3F',logoData:'',note:'Bản đầu tiên',createdAt:Date.now(),by:''}}
@@ -915,15 +932,15 @@ function reqDocHTML(r,tpl){
   const fs=C.reqFields.filter(f=>f.vis!==0&&f.vis!==false);
   const cellV=f=>{const v=r.v[f.k];return esc(v==null||v===''?'':(f.t==='date'?fmtD(v):f.t==='number'?fmtNum(v):f.t==='file'?(v&&v.name||''):v))};
   const rows=fs.map(f=>`<tr><td class="k">${esc(f.l)}</td><td>${cellV(f)}</td></tr>`).join('');
-  const org=tpl.org||C.company;
+  const org=tpl.org||'';
   const mt=r.jd?(r.jd.mode==='library'?`Bản MTCV v${esc(r.jd.ver)} trong Thư viện – đã được người đề xuất xác nhận sử dụng`:'File MTCV do người đề xuất tải lên kèm theo phiếu'):'';
   return`<style>${reqDocCSS()}</style><div class="rq-doc">
-  <table class="rq-head"><tr><td class="rq-logo">${tpl.logoData?`<img src="${tpl.logoData}" alt="logo">`:''}<div class="rq-org" style="${tpl.logoData?'':`color:${acc};font-size:11pt`}">${esc(org)}</div>${tpl.sub?`<div class="rq-orgsub">${esc(tpl.sub)}</div>`:''}</td>
+  <table class="rq-head"><tr><td class="rq-logo">${tpl.logoData?`<img src="${tpl.logoData}" alt="logo">`:''}${org?`<div class="rq-org" style="${tpl.logoData?'':`color:${acc};font-size:11pt`}">${esc(org)}</div>`:''}${tpl.sub?`<div class="rq-orgsub">${esc(tpl.sub)}</div>`:''}</td>
     <td class="rq-title" style="color:${acc}">${esc(tpl.title||'PHIẾU ĐỀ XUẤT TUYỂN DỤNG')}<div class="rq-no">Số: <b>${esc(r.code)}</b> &nbsp;·&nbsp; Ngày lập: ${fmtD(r.at)}</div></td>
     <td class="rq-meta"><div><b>Số hiệu:</b> ${esc(tpl.code)}</div><div><b>Ngày hiệu lực:</b> ${fmtD(tpl.effective)}</div><div><b>Lần ban hành:</b> ${esc(tpl.issue)}</div></td></tr></table>
   <div class="rq-h" style="border-color:${acc}">I. Thông tin đề xuất</div><table class="rq-t">${rows}</table>
   ${mt?`<div class="rq-h" style="border-color:${acc}">II. Mô tả công việc (MTCV)</div><table class="rq-t"><tr><td class="k">MTCV đính kèm</td><td>${mt}</td></tr></table>`:''}
-  <div class="rq-h" style="border-color:${acc}">${mt?'III':'II'}. Xác nhận và phê duyệt</div><div class="rq-sign">${signHTML(r.v.block,userName(r.by))||'<div style="color:#666">(Chưa thiết lập người ký)</div>'}</div>
+  <div class="rq-h" style="border-color:${acc}">${mt?'III':'II'}. Xác nhận và phê duyệt</div><div class="rq-sign">${signHTML(r.v.block,userName(r.by),r.signerNames)||'<div style="color:#666">(Chưa thiết lập người ký)</div>'}</div>
   <div class="rq-foot"><span>Số hiệu: ${esc(tpl.code)} &nbsp;|&nbsp; Lần ban hành: ${esc(tpl.issue)} &nbsp;|&nbsp; Hiệu lực: ${fmtD(tpl.effective)}</span><span>${esc(org)}</span></div></div>`;
 }
 function printReq(r){
@@ -940,7 +957,7 @@ function frmModal(id,fresh){
   const nextIssue=String(cur.issue||'').match(/^\d+$/)?String(+cur.issue+1).padStart(String(cur.issue).length,'0'):'';
   const v=old||{...cur,issue:nextIssue,effective:iso(),note:''};
   const fields=[{k:'code',l:'Số hiệu',t:'text',req:1},{k:'issue',l:'Lần ban hành',t:'text',req:1},{k:'effective',l:'Ngày hiệu lực',t:'date',req:1},{k:'accent',l:'Màu nhấn tiêu đề (mã màu)',t:'text'},
-    {k:'title',l:'Tiêu đề phiếu',t:'text',req:1,wide:1},{k:'org',l:'Tên đơn vị trên phiếu (trống = tên công ty ở Thông tin chung)',t:'text',wide:1},{k:'sub',l:'Dòng phụ dưới tên đơn vị (tuỳ chọn)',t:'text',wide:1},{k:'note',l:'Nội dung thay đổi so với bản trước',t:'textarea',wide:1}];
+    {k:'title',l:'Tiêu đề phiếu',t:'text',req:1,wide:1},{k:'org',l:'Tên đơn vị trên phiếu (để trống = không hiển thị)',t:'text',wide:1},{k:'sub',l:'Dòng phụ dưới tên đơn vị (tuỳ chọn)',t:'text',wide:1},{k:'note',l:'Nội dung thay đổi so với bản trước',t:'textarea',wide:1}];
   modal({title:old?`Sửa mẫu phiếu ${old.code} (lần ${old.issue})`:'Ban hành mẫu phiếu mới',wide:true,
     html:formHTML(fields,v)+`<div style="margin-top:14px"><label class="f">Logo công ty (PNG / JPG / SVG – tự cắt viền trắng và thu nhỏ)</label>${v.logoData?`<div class="row" style="margin-bottom:8px"><img src="${v.logoData}" style="max-height:60px;max-width:220px;border:1px solid var(--line);border-radius:6px;padding:4px;background:#fff"><select id="fm_lk" style="width:auto"><option value="keep">Giữ logo hiện tại</option><option value="del">Xoá logo</option></select></div>`:'<div class="small muted" style="margin-bottom:6px">Chưa có logo.</div>'}<input type="file" id="fm_logo" accept="image/*"></div>${old?'':`<p class="small muted" style="margin-top:10px">Bản đang áp dụng (${esc(cur.code)} – lần ${esc(cur.issue)}) sẽ hết hiệu lực vào ngày trước ngày hiệu lực của bản mới. Các đề xuất đã lập vẫn in theo mẫu đã áp dụng lúc lập.</p>`}`,
     buttons:[modalCancel,{label:old?'Lưu thay đổi':'Ban hành',cls:'pri',icon:'check',fn:()=>{
@@ -1174,7 +1191,7 @@ function cfgBody(){
     return`<div class="card"><div class="card-h"><span>Chữ ký cuối phiếu đề xuất <span class="badge b-gray">${list.length}</span></span><div class="row"><button class="btn sm" data-act="signPreview">${ic('eye')}Xem trước</button><button class="btn sm" data-act="signReset">Khôi phục mặc định</button><button class="btn pri sm" data-act="signEdit" data-id="">${ic('plus')}Thêm người ký</button></div></div>
       <div class="small muted" style="padding:12px 18px 0">Khối chữ ký in ở cuối phiếu đề xuất, theo thứ tự bên dưới. Mỗi người gồm <b>Chức danh</b>, <b>Họ và tên</b> (để trống nếu ký tay) và dòng <b>Ngày ký: ...../....../........</b>. Có thể giới hạn người ký theo từng khối (ví dụ Hội đồng trực thuộc cho Khối trường).</div>
       <div class="tbl-wrap"><table><thead><tr><th>#</th><th>Chức danh</th><th>Họ và tên</th><th>Ghi chú dưới chức danh</th><th>Ngày ký</th><th>Áp dụng cho</th><th></th></tr></thead><tbody>${list.map((x,i)=>`<tr><td class="muted" style="width:44px">${i+1}</td><td><b>${esc(x.title)}</b></td><td>${esc(x.name==='{{nguoi_de_xuat}}'?'(Tự điền: người đề xuất)':(x.name||'—'))}</td><td class="small">${esc(x.note||'—')}</td><td>${x.showDate?badge('Có','b-ok'):badge('Không','b-gray')}</td><td>${x.block?badge(x.block,'b-vio'):'Tất cả khối'}</td><td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" data-act="signMove" data-id="${i}" data-arg="-1">${ic('up')}</button><button class="btn ghost sm" data-act="signMove" data-id="${i}" data-arg="1">${ic('down')}</button> <button class="btn sm" data-act="signEdit" data-id="${i}">${ic('edit')}Sửa</button> <button class="btn sm bad" data-act="signDel" data-id="${i}">${ic('trash')}Xoá</button></td></tr>`).join('')||`<tr><td colspan="7"><div class="empty">Chưa có người ký – bấm “Thêm người ký”</div></td></tr>`}</tbody></table></div>
-      <div class="pad" style="border-top:1px solid var(--line)"><div class="fgrid"><div><label class="f">Số cột chữ ký trên mỗi hàng</label><select data-cfg="signCols">${[2,3,4,5,6].map(n=>`<option value="${n}" ${(+C.signCols||4)===n?'selected':''}>${n} cột</option>`).join('')}</select></div>
+      <div class="pad" style="border-top:1px solid var(--line)"><div class="fgrid"><div><label class="f">Số cột chữ ký tối đa trên mỗi hàng (các hàng được chia đều và canh giữa)</label><select data-cfg="signCols">${[2,3,4,5,6].map(n=>`<option value="${n}" ${(+C.signCols||4)===n?'selected':''}>${n} cột</option>`).join('')}</select></div>
       <div class="wide"><label class="f">Ghi chú cuối phiếu (tuỳ chọn, ví dụ yêu cầu về ký số / ký trực tiếp)</label><textarea data-cfg="signFooter" placeholder="VD: Phiếu cần có ký số điện tử hoặc ký trực tiếp đến cấp Trưởng đơn vị.">${esc(C.signFooter||'')}</textarea></div></div></div></div>`;
   }
   if(ui.cf==='users')return`<div class="card"><div class="card-h"><span>Người dùng</span><div class="row">${exportBtn('cfg:users',1)}<button class="btn sm" data-act="csv" data-id="users">${ic('upload')}Nhập CSV</button><button class="btn pri sm" data-act="userEdit" data-id="">${ic('plus')}Thêm người dùng</button></div></div><div class="tbl-wrap"><table><thead><tr><th>Họ tên</th><th>Email đăng nhập</th><th>Chức danh</th><th>Phòng ban</th><th>Vai trò</th><th></th></tr></thead><tbody>${C.users.map(u=>`<tr><td><b>${esc(u.name)}</b></td><td class="small">${esc(u.email||'—')}</td><td>${esc(u.title)}</td><td>${esc(u.dept)}</td><td>${badge(roleOf(u).name,'b-info')}</td><td style="text-align:right;white-space:nowrap"><button class="btn sm" data-act="userEdit" data-id="${u.id}">${ic('edit')}Sửa</button> <button class="btn sm bad" data-act="userDel" data-id="${u.id}">${ic('trash')}Xoá</button></td></tr>`).join('')}</tbody></table></div></div>
@@ -1245,7 +1262,7 @@ function exportData(id){
         {label:'Danh sách vị trí (bản hiện hành)',desc:'Mã, tên, thời hạn tuyển, ngày hiệu lực, tình trạng — cùng định dạng với Nhập CSV nên có thể nhập lại.',fn:()=>downloadCSV('vi-tri',[['Mã vị trí','Tên vị trí','Thời hạn tuyển (ngày)','Ngày hiệu lực','Tình trạng','Bản hiện hành','Số phiên bản','File scan đã duyệt'],...L.map(p=>[p.code,p.name,p.slaDays,fmtD(p.effective),p.status,'v'+p.curVer,(p.versions||[]).length,p.file?(p.file.url||p.file.name):''])])},
         {label:'Lịch sử phiên bản',desc:'Mỗi dòng là một phiên bản MTCV của vị trí: hiệu lực, thời hạn, nội dung thay đổi, file scan.',fn:()=>{const rows=[['Mã vị trí','Tên vị trí','Bản','Hiệu lực từ','Hiệu lực đến','Trạng thái','Thời hạn tuyển (ngày)','Nội dung thay đổi','File scan','Người tạo','Ngày tạo']];
           L.forEach(p=>{const vs=verList(p),cur=posVer(p);vs.forEach((v,i)=>{const nx=vs[i+1];rows.push([p.code,p.name,'v'+v.ver,fmtD(v.effective),nx&&nx.effective?fmtD(new Date(new Date(nx.effective).getTime()-dayMs).toISOString().slice(0,10)):'',(v.effective||'')>todayIso()?'Sắp hiệu lực':(v===cur?'Đang hiệu lực':'Hết hiệu lực'),v.slaDays,v.note||'',v.file?(v.file.url||v.file.name):'',v.by||'',fmtD(v.createdAt)])})});downloadCSV('vi-tri-lich-su-phien-ban',rows)}}]);return}
-    if(ui.lt==='frm'){downloadCSV('mau-phieu-de-xuat',[['Số hiệu','Lần ban hành','Ngày hiệu lực','Trạng thái','Tiêu đề','Tên đơn vị','Nội dung thay đổi','Người tạo'],...frmList().map(t=>[t.code,t.issue,fmtD(t.effective),(t.effective||'')>todayIso()?'Sắp hiệu lực':(t===tplAt(Date.now())?'Đang áp dụng':'Hết hiệu lực'),t.title,t.org||DB.cfg.company,t.note||'',t.by||''])]);return}
+    if(ui.lt==='frm'){downloadCSV('mau-phieu-de-xuat',[['Số hiệu','Lần ban hành','Ngày hiệu lực','Trạng thái','Tiêu đề','Tên đơn vị','Nội dung thay đổi','Người tạo'],...frmList().map(t=>[t.code,t.issue,fmtD(t.effective),(t.effective||'')>todayIso()?'Sắp hiệu lực':(t===tplAt(Date.now())?'Đang áp dụng':'Hết hiệu lực'),t.title,t.org||'',t.note||'',t.by||''])]);return}
     if(ui.lt==='tpl'){const L=DB.lib.templates.filter(t=>(!ui.tplType||t.type===ui.tplType)&&(!q||(t.name+t.body).toLowerCase().includes(q)));downloadCSV('mau-thu',[['Tên mẫu','Loại thư','Tiêu đề','Nội dung'],...L.map(t=>[t.name,t.type,t.subject,t.body])]);return}
     const L=DB.lib.forms.filter(f=>!q||(f.name+f.cat+(f.desc||'')).toLowerCase().includes(q));downloadCSV('bieu-mau',[['Tên biểu mẫu','Nhóm','Mô tả','Tên tệp','Dung lượng (KB)','Ngày tải','Liên kết'],...L.map(f=>[f.name,f.cat||'',f.desc||'',f.file.name,Math.ceil(f.file.size/1024),fmtD(f.file.at),f.file.url||''])]);return}
   if(k==='cfg'){
