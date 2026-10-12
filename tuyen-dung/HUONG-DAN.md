@@ -87,3 +87,10 @@ Dán code mới vào `Code.gs` / `Index`, rồi **Triển khai → Quản lý b�
 
 - Thiết lập → **Chữ ký phiếu đề xuất**: thêm / sửa / xoá / sắp xếp người ký. Mỗi người có **Chức danh**, **Họ và tên** (để trống nếu ký tay; gõ `{{nguoi_de_xuat}}` để tự điền tên người đề xuất), ghi chú dưới chức danh, dòng **Ngày ký: ...../....../........** và phạm vi áp dụng (tất cả khối hoặc một khối).
 - Chọn số cột chữ ký mỗi hàng (2–6) và thêm ghi chú cuối phiếu. Nút **Xem trước** hiển thị theo từng khối; nút **In phiếu đề xuất** dùng đúng cấu hình này.
+
+## Mẫu phiếu đề xuất (Thư viện → Mẫu phiếu đề xuất)
+
+- Thiết lập **logo**, **Số hiệu**, **Ngày hiệu lực**, **Lần ban hành**, tiêu đề, tên đơn vị, dòng phụ và màu nhấn của phiếu in. Số hiệu / Ngày hiệu lực / Lần ban hành in ở **góc phải phía trên** phiếu và lặp lại ở chân phiếu.
+- Logo tự được cắt viền trắng và thu nhỏ (giữ dưới ~36.000 ký tự để không vượt giới hạn ô Google Sheet).
+- Có biểu mẫu mới: **Ban hành mẫu mới** (lần ban hành tự tăng, chọn ngày hiệu lực). Mẫu cũ được giữ lại; mỗi đề xuất ghi nhớ mẫu đang áp dụng lúc lập (đề xuất còn chờ duyệt được cập nhật theo mẫu hiện hành khi sửa) và in theo mẫu đó.
+- Khối chữ ký ở cuối phiếu cấu hình tại Thiết lập → Chữ ký phiếu đề xuất.
