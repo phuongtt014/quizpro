@@ -59,7 +59,16 @@ function setupDatabase() {
   return "Khởi tạo CSDL mẫu thành công!";
 }
 
-const TIER_HEADERS = ["Ma_PhucLoi", "Ten_Bac", "Tham_Nien_Tu_Thang", "Tham_Nien_Den_Thang", "Doi_Tuong", "Cap_Bac", "Gia_Tri"];
+const TIER_HEADERS = ["Ma_PhucLoi", "Ten_Bac", "Tham_Nien_Tu_Thang", "Tham_Nien_Den_Thang", "Doi_Tuong", "Cap_Bac", "Gia_Tri", "Phien_Ban"];
+
+// 2 phương án chính sách: HH = Hiện hành, PA2 = Phương án 2 (dự kiến). Dòng chưa ghi phiên bản = HH.
+const VERSION_IDS = ["HH", "PA2"];
+const VERSION_HEADERS = ["Ma_PB", "Ten_PB", "Ty_Le_Lam_Phat", "Da_Khoi_Tao"];
+
+function normVer(v) {
+  const t = String(v == null ? "" : v).trim();
+  return VERSION_IDS.indexOf(t) >= 0 ? t : "HH";
+}
 
 function getOrCreateTierSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -69,12 +78,69 @@ function getOrCreateTierSheet() {
     sh.appendRow(TIER_HEADERS);
     formatHeader(sh, TIER_HEADERS.length);
   }
+  ensureTierColumns(sh);
   return sh;
+}
+
+// Sheet DM_PhucLoi_Bac cũ (7 cột): tự bổ sung cột 8 Phien_Ban
+function ensureTierColumns(sh) {
+  const need = TIER_HEADERS.length;
+  if (sh.getMaxColumns() < need) sh.insertColumnsAfter(sh.getMaxColumns(), need - sh.getMaxColumns());
+  if (String(sh.getRange(1, need).getValue()).trim() !== "Phien_Ban") {
+    sh.getRange(1, need).setValue("Phien_Ban");
+    formatHeader(sh, need);
+  }
+}
+
+function getOrCreateVersionSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName("DM_PhienBan");
+  if (!sh) sh = ss.insertSheet("DM_PhienBan");
+  if (sh.getLastRow() === 0) {
+    sh.appendRow(VERSION_HEADERS);
+    sh.appendRow(["HH", "Hiện hành", 5, "Có"]);
+    sh.appendRow(["PA2", "Phương án 2", 5, "Chưa"]);
+    formatHeader(sh, VERSION_HEADERS.length);
+  }
+  return sh;
+}
+
+function getVersions() {
+  const sh = getOrCreateVersionSheet();
+  const rows = sh.getDataRange().getValues().slice(1);
+  return VERSION_IDS.map(id => {
+    const r = rows.find(x => String(x[0]).trim() === id) || [id, id === "HH" ? "Hiện hành" : "Phương án 2", 5, id === "HH" ? "Có" : "Chưa"];
+    const rate = cellToNum(r[2]);
+    return { Ma_PB: id, Ten_PB: String(r[1] || (id === "HH" ? "Hiện hành" : "Phương án 2")), Ty_Le_Lam_Phat: rate === "" ? 5 : rate, Da_Khoi_Tao: String(r[3]).trim() === "Có" };
+  });
+}
+
+function saveVersionRate(ver, rate) {
+  ver = normVer(ver);
+  const sh = getOrCreateVersionSheet();
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === ver) {
+      sh.getRange(i + 1, 3).setValue(cellToNum(rate) === "" ? 5 : cellToNum(rate));
+      return "OK";
+    }
+  }
+  sh.appendRow([ver, ver === "HH" ? "Hiện hành" : "Phương án 2", cellToNum(rate) === "" ? 5 : cellToNum(rate), ver === "HH" ? "Có" : "Chưa"]);
+  return "OK";
+}
+
+function setVersionInitialised(ver, yes) {
+  const sh = getOrCreateVersionSheet();
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === ver) { sh.getRange(i + 1, 4).setValue(yes ? "Có" : "Chưa"); return; }
+  }
 }
 
 // Đọc DM_PhucLoi: 2 cột ngày/tháng chi trả (cột 12, 13) luôn đọc theo VỊ TRÍ, giống cách ghi,
 // nên không phụ thuộc việc tên tiêu đề cột có bị sửa/gõ lệch hay không.
-function loadBenefits(ss) {
+// ver: nếu truyền (HH/PA2) chỉ trả các dòng của phiên bản đó; bỏ trống = trả tất cả (mỗi dòng có Phien_Ban).
+function loadBenefits(ss, ver) {
   const sh = ss.getSheetByName("DM_PhucLoi");
   const list = getSheetDataAsJson(sh);
   if (!sh || list.length === 0) return list;
@@ -85,8 +151,17 @@ function loadBenefits(ss) {
     b.Ngay_Chi_Tra = cellToInt(r[11]);
     b.Thang_Chi_Tra = cellToInt(r[12]);
     b.Ty_Le_Tang = cellToNum(r[13]); // "" = dùng tỷ lệ chung; 0 = không tăng
+    b.Phien_Ban = normVer(r[14]);
   });
-  return list;
+  const rows = list.filter(b => String(b.Ma_PhucLoi).trim() !== "");
+  return ver ? rows.filter(b => b.Phien_Ban === normVer(ver)) : rows;
+}
+
+function loadTiers(ss, ver) {
+  const list = getSheetDataAsJson(ss.getSheetByName("DM_PhucLoi_Bac"));
+  list.forEach(t => { t.Phien_Ban = normVer(t.Phien_Ban); });
+  const rows = list.filter(t => String(t.Ma_PhucLoi).trim() !== "");
+  return ver ? rows.filter(t => t.Phien_Ban === normVer(ver)) : rows;
 }
 
 // Đọc DB_NhanSu; cột 14 (PL_Loai_Tru) đọc theo vị trí
@@ -95,10 +170,13 @@ function loadEmployees(ss) {
   const list = getSheetDataAsJson(sh);
   if (!sh || list.length === 0) return list;
   const raw = sh.getDataRange().getValues();
-  const exCol = headerIndex(raw.shift().map(h => String(h).trim()), "PL_Loai_Tru", 13);
+  const hdr = raw.shift().map(h => String(h).trim());
+  const exCol = headerIndex(hdr, "PL_Loai_Tru", 13);
+  const exCol2 = headerIndex(hdr, "PL_Loai_Tru_PA2", 14);
   list.forEach((e, i) => {
     const r = raw[i] || [];
-    e.PL_Loai_Tru = String(r[exCol] == null ? "" : r[exCol]).trim();
+    e.PL_Loai_Tru = String(r[exCol] == null ? "" : r[exCol]).trim();          // Hiện hành
+    e.PL_Loai_Tru_PA2 = String(r[exCol2] == null ? "" : r[exCol2]).trim();    // Phương án 2
   });
   return list;
 }
@@ -128,7 +206,7 @@ function cellToInt(v) {
 
 // Sheet DM_PhucLoi cũ (11 cột): tự bổ sung 2 cột Ngay_Chi_Tra, Thang_Chi_Tra
 function ensureBenefitColumns(sh) {
-  const heads = ["Ngay_Chi_Tra", "Thang_Chi_Tra", "Ty_Le_Tang"]; // cột 12, 13, 14
+  const heads = ["Ngay_Chi_Tra", "Thang_Chi_Tra", "Ty_Le_Tang", "Phien_Ban"]; // cột 12, 13, 14, 15
   const need = 11 + heads.length;
   if (sh.getMaxColumns() < need) sh.insertColumnsAfter(sh.getMaxColumns(), need - sh.getMaxColumns());
   const cur = sh.getRange(1, 12, 1, heads.length).getValues()[0].map(v => String(v).trim());
@@ -140,10 +218,11 @@ function ensureBenefitColumns(sh) {
 
 // Sheet DB_NhanSu cũ (13 cột): tự bổ sung cột 14 PL_Loai_Tru (danh sách mã phúc lợi không được hưởng, cách nhau dấu phẩy)
 function ensureEmployeeColumns(sh) {
-  const need = 14;
+  const need = 15; // cột 14 PL_Loai_Tru (Hiện hành), cột 15 PL_Loai_Tru_PA2 (Phương án 2)
   if (sh.getMaxColumns() < need) sh.insertColumnsAfter(sh.getMaxColumns(), need - sh.getMaxColumns());
-  if (String(sh.getRange(1, need).getValue()).trim() !== "PL_Loai_Tru") {
-    sh.getRange(1, need).setValue("PL_Loai_Tru");
+  const cur = sh.getRange(1, 14, 1, 2).getValues()[0].map(v => String(v).trim());
+  if (cur[0] !== "PL_Loai_Tru" || cur[1] !== "PL_Loai_Tru_PA2") {
+    sh.getRange(1, 14, 1, 2).setValues([["PL_Loai_Tru", "PL_Loai_Tru_PA2"]]);
     formatHeader(sh, need);
   }
 }
@@ -171,14 +250,16 @@ function getInitialData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   return {
     employees: loadEmployees(ss),
-    benefits: loadBenefits(ss),
-    benefitTiers: getSheetDataAsJson(ss.getSheetByName("DM_PhucLoi_Bac")),
+    benefits: loadBenefits(ss),               // tất cả phiên bản (mỗi dòng có Phien_Ban)
+    benefitTiers: loadTiers(ss),
+    versions: getVersions(),
     newHirePlan: getSheetDataAsJson(ss.getSheetByName("KeHoach_TuyenDung"))
   };
 }
 
 // 3b. LƯU CÁC BẬC THƯỞNG CỦA 1 PHÚC LỢI (thay thế toàn bộ bậc cũ của mã đó)
-function saveBenefitTiers(maPL, tiers) {
+function saveBenefitTiers(maPL, tiers, ver) {
+  ver = normVer(ver);
   maPL = String(maPL).trim();
   tiers = tiers || [];
   tiers.forEach((t, i) => {
@@ -194,7 +275,7 @@ function saveBenefitTiers(maPL, tiers) {
 
   const sh = getOrCreateTierSheet();
   const data = sh.getDataRange().getValues();
-  const keep = data.slice(1).filter(r => String(r[0]).trim() !== maPL);
+  const keep = data.slice(1).filter(r => !(String(r[0]).trim() === maPL && normVer(r[7]) === ver));
   const added = tiers.map(t => [
     maPL,
     t.Ten_Bac || "",
@@ -202,9 +283,10 @@ function saveBenefitTiers(maPL, tiers) {
     (t.Tham_Nien_Den_Thang === "" || t.Tham_Nien_Den_Thang == null) ? "" : parseInt(t.Tham_Nien_Den_Thang),
     t.Doi_Tuong || "All",
     t.Cap_Bac || "All",
-    parseFloat(t.Gia_Tri) || 0
+    parseFloat(t.Gia_Tri) || 0,
+    ver
   ]);
-  const rows = keep.concat(added);
+  const rows = keep.map(r => { const x = r.slice(0, TIER_HEADERS.length); while (x.length < TIER_HEADERS.length) x.push(""); x[7] = normVer(x[7]); return x; }).concat(added);
 
   if (sh.getLastRow() > 1) {
     sh.getRange(2, 1, sh.getLastRow() - 1, TIER_HEADERS.length).clearContent();
@@ -216,7 +298,8 @@ function saveBenefitTiers(maPL, tiers) {
 }
 
 // 3. THÊM / SỬA PHÚC LỢI
-function saveBenefit(b, oldCode) {
+function saveBenefit(b, oldCode, ver) {
+  ver = normVer(ver);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let shPL = ss.getSheetByName("DM_PhucLoi");
   if (!shPL) { setupDatabase(); shPL = ss.getSheetByName("DM_PhucLoi"); }
@@ -230,9 +313,11 @@ function saveBenefit(b, oldCode) {
   let data = shPL.getDataRange().getValues();
   const headers = data[0].map(h => String(h).trim());
   const codeCol = headerIndex(headers, "Ma_PhucLoi", 0);
+  const verCol = headerIndex(headers, "Phien_Ban", 14);
   let foundRowIndex = -1;
 
   for (let i = 1; i < data.length; i++) {
+    if (normVer(data[i][verCol]) !== ver) continue; // chỉ xét các dòng của phiên bản đang sửa
     const code = String(data[i][codeCol]).trim();
     if (code === lookupCode && foundRowIndex < 0) foundRowIndex = i + 1;
     // Đổi mã: không được trùng với mã của chính sách khác
@@ -245,12 +330,13 @@ function saveBenefit(b, oldCode) {
   if (oldCode && newCode !== oldCode && foundRowIndex > 0) {
     const shBac = ss.getSheetByName("DM_PhucLoi_Bac");
     if (shBac && shBac.getLastRow() > 1) {
-      const rng = shBac.getRange(2, 1, shBac.getLastRow() - 1, 1);
-      rng.setValues(rng.getValues().map(r => [String(r[0]).trim() === oldCode ? newCode : r[0]]));
+      ensureTierColumns(shBac);
+      const rng = shBac.getRange(2, 1, shBac.getLastRow() - 1, 8);
+      rng.setValues(rng.getValues().map(r => { if (String(r[0]).trim() === oldCode && normVer(r[7]) === ver) r[0] = newCode; return r; }));
     }
     // Danh sách phúc lợi loại trừ của nhân sự cũng phải đổi theo mã mới
     const shNV = ss.getSheetByName("DB_NhanSu");
-    const nvCol = shNV ? headerIndex(shNV.getRange(1, 1, 1, shNV.getLastColumn()).getValues()[0].map(h => String(h).trim()), "PL_Loai_Tru", 13) + 1 : 0;
+    const nvCol = shNV ? headerIndex(shNV.getRange(1, 1, 1, shNV.getLastColumn()).getValues()[0].map(h => String(h).trim()), ver === "PA2" ? "PL_Loai_Tru_PA2" : "PL_Loai_Tru", ver === "PA2" ? 14 : 13) + 1 : 0;
     if (shNV && shNV.getMaxColumns() >= nvCol && shNV.getLastRow() > 1) {
       const rngNV = shNV.getRange(2, nvCol, shNV.getLastRow() - 1, 1);
       rngNV.setValues(rngNV.getValues().map(r => [String(r[0]).split(",").map(x => x.trim()).filter(x => x).map(x => x === oldCode ? newCode : x).join(", ")]));
@@ -271,7 +357,8 @@ function saveBenefit(b, oldCode) {
     Tham_Nien_Toi_Thieu_Thang: parseInt(b.Tham_Nien_Toi_Thieu_Thang) || 0,
     Ngay_Chi_Tra: Math.min(Math.max(parseInt(b.Ngay_Chi_Tra) || 1, 1), 31),
     Thang_Chi_Tra: (parseInt(b.Thang_Chi_Tra) >= 1 && parseInt(b.Thang_Chi_Tra) <= 12) ? parseInt(b.Thang_Chi_Tra) : "",
-    Ty_Le_Tang: cellToNum(b.Ty_Le_Tang)
+    Ty_Le_Tang: cellToNum(b.Ty_Le_Tang),
+    Phien_Ban: ver
   };
 
   if (foundRowIndex > 0) {
@@ -284,16 +371,18 @@ function saveBenefit(b, oldCode) {
 }
 
 // 3c. XÓA PHÚC LỢI (kèm các bậc thưởng của nó)
-function deleteBenefit(maPL) {
+function deleteBenefit(maPL, ver) {
+  ver = normVer(ver);
   maPL = String(maPL).trim();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const shPL = ss.getSheetByName("DM_PhucLoi");
   if (!shPL) throw new Error("Không tìm thấy sheet DM_PhucLoi.");
 
   const data = shPL.getDataRange().getValues();
+  const verCol = headerIndex(data[0].map(h => String(h).trim()), "Phien_Ban", 14);
   let found = false;
   for (let i = data.length - 1; i >= 1; i--) {
-    if (String(data[i][0]).trim() === maPL) {
+    if (String(data[i][0]).trim() === maPL && normVer(data[i][verCol]) === ver) {
       shPL.deleteRow(i + 1);
       found = true;
     }
@@ -304,7 +393,7 @@ function deleteBenefit(maPL) {
   if (shBac) {
     const t = shBac.getDataRange().getValues();
     for (let i = t.length - 1; i >= 1; i--) {
-      if (String(t[i][0]).trim() === maPL) shBac.deleteRow(i + 1);
+      if (String(t[i][0]).trim() === maPL && normVer(t[i][7]) === ver) shBac.deleteRow(i + 1);
     }
   }
   return "Đã xóa chính sách " + maPL + "!";
@@ -346,8 +435,10 @@ function saveEmployee(emp) {
     Luong_Dong_BHXH: parseFloat(emp.Luong_Dong_BHXH) || 0,
     DCH: parseFloat(emp.DCH) || 0,
     Trang_Thai: emp.Trang_Thai || "Đang làm việc",
-    PL_Loai_Tru: String(emp.PL_Loai_Tru || "").split(",").map(x => x.trim()).filter(x => x).join(", ")
   };
+  const cleanList = v => String(v || "").split(",").map(x => x.trim()).filter(x => x).join(", ");
+  if (emp.PL_Loai_Tru !== undefined) values.PL_Loai_Tru = cleanList(emp.PL_Loai_Tru);             // Hiện hành
+  if (emp.PL_Loai_Tru_PA2 !== undefined) values.PL_Loai_Tru_PA2 = cleanList(emp.PL_Loai_Tru_PA2); // Phương án 2
 
   if (foundRowIndex > 0) {
     const newRow = rowByHeaders(headers, values, data[foundRowIndex - 1]);
@@ -371,13 +462,16 @@ function parseDateVN(dateStr) {
 }
 
 // 5. TÍNH TOÁN DỰ BÁO NGÂN SÁCH & BẢNG KÊ CHI TIẾT TỪNG NHÂN SỰ
-function calculateBudget(targetYear, inflationRate, filters) {
+function calculateBudget(targetYear, inflationRate, filters, ver) {
+  ver = normVer(ver);
   targetYear = parseInt(targetYear) || (new Date().getFullYear() + 1);
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   filters = filters || {};
   const allEmployees = loadEmployees(ss);
-  const benefits = loadBenefits(ss);
+  // Danh sách phúc lợi loại trừ theo phiên bản đang tính
+  allEmployees.forEach(e => { e.PL_Loai_Tru = ver === "PA2" ? (e.PL_Loai_Tru_PA2 || "") : (e.PL_Loai_Tru || ""); });
+  const benefits = loadBenefits(ss, ver);
   const allPlans = getSheetDataAsJson(ss.getSheetByName("KeHoach_TuyenDung"));
 
   // Bộ lọc (mỗi nhóm chọn nhiều giá trị; để trống = không lọc). Dòng kế hoạch tuyển mới có
@@ -390,7 +484,7 @@ function calculateBudget(targetYear, inflationRate, filters) {
   }, true));
 
   // Gắn các bậc thưởng vào từng phúc lợi (nếu có)
-  const tiers = getSheetDataAsJson(ss.getSheetByName("DM_PhucLoi_Bac"));
+  const tiers = loadTiers(ss, ver);
   benefits.forEach(b => {
     b.tiers = tiers.filter(t => String(t.Ma_PhucLoi).trim() === String(b.Ma_PhucLoi).trim());
   });
@@ -505,6 +599,7 @@ function calculateBudget(targetYear, inflationRate, filters) {
   return {
     summary: {
       targetYear: targetYear,
+      version: ver,
       inflationRate: parseFloat(inflationRate) || 0,
       totalBudget: totalExistingBudget + totalNewHireBudget,
       existingBudget: totalExistingBudget,
@@ -683,6 +778,108 @@ function calculateBenefitAmount(benefit, emp, seniorityMonths) {
   }
 
   return baseAmount;
+}
+
+// ================= PHIÊN BẢN CHÍNH SÁCH (Hiện hành / Phương án 2) =================
+
+// Sao chép toàn bộ chính sách từ phiên bản `from` sang `to` (ghi đè `to`): phúc lợi, bậc thưởng,
+// tỷ lệ lạm phát và danh sách phúc lợi loại trừ của từng nhân sự. Kế hoạch tuyển mới và hồ sơ dùng chung nên không đổi.
+function cloneVersion(from, to) {
+  from = normVer(from); to = normVer(to);
+  if (from === to) throw new Error("Phiên bản nguồn và đích phải khác nhau.");
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 1) Phúc lợi
+  const shPL = ss.getSheetByName("DM_PhucLoi");
+  if (!shPL) throw new Error("Không tìm thấy sheet DM_PhucLoi.");
+  ensureBenefitColumns(shPL);
+  let data = shPL.getDataRange().getValues();
+  const hdr = data[0].map(h => String(h).trim());
+  const vCol = headerIndex(hdr, "Phien_Ban", 14);
+  const width = hdr.length;
+  const own = data.slice(1).filter(r => String(r[0]).trim() !== "" || r.some(x => x !== ""));
+  const kept = own.filter(r => normVer(r[vCol]) !== to).map(r => { const x = r.slice(0, width); x[vCol] = normVer(x[vCol]); return x; });
+  const copies = kept.filter(r => r[vCol] === from).map(r => { const x = r.slice(); x[vCol] = to; return x; });
+  const all = kept.concat(copies);
+  if (shPL.getLastRow() > 1) shPL.getRange(2, 1, shPL.getLastRow() - 1, width).clearContent();
+  if (all.length) shPL.getRange(2, 1, all.length, width).setValues(all);
+
+  // 2) Bậc thưởng
+  const shBac = getOrCreateTierSheet();
+  const tw = TIER_HEADERS.length;
+  const tdata = shBac.getDataRange().getValues().slice(1).filter(r => r.some(x => x !== ""));
+  const tkept = tdata.filter(r => normVer(r[7]) !== to).map(r => { const x = r.slice(0, tw); while (x.length < tw) x.push(""); x[7] = normVer(x[7]); return x; });
+  const tcopies = tkept.filter(r => r[7] === from).map(r => { const x = r.slice(); x[7] = to; return x; });
+  const tall = tkept.concat(tcopies);
+  if (shBac.getLastRow() > 1) shBac.getRange(2, 1, shBac.getLastRow() - 1, tw).clearContent();
+  if (tall.length) shBac.getRange(2, 1, tall.length, tw).setValues(tall);
+
+  // 3) Danh sách loại trừ của nhân sự
+  const shNV = ss.getSheetByName("DB_NhanSu");
+  if (shNV) {
+    ensureEmployeeColumns(shNV);
+    if (shNV.getLastRow() > 1) {
+      const colFrom = from === "PA2" ? 15 : 14, colTo = to === "PA2" ? 15 : 14;
+      const n = shNV.getLastRow() - 1;
+      const src = shNV.getRange(2, colFrom, n, 1).getValues();
+      shNV.getRange(2, colTo, n, 1).setValues(src);
+    }
+  }
+
+  // 4) Tỷ lệ lạm phát + đánh dấu đã khởi tạo
+  const vs = getVersions();
+  saveVersionRate(to, vs.find(v => v.Ma_PB === from).Ty_Le_Lam_Phat);
+  setVersionInitialised(to, true);
+  return "Đã sao chép " + copies.length + " phúc lợi, " + tcopies.length + " bậc thưởng, tỷ lệ lạm phát và danh sách loại trừ nhân sự sang " + (to === "PA2" ? "Phương án 2" : "Hiện hành") + ".";
+}
+
+// Hoán đổi: Phương án 2 trở thành Hiện hành và Hiện hành cũ trở thành Phương án 2 (không mất dữ liệu, bấm lại để hoàn tác)
+function swapVersions() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const flip = v => (normVer(v) === "HH" ? "PA2" : "HH");
+
+  const shPL = ss.getSheetByName("DM_PhucLoi");
+  if (shPL && shPL.getLastRow() > 1) {
+    ensureBenefitColumns(shPL);
+    const hdr = shPL.getRange(1, 1, 1, shPL.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    const vCol = headerIndex(hdr, "Phien_Ban", 14) + 1;
+    const rng = shPL.getRange(2, vCol, shPL.getLastRow() - 1, 1);
+    rng.setValues(rng.getValues().map(r => [flip(r[0])]));
+  }
+  const shBac = ss.getSheetByName("DM_PhucLoi_Bac");
+  if (shBac && shBac.getLastRow() > 1) {
+    ensureTierColumns(shBac);
+    const rng = shBac.getRange(2, 8, shBac.getLastRow() - 1, 1);
+    rng.setValues(rng.getValues().map(r => [flip(r[0])]));
+  }
+  const shNV = ss.getSheetByName("DB_NhanSu");
+  if (shNV) {
+    ensureEmployeeColumns(shNV);
+    if (shNV.getLastRow() > 1) {
+      const rng = shNV.getRange(2, 14, shNV.getLastRow() - 1, 2);
+      rng.setValues(rng.getValues().map(r => [r[1], r[0]]));
+    }
+  }
+  const vs = getVersions();
+  const hh = vs.find(v => v.Ma_PB === "HH"), pa = vs.find(v => v.Ma_PB === "PA2");
+  saveVersionRate("HH", pa.Ty_Le_Lam_Phat);
+  saveVersionRate("PA2", hh.Ty_Le_Lam_Phat);
+  setVersionInitialised("HH", true); setVersionInitialised("PA2", true);
+  return "Đã hoán đổi: Phương án 2 hiện là Hiện hành, Hiện hành cũ chuyển thành Phương án 2.";
+}
+
+// So sánh 2 phương án (mỗi phương án dùng tỷ lệ lạm phát riêng đã lưu); bộ lọc áp dụng cho cả hai
+function compareVersions(targetYear, filters) {
+  const vs = getVersions();
+  const out = { versions: vs };
+  VERSION_IDS.forEach(id => {
+    const rate = vs.find(v => v.Ma_PB === id).Ty_Le_Lam_Phat;
+    const r = calculateBudget(targetYear, rate, filters, id);
+    const monthly = new Array(12).fill(0);
+    r.cashflow.forEach(e => { monthly[parseInt(e.date.substr(5, 2), 10) - 1] += e.amount; });
+    out[id] = { rate: rate, summary: r.summary, categoryList: r.categoryList, deptList: r.deptList, deptPayroll: r.deptPayroll, monthly: monthly };
+  });
+  return out;
 }
 
 // 7. Lưu Kế hoạch Tuyển dụng

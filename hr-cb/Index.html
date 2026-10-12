@@ -132,7 +132,7 @@
       @page { size: A4 landscape; margin: 10mm; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       body { background: #fff !important; }
-      .app-header, #mainTab, .export-bar, .loading-overlay, .filter-card, .btn, .ms, .modal,
+      .app-header, .version-bar, #mainTab, .export-bar, .loading-overlay, .filter-card, .btn, .ms, .modal,
       #tab-employees .row.g-2, #tab-emp-details .row.g-2, #tab-policy #policyDimBtns { display: none !important; }
       #printHeader { display: block !important; border-bottom: 2px solid var(--accent); padding-bottom: 6px; margin-bottom: 10px; }
       .tab-content > .tab-pane { display: none !important; }
@@ -152,6 +152,13 @@
       .kpi-card { margin-top: 10px !important; padding: 8px 6px !important; }
       .row { --bs-gutter-x: 0.75rem; }
     }
+    .version-bar { background: #fff; border: 1px solid var(--line); border-left: 5px solid var(--green); border-radius: 6px; padding: 10px 14px; }
+    body.ver-pa2 .version-bar { border-left-color: var(--orange); background: #fff7f2; }
+    body.ver-pa2 .app-header { border-bottom-color: var(--orange); }
+    .ver-btn { border: 1px solid #ced4da; background: #fff; color: var(--ink); font-weight: 600; }
+    .ver-btn.on-hh { background: var(--green); border-color: var(--green); color: #fff; }
+    .ver-btn.on-pa2 { background: var(--orange); border-color: var(--orange); color: #3b1a0b; }
+    .delta-up { color: var(--terra); } .delta-down { color: var(--green); }
     .legend-list { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; font-size: 0.8rem; }
     .legend-item { display: flex; align-items: center; gap: 6px; }
     .legend-dot { width: 11px; height: 11px; border-radius: 2px; flex: none; }
@@ -256,6 +263,22 @@
       <div style="font-size:11px; color:#444" id="printMeta"></div>
     </div>
 
+    <!-- Phiên bản chính sách -->
+    <div class="version-bar mb-3" id="versionBar">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="small fw-bold text-muted"><i class="fa-solid fa-code-branch me-1"></i>Phiên bản chính sách:</span>
+        <div class="btn-group btn-group-sm" role="group">
+          <button type="button" class="btn ver-btn" data-ver="HH" onclick="switchVersion('HH')">Hiện hành</button>
+          <button type="button" class="btn ver-btn" data-ver="PA2" onclick="switchVersion('PA2')">Phương án 2 <span class="small">(dự kiến)</span></button>
+        </div>
+        <span class="small" id="versionNote"></span>
+        <div class="ms-auto d-flex gap-2" id="versionActions" style="display:none">
+          <button class="btn btn-sm btn-outline-secondary" onclick="cloneToPA2()" title="Ghi đè Phương án 2 bằng bản sao của Hiện hành"><i class="fa-regular fa-copy me-1"></i> Nhân bản từ Hiện hành</button>
+          <button class="btn btn-sm btn-executive" onclick="applyPA2()" title="Hoán đổi: Phương án 2 thành Hiện hành, Hiện hành cũ thành Phương án 2"><i class="fa-solid fa-right-left me-1"></i> Áp dụng Phương án 2 làm hiện hành</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Filter Control -->
     <div class="card-executive p-3 mb-4 filter-card">
       <div class="row g-3 align-items-center">
@@ -340,6 +363,11 @@
       <li class="nav-item">
         <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-policy">
           <i class="fa-solid fa-table-cells-large me-2"></i>Chính Sách Theo Đối Tượng
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-compare">
+          <i class="fa-solid fa-scale-balanced me-2"></i>So Sánh Phương Án
         </button>
       </li>
       <li class="nav-item">
@@ -557,6 +585,39 @@
               <tfoot id="empDetailTfoot"></tfoot>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- TAB: SO SÁNH PHƯƠNG ÁN -->
+      <div class="tab-pane fade" id="tab-compare">
+        <div class="card-executive p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <h6 class="fw-bold mb-0">So Sánh Hiện Hành và Phương Án 2</h6>
+              <div class="small text-muted">Hồ sơ nhân sự và kế hoạch tuyển mới dùng chung; mỗi phương án dùng chính sách, tỷ lệ lạm phát và danh sách loại trừ riêng. Bộ lọc ở đầu trang áp dụng cho cả hai.</div>
+              <div class="small mt-1" id="cmpRates" style="color: var(--green-dark)"></div>
+            </div>
+            <button class="btn btn-sm btn-outline-dark" onclick="loadComparison()"><i class="fa-solid fa-rotate me-1"></i> Tính lại so sánh</button>
+          </div>
+        </div>
+        <div class="row g-3 mb-3" id="cmpKpis"></div>
+        <div class="row g-3 mb-3">
+          <div class="col-lg-7"><div class="card-executive p-3"><h6 class="fw-bold mb-2">Chi phí theo từng khoản phúc lợi</h6>
+            <div id="cmpCatWrap" style="position:relative; height:320px"><canvas id="cmpCatChart"></canvas></div></div></div>
+          <div class="col-lg-5"><div class="card-executive p-3"><h6 class="fw-bold mb-2">Dòng tiền lũy kế trong năm</h6>
+            <div style="position:relative; height:320px"><canvas id="cmpCashChart"></canvas></div></div></div>
+        </div>
+        <div class="card-executive p-3 mb-3"><h6 class="fw-bold mb-2">Chi phí theo phòng ban</h6>
+          <div style="position:relative; height:300px"><canvas id="cmpDeptChart"></canvas></div></div>
+        <div class="row g-3">
+          <div class="col-lg-6"><div class="card-executive p-3"><h6 class="fw-bold mb-2">Chênh lệch theo khoản (VNĐ)</h6>
+            <div class="table-responsive"><table class="table table-executive align-middle mb-0">
+              <thead><tr><th>Khoản</th><th class="text-end">Hiện hành</th><th class="text-end">Phương án 2</th><th class="text-end">Chênh lệch</th><th class="text-end">%</th></tr></thead>
+              <tbody id="cmpBenefitTbody"></tbody><tfoot id="cmpBenefitTfoot"></tfoot></table></div></div></div>
+          <div class="col-lg-6"><div class="card-executive p-3"><h6 class="fw-bold mb-2">Những điểm khác nhau về chính sách</h6>
+            <div class="table-responsive"><table class="table table-executive align-middle mb-0">
+              <thead><tr><th>Khoản / Đối tượng</th><th>Thay đổi</th><th>Chi tiết (Hiện hành → Phương án 2)</th></tr></thead>
+              <tbody id="cmpChangesTbody"></tbody></table></div></div></div>
         </div>
       </div>
 
@@ -928,7 +989,7 @@
             </div>
 
             <hr class="my-3 text-muted">
-            <h6 class="fw-bold fs-7 text-dark mb-1"><i class="fa-solid fa-user-slash me-1"></i> Trường Hợp Đặc Biệt — Không Được Hưởng Phúc Lợi</h6>
+            <h6 class="fw-bold fs-7 text-dark mb-1"><i class="fa-solid fa-user-slash me-1"></i> Trường Hợp Đặc Biệt — Không Được Hưởng Phúc Lợi <span class="badge bg-light text-dark border ms-1" id="emp_ExclVer">Hiện hành</span></h6>
             <div class="small text-muted mb-2">Tích chọn các khoản mà nhân sự này <b>không</b> được hưởng (dù đủ điều kiện chung). Các khoản này sẽ không được tính vào chi phí của người này.</div>
             <div class="ms-actions mb-1">
               <a onclick="setAllExclusions(true)"><i class="fa-solid fa-square-check me-1"></i>Chọn tất cả</a>
@@ -959,6 +1020,11 @@
     let editingBenefitCode = '';
     let currentInflation = 0;
     let currentCashflow = [];
+    let activeVer = 'HH';
+    let versions = [{ Ma_PB: 'HH', Ten_PB: 'Hiện hành', Ty_Le_Lam_Phat: 5, Da_Khoi_Tao: true }, { Ma_PB: 'PA2', Ten_PB: 'Phương án 2', Ty_Le_Lam_Phat: 5, Da_Khoi_Tao: false }];
+    let allBenefits = [], allTiers = [];
+    let lastCompare = null, lastChanges = [];
+    let cmpCatInst = null, cmpCashInst = null, cmpDeptInst = null;
     let lastResult = null;
     let shownEmpDetails = [];
     let planForFilters = [];
@@ -1021,8 +1087,11 @@
       google.script.run
         .withSuccessHandler(data => {
           try {
-            currentBenefits = data.benefits || [];
-            currentBenefitTiers = data.benefitTiers || [];
+            allBenefits = data.benefits || [];
+            allTiers = data.benefitTiers || [];
+            if (data.versions) versions = data.versions;
+            applyVersionData();
+            updateVersionUI();
             planForFilters = data.newHirePlan || [];
             currentEmployees = data.employees || [];
             renderBenefitsTable(currentBenefits);
@@ -1094,7 +1163,7 @@
       google.script.run
         .withSuccessHandler(() => loadInitialData())
         .withFailureHandler(err => { toggleLoading(false); alert("Lỗi xóa: " + err.message); })
-        .deleteBenefit(b.Ma_PhucLoi);
+        .deleteBenefit(b.Ma_PhucLoi, activeVer);
     }
 
     function rateLabel(b) {
@@ -1268,10 +1337,10 @@
           google.script.run
             .withSuccessHandler(() => loadInitialData())
             .withFailureHandler(err => { toggleLoading(false); alert("Lỗi lưu bậc thưởng: " + err.message); })
-            .saveBenefitTiers(data.Ma_PhucLoi, tiers);
+            .saveBenefitTiers(data.Ma_PhucLoi, tiers, activeVer);
         })
         .withFailureHandler(err => { toggleLoading(false); alert("Lỗi: " + err.message); })
-        .saveBenefit(data, editingBenefitCode);
+        .saveBenefit(data, editingBenefitCode, activeVer);
     }
 
     // --- NHÂN VIÊN ---
@@ -1310,7 +1379,7 @@
         let tr = document.createElement('tr');
         tr.innerHTML = `
           <td><span class="badge-subtle">${e.Ma_NV}</span></td>
-          <td class="fw-semibold">${e.Ho_Ten}${e.PL_Loai_Tru ? `<br><small class="text-danger fw-normal" title="Trường hợp đặc biệt: không được hưởng"><i class="fa-solid fa-user-slash me-1"></i>Loại trừ: ${esc(e.PL_Loai_Tru)}</small>` : ''}</td>
+          <td class="fw-semibold">${e.Ho_Ten}${exclOf(e) ? `<br><small class="text-danger fw-normal" title="Trường hợp đặc biệt: không được hưởng"><i class="fa-solid fa-user-slash me-1"></i>Loại trừ: ${esc(exclOf(e))}</small>` : ''}</td>
           <td>${e.Phong_Ban}</td>
           <td>${e.Vi_Tri} <small class="text-muted">(${e.Cap_Bac})</small></td>
           <td>${e.Gioi_Tinh}</td>
@@ -1342,6 +1411,7 @@
           <span><span class="badge-subtle">${esc(b.Ma_PhucLoi)}</span> ${esc(b.Ten_PhucLoi)}</span>
         </label>`).join('') : '<div class="small text-muted">Chưa có phúc lợi nào</div>';
       updateExclCount();
+      let tag = document.getElementById('emp_ExclVer'); if (tag) tag.innerText = 'Áp dụng cho: ' + verName(activeVer);
     }
 
     function updateExclCount() {
@@ -1393,7 +1463,7 @@
 
     function editEmp(idx) {
       let e = currentEmployees[idx];
-      renderExclusionList(e.PL_Loai_Tru);
+      renderExclusionList(exclOf(e));
       document.getElementById('empModalTitle').innerText = "Chỉnh Sửa Nhân Viên: " + e.Ma_NV;
       document.getElementById('emp_Ma').value = e.Ma_NV;
       document.getElementById('emp_Ma').readOnly = true;
@@ -1426,9 +1496,13 @@
         Luong: document.getElementById('emp_Luong').value,
         Luong_Dong_BHXH: document.getElementById('emp_LuongBH').value,
         DCH: document.getElementById('emp_DCH').value,
-        Trang_Thai: document.getElementById('emp_TrangThai').value,
-        PL_Loai_Tru: [...document.querySelectorAll('#emp_Excl .excl-cb:checked')].map(i => i.value).join(', ')
+        Trang_Thai: document.getElementById('emp_TrangThai').value
       };
+      // Danh sách loại trừ: chỉ cập nhật phiên bản đang chọn; phiên bản kia giữ nguyên (nhân sự mới: áp dụng cho cả hai)
+      let list = [...document.querySelectorAll('#emp_Excl .excl-cb:checked')].map(i => i.value).join(', ');
+      let ex = currentEmployees.find(x => String(x.Ma_NV).trim() === data.Ma_NV);
+      if (activeVer === 'PA2') { data.PL_Loai_Tru_PA2 = list; data.PL_Loai_Tru = ex ? (ex.PL_Loai_Tru || '') : list; }
+      else { data.PL_Loai_Tru = list; data.PL_Loai_Tru_PA2 = ex ? (ex.PL_Loai_Tru_PA2 || '') : list; }
 
       if (!data.Ma_NV || !data.Ho_Ten || !data.Luong) {
         alert("Vui lòng điền đầy đủ các trường thông tin bắt buộc!");
@@ -1675,6 +1749,7 @@
             currentCashflow = res.cashflow || [];
             lastResult = res;
             renderCashflow();
+            if (activeTabId() === 'tab-compare') loadComparison();
           } catch(err) {
             alert("Lỗi xử lý báo cáo: " + err.message);
           } finally {
@@ -1685,7 +1760,7 @@
           toggleLoading(false);
           alert("Lỗi tính toán: " + err.message);
         })
-        .calculateBudget(year, inflation, filterSel);
+        .calculateBudget(year, inflation, filterSel, activeVer);
     }
 
     function renderCashflow() {
@@ -1855,6 +1930,221 @@
       }).join('') : `<tr><td colspan="${groups.length + 1}" class="text-center text-muted py-3">Chưa có chính sách phúc lợi</td></tr>`;
     }
 
+    // ================= PHIÊN BẢN CHÍNH SÁCH: Hiện hành / Phương án 2 =================
+    function verInfo(id) { return versions.find(v => v.Ma_PB === id) || {}; }
+    function verName(id) { return id === 'PA2' ? 'Phương án 2' : 'Hiện hành'; }
+    function exclOf(e) { return (activeVer === 'PA2' ? e.PL_Loai_Tru_PA2 : e.PL_Loai_Tru) || ''; }
+
+    function applyVersionData() {
+      currentBenefits = allBenefits.filter(b => (b.Phien_Ban || 'HH') === activeVer);
+      currentBenefitTiers = allTiers.filter(t => (t.Phien_Ban || 'HH') === activeVer);
+    }
+
+    function updateVersionUI() {
+      document.body.classList.toggle('ver-pa2', activeVer === 'PA2');
+      document.querySelectorAll('.ver-btn').forEach(b => {
+        let v = b.getAttribute('data-ver');
+        b.classList.toggle('on-hh', v === 'HH' && activeVer === 'HH');
+        b.classList.toggle('on-pa2', v === 'PA2' && activeVer === 'PA2');
+      });
+      document.getElementById('versionActions').style.display = activeVer === 'PA2' ? 'flex' : 'none';
+      document.getElementById('versionNote').innerHTML = activeVer === 'PA2'
+        ? '<b style="color:#b4531f">Đang xem / chỉnh sửa PHƯƠNG ÁN 2 (dự kiến)</b> — không ảnh hưởng chính sách hiện hành.'
+        : 'Đang xem / chỉnh sửa chính sách <b>đang áp dụng</b>.';
+      document.getElementById('inflationRate').value = verInfo(activeVer).Ty_Le_Lam_Phat;
+    }
+
+    // Tỷ lệ lạm phát riêng cho từng phiên bản: lưu ngay khi đổi
+    document.getElementById('inflationRate').addEventListener('change', () => {
+      let v = document.getElementById('inflationRate').value;
+      verInfo(activeVer).Ty_Le_Lam_Phat = parseFloat(v) || 0;
+      google.script.run.withFailureHandler(err => alert('Không lưu được tỷ lệ lạm phát: ' + err.message)).saveVersionRate(activeVer, v);
+    });
+
+    function switchVersion(v) {
+      if (v === activeVer) return;
+      if (v === 'PA2' && !verInfo('PA2').Da_Khoi_Tao) {
+        if (!confirm('Phương án 2 chưa có dữ liệu.\nNhân bản toàn bộ chính sách (phúc lợi, bậc thưởng, tỷ lệ lạm phát, danh sách loại trừ nhân sự) từ Hiện hành sang Phương án 2 để bắt đầu chỉnh sửa?')) return;
+        runClone(true);
+        return;
+      }
+      activeVer = v;
+      applyVersionData();
+      updateVersionUI();
+      renderBenefitsTable(currentBenefits);
+      renderEmployeesTable(currentEmployees);
+      renderPolicyView();
+      runCalculation();
+    }
+
+    function runClone(switchAfter) {
+      toggleLoading(true);
+      google.script.run
+        .withSuccessHandler(msg => { if (switchAfter) activeVer = 'PA2'; alert(msg); loadInitialData(); })
+        .withFailureHandler(err => { toggleLoading(false); alert('Lỗi: ' + err.message); })
+        .cloneVersion('HH', 'PA2');
+    }
+
+    function cloneToPA2() {
+      if (!confirm('Ghi đè TOÀN BỘ Phương án 2 (phúc lợi, bậc thưởng, tỷ lệ lạm phát, danh sách loại trừ) bằng bản sao của Hiện hành?\nCác chỉnh sửa hiện có ở Phương án 2 sẽ mất.')) return;
+      runClone(false);
+    }
+
+    function applyPA2() {
+      if (!confirm('Áp dụng Phương án 2 làm chính sách Hiện hành?\n\n• Phương án 2 trở thành Hiện hành.\n• Hiện hành cũ được giữ lại thành Phương án 2 (không mất dữ liệu).\n• Muốn hoàn tác, bấm lại nút này.')) return;
+      toggleLoading(true);
+      google.script.run
+        .withSuccessHandler(msg => { activeVer = 'HH'; alert(msg); loadInitialData(); })
+        .withFailureHandler(err => { toggleLoading(false); alert('Lỗi: ' + err.message); })
+        .swapVersions();
+    }
+
+    // ---- Tab So sánh phương án ----
+    const DIFF_FIELDS = [['Ten_PhucLoi', 'Tên'], ['Loai_Tinh_Toan', 'Loại tính toán'], ['Gia_Tri_Mac_Dinh', 'Giá trị / tỷ lệ'], ['Can_Cu_Luong', 'Căn cứ lương'],
+      ['Chu_Ky', 'Chu kỳ'], ['Ngay_Chi_Tra', 'Ngày chi trả'], ['Thang_Chi_Tra', 'Tháng chi trả'], ['Ty_Le_Tang', 'Mức tăng (%)'], ['Doi_Tuong', 'Đối tượng'],
+      ['Gioi_Tinh', 'Giới tính'], ['Cap_Bac', 'Cấp bậc'], ['Phong_Ban', 'Phòng ban'], ['Tham_Nien_Toi_Thieu_Thang', 'Thâm niên tối thiểu (tháng)']];
+
+    function normField(k, v) {
+      let t = String(v == null ? '' : v).trim();
+      if (['Doi_Tuong', 'Gioi_Tinh', 'Cap_Bac', 'Phong_Ban'].includes(k) && t === '') return 'All';
+      if (k === 'Ty_Le_Tang' && t === '') return 'Chung';
+      if (k === 'Ngay_Chi_Tra' && t === '') return '1';
+      if (k === 'Thang_Chi_Tra' && t === '') return 'Mặc định';
+      if (t !== '' && !isNaN(Number(t))) return String(Number(t));
+      return t;
+    }
+
+    function tierText(list) {
+      if (!list.length) return 'Không có bậc';
+      return list.slice().sort((a, b) => (parseInt(a.Tham_Nien_Tu_Thang) || 0) - (parseInt(b.Tham_Nien_Tu_Thang) || 0)).map(t =>
+        `${t.Tham_Nien_Tu_Thang || 0}${t.Tham_Nien_Den_Thang === '' || t.Tham_Nien_Den_Thang == null ? '+' : '–' + t.Tham_Nien_Den_Thang}th${t.Doi_Tuong && t.Doi_Tuong !== 'All' ? ' ' + t.Doi_Tuong : ''}${t.Cap_Bac && t.Cap_Bac !== 'All' ? ' ' + t.Cap_Bac : ''}: ${t.Gia_Tri}`).join('; ');
+    }
+
+    function exclList(v) { return String(v || '').split(',').map(x => x.trim()).filter(x => x).sort(natCmp).join(', '); }
+
+    function diffPolicies() {
+      let rows = [];
+      let ben = v => { let m = {}; allBenefits.filter(b => (b.Phien_Ban || 'HH') === v).forEach(b => { m[String(b.Ma_PhucLoi).trim()] = b; }); return m; };
+      let A = ben('HH'), B = ben('PA2');
+      let tiersOfVer = (v, code) => allTiers.filter(t => (t.Phien_Ban || 'HH') === v && String(t.Ma_PhucLoi).trim() === code);
+      let codes = [...new Set([...Object.keys(A), ...Object.keys(B)])].sort(natCmp);
+      codes.forEach(code => {
+        let a = A[code], b = B[code];
+        if (!a) { rows.push([code + ' ' + b.Ten_PhucLoi, 'Thêm mới ở Phương án 2', `${b.Loai_Tinh_Toan}: ${b.Gia_Tri_Mac_Dinh}, chu kỳ ${b.Chu_Ky}`]); return; }
+        if (!b) { rows.push([code + ' ' + a.Ten_PhucLoi, 'Bỏ ở Phương án 2', `Hiện hành có: ${a.Loai_Tinh_Toan}: ${a.Gia_Tri_Mac_Dinh}, chu kỳ ${a.Chu_Ky}`]); return; }
+        let diffs = [];
+        DIFF_FIELDS.forEach(([k, label]) => {
+          let x = normField(k, a[k]), y = normField(k, b[k]);
+          if (x !== y) diffs.push(`${label}: ${x} → ${y}`);
+        });
+        let ta = tierText(tiersOfVer('HH', code)), tb = tierText(tiersOfVer('PA2', code));
+        if (ta !== tb) diffs.push(`Bậc thưởng: [${ta}] → [${tb}]`);
+        if (diffs.length) rows.push([code + ' ' + (b.Ten_PhucLoi || a.Ten_PhucLoi), 'Đổi chính sách', diffs.join(' | ')]);
+      });
+      let nEx = 0;
+      currentEmployees.forEach(e => {
+        let x = exclList(e.PL_Loai_Tru), y = exclList(e.PL_Loai_Tru_PA2);
+        if (x !== y) { nEx++; rows.push([`${e.Ma_NV} ${e.Ho_Ten}`, 'Loại trừ phúc lợi khác nhau', `[${x || 'không'}] → [${y || 'không'}]`]); }
+      });
+      return rows;
+    }
+
+    function loadComparison() {
+      toggleLoading(true);
+      google.script.run
+        .withSuccessHandler(res => {
+          try { lastCompare = res; renderComparison(res); } catch (err) { alert('Lỗi hiển thị so sánh: ' + err.message); } finally { toggleLoading(false); }
+        })
+        .withFailureHandler(err => { toggleLoading(false); alert('Lỗi so sánh: ' + err.message); })
+        .compareVersions(document.getElementById('targetYear').value, filterSel);
+    }
+    document.querySelector('[data-bs-target="#tab-compare"]').addEventListener('shown.bs.tab', loadComparison);
+
+    function deltaHtml(a, b) {
+      let d = b - a, p = a ? d / a * 100 : (b ? 100 : 0);
+      let cls = d > 0 ? 'delta-up' : (d < 0 ? 'delta-down' : '');
+      return `<span class="${cls}">${d > 0 ? '+' : ''}${formatVND(d)}</span> <small class="${cls}">(${d > 0 ? '+' : ''}${p.toFixed(1)}%)</small>`;
+    }
+
+    function renderComparison(res) {
+      let A = res.HH, B = res.PA2;
+      let ini = (res.versions.find(v => v.Ma_PB === 'PA2') || {}).Da_Khoi_Tao;
+      document.getElementById('cmpRates').innerHTML = `Lạm phát chung — Hiện hành: <b>${A.rate}%</b> | Phương án 2: <b>${B.rate}%</b>` +
+        (ini ? '' : ' <span class="text-danger">— Phương án 2 chưa được khởi tạo (chưa có chính sách). Hãy chọn Phương án 2 để nhân bản từ Hiện hành.</span>');
+
+      // thẻ chênh lệch
+      let cards = [['Tổng Ngân Sách', 'totalBudget', 'pill-green'], ['Nhân Sự Hiện Tại', 'existingBudget', 'pill-terra'], ['TB Phúc Lợi / NS Hiện Tại', 'avgBenefitPerExisting', 'pill-teal'], ['Tuyển Mới', 'newHireBudget', 'pill-navy']];
+      document.getElementById('cmpKpis').innerHTML = cards.map(([label, k, cls]) => {
+        let a = A.summary[k] || 0, b = B.summary[k] || 0;
+        return `<div class="col-md-3"><div class="kpi-pill ${cls}">${label}</div>
+          <div class="kpi-card"><div class="kpi-value fs-5">${deltaHtml(a, b)}</div><div class="kpi-title mt-1">Chênh lệch (PA2 − Hiện hành)</div>
+          <div class="small text-muted mt-2">Hiện hành: ${formatVND(a)}</div><div class="small text-muted">Phương án 2: ${formatVND(b)}</div></div></div>`;
+      }).join('');
+
+      let colA = '#2a7d91', colB = '#ef8a5c';
+      // theo khoản
+      let cat = {};
+      (A.categoryList || []).forEach(c => { cat[c.code] = { name: c.name, a: c.amount, b: 0 }; });
+      (B.categoryList || []).forEach(c => { (cat[c.code] = cat[c.code] || { name: c.name, a: 0, b: 0 }).b = c.amount; if (!cat[c.code].name) cat[c.code].name = c.name; });
+      let codes = Object.keys(cat).sort(natCmp);
+      document.getElementById('cmpCatWrap').style.height = Math.max(260, codes.length * 46 + 80) + 'px';
+      if (cmpCatInst) cmpCatInst.destroy();
+      cmpCatInst = new Chart(document.getElementById('cmpCatChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels: codes.map(c => `${c} · ${cat[c].name}`), datasets: [
+          { label: 'Hiện hành', data: codes.map(c => cat[c].a), backgroundColor: colA, borderRadius: 3 },
+          { label: 'Phương án 2', data: codes.map(c => cat[c].b), backgroundColor: colB, borderRadius: 3 }] },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${formatVND(c.parsed.x)}` } } },
+          scales: { x: { grid: { color: '#eef2f3' }, ticks: { callback: v => (v / 1e6).toLocaleString('vi-VN') + ' tr' } }, y: { grid: { display: false } } } }
+      });
+
+      // dòng tiền lũy kế
+      let cum = arr => { let r = 0; return arr.map(v => (r += v)); };
+      if (cmpCashInst) cmpCashInst.destroy();
+      cmpCashInst = new Chart(document.getElementById('cmpCashChart').getContext('2d'), {
+        type: 'line',
+        data: { labels: A.monthly.map((_, i) => 'T' + (i + 1)), datasets: [
+          { label: 'Hiện hành', data: cum(A.monthly), borderColor: colA, backgroundColor: colA, tension: 0.2, pointRadius: 3 },
+          { label: 'Phương án 2', data: cum(B.monthly), borderColor: colB, backgroundColor: colB, tension: 0.2, pointRadius: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${formatVND(c.parsed.y)}` } } },
+          scales: { y: { grid: { color: '#eef2f3' }, ticks: { callback: v => (v / 1e6).toLocaleString('vi-VN') + ' tr' } }, x: { grid: { display: false } } } }
+      });
+
+      // theo phòng ban
+      let dep = {};
+      (A.deptList || []).forEach(d => { dep[d.name] = { a: d.amount, b: 0 }; });
+      (B.deptList || []).forEach(d => { (dep[d.name] = dep[d.name] || { a: 0, b: 0 }).b = d.amount; });
+      let dnames = Object.keys(dep).sort((x, y) => x.localeCompare(y, 'vi'));
+      if (cmpDeptInst) cmpDeptInst.destroy();
+      cmpDeptInst = new Chart(document.getElementById('cmpDeptChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels: dnames, datasets: [
+          { label: 'Hiện hành', data: dnames.map(n => dep[n].a), backgroundColor: colA, borderRadius: 3 },
+          { label: 'Phương án 2', data: dnames.map(n => dep[n].b), backgroundColor: colB, borderRadius: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${formatVND(c.parsed.y)}` } } },
+          scales: { y: { grid: { color: '#eef2f3' }, ticks: { callback: v => (v / 1e6).toLocaleString('vi-VN') + ' tr' } }, x: { grid: { display: false } } } }
+      });
+
+      // bảng theo khoản
+      document.getElementById('cmpBenefitTbody').innerHTML = codes.length ? codes.map(c => `
+        <tr><td><span class="badge-subtle">${esc(c)}</span> ${esc(cat[c].name)}</td><td class="text-end">${formatVND(cat[c].a)}</td>
+        <td class="text-end">${formatVND(cat[c].b)}</td><td class="text-end">${deltaHtml(cat[c].a, cat[c].b).split(' <small')[0]}</td>
+        <td class="text-end small">${cat[c].a ? ((cat[c].b - cat[c].a) / cat[c].a * 100).toFixed(1) + '%' : (cat[c].b ? 'mới' : '—')}</td></tr>`).join('')
+        : '<tr><td colspan="5" class="text-center text-muted py-3">Chưa có dữ liệu</td></tr>';
+      let ta = codes.reduce((s2, c) => s2 + cat[c].a, 0), tb = codes.reduce((s2, c) => s2 + cat[c].b, 0);
+      document.getElementById('cmpBenefitTfoot').innerHTML = codes.length ? `<tr><td>TỔNG CỘNG</td><td class="text-end">${formatVND(ta)}</td><td class="text-end">${formatVND(tb)}</td>
+        <td class="text-end">${deltaHtml(ta, tb).split(' <small')[0]}</td><td class="text-end small">${ta ? ((tb - ta) / ta * 100).toFixed(1) + '%' : ''}</td></tr>` : '';
+
+      // điểm khác nhau về chính sách
+      lastChanges = diffPolicies();
+      document.getElementById('cmpChangesTbody').innerHTML = lastChanges.length ? lastChanges.map(r => `
+        <tr><td class="fw-semibold">${esc(r[0])}</td><td><span class="badge bg-light text-dark border">${esc(r[1])}</span></td><td class="small">${esc(r[2])}</td></tr>`).join('')
+        : '<tr><td colspan="3" class="text-center text-muted py-3">Hai phương án đang giống nhau</td></tr>';
+    }
+
     // ================= XUẤT CSV / PDF =================
     const TAB_LABELS = {
       'tab-dashboard': 'Tổng quan chi phí',
@@ -1863,6 +2153,7 @@
       'tab-employees': 'Bảng mức lương và hồ sơ nhân sự',
       'tab-emp-details': 'Chi tiết theo nhân sự',
       'tab-cashflow': 'Dòng tiền theo thời gian',
+      'tab-compare': 'So sánh phương án',
       'tab-newhire': 'Kế hoạch tuyển mới'
     };
 
@@ -1887,7 +2178,8 @@
     function exportFileName(id, ext) {
       let d = new Date(), p = n => String(n).padStart(2, '0');
       let slug = normText(TAB_LABELS[id]).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-      return `${slug}_${document.getElementById('targetYear').value}_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.${ext}`;
+      let vtag = id === 'tab-compare' ? 'HH-vs-PA2' : activeVer;
+      return `${slug}_${vtag}_${document.getElementById('targetYear').value}_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.${ext}`;
     }
 
     // ---- CSV (dấu ; để mở đúng trong Excel tiếng Việt; có BOM UTF-8) ----
@@ -1941,7 +2233,7 @@
     function buildCsvSections(id) {
       let year = document.getElementById('targetYear').value;
       let infl = document.getElementById('inflationRate').value;
-      let info = { title: `${TAB_LABELS[id]} — năm ${year} (lạm phát chung ${infl}%) — Bộ lọc: ${filterSummaryText()}` };
+      let info = { title: `${TAB_LABELS[id]} — ${verName(activeVer)} — năm ${year} (lạm phát chung ${infl}%) — Bộ lọc: ${filterSummaryText()}` };
       let r = lastResult;
 
       if (id === 'tab-dashboard') {
@@ -1979,7 +2271,7 @@
       if (id === 'tab-benefits') {
         let list = currentBenefits.slice().sort((a, b) => natCmp(a.Ma_PhucLoi, b.Ma_PhucLoi));
         return [
-          { title: `${TAB_LABELS[id]}` },
+          { title: `${TAB_LABELS[id]} — ${verName(activeVer)}` },
           { title: 'Danh mục phúc lợi',
             headers: ['Mã', 'Tên khoản', 'Loại tính toán', 'Giá trị / tỷ lệ', 'Căn cứ lương', 'Chu kỳ', 'Ngày chi trả', 'Tháng chi trả', 'Mức tăng riêng (%)', 'Đối tượng', 'Giới tính', 'Cấp bậc', 'Phòng ban', 'Thâm niên tối thiểu (tháng)'],
             rows: list.map(b => [b.Ma_PhucLoi, b.Ten_PhucLoi, b.Loai_Tinh_Toan, Number(b.Gia_Tri_Mac_Dinh) || 0, b.Can_Cu_Luong, b.Chu_Ky,
@@ -1997,7 +2289,7 @@
           { title: kw ? `${TAB_LABELS[id]} (kết quả tìm kiếm: ${document.getElementById('empSearch').value})` : TAB_LABELS[id] },
           { headers: ['Mã NV', 'Họ tên', 'Phòng ban', 'Vị trí', 'Cấp bậc', 'Giới tính', 'Đối tượng', 'Ngày vào làm', 'Lương', 'Lương đóng BHXH', 'ĐCH', 'Trạng thái', 'Phúc lợi không được hưởng'],
             rows: list.map(e => [e.Ma_NV, e.Ho_Ten, e.Phong_Ban, e.Vi_Tri, e.Cap_Bac, e.Gioi_Tinh, e.Doi_Tuong || 'Cơ hữu', formatDateDisplay(e.Ngay_Vao_Lam),
-              Number(e.Luong !== undefined ? e.Luong : e.Luong_Co_Ban) || 0, Number(e.Luong_Dong_BHXH) || 0, Number(e.DCH) || 0, e.Trang_Thai, e.PL_Loai_Tru || '']) }
+              Number(e.Luong !== undefined ? e.Luong : e.Luong_Co_Ban) || 0, Number(e.Luong_Dong_BHXH) || 0, Number(e.DCH) || 0, e.Trang_Thai, exclOf(e)]) }
         ];
       }
 
@@ -2028,6 +2320,32 @@
         ];
       }
 
+      if (id === 'tab-compare') {
+        if (!lastCompare) return [];
+        let A = lastCompare.HH, B = lastCompare.PA2;
+        let pct = (a, b) => a ? Math.round((b - a) / a * 1000) / 10 : '';
+        let sumRows = [['Tổng ngân sách', 'totalBudget'], ['Ngân sách nhân sự hiện tại', 'existingBudget'], ['TB phúc lợi / nhân sự hiện tại', 'avgBenefitPerExisting'], ['Ngân sách tuyển mới', 'newHireBudget']]
+          .map(([l, k]) => [l, Math.round(A.summary[k] || 0), Math.round(B.summary[k] || 0), Math.round((B.summary[k] || 0) - (A.summary[k] || 0)), pct(A.summary[k] || 0, B.summary[k] || 0)]);
+        let cat = {};
+        (A.categoryList || []).forEach(c => { cat[c.code] = { name: c.name, a: c.amount, b: 0 }; });
+        (B.categoryList || []).forEach(c => { (cat[c.code] = cat[c.code] || { name: c.name, a: 0, b: 0 }).b = c.amount; });
+        let dep = {};
+        (A.deptList || []).forEach(d => { dep[d.name] = { a: d.amount, b: 0 }; });
+        (B.deptList || []).forEach(d => { (dep[d.name] = dep[d.name] || { a: 0, b: 0 }).b = d.amount; });
+        let ca = 0, cb = 0;
+        return [
+          { title: `So sánh Hiện hành (lạm phát ${A.rate}%) và Phương án 2 (lạm phát ${B.rate}%) — năm ${year} — Bộ lọc: ${filterSummaryText()}` },
+          { title: 'Tổng hợp (VNĐ)', headers: ['Chỉ tiêu', 'Hiện hành', 'Phương án 2', 'Chênh lệch', '% chênh lệch'], rows: sumRows },
+          { title: 'Theo khoản phúc lợi (VNĐ)', headers: ['Mã', 'Tên khoản', 'Hiện hành', 'Phương án 2', 'Chênh lệch', '% chênh lệch'],
+            rows: Object.keys(cat).sort(natCmp).map(c => [c, cat[c].name, Math.round(cat[c].a), Math.round(cat[c].b), Math.round(cat[c].b - cat[c].a), pct(cat[c].a, cat[c].b)]) },
+          { title: 'Theo phòng ban (VNĐ)', headers: ['Phòng ban', 'Hiện hành', 'Phương án 2', 'Chênh lệch', '% chênh lệch'],
+            rows: Object.keys(dep).sort((x, y) => x.localeCompare(y, 'vi')).map(n => [n, Math.round(dep[n].a), Math.round(dep[n].b), Math.round(dep[n].b - dep[n].a), pct(dep[n].a, dep[n].b)]) },
+          { title: 'Dòng tiền lũy kế theo tháng (VNĐ)', headers: ['Tháng', 'Hiện hành', 'Phương án 2', 'Chênh lệch'],
+            rows: A.monthly.map((v, i) => { ca += v; cb += B.monthly[i]; return ['Tháng ' + (i + 1), Math.round(ca), Math.round(cb), Math.round(cb - ca)]; }) },
+          { title: 'Những điểm khác nhau về chính sách', headers: ['Khoản / Nhân sự', 'Thay đổi', 'Chi tiết (Hiện hành → Phương án 2)'], rows: lastChanges }
+        ];
+      }
+
       if (id === 'tab-newhire') {
         return [
           { title: TAB_LABELS[id] },
@@ -2042,9 +2360,9 @@
     function exportPdf(id) {
       let year = document.getElementById('targetYear').value;
       let infl = document.getElementById('inflationRate').value;
-      document.getElementById('printTitle').innerText = `${TAB_LABELS[id]} — năm ${year}`;
+      document.getElementById('printTitle').innerText = `${TAB_LABELS[id]}${id === 'tab-compare' ? '' : ' — ' + verName(activeVer)} — năm ${year}`;
       document.getElementById('printMeta').innerText =
-        `Lạm phát chung: ${infl}% | Bộ lọc: ${filterSummaryText()} | Xuất ngày ${new Date().toLocaleDateString('vi-VN')}`;
+        `${id === 'tab-compare' ? 'Hiện hành vs Phương án 2' : 'Phiên bản: ' + verName(activeVer)} | Lạm phát: ${id === 'tab-compare' ? verInfo('HH').Ty_Le_Lam_Phat + '% / ' + verInfo('PA2').Ty_Le_Lam_Phat + '%' : infl + '%'} | Bộ lọc: ${filterSummaryText()} | Xuất ngày ${new Date().toLocaleDateString('vi-VN')}`;
       document.body.setAttribute('data-print-tab', id);
       titleBeforePrint = document.title;
       document.title = exportFileName(id, 'pdf').replace(/\.pdf$/, '');
