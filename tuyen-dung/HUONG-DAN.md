@@ -72,3 +72,13 @@ Dán code mới vào `Code.gs` / `Index`, rồi **Triển khai → Quản lý b�
 1. Cập nhật **cả hai** file: `Code.gs` (bản mới tự dọn dòng trùng mã và đọc/ghi thống nhất) và `Index`, rồi Triển khai phiên bản mới.
 2. Vào **Thiết lập → Dữ liệu & sao lưu → Kiểm tra Google Sheet** để xem số dòng từng sheet, mã bị trùng và kích thước ô dữ liệu.
 3. Bấm vào dòng cảnh báo đỏ ở thanh bên để gửi lại Thiết lập.
+
+## Xuất dữ liệu (CSV)
+
+- Mỗi tab có nút **Xuất CSV** (cần quyền "Xuất dữ liệu ra file CSV" trong Thiết lập → Phân quyền; mặc định có ở Nhân viên tuyển dụng, Ban TGĐ, Quản trị).
+  - **Tổng quan:** báo cáo KPI, phễu, lý do loại, theo vị trí, KPI thời gian tuyển, hồ sơ theo tháng (theo bộ lọc khối đang chọn).
+  - **Đề xuất:** theo bộ lọc/tìm kiếm hiện tại, gồm cả các trường tự thêm, MTCV và tình trạng bản ký.
+  - **Ứng viên:** danh sách (theo bộ lọc) hoặc chi tiết từng vòng phỏng vấn.
+  - **Thư viện:** vị trí (danh sách hoặc lịch sử phiên bản), mẫu thư, biểu mẫu.
+  - **Thiết lập:** từng bảng (khối, phòng ban, nguồn, lý do loại, trường, người dùng, phân quyền). Khối, phòng ban, nguồn, lý do loại, người dùng có thể nhập lại bằng **Nhập CSV**.
+- File mở được bằng Excel / Google Sheets (UTF-8). Số điện thoại và mã bắt đầu bằng 0 được giữ nguyên; giá trị bắt đầu bằng `=`, `+`, `-`, `@` được thêm dấu `'` để tránh bị hiểu là công thức.
