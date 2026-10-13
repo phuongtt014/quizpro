@@ -100,3 +100,8 @@ Dán code mới vào `Code.gs` / `Index`, rồi **Triển khai → Quản lý b�
 - Khi tạo/sửa đề xuất có mục **"Người ký trên phiếu đề xuất"**: người đề xuất điều chỉnh họ tên từng người ký (để trống nếu ký tay). Danh sách chức danh lấy theo khối đã chọn ở Thiết lập → Chữ ký phiếu đề xuất. Tên đã nhập được lưu theo từng đề xuất và in trên phiếu.
 - **Số cột chữ ký tối đa** mỗi hàng: các hàng được chia đều và canh giữa theo chiều ngang giấy (ví dụ 4 người ký, tối đa 3 cột → 2 + 2; 5 người → 3 + 2 canh giữa).
 - Mẫu phiếu: **Tên đơn vị trên phiếu** để trống = không hiển thị.
+
+## Trường của Sơ vấn / Phỏng vấn / Thư mời & xác nhận chuyển giai đoạn
+
+- Thiết lập có thêm 3 mục **Trường – Sơ vấn**, **Trường – Phỏng vấn**, **Trường – Thư mời**: sửa tên, ẩn/hiện, bắt buộc, đổi kiểu, thêm trường mới (số, ngày, giờ, URL, tệp…), sắp xếp, nhập/xuất CSV. Trường dùng cho quy trình (Kết quả sơ vấn, Tên vòng và Kết quả phỏng vấn, Trạng thái thư mời) là trường hệ thống, chỉ đổi được tên. Dữ liệu của trường bị ẩn vẫn được giữ.
+- Mọi lần **chuyển giai đoạn** của ứng viên (nút trong hồ sơ, kéo-thả trên bảng, hoặc hệ thống gợi ý sau khi ghi nhận sơ vấn / thêm vòng phỏng vấn / tạo thư mời) đều hiện hộp thoại **xác nhận**; chọn Huỷ thì giữ nguyên giai đoạn. Khi chuyển sang "Loại" phải chọn lý do ngay trong hộp thoại.
