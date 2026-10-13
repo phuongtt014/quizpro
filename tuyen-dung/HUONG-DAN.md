@@ -105,3 +105,20 @@ Dán code mới vào `Code.gs` / `Index`, rồi **Triển khai → Quản lý b�
 
 - Thiết lập có thêm 3 mục **Trường – Sơ vấn**, **Trường – Phỏng vấn**, **Trường – Thư mời**: sửa tên, ẩn/hiện, bắt buộc, đổi kiểu, thêm trường mới (số, ngày, giờ, URL, tệp…), sắp xếp, nhập/xuất CSV. Trường dùng cho quy trình (Kết quả sơ vấn, Tên vòng và Kết quả phỏng vấn, Trạng thái thư mời) là trường hệ thống, chỉ đổi được tên. Dữ liệu của trường bị ẩn vẫn được giữ.
 - Mọi lần **chuyển giai đoạn** của ứng viên (nút trong hồ sơ, kéo-thả trên bảng, hoặc hệ thống gợi ý sau khi ghi nhận sơ vấn / thêm vòng phỏng vấn / tạo thư mời) đều hiện hộp thoại **xác nhận**; chọn Huỷ thì giữ nguyên giai đoạn. Khi chuyển sang "Loại" phải chọn lý do ngay trong hộp thoại.
+
+## Gửi email cho ứng viên bằng email tuyển dụng (alias "Gửi thư với tư cách")
+
+**Yêu cầu:** cập nhật **cả `Code.gs` và `Index`**, rồi Triển khai phiên bản mới.
+
+1. Trong Gmail của **tài khoản chủ dự án** (tài khoản quản trị): ⚙ Cài đặt → Xem tất cả cài đặt → **Tài khoản và Nhập** → **Gửi thư với tư cách** → *Thêm địa chỉ email khác* → nhập email tuyển dụng → xác minh (Gmail gửi thư xác nhận tới hộp thư tuyển dụng; bấm liên kết/nhập mã).
+2. Trong Apps Script chọn hàm **`authorizeMail`** → Chạy → cấp quyền Gmail (màn hình cấp quyền sẽ nêu quyền truy cập Gmail; dự án chỉ dùng để gửi thư và đọc danh sách alias).
+3. Triển khai → Quản lý bản triển khai → Phiên bản mới.
+4. Trong ứng dụng: **Thiết lập → Email gửi ứng viên** → *Kiểm tra alias trong Gmail* → chọn địa chỉ gửi, nhập tên hiển thị, **BCC** (để thư cũng nằm trong hộp thư tuyển dụng), chữ ký, giới hạn/ngày → Bật → *Gửi thư thử*.
+5. Gửi thư cho ứng viên: mở hồ sơ ứng viên → chọn mẫu thư → khung **Gửi email trực tiếp** (sửa người nhận, CC, đính kèm biểu mẫu từ Thư viện) → bấm **Gửi email ngay** → bấm lần nữa để xác nhận.
+
+**Bảo mật & vận hành**
+- Địa chỉ gửi, tên hiển thị, BCC, chữ ký, giới hạn/ngày do **máy chủ** đọc từ Thiết lập; giao diện chỉ chọn được người nhận, CC thêm, nội dung và tệp đính kèm (chỉ tệp trong thư mục của ứng dụng). Chỉ vai trò có quyền "Chuyển giai đoạn, soạn thư…" (hoặc quản trị) mới gửi được.
+- Mọi email được ghi vào sheet **NhatKyEmail** (thời gian, người thao tác, người nhận, tiêu đề, kết quả) và vào lịch sử ứng viên.
+- Ứng viên trả lời sẽ về địa chỉ tuyển dụng (hoặc Reply-To nếu đặt). Thư nằm trong "Đã gửi" của tài khoản chủ dự án; dùng BCC để có bản sao ở hộp thư tuyển dụng.
+- Hạn mức Google Workspace khoảng 1.500 người nhận/ngày; ứng dụng có giới hạn riêng (mặc định 200 email/ngày).
+- **Không chia sẻ** Google Sheet, thư mục Drive và dự án Apps Script cho nhân viên: họ chỉ cần quyền mở đường link ứng dụng.

@@ -275,7 +275,7 @@ const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{co
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
-const APP_VER='v18 · 13/10/2026';
+const APP_VER='v19 · 13/10/2026';
 const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const MAXF=GS?10:15;
@@ -462,6 +462,7 @@ function normalize(){
   const C=DB.cfg;C.migr=C.migr||{};if(!C.migr.export){C.roles.forEach(r=>{if(['recruiter','approver'].includes(r.id)&&!r.caps.includes('data.export'))r.caps.push('data.export')});C.migr.export=1}
   if(!Array.isArray(C.signers))C.signers=defaultSigners();C.signCols=C.signCols||4;if(C.signFooter==null)C.signFooter='';
   if(!Array.isArray(C.screenFields))C.screenFields=defScreenFields();if(!Array.isArray(C.interviewFields))C.interviewFields=defInterviewFields();if(!Array.isArray(C.offerFields))C.offerFields=defOfferFields();
+  C.mail=Object.assign({enabled:0,fromAlias:'',senderName:'',replyTo:'',cc:'',bcc:'',signature:'',dailyLimit:200},C.mail||{});
   C.rejectReasons=C.rejectReasons||['Không phù hợp chuyên môn','Kỳ vọng lương cao','Nhận được offer tốt hơn','Vấn đề địa điểm','Ứng viên từ chối offer','Lý do khác'];
   C.users.forEach(u=>u.email=u.email||'');DB.reqs.forEach(r=>{r.history=r.history||[];r.v=r.v||{}});DB.cands.forEach(c=>{c.history=c.history||[];c.interviews=c.interviews||[];c.v=c.v||{}});
   DB.lib=DB.lib||{};['positions','templates','forms','formTpls'].forEach(k=>DB.lib[k]=DB.lib[k]||[]);
@@ -1158,22 +1159,29 @@ function tplModal(t){
 }
 function sampleVars(){return{ten_ung_vien:'Nguyễn Văn A',vi_tri:'Giáo viên Toán THCS',phong_ban:'Tổ Toán – Tin',ngay_phong_van:fmtD(iso(3)),gio_phong_van:'09:00',dia_diem:'Phòng họp A',luong:'15.000.000 đ/tháng',ngay_nhan_viec:fmtD(iso(20)),han_phan_hoi:fmtD(iso(7)),nguoi_gui:me().name,cong_ty:DB.cfg.company}}
 function copyText(t){try{navigator.clipboard.writeText(t).catch(()=>0)}catch(e){}const ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;opacity:0';document.body.append(ta);ta.select();try{document.execCommand('copy')}catch(e){}ta.remove()}
+const mailFromLabel=()=>{const m=DB.cfg.mail;return(m.senderName?m.senderName+' ':'')+'<'+(m.fromAlias||'tài khoản chủ dự án')+'>'};
 function letterModal(c,t){
   const v=c?letterVars(c):sampleVars();
   const subj=merge(t.subject,v),body=merge(t.body,v);
   const left=(subj+body).match(/\{\{\w+\}\}/g)||[];
+  const canSend=ENV.gs&&!!c&&can('cand.move')&&DB.cfg.mail&&DB.cfg.mail.enabled;
+  const atts=DB.lib.forms.filter(f=>f.file&&f.file.id&&f.file.url);
   modal({title:c?`Soạn thư cho ${c.v.name}`:'Xem trước mẫu thư (dữ liệu mẫu)',wide:true,
     html:`${left.length?`<div class="alert warn" style="margin-bottom:12px">${ic('alert')}<div>Còn ${left.length} trường chưa có dữ liệu (${[...new Set(left)].join(', ')}). Hãy bổ sung thông tin ứng viên hoặc sửa trực tiếp bên dưới.</div></div>`:''}
-    <label class="f">Tiêu đề</label><input type="text" id="lt_s" value="${esc(subj)}"><label class="f" style="margin-top:12px">Nội dung</label><textarea id="lt_b" style="min-height:300px">${esc(body)}</textarea>`,
+    <label class="f">Tiêu đề</label><input type="text" id="lt_s" value="${esc(subj)}"><label class="f" style="margin-top:12px">Nội dung</label><textarea id="lt_b" style="min-height:280px">${esc(body)}</textarea>
+    ${canSend?`<div class="card sec" style="margin-top:14px;border-left:4px solid var(--brand)"><div class="sec-h"><h3>${ic('mail')}Gửi email trực tiếp</h3></div>
+      <div class="fgrid"><div><label class="f">Gửi tới</label><input type="text" id="ml_to" value="${esc(c.v.email||'')}" placeholder="email ứng viên"></div><div><label class="f">CC thêm (tuỳ chọn)</label><input type="text" id="ml_cc" placeholder="a@congty.vn, b@congty.vn"></div></div>
+      ${atts.length?`<div style="margin-top:10px"><label class="f">Đính kèm biểu mẫu từ Thư viện</label><div id="ml_att">${atts.map(f=>`<label style="display:flex;gap:8px;align-items:center;margin:4px 0"><input type="checkbox" class="chk" value="${esc(f.file.id)}">${esc(f.name)} <span class="muted small">(${fsize(f.file.size)})</span></label>`).join('')}</div></div>`:''}
+      <div class="row" style="margin-top:12px"><button class="btn pri" id="ml_send" data-act="mlSend" data-id="${c.id}" data-arg="${t.id}" data-label="${esc('Gửi email ngay')}">${ic('mail')}Gửi email ngay</button><span class="small muted">Gửi từ <b>${esc(mailFromLabel())}</b>. Chữ ký và BCC lưu bản sao thêm tự động.</span></div></div>`:''}`,
     buttons:[modalCancel,{label:'Sao chép',icon:'copy',fn:()=>{copyText($('#lt_s').value+'\n\n'+$('#lt_b').value);toast('Đã sao chép nội dung thư','ok');return false}},
       ...(c?[{label:'Mở trong ứng dụng email',icon:'mail',fn:()=>{const a=document.createElement('a');a.href=`mailto:${encodeURIComponent(c.v.email||'')}?subject=${encodeURIComponent($('#lt_s').value)}&body=${encodeURIComponent($('#lt_b').value)}`;a.target='_blank';document.body.append(a);a.click();a.remove();return false}},
-      {label:'Ghi nhận đã gửi',cls:'pri',icon:'check',fn:()=>{log(c,`Đã gửi thư: ${t.name}`);commit();toast('Đã ghi nhận vào lịch sử ứng viên','ok')}}]:[])]});
+      {label:'Ghi nhận đã gửi',cls:canSend?'':'pri',icon:'check',fn:()=>{log(c,`Đã gửi thư: ${t.name}`);commit();toast('Đã ghi nhận vào lịch sử ứng viên','ok')}}]:[])]});
 }
 
 /* ============ SETTINGS ============ */
 function vCfg(){
   const ro=!can('cfg.edit');
-  const subs=[['general','Thông tin chung'],['lists','Danh mục'],['reqf','Trường – Đề xuất'],['candf','Trường – Ứng viên'],['scrf','Trường – Sơ vấn'],['ivf','Trường – Phỏng vấn'],['offf','Trường – Thư mời'],['sign','Chữ ký phiếu đề xuất'],['users','Người dùng'],['perm','Phân quyền'],['data','Dữ liệu & sao lưu']];
+  const subs=[['general','Thông tin chung'],['lists','Danh mục'],['reqf','Trường – Đề xuất'],['candf','Trường – Ứng viên'],['scrf','Trường – Sơ vấn'],['ivf','Trường – Phỏng vấn'],['offf','Trường – Thư mời'],['sign','Chữ ký phiếu đề xuất'],['mail','Email gửi ứng viên'],['users','Người dùng'],['perm','Phân quyền'],['data','Dữ liệu & sao lưu']];
   return pageH('Thiết lập','Cấu hình trường dữ liệu, danh mục, người dùng và phân quyền.')+`<div class="side"><div class="snav">${subs.map(s=>`<button class="${ui.cf===s[0]?'on':''}" data-act="cf" data-id="${s[0]}">${s[1]}</button>`).join('')}</div><div class="${ro?'ro':''}">${ro?`<div class="alert info" style="margin-bottom:14px">${ic('eye')}<div>Bạn chỉ có quyền <b>xem</b> Thiết lập. Chỉ quản trị (hoặc vai trò được cấp quyền “Chỉnh sửa Thiết lập”) mới thay đổi được.</div></div>`:''}${cfgBody()}</div></div>`;
 }
 const FKEY={reqf:['reqFields','Trường của biểu mẫu Đề xuất'],candf:['candFields','Trường của hồ sơ Ứng viên'],scrf:['screenFields','Trường của biểu mẫu Sơ vấn'],ivf:['interviewFields','Trường của mỗi vòng Phỏng vấn'],offf:['offerFields','Trường của Thư mời tuyển dụng']};
@@ -1195,6 +1203,23 @@ function cfgBody(){
       <td><input type="checkbox" class="chk" ${f.req?'checked':''} ${f.lock?'disabled':''} data-act="fieldToggle" data-id="${key}" data-arg="${i}:req"></td>
       <td><input type="checkbox" class="chk" ${f.vis!==0&&f.vis!==false?'checked':''} ${f.lock?'disabled':''} data-act="fieldToggle" data-id="${key}" data-arg="${i}:vis"></td>
       <td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" data-act="fieldMove" data-id="${key}" data-arg="${i}:-1">${ic('up')}</button><button class="btn ghost sm" data-act="fieldMove" data-id="${key}" data-arg="${i}:1">${ic('down')}</button><button class="btn sm" data-act="fieldEdit" data-id="${key}" data-arg="${i}">${ic('edit')}Sửa</button>${f.custom?` <button class="btn sm bad" data-act="fieldDel" data-id="${key}" data-arg="${i}">${ic('trash')}Xoá</button>`:''}</td></tr>`).join('')}</tbody></table></div></div>`;
+  }
+  if(ui.cf==='mail'){
+    const M=C.mail,info=ui._mailInfo;
+    return`<div class="card pad"><h3 style="margin-bottom:6px">Gửi email cho ứng viên bằng email tuyển dụng</h3>
+      <div class="alert info" style="margin:10px 0 14px">${ic('alert')}<div><b>Cách thiết lập (làm một lần):</b><ol style="margin:6px 0 0 18px"><li>Trong Gmail của <b>tài khoản chủ dự án</b>: ⚙ Cài đặt → Xem tất cả cài đặt → <b>Tài khoản và Nhập</b> → <b>Gửi thư với tư cách</b> → Thêm địa chỉ email khác → nhập email tuyển dụng → xác minh (thư xác nhận gửi tới hộp thư tuyển dụng).</li><li>Trong Apps Script chạy hàm <b>authorizeMail</b> một lần để cấp quyền Gmail, rồi Triển khai phiên bản mới.</li><li>Ở đây: bấm <b>Kiểm tra alias</b>, chọn địa chỉ gửi, bật tính năng, rồi <b>Gửi thư thử</b>.</li></ol></div></div>
+      ${ENV.gs?'':`<div class="alert warn" style="margin-bottom:14px">${ic('alert')}<div>Đang ở chế độ xem thử – chỉ gửi trực tiếp được khi chạy trên Google Sheet (Apps Script).</div></div>`}
+      <div class="fgrid"><div><label class="f">Gửi email trực tiếp từ ứng dụng</label><select data-cfg="mail.enabled" data-bool="1"><option value="0" ${M.enabled?'':'selected'}>Tắt (chỉ soạn thư / mở ứng dụng email)</option><option value="1" ${M.enabled?'selected':''}>Bật</option></select></div>
+      <div><label class="f">Gửi từ địa chỉ (alias)</label><input type="text" data-cfg="mail.fromAlias" list="dl_alias" value="${esc(M.fromAlias)}" placeholder="tuyendung@congty.vn"><datalist id="dl_alias">${(ui._aliases||[]).map(a=>`<option value="${esc(a)}">`).join('')}</datalist></div>
+      <div><label class="f">Tên người gửi hiển thị</label><input type="text" data-cfg="mail.senderName" value="${esc(M.senderName)}" placeholder="Phòng Nhân sự – Tên công ty"></div>
+      <div><label class="f">Địa chỉ nhận phản hồi (Reply-To, tuỳ chọn)</label><input type="text" data-cfg="mail.replyTo" value="${esc(M.replyTo)}" placeholder="Để trống = trả lời về địa chỉ gửi"></div>
+      <div><label class="f">CC mặc định (cách nhau bằng dấu phẩy)</label><input type="text" data-cfg="mail.cc" value="${esc(M.cc)}"></div>
+      <div><label class="f">BCC lưu bản sao vào hộp thư tuyển dụng</label><input type="text" data-cfg="mail.bcc" value="${esc(M.bcc)}" placeholder="tuyendung@congty.vn"></div>
+      <div><label class="f">Giới hạn số email mỗi ngày</label><input type="number" min="1" data-cfg="mail.dailyLimit" value="${esc(M.dailyLimit)}"></div>
+      <div class="wide"><label class="f">Chữ ký email (tự thêm cuối mọi thư)</label><textarea data-cfg="mail.signature" placeholder="Trân trọng,&#10;Phòng Nhân sự – Tên công ty&#10;Hotline: …">${esc(M.signature)}</textarea></div></div>
+      <div class="row" style="margin-top:14px"><button class="btn" data-act="mailAliases" ${ENV.gs?'':'disabled'}>${ic('search')}Kiểm tra alias trong Gmail</button><button class="btn pri" data-act="mailTest" ${ENV.gs?'':'disabled'}>${ic('mail')}Gửi thư thử tới email của tôi</button></div>
+      ${info?`<p class="small" style="margin-top:12px">Chủ dự án: <b>${esc(info.owner)}</b> · Alias tìm thấy: ${info.aliases.length?info.aliases.map(a=>badge(a,'b-ok')).join(' '):badge('Chưa có alias nào – hãy thêm “Gửi thư với tư cách” trong Gmail','b-warn')} · Hạn mức còn lại hôm nay: <b>${esc(info.quota)}</b> email</p>`:''}
+      <p class="small muted" style="margin-top:10px">Mọi email gửi qua ứng dụng được ghi vào sheet <b>NhatKyEmail</b> và vào lịch sử của ứng viên. Thư nằm trong thư mục "Đã gửi" của tài khoản chủ dự án — dùng BCC để có bản sao ở hộp thư tuyển dụng.</p></div>`;
   }
   if(ui.cf==='sign'){
     const list=C.signers||[];
@@ -1502,6 +1527,19 @@ const A={
  signMove:(id,el)=>{const i=+id,d=+el.dataset.arg,a=DB.cfg.signers,j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];commit()},
  signPreview:()=>signPreviewModal(),
  signReset:()=>confirmBox('Khôi phục danh sách chữ ký mặc định (4 người ký)? Danh sách hiện tại sẽ bị thay thế.',()=>{DB.cfg.signers=defaultSigners();commit()},'Khôi phục'),
+ mailAliases:async()=>{try{ui._mailInfo=await gcall('api_mailInfo');ui._aliases=ui._mailInfo.aliases;render();toast(ui._aliases.length?'Đã tải danh sách alias':'Chưa có alias nào trong Gmail của chủ dự án',ui._aliases.length?'ok':'err')}catch(e){toast(String(e&&e.message||e),'err')}},
+ mailTest:async()=>{try{if(saveTimer){clearTimeout(saveTimer);flush()}await chain;toast('Đang gửi thư thử…');const r=await gcall('api_sendMail',{to:ENV.email,subject:'[Thử] Email tuyển dụng – '+DB.cfg.company,body:'Đây là thư thử từ ứng dụng HR Recruit.\nNếu bạn nhận được thư này từ địa chỉ tuyển dụng thì cấu hình đã đúng.',candidate:'(thư thử)'});toast('Đã gửi thư thử từ '+r.from+' tới '+ENV.email,'ok')}catch(e){toast(String(e&&e.message||e),'err')}},
+ mlSend:async(id,el)=>{
+   const c=DB.cands.find(x=>x.id===id);if(!c||el.dataset.busy)return;
+   const to=$('#ml_to').value.trim(),cc=$('#ml_cc').value.trim(),subject=$('#lt_s').value.trim(),body=$('#lt_b').value;
+   if(!/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(to)){toast('Email người nhận không hợp lệ','err');return}
+   if(!subject||!body.trim()){toast('Thiếu tiêu đề hoặc nội dung','err');return}
+   const left=(subject+body).match(/\{\{\w+\}\}/g);if(left){toast('Thư còn trường chưa điền: '+[...new Set(left)].join(', '),'err');return}
+   if(!el.dataset.armed){el.dataset.armed='1';el.innerHTML=ic('check')+'Bấm lần nữa để XÁC NHẬN gửi tới '+esc(to);setTimeout(()=>{if(el.dataset.armed&&!el.dataset.busy){delete el.dataset.armed;el.innerHTML=ic('mail')+el.dataset.label}},6000);return}
+   el.dataset.busy='1';el.disabled=true;el.textContent='Đang gửi…';
+   try{const r=await gcall('api_sendMail',{to,cc,subject,body,candidate:c.v.name,attachIds:qa('#ml_att input:checked').map(i=>i.value)});
+     log(c,`Đã gửi email "${subject}" tới ${to} (từ ${r.from})`);closeModal();commit();toast('Đã gửi email từ '+r.from,'ok')}
+   catch(e){delete el.dataset.busy;delete el.dataset.armed;el.disabled=false;el.innerHTML=ic('mail')+el.dataset.label;toast('Không gửi được: '+String(e&&e.message||e),'err')}},
  itemAdd:id=>itemModal(id),itemEdit:(id,el)=>itemModal(id,+el.dataset.arg),
  itemDel:(id,el)=>{const i=+el.dataset.arg,v=DB.cfg[id][i],n=usedCount(id,v);confirmBox(`Xoá “${esc(v)}”?${n?` Đang được dùng ở ${n} bản ghi (dữ liệu cũ vẫn giữ nguyên giá trị).`:''}`,()=>{DB.cfg[id].splice(i,1);commit()},'Xoá')},
  deptAdd:()=>deptModal(),deptEdit:(id,el)=>deptModal(+el.dataset.arg),
@@ -1529,7 +1567,7 @@ const A={
  resetDemo:()=>confirmBox('Nạp dữ liệu mẫu? Dữ liệu hiện tại sẽ bị thay thế.',()=>{DB=seedDemo();normalize();pickUser();ui.tab='dash';commit()},'Nạp dữ liệu mẫu'),
  clearAll:()=>confirmBox('Xoá TOÀN BỘ đề xuất, ứng viên và thư viện (giữ thiết lập)?',()=>{DB.reqs=[];DB.cands=[];DB.lib={positions:[],templates:[],forms:[],formTpls:[defaultFormTpl()]};commit()},'Xoá hết')
 };
-const CFG_ACTS=['signEdit','signDel','signMove','signReset','itemAdd','itemEdit','itemDel','deptAdd','deptEdit','deptDel','addItem','delItem','addDept','delDept','addField','fieldEdit','fieldDel','fieldToggle','fieldMove','userEdit','userDel','capToggle','roleAdd','roleDel','importData','resetDemo','clearAll'];
+const CFG_ACTS=['mailAliases','mailTest','signEdit','signDel','signMove','signReset','itemAdd','itemEdit','itemDel','deptAdd','deptEdit','deptDel','addItem','delItem','addDept','delDept','addField','fieldEdit','fieldDel','fieldToggle','fieldMove','userEdit','userDel','capToggle','roleAdd','roleDel','importData','resetDemo','clearAll'];
 CFG_ACTS.forEach(k=>{const f=A[k];A[k]=(...a)=>can('cfg.edit')?f(...a):toast('Bạn không có quyền chỉnh sửa Thiết lập','err')});
 function roundModal(c,i){
   const fields=DB.cfg.interviewFields;
@@ -1550,7 +1588,7 @@ document.addEventListener('change',ev=>{
   const el=ev.target;
   if(el.dataset.who){ui.me=el.value;ui.tab=can('report.view')?'dash':(can('req.create')?'req':'lib');closeDrawer();render();toast('Đang xem với vai trò: '+roleOf(me()).name)}
   else if(el.tagName==='INPUT'&&el.dataset.act){A[el.dataset.act](el.dataset.id,el)}
-  else if(el.dataset.cfg){if(!can('cfg.edit'))return;const k=el.dataset.cfg;DB.cfg[k]=el.type==='number'?Number(el.value):el.value;save()}
+  else if(el.dataset.cfg){if(!can('cfg.edit'))return;const k=el.dataset.cfg;const val=el.type==='number'?Number(el.value):(el.dataset.bool?+el.value:el.value);if(k.includes('.')){const[a,b]=k.split('.');(DB.cfg[a]=DB.cfg[a]||{})[b]=val}else DB.cfg[k]=val;save()}
   else if(el.dataset.bind&&el.tagName==='SELECT'){ui[el.dataset.bind]=el.value;render()}
 });
 document.addEventListener('input',ev=>{const el=ev.target;if(el.dataset&&el.dataset.num){formatNumInput(el);return}if(el.dataset.bind&&el.tagName==='INPUT'){ui[el.dataset.bind]=el.value;render()}});
