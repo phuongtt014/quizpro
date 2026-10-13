@@ -122,3 +122,13 @@ Dán code mới vào `Code.gs` / `Index`, rồi **Triển khai → Quản lý b�
 - Ứng viên trả lời sẽ về địa chỉ tuyển dụng (hoặc Reply-To nếu đặt). Thư nằm trong "Đã gửi" của tài khoản chủ dự án; dùng BCC để có bản sao ở hộp thư tuyển dụng.
 - Hạn mức Google Workspace khoảng 1.500 người nhận/ngày; ứng dụng có giới hạn riêng (mặc định 200 email/ngày).
 - **Không chia sẻ** Google Sheet, thư mục Drive và dự án Apps Script cho nhân viên: họ chỉ cần quyền mở đường link ứng dụng.
+
+## Biến chèn vào thư mẫu (tự sinh theo các trường đã thiết lập)
+
+- Khi soạn/sửa **mẫu thư** (Thư viện → Mẫu thư), các nút chèn biến được nhóm theo: Chung, Ứng viên, Đề xuất tuyển dụng, Sơ vấn, **Phỏng vấn**, Thư mời, và nhóm "Tên cũ". Bấm nút để chèn vào ô **Tiêu đề** hoặc **Nội dung** (ô nào đang chọn).
+- Mỗi trường trong Thiết lập (Đề xuất, Ứng viên, Sơ vấn, Phỏng vấn, Thư mời) có **mã chèn thư mẫu** (cột cuối của bảng trường), dạng `{{tiền_tố_mã}}`:
+  - `uv_` ứng viên (vd. `{{uv_sdt}}`), `dx_` đề xuất (vd. `{{dx_so_luong}}`), `sv_` sơ vấn, `pv_` phỏng vấn (vd. `{{pv_nguoi_phong_van}}`, `{{pv_dia_diem}}`), `tm_` thư mời (vd. `{{tm_luong}}`).
+  - **Trường tạo mới tự có mã** (tạo từ tên trường, ví dụ "Điểm chuyên môn" → `{{pv_diem_chuyen_mon}}`); đổi tên trường về sau **không** đổi mã, nên mẫu thư cũ không bị hỏng.
+- Biến `pv_` lấy theo **vòng phỏng vấn được chọn**: mặc định vòng gần nhất có ngày; nếu ứng viên có nhiều vòng, hộp soạn thư có ô chọn vòng (đổi vòng sẽ soạn lại thư từ mẫu).
+- Biến chung: `{{nguoi_gui}}`, `{{nguoi_gui_chuc_danh}}`, `{{cong_ty}}`, `{{ngay_hom_nay}}`, `{{ma_de_xuat}}`, `{{giai_doan}}`, `{{so_vong_pv}}`. Các tên cũ (`{{ten_ung_vien}}`, `{{vi_tri}}`, `{{ngay_phong_van}}`…) vẫn dùng được.
+- Giá trị trống thì biến được giữ nguyên `{{...}}` và hộp thoại cảnh báo "Còn n trường chưa có dữ liệu"; thư còn biến chưa điền sẽ không gửi trực tiếp được.

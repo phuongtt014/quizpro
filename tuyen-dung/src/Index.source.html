@@ -275,7 +275,7 @@ const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{co
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
-const APP_VER='v19 · 13/10/2026';
+const APP_VER='v20 · 13/10/2026';
 const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const MAXF=GS?10:15;
@@ -463,6 +463,7 @@ function normalize(){
   if(!Array.isArray(C.signers))C.signers=defaultSigners();C.signCols=C.signCols||4;if(C.signFooter==null)C.signFooter='';
   if(!Array.isArray(C.screenFields))C.screenFields=defScreenFields();if(!Array.isArray(C.interviewFields))C.interviewFields=defInterviewFields();if(!Array.isArray(C.offerFields))C.offerFields=defOfferFields();
   C.mail=Object.assign({enabled:0,fromAlias:'',senderName:'',replyTo:'',cc:'',bcc:'',signature:'',dailyLimit:200},C.mail||{});
+  ensureSlugs(C);
   C.rejectReasons=C.rejectReasons||['Không phù hợp chuyên môn','Kỳ vọng lương cao','Nhận được offer tốt hơn','Vấn đề địa điểm','Ứng viên từ chối offer','Lý do khác'];
   C.users.forEach(u=>u.email=u.email||'');DB.reqs.forEach(r=>{r.history=r.history||[];r.v=r.v||{}});DB.cands.forEach(c=>{c.history=c.history||[];c.interviews=c.interviews||[];c.v=c.v||{}});
   DB.lib=DB.lib||{};['positions','templates','forms','formTpls'].forEach(k=>DB.lib[k]=DB.lib[k]||[]);
@@ -1071,10 +1072,46 @@ function mini(title,fields,vals,onSave){
     (async()=>{try{const rel=await finishFiles(fields,v,vals);onSave(v);closeModal();commit();rel.forEach(releaseFile)}catch(e){toast('Không lưu được tệp','err')}})();return false}}]});
 }
 const suggestStage=(c,s)=>{if(c.stage!==s)setTimeout(()=>changeStage(c,s),80)};
-function letterVars(c){
-  const r=reqById(c.v.reqId);const iv=[...c.interviews].reverse().find(i=>i.date)||{};const o=c.offer||{};
-  return{ten_ung_vien:c.v.name,vi_tri:r?.v.position||'',phong_ban:r?.v.dept||'',ngay_phong_van:iv.date?fmtD(iv.date):'',gio_phong_van:iv.time||'',dia_diem:iv.place||'',luong:o.salary||'',ngay_nhan_viec:o.startDate?fmtD(o.startDate):'',han_phan_hoi:o.deadline?fmtD(o.deadline):'',nguoi_gui:me().name,cong_ty:DB.cfg.company};
+/* ===== Biến chèn vào thư mẫu: tự sinh từ MỌI trường đã thiết lập (kể cả trường mới tạo) ===== */
+const GROUPS=[['uv','candFields','Ứng viên'],['dx','reqFields','Đề xuất tuyển dụng'],['sv','screenFields','Sơ vấn'],['pv','interviewFields','Phỏng vấn (vòng được chọn)'],['tm','offerFields','Thư mời tuyển dụng']];
+const BSLUG={candFields:{name:'ten',phone:'sdt',email:'email',reqId:'de_xuat',source:'nguon',dob:'ngay_sinh',edu:'trinh_do',exp:'kinh_nghiem',expSalary:'luong_mong_muon',cvLink:'link_cv',note:'ghi_chu'},
+ reqFields:{block:'khoi',dept:'phong_ban',position:'vi_tri',qty:'so_luong',reqType:'loai_de_xuat',neededBy:'ngay_can_nhan_su',salary:'luong_du_kien',reason:'ly_do',notes:'yeu_cau_khac'},
+ screenFields:{date:'ngay',by:'nguoi_thuc_hien',result:'ket_qua',note:'nhan_xet'},
+ interviewFields:{name:'ten_vong',date:'ngay',time:'gio',place:'dia_diem',who:'nguoi_phong_van',result:'ket_qua',score:'diem',note:'nhan_xet'},
+ offerFields:{status:'trang_thai',salary:'luong',startDate:'ngay_nhan_viec',deadline:'han_phan_hoi',note:'ghi_chu'}};
+const slugOf=l=>nrm(l).replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,32)||'truong';
+const uniqSlug=(list,base)=>{let x=base,n=2;while(list.some(f=>f.slug===x))x=base+'_'+(n++);return x};
+function ensureSlugs(C){GROUPS.forEach(([p,key])=>{const list=C[key];list.forEach(f=>{if(!f.slug&&BSLUG[key]&&BSLUG[key][f.k])f.slug=BSLUG[key][f.k]});list.forEach(f=>{if(!f.slug)f.slug=uniqSlug(list.filter(x=>x!==f),slugOf(f.l))})})}
+const fieldText=(f,v)=>{if(v==null||v==='')return'';if(f.t==='date')return fmtD(v);if(f.t==='number')return fmtNum(v);if(f.t==='file')return v&&v.name?(v.url||v.name):'';return typeof v==='object'?'':String(v)};
+function defaultRound(c){const r=c.interviews||[];return[...r].reverse().find(i=>i.date)||r[r.length-1]||null}
+function letterVars(c,roundId){
+  const r=reqById(c.v.reqId),rounds=c.interviews||[];
+  const iv=(roundId&&rounds.find(i=>i.id===roundId))||defaultRound(c)||{},sc=c.screening||{},o=c.offer||{},C=DB.cfg;
+  const V={};const put=(p,key,rec)=>C[key].forEach(f=>{if(f.slug)V[p+'_'+f.slug]=fieldText(f,rec&&rec[f.k])});
+  put('uv','candFields',c.v);put('dx','reqFields',r?r.v:{});put('sv','screenFields',sc);put('pv','interviewFields',iv);put('tm','offerFields',o);
+  V.uv_de_xuat=r?r.code:'';
+  V.ma_de_xuat=r?r.code:'';V.giai_doan=STG[c.stage][1];V.so_vong_pv=String(rounds.length);V.ngay_hom_nay=fmtD(Date.now());
+  V.nguoi_gui=me().name;V.nguoi_gui_chuc_danh=me().title||'';V.cong_ty=C.company;
+  /* tên cũ – vẫn dùng được */
+  V.ten_ung_vien=V.uv_ten||c.v.name||'';V.vi_tri=V.dx_vi_tri||'';V.phong_ban=V.dx_phong_ban||'';V.ngay_phong_van=V.pv_ngay||'';V.gio_phong_van=V.pv_gio||'';
+  V.dia_diem=V.pv_dia_diem||'';V.luong=V.tm_luong||'';V.ngay_nhan_viec=V.tm_ngay_nhan_viec||'';V.han_phan_hoi=V.tm_han_phan_hoi||'';
+  return V;
 }
+function sampleVars(){
+  const C=DB.cfg;const V={};
+  GROUPS.forEach(([p,key])=>C[key].forEach(f=>{if(!f.slug)return;V[p+'_'+f.slug]=f.t==='date'?fmtD(iso(3)):f.t==='number'?'1.000':f.t==='time'?'09:00':f.t==='url'?'https://example.vn':f.t==='file'?'tep-mau.pdf':f.t==='select'&&f.opts&&f.opts.length?f.opts[0]:'Ví dụ: '+f.l}));
+  Object.assign(V,{uv_ten:'Nguyễn Văn A',dx_vi_tri:'Giáo viên Toán THCS',dx_phong_ban:'Tổ Toán – Tin',pv_ngay:fmtD(iso(3)),pv_gio:'09:00',pv_dia_diem:'Phòng họp A',tm_luong:'15.000.000 đ/tháng',tm_ngay_nhan_viec:fmtD(iso(20)),tm_han_phan_hoi:fmtD(iso(7)),
+    ma_de_xuat:'ĐX-2026-001',giai_doan:'Phỏng vấn',so_vong_pv:'2',ngay_hom_nay:fmtD(Date.now()),nguoi_gui:me().name,nguoi_gui_chuc_danh:me().title||'',cong_ty:C.company});
+  Object.assign(V,{ten_ung_vien:V.uv_ten,vi_tri:V.dx_vi_tri,phong_ban:V.dx_phong_ban,ngay_phong_van:V.pv_ngay,gio_phong_van:V.pv_gio,dia_diem:V.pv_dia_diem,luong:V.tm_luong,ngay_nhan_viec:V.tm_ngay_nhan_viec,han_phan_hoi:V.tm_han_phan_hoi});
+  return V;
+}
+function phGroups(){
+  const g=[['Chung',[['nguoi_gui','Người gửi'],['nguoi_gui_chuc_danh','Chức danh người gửi'],['cong_ty','Công ty'],['ngay_hom_nay','Ngày hôm nay'],['ma_de_xuat','Mã đề xuất'],['giai_doan','Giai đoạn hiện tại'],['so_vong_pv','Số vòng phỏng vấn']]]];
+  GROUPS.forEach(([p,key,title])=>g.push([title,DB.cfg[key].filter(f=>f.slug).map(f=>[p+'_'+f.slug,f.l+(f.vis===0||f.vis===false?' (ẩn)':'')])]));
+  g.push(['Tên cũ (vẫn dùng được)',PH]);return g;
+}
+const phChipsHTML=()=>phGroups().map(g=>`<div style="margin-top:8px"><div class="small" style="font-weight:600;color:var(--ink2);margin-bottom:4px">${esc(g[0])}</div>${g[1].map(x=>`<button class="chip ph" style="font-family:inherit;font-size:12.5px" data-act="insPh" data-id="${x[0]}" title="{{${x[0]}}}">${esc(x[1])}</button>`).join('')}</div>`).join('');
+let tplFocusId='ff_body';
 const merge=(t,v)=>t.replace(/\{\{(\w+)\}\}/g,(m,k)=>v[k]||m);
 
 /* ============ LIBRARY ============ */
@@ -1154,25 +1191,28 @@ function histModal(p){
 function tplModal(t){
   const v=t||{type:TPL_TYPES[0],name:'',subject:'',body:''};
   const fields=[{k:'name',l:'Tên mẫu',t:'text',req:1},{k:'type',l:'Loại thư',t:'select',opts:TPL_TYPES,req:1},{k:'subject',l:'Tiêu đề email',t:'text',req:1,wide:1},{k:'body',l:'Nội dung',t:'textarea',req:1,wide:1}];
-  modal({title:t?'Sửa mẫu thư':'Thêm mẫu thư',wide:true,html:formHTML(fields,v)+`<div style="margin-top:12px"><div class="small muted" style="margin-bottom:6px">Bấm để chèn trường thông tin tự động vào nội dung:</div>${PH.map(p=>`<button class="chip ph" data-act="insPh" data-id="${p[0]}" title="${p[1]}">{{${p[0]}}}</button>`).join('')}</div>`,after:()=>{$('#ff_body').style.minHeight='240px'},
+  modal({title:t?'Sửa mẫu thư':'Thêm mẫu thư',wide:true,html:formHTML(fields,v)+`<div style="margin-top:12px"><div class="small muted">Bấm để chèn trường thông tin tự động vào ô <b>Tiêu đề</b> hoặc <b>Nội dung</b> (ô nào đang chọn). Các trường tạo mới ở Thiết lập sẽ tự xuất hiện ở đây.</div>${phChipsHTML()}</div>`,after:()=>{tplFocusId='ff_body';$('#ff_body').style.minHeight='240px'},
     buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{const x=readForm($('#modal'),fields);if(!x)return false;if(t)Object.assign(t,x);else DB.lib.templates.push({id:uid('t_'),...x});commit();toast('Đã lưu mẫu thư','ok')}}]});
 }
 function sampleVars(){return{ten_ung_vien:'Nguyễn Văn A',vi_tri:'Giáo viên Toán THCS',phong_ban:'Tổ Toán – Tin',ngay_phong_van:fmtD(iso(3)),gio_phong_van:'09:00',dia_diem:'Phòng họp A',luong:'15.000.000 đ/tháng',ngay_nhan_viec:fmtD(iso(20)),han_phan_hoi:fmtD(iso(7)),nguoi_gui:me().name,cong_ty:DB.cfg.company}}
 function copyText(t){try{navigator.clipboard.writeText(t).catch(()=>0)}catch(e){}const ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;opacity:0';document.body.append(ta);ta.select();try{document.execCommand('copy')}catch(e){}ta.remove()}
 const mailFromLabel=()=>{const m=DB.cfg.mail;return(m.senderName?m.senderName+' ':'')+'<'+(m.fromAlias||'tài khoản chủ dự án')+'>'};
 function letterModal(c,t){
-  const v=c?letterVars(c):sampleVars();
-  const subj=merge(t.subject,v),body=merge(t.body,v);
-  const left=(subj+body).match(/\{\{\w+\}\}/g)||[];
+  let rid=null;const rounds=c?c.interviews:[];
+  const compose=()=>{const v=c?letterVars(c,rid):sampleVars();return{subj:merge(t.subject,v),body:merge(t.body,v)}};
+  const warnHTML=(a,b)=>{const left=(a+b).match(/\{\{\w+\}\}/g)||[];return left.length?`<div class="alert warn" style="margin-bottom:12px">${ic('alert')}<div>Còn ${left.length} trường chưa có dữ liệu (${[...new Set(left)].join(', ')}). Hãy bổ sung thông tin ứng viên hoặc sửa trực tiếp bên dưới.</div></div>`:''};
+  const m0=compose(),subj=m0.subj,body=m0.body;
+  const dr=c?defaultRound(c):null;
   const canSend=ENV.gs&&!!c&&can('cand.move')&&DB.cfg.mail&&DB.cfg.mail.enabled;
   const atts=DB.lib.forms.filter(f=>f.file&&f.file.id&&f.file.url);
   modal({title:c?`Soạn thư cho ${c.v.name}`:'Xem trước mẫu thư (dữ liệu mẫu)',wide:true,
-    html:`${left.length?`<div class="alert warn" style="margin-bottom:12px">${ic('alert')}<div>Còn ${left.length} trường chưa có dữ liệu (${[...new Set(left)].join(', ')}). Hãy bổ sung thông tin ứng viên hoặc sửa trực tiếp bên dưới.</div></div>`:''}
+    html:`<div id="lt_warn">${warnHTML(subj,body)}</div>${rounds.length>1?`<div class="row" style="margin-bottom:12px"><label class="f" style="margin:0">Dùng thông tin vòng phỏng vấn:</label><select id="lt_round" style="width:auto;max-width:320px">${rounds.map(i=>`<option value="${esc(i.id)}">${esc(i.name||'Vòng')}${i.date?' – '+fmtD(i.date):''}</option>`).join('')}</select><span class="small muted">Đổi vòng sẽ soạn lại thư từ mẫu.</span></div>`:''}
     <label class="f">Tiêu đề</label><input type="text" id="lt_s" value="${esc(subj)}"><label class="f" style="margin-top:12px">Nội dung</label><textarea id="lt_b" style="min-height:280px">${esc(body)}</textarea>
     ${canSend?`<div class="card sec" style="margin-top:14px;border-left:4px solid var(--brand)"><div class="sec-h"><h3>${ic('mail')}Gửi email trực tiếp</h3></div>
       <div class="fgrid"><div><label class="f">Gửi tới</label><input type="text" id="ml_to" value="${esc(c.v.email||'')}" placeholder="email ứng viên"></div><div><label class="f">CC thêm (tuỳ chọn)</label><input type="text" id="ml_cc" placeholder="a@congty.vn, b@congty.vn"></div></div>
       ${atts.length?`<div style="margin-top:10px"><label class="f">Đính kèm biểu mẫu từ Thư viện</label><div id="ml_att">${atts.map(f=>`<label style="display:flex;gap:8px;align-items:center;margin:4px 0"><input type="checkbox" class="chk" value="${esc(f.file.id)}">${esc(f.name)} <span class="muted small">(${fsize(f.file.size)})</span></label>`).join('')}</div></div>`:''}
       <div class="row" style="margin-top:12px"><button class="btn pri" id="ml_send" data-act="mlSend" data-id="${c.id}" data-arg="${t.id}" data-label="${esc('Gửi email ngay')}">${ic('mail')}Gửi email ngay</button><span class="small muted">Gửi từ <b>${esc(mailFromLabel())}</b>. Chữ ký và BCC lưu bản sao thêm tự động.</span></div></div>`:''}`,
+    after:()=>{const sel=$('#lt_round');if(sel){sel.value=dr?dr.id:rounds[rounds.length-1].id;sel.onchange=()=>{rid=sel.value;const x=compose();$('#lt_s').value=x.subj;$('#lt_b').value=x.body;$('#lt_warn').innerHTML=warnHTML(x.subj,x.body)}}},
     buttons:[modalCancel,{label:'Sao chép',icon:'copy',fn:()=>{copyText($('#lt_s').value+'\n\n'+$('#lt_b').value);toast('Đã sao chép nội dung thư','ok');return false}},
       ...(c?[{label:'Mở trong ứng dụng email',icon:'mail',fn:()=>{const a=document.createElement('a');a.href=`mailto:${encodeURIComponent(c.v.email||'')}?subject=${encodeURIComponent($('#lt_s').value)}&body=${encodeURIComponent($('#lt_b').value)}`;a.target='_blank';document.body.append(a);a.click();a.remove();return false}},
       {label:'Ghi nhận đã gửi',cls:canSend?'':'pri',icon:'check',fn:()=>{log(c,`Đã gửi thư: ${t.name}`);commit();toast('Đã ghi nhận vào lịch sử ứng viên','ok')}}]:[])]});
@@ -1197,11 +1237,12 @@ function cfgBody(){
      +simple('sources')+simple('rejectReasons');
   }
   if(FKEY[ui.cf]){
-    const key=FKEY[ui.cf][0];const fs=C[key];
+    const key=FKEY[ui.cf][0];const fs=C[key];const pfx=(GROUPS.find(g=>g[1]===key)||[])[0];
     return`<div class="card"><div class="card-h"><span>${FKEY[ui.cf][1]}</span><div class="row">${exportBtn('cfg:'+key,1)}<button class="btn sm" data-act="csv" data-id="${key}">${ic('upload')}Nhập CSV</button><button class="btn pri sm" data-act="addField" data-id="${key}">${ic('plus')}Thêm trường</button></div></div>
-    <div class="tbl-wrap"><table><thead><tr><th>Tên trường</th><th>Kiểu</th><th>Bắt buộc</th><th>Hiển thị</th><th></th></tr></thead><tbody>${fs.map((f,i)=>`<tr><td><b>${esc(f.l)}</b>${f.lock?' <span class="muted small">(hệ thống)</span>':''}${f.t==='select'&&f.opts?`<div class="muted small">${esc(f.opts.join(' · '))}</div>`:''}</td><td class="small">${esc((FTYPES.find(t=>t[0]===f.t)||[0,f.from?'Danh mục':f.t])[1])}</td>
+    <div class="tbl-wrap"><table><thead><tr><th>Tên trường</th><th>Kiểu</th><th>Bắt buộc</th><th>Hiển thị</th>${pfx?'<th>Mã chèn thư mẫu</th>':''}<th></th></tr></thead><tbody>${fs.map((f,i)=>`<tr><td><b>${esc(f.l)}</b>${f.lock?' <span class="muted small">(hệ thống)</span>':''}${f.t==='select'&&f.opts?`<div class="muted small">${esc(f.opts.join(' · '))}</div>`:''}</td><td class="small">${esc((FTYPES.find(t=>t[0]===f.t)||[0,f.from?'Danh mục':f.t])[1])}</td>
       <td><input type="checkbox" class="chk" ${f.req?'checked':''} ${f.lock?'disabled':''} data-act="fieldToggle" data-id="${key}" data-arg="${i}:req"></td>
       <td><input type="checkbox" class="chk" ${f.vis!==0&&f.vis!==false?'checked':''} ${f.lock?'disabled':''} data-act="fieldToggle" data-id="${key}" data-arg="${i}:vis"></td>
+      ${pfx?`<td class="mono small muted">{{${pfx}_${esc(f.slug||'')}}}</td>`:''}
       <td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" data-act="fieldMove" data-id="${key}" data-arg="${i}:-1">${ic('up')}</button><button class="btn ghost sm" data-act="fieldMove" data-id="${key}" data-arg="${i}:1">${ic('down')}</button><button class="btn sm" data-act="fieldEdit" data-id="${key}" data-arg="${i}">${ic('edit')}Sửa</button>${f.custom?` <button class="btn sm bad" data-act="fieldDel" data-id="${key}" data-arg="${i}">${ic('trash')}Xoá</button>`:''}</td></tr>`).join('')}</tbody></table></div></div>`;
   }
   if(ui.cf==='mail'){
@@ -1386,7 +1427,7 @@ function csvSpec(key){
     note:'Kiểu: Văn bản ngắn, Văn bản dài, Số, Ngày, Danh sách chọn, Liên kết (URL), Tệp tải lên. Lựa chọn cách nhau bằng dấu |.',
     apply(rows){let a=0,s=0;rows.forEach(r=>{const l=r[0];if(!l||C[key].some(f=>nrm(f.l)===nrm(l))){s++;return}
       let t=typeFromText(r[1]);const opts=(r[3]||'').split(/[|\n]/).map(x=>x.trim()).filter(Boolean);if(t==='select'&&!opts.length)t='text';
-      C[key].push({k:uid('c_'),l,t,req:TRUTHY.includes(nrm(r[2]))?1:0,vis:1,custom:1,opts:t==='select'?opts:undefined});a++});return`Đã thêm ${a} trường, bỏ qua ${s} (trùng hoặc trống)`}};
+      C[key].push({k:uid('c_'),l,t,req:TRUTHY.includes(nrm(r[2]))?1:0,vis:1,custom:1,opts:t==='select'?opts:undefined,slug:uniqSlug(C[key],slugOf(l))});a++});return`Đã thêm ${a} trường, bỏ qua ${s} (trùng hoặc trống)`}};
   if(key==='users')return{title:'Người dùng',cols:['Họ tên','Email','Chức danh','Phòng ban','Vai trò'],example:[['Nguyễn Văn B','b@congty.edu.vn','Tổ trưởng','Tổ Ngữ văn','Người đề xuất']],note:'Email trùng sẽ được cập nhật. Vai trò theo tên đã tạo; không khớp sẽ dùng vai trò đầu tiên.',
     apply(rows){let a=0,u=0,s=0;rows.forEach(r=>{const n=r[0];if(!n){s++;return}const em=(r[1]||'').toLowerCase();const role=C.roles.find(x=>nrm(x.name)===nrm(r[4])||x.id===r[4])||C.roles[0];
       const ex=em&&C.users.find(x=>(x.email||'').toLowerCase()===em);
@@ -1444,13 +1485,14 @@ function fieldModal(key,i){
     <div><label class="f">Bắt buộc</label><select id="nf_r" ${locked?'disabled':''}><option value="0">Không</option><option value="1" ${f.req?'selected':''}>Có</option></select></div>
     <div><label class="f">Hiển thị trong biểu mẫu</label><select id="nf_v" ${locked?'disabled':''}><option value="1">Có</option><option value="0" ${f.vis===0||f.vis===false?'selected':''}>Ẩn</option></select></div>
     ${f.from||typeLocked?'':`<div class="wide"><label class="f">Các lựa chọn (mỗi dòng một giá trị – chỉ dùng cho kiểu “Danh sách chọn”)</label><textarea id="nf_o">${esc((f.opts||[]).join('\n'))}</textarea></div>`}</div>
-    ${locked?'<p class="small muted" style="margin-top:10px">Trường hệ thống bắt buộc: chỉ đổi được tên hiển thị.</p>':''}`,
+    ${locked?'<p class="small muted" style="margin-top:10px">Trường hệ thống bắt buộc: chỉ đổi được tên hiển thị.</p>':''}
+    ${GROUPS.find(g=>g[1]===key)?`<p class="small muted" style="margin-top:10px">Mã chèn vào thư mẫu: <span class="mono">${i==null?'tự tạo từ tên trường':`{{${GROUPS.find(g=>g[1]===key)[0]}_${esc(f.slug||'')}}}`}</span></p>`:''}`,
     buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{const l=$('#nf_l').value.trim();if(!l){$('#nf_l').classList.add('err');return false}
       const t=typeLocked?f.t:$('#nf_t').value;const oel=$('#nf_o');const o=oel?oel.value.split('\n').map(s=>s.trim()).filter(Boolean):(f.opts||[]);
       if(t==='select'&&!f.from&&!o.length){toast('Vui lòng nhập các lựa chọn','err');return false}
       const nf={...f,l,t,req:locked?f.req:($('#nf_r').value==='1'?1:0),vis:locked?f.vis:($('#nf_v').value==='1'?1:0),opts:f.from?f.opts:(t==='select'?o:undefined),k:f.k||uid('c_')};
       if(nf.vis===0)nf.req=0;
-      if(i==null){nf.custom=1;DB.cfg[key].push(nf)}else DB.cfg[key][i]=nf;commit()}}]});
+      if(i==null){nf.custom=1;nf.slug=uniqSlug(DB.cfg[key],slugOf(l));DB.cfg[key].push(nf)}else DB.cfg[key][i]=nf;commit()}}]});
 }
 
 /* ============ actions ============ */
@@ -1515,7 +1557,7 @@ const A={
  viewTpl:id=>letterModal(null,DB.lib.templates.find(t=>t.id===id)),
  dupTpl:id=>{const t=DB.lib.templates.find(x=>x.id===id);DB.lib.templates.push({...t,id:uid('t_'),name:t.name+' (bản sao)'});commit();toast('Đã nhân bản','ok')},
  delTpl:id=>confirmBox('Xoá mẫu thư này?',()=>{DB.lib.templates=DB.lib.templates.filter(t=>t.id!==id);commit()},'Xoá'),
- insPh:id=>{const ta=$('#ff_body');const s=ta.selectionStart,t=`{{${id}}}`;ta.value=ta.value.slice(0,s)+t+ta.value.slice(ta.selectionEnd);ta.focus();ta.setSelectionRange(s+t.length,s+t.length)},
+ insPh:id=>{const ta=$('#'+tplFocusId)||$('#ff_body');const s=ta.selectionStart,t=`{{${id}}}`;ta.value=ta.value.slice(0,s)+t+ta.value.slice(ta.selectionEnd);ta.focus();ta.setSelectionRange(s+t.length,s+t.length)},
  newForm:async()=>{const f=await pickFile();if(!f)return;if(f.size>MAXF*1048576){toast(`Tệp quá lớn (tối đa ${MAXF}MB)`,'err');return}
    const fields=[{k:'name',l:'Tên biểu mẫu',t:'text',req:1,wide:1},{k:'cat',l:'Nhóm',t:'select',opts:['Phiếu đánh giá phỏng vấn','Hồ sơ nhận việc','Hợp đồng','Quy trình','Khác']},{k:'desc',l:'Mô tả',t:'textarea',wide:1}];
    modal({title:'Thêm biểu mẫu',html:formHTML(fields,{name:f.name.replace(/\.[^.]+$/,''),cat:'Khác'}),buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{const v=readForm($('#modal'),fields);if(!v)return false;toast('Đang tải tệp lên…');storeFile(f).then(meta=>{DB.lib.forms.push({id:uid('fm_'),...v,file:meta});commit();toast('Đã thêm biểu mẫu','ok')}).catch(()=>toast('Không lưu được tệp','err'))}}]})},
@@ -1593,6 +1635,7 @@ document.addEventListener('change',ev=>{
 });
 document.addEventListener('input',ev=>{const el=ev.target;if(el.dataset&&el.dataset.num){formatNumInput(el);return}if(el.dataset.bind&&el.tagName==='INPUT'){ui[el.dataset.bind]=el.value;render()}});
 window.addEventListener('focus',()=>{if(ENV.gs&&DB&&Date.now()-lastLoad>120000&&!saveTimer&&!inflight&&!$('#mw').classList.contains('on'))reloadData(true)});
+document.addEventListener('focusin',e=>{const i=e.target&&e.target.id;if(i==='ff_subject'||i==='ff_body')tplFocusId=i});
 window.addEventListener('beforeunload',e=>{if(ENV.gs&&(saveTimer||inflight)){e.preventDefault();e.returnValue=''}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&ENV.gs&&saveTimer){clearTimeout(saveTimer);flush()}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('#mw').classList.contains('on'))closeModal();else closeDrawer()}});
