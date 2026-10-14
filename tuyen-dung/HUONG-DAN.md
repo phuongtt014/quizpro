@@ -132,3 +132,33 @@ Dán code mới vào `Code.gs` / `Index`, rồi **Triển khai → Quản lý b�
 - Biến `pv_` lấy theo **vòng phỏng vấn được chọn**: mặc định vòng gần nhất có ngày; nếu ứng viên có nhiều vòng, hộp soạn thư có ô chọn vòng (đổi vòng sẽ soạn lại thư từ mẫu).
 - Biến chung: `{{nguoi_gui}}`, `{{nguoi_gui_chuc_danh}}`, `{{cong_ty}}`, `{{ngay_hom_nay}}`, `{{ma_de_xuat}}`, `{{giai_doan}}`, `{{so_vong_pv}}`. Các tên cũ (`{{ten_ung_vien}}`, `{{vi_tri}}`, `{{ngay_phong_van}}`…) vẫn dùng được.
 - Giá trị trống thì biến được giữ nguyên `{{...}}` và hộp thoại cảnh báo "Còn n trường chưa có dữ liệu"; thư còn biến chưa điền sẽ không gửi trực tiếp được.
+
+---
+
+## Gửi email bằng chính email của người bấm gửi (v21)
+
+Mặc định (chế độ **Tài khoản chủ dự án**) thư được gửi bằng tài khoản chủ dự án + alias tuyển dụng. Nếu muốn **thư đi từ email của từng nhân viên bấm gửi** mà vẫn giữ **dữ liệu Sheet/Drive kín**, dùng chế độ **Email của chính người bấm gửi** với *hai bản triển khai* của cùng một dự án Apps Script:
+
+| Bản triển khai | Thực thi dưới tư cách | Ai truy cập | Dùng để |
+|---|---|---|---|
+| **Chính** (đang dùng) | Tôi (chủ dự án) | Bất kỳ ai trong tổ chức | Toàn bộ ứng dụng, đọc/ghi Sheet |
+| **Người gửi** (mới) | Người dùng truy cập ứng dụng web | Bất kỳ ai trong tổ chức | Chỉ một trang nhỏ "xem lại & Gửi ngay" |
+
+Các bước (làm một lần):
+1. Thay **Code.gs** và **Index** bằng bản v21. Chạy hàm **`setup()`** một lần (ghi nhận chủ dự án để chặn bản "người gửi" đụng vào dữ liệu).
+2. **Triển khai → Triển khai mới → Ứng dụng web** → *Thực thi dưới tư cách: Người dùng truy cập ứng dụng web*; *Ai có quyền truy cập: Bất kỳ ai trong tổ chức* → sao chép URL (kết thúc `/exec`).
+3. Bản triển khai **chính** cũng cần **Triển khai phiên bản mới** để nhận Code.gs mới.
+4. Thiết lập → Email gửi ứng viên → *Gửi bằng tài khoản nào?* = **Email của chính người bấm gửi**, dán URL vào ô "URL bản triển khai người gửi", bật gửi trực tiếp.
+5. Mỗi nhân viên lần đầu bấm gửi sẽ thấy màn hình Google xin cấp quyền Gmail (quản trị Workspace có thể tin cậy sẵn ứng dụng).
+
+Cách hoạt động: bấm **Gửi email ngay** (xác nhận 2 lần) → ứng dụng kiểm tra thư và lưu nháp tạm (15 phút) → mở cửa sổ nhỏ hiển thị *Từ / Đến / Nội dung* → người dùng bấm **Gửi ngay** → thư gửi bằng Gmail của họ, một lần duy nhất → ứng dụng chính nhận kết quả, ghi nhật ký (`NhatKyEmail`) và lịch sử ứng viên.
+
+Lưu ý:
+- Cần cho phép **cửa sổ bật lên (pop-up)** cho trang ứng dụng.
+- Tên hiển thị dùng được `{{ten}}` (tên trong Thiết lập → Người dùng); Reply-To mặc định là email người gửi (`{{email}}`).
+- Nếu người gửi cũng có alias đã nhập (Gmail "Gửi thư với tư cách") thì dùng alias, nếu không thì dùng email của họ. BCC vẫn gửi bản sao vào hộp thư tuyển dụng.
+- Giới hạn email/ngày tính **riêng cho từng người**.
+- Tệp đính kèm lấy từ thư mục Drive của ứng dụng (cần chia sẻ trong tổ chức); tài khoản cá nhân (không có Workspace) không chia sẻ nội bộ được nên không đính kèm được ở chế độ này.
+- Nếu đang đăng nhập nhiều tài khoản Google trong một trình duyệt, hãy mở ứng dụng bằng đúng tài khoản công ty (hoặc dùng cửa sổ ẩn danh/hồ sơ trình duyệt riêng).
+- Bản triển khai "người gửi" **không đọc/ghi dữ liệu**: mọi hàm dữ liệu từ chối nếu không phải bản chính.
+- Quay lại chế độ cũ bất cứ lúc nào bằng cách chọn lại *Tài khoản chủ dự án*.

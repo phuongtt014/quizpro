@@ -11,7 +11,8 @@ const FOLDER_NAME = 'HR Recruit – Tệp đính kèm';
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 /** Mở ứng dụng. */
-function doGet() {
+function doGet(e) {
+  if (e && e.parameter && e.parameter.t) return senderPage_(String(e.parameter.t));
   return HtmlService.createHtmlOutputFromFile('Index')
     .setTitle('HR Recruit – Quản lý tuyển dụng')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
@@ -22,11 +23,29 @@ function doGet() {
 function setup() {
   SpreadsheetApp.getActiveSpreadsheet();
   folder_();
-  Logger.log('OK – đã cấp quyền và tạo thư mục Drive.');
+  PropertiesService.getScriptProperties().setProperty('OWNER_EMAIL', String(Session.getEffectiveUser().getEmail() || '').toLowerCase());
+  Logger.log('OK – đã cấp quyền, tạo thư mục Drive và ghi nhận chủ dự án.');
 }
 
 function ss_() {
   return SpreadsheetApp.getActiveSpreadsheet();
+}
+
+/**
+ * Chặn việc gọi hàm dữ liệu từ bản triển khai "người gửi" (chạy dưới tư cách người dùng).
+ * Bản chính (Execute as Me): người dùng ≠ chủ dự án. Bản người gửi: người dùng = chính họ.
+ */
+function guardMain_() {
+  const eff = String(Session.getEffectiveUser().getEmail() || '').toLowerCase();
+  const act = who_();
+  const props = PropertiesService.getScriptProperties();
+  if (eff && act && eff !== act) { // bản chính: tài khoản thực thi là chủ dự án
+    if (props.getProperty('OWNER_EMAIL') !== eff) props.setProperty('OWNER_EMAIL', eff);
+    return;
+  }
+  const owner = props.getProperty('OWNER_EMAIL');
+  if (!owner) throw new Error('Chủ dự án hãy chạy hàm setup() một lần để hoàn tất cấu hình bảo mật.');
+  if (act !== owner) throw new Error('Địa chỉ này chỉ dùng để gửi email. Hãy mở ứng dụng bằng đường dẫn chính.');
 }
 
 function who_() {
@@ -55,6 +74,7 @@ function readCol_(col) {
 
 /** Trả toàn bộ dữ liệu cho giao diện. */
 function api_load() {
+  guardMain_();
   const cfgArr = readCol_('cfg');
   return {
     email: who_(),
@@ -97,6 +117,7 @@ function getSheet_(col, head) {
 
 /** Ghi thay đổi: ops = [{col, type:'put'|'del', id, head, row, data}] */
 function api_sync(ops) {
+  guardMain_();
   const lock = LockService.getScriptLock();
   lock.waitLock(25000);
   try {
@@ -164,7 +185,7 @@ function api_sync(ops) {
 function folder_() {
   const props = PropertiesService.getScriptProperties();
   const id = props.getProperty('FOLDER_ID');
-  if (id) { try { return DriveApp.getFolderById(id); } catch (e) { /* tạo mới */ } }
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) { throw new Error('Không mở được thư mục tệp đính kèm (' + id + '). Kiểm tra quyền Drive của chủ dự án, không tự tạo thư mục mới để tránh mất liên kết.'); } }
   const f = DriveApp.createFolder(FOLDER_NAME);
   props.setProperty('FOLDER_ID', f.getId());
   return f;
@@ -172,6 +193,7 @@ function folder_() {
 
 /** Tải tệp lên Drive. Trả về metadata để lưu cùng hồ sơ. */
 function api_upload(name, mime, b64) {
+  guardMain_();
   assertCanWrite_([]);
   const bytes = Utilities.base64Decode(b64);
   if (bytes.length > MAX_UPLOAD_BYTES) throw new Error('Tệp vượt quá 10MB.');
@@ -182,6 +204,7 @@ function api_upload(name, mime, b64) {
 }
 
 function api_deleteFile(id) {
+  guardMain_();
   assertCanWrite_([]);
   try { DriveApp.getFileById(id).setTrashed(true); } catch (e) { /* đã xoá */ }
   return true;
@@ -189,6 +212,7 @@ function api_deleteFile(id) {
 
 /** Chẩn đoán: số dòng, mã trùng, kích thước dữ liệu lớn nhất của từng sheet. */
 function api_diag() {
+  guardMain_();
   const out = { email: who_(), sheets: {} };
   Object.keys(SHEETS).forEach(function (col) {
     const sh = ss_().getSheetByName(SHEETS[col]);
@@ -257,6 +281,7 @@ function logMail_(row) {
 
 /** Cho quản trị xem alias "Gửi thư với tư cách" đã cấu hình trong Gmail của chủ dự án. */
 function api_mailInfo() {
+  guardMain_();
   if (!userCan_('cfg.edit')) throw new Error('Chỉ quản trị mới xem được cấu hình email.');
   let aliases;
   try { aliases = GmailApp.getAliases(); }
@@ -264,37 +289,64 @@ function api_mailInfo() {
   return { owner: Session.getEffectiveUser().getEmail(), aliases: aliases, quota: MailApp.getRemainingDailyQuota() };
 }
 
-/**
- * Gửi 1 email cho ứng viên. Người gửi / alias / BCC / chữ ký / giới hạn ngày lấy từ Thiết lập (phía máy chủ),
- * giao diện chỉ được chọn người nhận, CC thêm, tiêu đề, nội dung và tệp đính kèm (chỉ tệp trong thư mục của ứng dụng).
- */
+/** Kiểm tra & chuẩn hoá một thư. Dùng chung cho chế độ "chủ dự án" và "người bấm gửi". */
+function validateMail_(p, m) {
+  const re = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
+  const subject = String((p && p.subject) || '').trim().slice(0, 200);
+  const to = String((p && p.to) || '').trim();
+  if (!m.enabled) throw new Error('Gửi email trực tiếp chưa được bật (Thiết lập → Email gửi ứng viên).');
+  if (!re.test(to)) throw new Error('Email người nhận không hợp lệ.');
+  const ccAll = splitEmails_(((p && p.cc) || '') + ',' + (m.cc || ''));
+  ccAll.forEach(function (x) { if (!re.test(x)) throw new Error('Email CC không hợp lệ: ' + x); });
+  if (ccAll.length > 6) throw new Error('Tối đa 6 địa chỉ CC.');
+  const bccAll = splitEmails_(m.bcc || '');
+  bccAll.forEach(function (x) { if (!re.test(x)) throw new Error('Email BCC trong Thiết lập không hợp lệ: ' + x); });
+  const body = String((p && p.body) || '');
+  if (!subject) throw new Error('Thiếu tiêu đề.');
+  if (!body.trim()) throw new Error('Thiếu nội dung.');
+  if (body.length > 20000) throw new Error('Nội dung quá dài.');
+  if (/\{\{\w+\}\}/.test(subject + body)) throw new Error('Thư còn trường chưa điền dạng {{...}}.');
+  const ids = ((p && p.attachIds) || []).slice(0, 5);
+  if (ids.length) {
+    const folderId = folder_().getId();
+    let total = 0;
+    ids.forEach(function (id) {
+      const f = DriveApp.getFileById(id);
+      let inside = false;
+      const it = f.getParents();
+      while (it.hasNext()) { if (it.next().getId() === folderId) { inside = true; break; } }
+      if (!inside) throw new Error('Tệp đính kèm không thuộc thư mục của ứng dụng.');
+      total += f.getSize();
+      if (total > 20 * 1024 * 1024) throw new Error('Tổng dung lượng đính kèm vượt 20MB.');
+    });
+  }
+  return { to: to, subject: subject, ccAll: ccAll, bccAll: bccAll, full: body + (m.signature ? '\n\n' + m.signature : ''), ids: ids };
+}
+
+function mailHtml_(full) {
+  return '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#111">' +
+    escHtml_(full).replace(/\r?\n/g, '<br>') + '</div>';
+}
+
+function today_() { return Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd'); }
+
+/** Chế độ "owner": gửi bằng tài khoản chủ dự án (có thể dùng alias). */
 function api_sendMail(p) {
+  guardMain_();
   const ctx = userCan_('cand.move');
   if (!ctx) throw new Error('Bạn không có quyền gửi email cho ứng viên.');
   const m = ctx.cfg.mail || {};
   const actor = who_();
-  const subject = String((p && p.subject) || '').trim().slice(0, 200);
   const to = String((p && p.to) || '').trim();
+  const subject = String((p && p.subject) || '').trim().slice(0, 200);
   try {
-    if (!m.enabled) throw new Error('Gửi email trực tiếp chưa được bật (Thiết lập → Email gửi ứng viên).');
-    const re = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
-    if (!re.test(to)) throw new Error('Email người nhận không hợp lệ.');
-    const ccAll = splitEmails_((p.cc || '') + ',' + (m.cc || ''));
-    ccAll.forEach(function (x) { if (!re.test(x)) throw new Error('Email CC không hợp lệ: ' + x); });
-    if (ccAll.length > 6) throw new Error('Tối đa 6 địa chỉ CC.');
-    const bccAll = splitEmails_(m.bcc || '');
-    bccAll.forEach(function (x) { if (!re.test(x)) throw new Error('Email BCC trong Thiết lập không hợp lệ: ' + x); });
-    const body = String((p && p.body) || '');
-    if (!subject) throw new Error('Thiếu tiêu đề.');
-    if (!body.trim()) throw new Error('Thiếu nội dung.');
-    if (body.length > 20000) throw new Error('Nội dung quá dài.');
-    if (/\{\{\w+\}\}/.test(subject + body)) throw new Error('Thư còn trường chưa điền dạng {{...}}.');
-
+    if (m.mode === 'user') throw new Error('Đang bật chế độ gửi bằng email của người bấm gửi; hãy dùng nút gửi trong ứng dụng.');
+    const v = validateMail_(p, m);
     const options = {};
     if (m.senderName) options.name = String(m.senderName);
     if (m.replyTo) options.replyTo = String(m.replyTo);
-    if (ccAll.length) options.cc = ccAll.join(',');
-    if (bccAll.length) options.bcc = bccAll.join(',');
+    if (v.ccAll.length) options.cc = v.ccAll.join(',');
+    if (v.bccAll.length) options.bcc = v.bccAll.join(',');
     if (m.fromAlias) {
       const aliases = GmailApp.getAliases().map(function (a) { return a.toLowerCase(); });
       if (aliases.indexOf(String(m.fromAlias).toLowerCase()) < 0) {
@@ -303,45 +355,185 @@ function api_sendMail(p) {
       }
       options.from = m.fromAlias;
     }
+    if (v.ids.length) options.attachments = v.ids.map(function (id) { return DriveApp.getFileById(id).getBlob(); });
+    options.htmlBody = mailHtml_(v.full);
 
-    const ids = (p.attachIds || []).slice(0, 5);
-    if (ids.length) {
-      const folderId = folder_().getId();
-      let total = 0;
-      options.attachments = ids.map(function (id) {
-        const f = DriveApp.getFileById(id);
-        let inside = false;
-        const it = f.getParents();
-        while (it.hasNext()) { if (it.next().getId() === folderId) { inside = true; break; } }
-        if (!inside) throw new Error('Tệp đính kèm không thuộc thư mục của ứng dụng.');
-        total += f.getSize();
-        if (total > 20 * 1024 * 1024) throw new Error('Tổng dung lượng đính kèm vượt 20MB.');
-        return f.getBlob();
-      });
-    }
-
-    const full = body + (m.signature ? '\n\n' + m.signature : '');
-    options.htmlBody = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#111">' +
-      escHtml_(full).replace(/\r?\n/g, '<br>') + '</div>';
-
-    // giới hạn số thư mỗi ngày (cấu hình trong Thiết lập)
     const props = PropertiesService.getScriptProperties();
-    const key = 'mail_' + Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd');
+    const key = 'mail_' + today_();
     const limit = Number(m.dailyLimit) || 200;
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
       const used = Number(props.getProperty(key)) || 0;
       if (used >= limit) throw new Error('Đã đạt giới hạn ' + limit + ' email/ngày đã đặt trong Thiết lập.');
-      if (MailApp.getRemainingDailyQuota() < 1 + ccAll.length + bccAll.length) throw new Error('Đã hết hạn mức gửi email trong ngày của Google.');
+      if (MailApp.getRemainingDailyQuota() < 1 + v.ccAll.length + v.bccAll.length) throw new Error('Đã hết hạn mức gửi email trong ngày của Google.');
       props.setProperty(key, String(used + 1));
     } finally { lock.releaseLock(); }
 
-    GmailApp.sendEmail(to, subject, full, options);
-    try { logMail_([new Date(), actor, to, ccAll.join(', '), subject, m.fromAlias || Session.getEffectiveUser().getEmail(), String(p.candidate || ''), 'ĐÃ GỬI']); } catch (x) { /* thư đã gửi; lỗi ghi nhật ký không được báo là gửi thất bại */ }
+    GmailApp.sendEmail(v.to, v.subject, v.full, options);
+    try { logMail_([new Date(), actor, v.to, v.ccAll.join(', '), v.subject, m.fromAlias || Session.getEffectiveUser().getEmail(), String(p.candidate || ''), 'ĐÃ GỬI']); } catch (x) { /* thư đã gửi; lỗi ghi nhật ký không được báo là gửi thất bại */ }
     return { ok: true, from: m.fromAlias || Session.getEffectiveUser().getEmail(), remaining: MailApp.getRemainingDailyQuota() };
   } catch (e) {
     try { logMail_([new Date(), actor, to, '', subject, m.fromAlias || '', String((p && p.candidate) || ''), 'LỖI: ' + e.message]); } catch (x) { /* bỏ qua */ }
     throw e;
   }
+}
+
+/* ---------- Chế độ "user": gửi bằng email của chính người bấm gửi (bản triển khai thứ hai) ---------- */
+
+const DRAFT_TTL_ = 900;     // thư nháp chờ gửi: 15 phút
+const RESULT_TTL_ = 21600;  // kết quả: 6 giờ
+
+function tokOk_(t) { return /^[0-9a-f-]{36}$/.test(String(t || '')); }
+
+function tplUser_(str, user, email) {
+  return String(str || '').replace(/\{\{ten\}\}/g, (user && user.name) || email).replace(/\{\{email\}\}/g, email);
+}
+
+/** Bước 1 (bản chính, chạy bằng chủ dự án): kiểm tra thư, lưu nháp tạm, trả token để mở trang gửi. */
+function api_mailPrepare(p) {
+  guardMain_();
+  const ctx = userCan_('cand.move');
+  if (!ctx) throw new Error('Bạn không có quyền gửi email cho ứng viên.');
+  const m = ctx.cfg.mail || {};
+  if (m.mode !== 'user') throw new Error('Chưa bật chế độ "gửi bằng email của người bấm gửi" trong Thiết lập.');
+  if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(String(m.senderUrl || ''))) throw new Error('Thiếu hoặc sai địa chỉ bản triển khai "người gửi" trong Thiết lập.');
+  const actor = who_();
+  const v = validateMail_(p, m);
+  const draft = {
+    email: actor, to: v.to, cc: v.ccAll, bcc: v.bccAll, subject: v.subject, full: v.full, ids: v.ids,
+    senderName: tplUser_(m.senderName || '{{ten}}', ctx.user, actor),
+    replyTo: tplUser_(m.replyTo || '{{email}}', ctx.user, actor),
+    fromAlias: String(m.fromAlias || ''), limit: Number(m.dailyLimit) || 200,
+    candidate: String((p && p.candidate) || '')
+  };
+  const token = Utilities.getUuid();
+  const cache = CacheService.getScriptCache();
+  cache.put('maildraft:' + token, JSON.stringify(draft), DRAFT_TTL_);
+  cache.put('mailmeta:' + token, JSON.stringify({ email: actor, to: v.to, cc: v.ccAll.join(', '), subject: v.subject, candidate: draft.candidate, logged: 0 }), RESULT_TTL_);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const q = JSON.parse(cache.get('mailq') || '[]');
+    q.push(token);
+    cache.put('mailq', JSON.stringify(q.slice(-60)), RESULT_TTL_);
+  } finally { lock.releaseLock(); }
+  try { flushMailLog_(); } catch (x) { /* bỏ qua */ }
+  return { token: token, url: String(m.senderUrl) + '?t=' + token };
+}
+
+/** Ghi nhật ký các thư đã có kết quả (gọi khi hỏi trạng thái / chuẩn bị thư mới). */
+function flushMailLog_() {
+  const cache = CacheService.getScriptCache();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const q = JSON.parse(cache.get('mailq') || '[]');
+    const keep = [];
+    q.forEach(function (t) {
+      const meta = JSON.parse(cache.get('mailmeta:' + t) || 'null');
+      if (!meta) return;
+      const res = JSON.parse(cache.get('mailres:' + t) || 'null');
+      if (!res) { keep.push(t); return; }
+      if (!meta.logged) {
+        logMail_([new Date(), meta.email, meta.to, meta.cc, meta.subject, res.from || '', meta.candidate, res.ok ? 'ĐÃ GỬI' : 'LỖI: ' + res.error]);
+        meta.logged = 1;
+        cache.put('mailmeta:' + t, JSON.stringify(meta), RESULT_TTL_);
+      }
+    });
+    cache.put('mailq', JSON.stringify(keep), RESULT_TTL_);
+  } finally { lock.releaseLock(); }
+}
+
+/** Bước 3 (bản chính): giao diện hỏi trạng thái. */
+function api_mailStatus(token) {
+  guardMain_();
+  if (!tokOk_(token)) throw new Error('Mã không hợp lệ.');
+  const cache = CacheService.getScriptCache();
+  const meta = JSON.parse(cache.get('mailmeta:' + token) || 'null');
+  if (!meta || meta.email !== who_()) throw new Error('Không tìm thấy phiên gửi thư (đã hết hạn).');
+  const res = JSON.parse(cache.get('mailres:' + token) || 'null');
+  if (res) {
+    try { flushMailLog_(); } catch (x) { /* bỏ qua */ }
+    return res.ok ? { state: 'sent', from: res.from } : { state: 'error', error: res.error };
+  }
+  if (cache.get('maildraft:' + token)) return { state: 'pending' };
+  return { state: 'expired' };
+}
+
+/** Điều kiện cho các hàm sender_*: phải chạy dưới tư cách chính người dùng và đúng chủ của nháp. */
+function senderDraft_(token) {
+  if (!tokOk_(token)) throw new Error('Mã không hợp lệ.');
+  const eff = String(Session.getEffectiveUser().getEmail() || '').toLowerCase();
+  const act = who_();
+  if (!act || eff !== act) throw new Error('Trang này phải được mở từ bản triển khai "người gửi" (Thực thi dưới tư cách người dùng truy cập).');
+  const raw = CacheService.getScriptCache().get('maildraft:' + token);
+  if (!raw) throw new Error('Thư nháp đã hết hạn hoặc đã được gửi. Hãy quay lại ứng dụng và bấm gửi lại.');
+  const d = JSON.parse(raw);
+  if (d.email !== act) throw new Error('Thư này được soạn bởi ' + d.email + ', bạn đang đăng nhập bằng ' + act + '.');
+  return d;
+}
+
+function sender_peek(token) {
+  const d = senderDraft_(token);
+  let from = d.email;
+  if (d.fromAlias) {
+    try { if (GmailApp.getAliases().map(function (a) { return a.toLowerCase(); }).indexOf(d.fromAlias.toLowerCase()) >= 0) from = d.fromAlias; } catch (e) { /* dùng email của bạn */ }
+  }
+  return { from: from, to: d.to, cc: d.cc.join(', '), subject: d.subject, body: d.full, attach: d.ids.length };
+}
+
+function sender_send(token) {
+  const d = senderDraft_(token);
+  const cache = CacheService.getScriptCache();
+  const props = PropertiesService.getScriptProperties();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  let from = d.email;
+  try {
+    if (!cache.get('maildraft:' + token)) throw new Error('Thư này đã được gửi hoặc đã hết hạn.');
+    cache.remove('maildraft:' + token); // dùng một lần
+    try {
+      const key = 'mail_' + today_() + '_' + d.email;
+      const used = Number(props.getProperty(key)) || 0;
+      if (used >= d.limit) throw new Error('Bạn đã đạt giới hạn ' + d.limit + ' email/ngày đặt trong Thiết lập.');
+      if (MailApp.getRemainingDailyQuota() < 1 + d.cc.length + d.bcc.length) throw new Error('Tài khoản của bạn đã hết hạn mức gửi email trong ngày của Google.');
+      const options = { name: d.senderName, replyTo: d.replyTo, htmlBody: mailHtml_(d.full) };
+      if (d.cc.length) options.cc = d.cc.join(',');
+      if (d.bcc.length) options.bcc = d.bcc.join(',');
+      if (d.fromAlias) {
+        const al = GmailApp.getAliases().map(function (a) { return a.toLowerCase(); });
+        if (al.indexOf(d.fromAlias.toLowerCase()) >= 0) { options.from = d.fromAlias; from = d.fromAlias; }
+      }
+      if (d.ids.length) options.attachments = d.ids.map(function (id) { return DriveApp.getFileById(id).getBlob(); });
+      props.setProperty(key, String(used + 1));
+      GmailApp.sendEmail(d.to, d.subject, d.full, options);
+      cache.put('mailres:' + token, JSON.stringify({ ok: true, from: from }), RESULT_TTL_);
+    } catch (e) {
+      cache.put('mailres:' + token, JSON.stringify({ ok: false, error: String(e.message || e), from: from }), RESULT_TTL_);
+      throw e;
+    }
+  } finally { lock.releaseLock(); }
+  return { ok: true, from: from };
+}
+
+/** Trang gửi thư (hiển thị ở cửa sổ phụ); người dùng xem lại rồi bấm Gửi. */
+function senderPage_(token) {
+  const t = tokOk_(token) ? token : '';
+  const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<style>body{font-family:Arial,sans-serif;background:#f4f2fb;margin:0;padding:20px;color:#222}.c{max-width:640px;margin:auto;background:#fff;border-radius:12px;padding:22px;box-shadow:0 2px 12px #0002}' +
+    'h2{margin:0 0 12px;color:#5b47d6;font-size:18px}.r{margin:6px 0;font-size:14px}.r b{display:inline-block;width:70px;color:#666}pre{white-space:pre-wrap;background:#faf9ff;border:1px solid #e3def8;border-radius:8px;padding:12px;font:13px/1.5 Arial}' +
+    'button{background:#5b47d6;color:#fff;border:0;border-radius:8px;padding:10px 22px;font-size:15px;cursor:pointer}button:disabled{opacity:.5}.e{color:#c0392b}.o{color:#1e8e3e;font-weight:bold}</style></head><body><div class="c">' +
+    '<h2>Gửi email cho ứng viên</h2><div id="m">Đang tải thư nháp…</div><div id="a" style="margin-top:14px"></div></div><script>' +
+    'var T=' + JSON.stringify(t) + ';' +
+    'function row(k,v){var d=document.createElement("div");d.className="r";var b=document.createElement("b");b.textContent=k;d.appendChild(b);d.appendChild(document.createTextNode(v));return d;}' +
+    'function err(x){var m=document.getElementById("m");m.innerHTML="";var d=document.createElement("div");d.className="e";d.textContent=String(x&&x.message||x);m.appendChild(d);document.getElementById("a").innerHTML="";}' +
+    'google.script.run.withFailureHandler(err).withSuccessHandler(function(p){var m=document.getElementById("m");m.innerHTML="";' +
+    'm.appendChild(row("Từ:",p.from));m.appendChild(row("Đến:",p.to));if(p.cc)m.appendChild(row("CC:",p.cc));m.appendChild(row("Tiêu đề:",p.subject));if(p.attach)m.appendChild(row("Đính kèm:",p.attach+" tệp"));' +
+    'var pre=document.createElement("pre");pre.textContent=p.body;m.appendChild(pre);' +
+    'var b=document.createElement("button");b.textContent="Gửi ngay";b.onclick=function(){b.disabled=true;b.textContent="Đang gửi…";' +
+    'google.script.run.withFailureHandler(function(e){err(e);}).withSuccessHandler(function(){document.getElementById("a").innerHTML="";var d=document.createElement("div");d.className="o";d.textContent="✓ Đã gửi. Bạn có thể đóng cửa sổ này.";document.getElementById("m").appendChild(d);setTimeout(function(){try{window.close();}catch(x){}},1500);}).sender_send(T);};' +
+    'document.getElementById("a").appendChild(b);}).sender_peek(T);' +
+    '<\/script></body></html>';
+  return HtmlService.createHtmlOutput(html).setTitle('Gửi email').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
