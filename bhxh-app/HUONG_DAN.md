@@ -129,7 +129,7 @@ Màn hình **Nhân viên** có 4 nút:
 
 Người **Nhập liệu** chỉ nhập/xuất được hồ sơ mình quản lý (theo *Email NV quản lý hồ sơ*); nhân viên mới do họ nhập sẽ tự gán email của họ. **Admin** không bị giới hạn này. Không nhập được vào kỳ đã chốt.
 
-**Kiểm tra theo danh mục cấu hình:** các trường dạng dropdown trong NV_COLS — **Đơn vị_Phòng ban** (danh mục ở *Thiết lập → Phòng ban*), **Mã phân loại** (*Thiết lập → Mã phân loại*), và **Tham gia công đoàn** (chỉ nhận "Có"/"Không") — được kiểm tra khi nhập (cả 3 cách nhập). Giá trị gõ khác hoa/thường hoặc thừa khoảng trắng vẫn được nhận và tự chuẩn hoá về đúng chính tả trong danh mục; nhưng giá trị **không khớp với bất kỳ mục nào** trong danh mục sẽ bị **báo lỗi và từ chối nhập** dòng đó (không còn tự tạo thành lựa chọn mới ngoài danh mục như trước). File mẫu Excel (nút **"⬇ File mẫu (Excel)"**) có kèm sheet **"Danh mục"** liệt kê đầy đủ các giá trị hợp lệ hiện tại của 3 trường này để tham khảo khi điền; file mẫu CSV không mang được nhiều sheet nên không có phần này.
+**Kiểm tra theo danh mục cấu hình:** các trường dạng dropdown trong NV_COLS — **Đơn vị_Phòng ban** (danh mục ở *Thiết lập → Phòng ban*), **Mã phân loại** (*Thiết lập → Mã phân loại*), **Tham gia công đoàn** (chỉ nhận "Có"/"Không"), và **Giới tính** (chỉ nhận "Nam"/"Nữ"/"Khác") — được kiểm tra khi nhập (cả 3 cách nhập). Giá trị gõ khác hoa/thường hoặc thừa khoảng trắng vẫn được nhận và tự chuẩn hoá về đúng chính tả trong danh mục; nhưng giá trị **không khớp với bất kỳ mục nào** trong danh mục sẽ bị **báo lỗi và từ chối nhập** dòng đó (không còn tự tạo thành lựa chọn mới ngoài danh mục như trước). Riêng **Giới tính** để trống vẫn được phép (không bắt buộc). File mẫu Excel (nút **"⬇ File mẫu (Excel)"**) có kèm sheet **"Danh mục"** liệt kê đầy đủ các giá trị hợp lệ hiện tại của các trường này để tham khảo khi điền; file mẫu CSV không mang được nhiều sheet nên không có phần này.
 
 **Nếu nhập file Excel (.xlsx) báo lỗi:** vào Apps Script, mục **Dịch vụ** (thanh bên trái) → bấm **+** → thêm **Drive API** (phiên bản v3) → Lưu. Hoặc lưu file dưới dạng **CSV** rồi nhập lại — CSV luôn hoạt động mà không cần bước này.
 
@@ -221,6 +221,10 @@ Màn hình **Tổng quan** (trang chủ) chỉ gồm bộ lọc và biểu đồ
 ## 9e. Truy thu – Thoái thu: cột Chênh lệch
 
 Bảng **Truy thu – Thoái thu** có thêm cột **Chênh lệch** (= Lương mới − Lương cũ) ngay sau cột Lương mới, tô nền để dễ nhận biết, giúp thấy ngay mức thay đổi lương làm căn cứ tính truy thu/thoái thu, kèm dòng TỔNG cộng dồn đúng cột ở cuối bảng.
+
+## 9f. Thêm trường Giới tính
+
+Hồ sơ nhân viên có thêm trường **Giới tính** (dropdown, nằm ngay sau Ngày sinh trong form Nhân viên), chỉ nhận **Nam / Nữ / Khác**, có thể để trống. Trường này được kiểm tra theo đúng danh mục như các dropdown khác (xem mục 6) và có trong file mẫu nhập/xuất cùng sheet "Danh mục". Với các công ty đã cài trước đó, vào Google Sheet → menu **BHXH → 1. Khởi tạo / cập nhật cấu trúc** một lần để Sheet tự thêm cột **"Giới tính"** vào các tab *Danh sách nhân viên* và *Dữ liệu kỳ* (các cột hiện có không bị ảnh hưởng).
 
 ## 10. Lưu ý
 

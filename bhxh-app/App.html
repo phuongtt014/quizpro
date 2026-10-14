@@ -577,6 +577,7 @@ async function nvForm(maNV) {
     ${inp('hoTen', 'Họ và tên', 'text', 'req')}
     ${inp('maBHXH', 'Mã số BHXH')}
     ${inp('ngaySinh', 'Ngày sinh', 'date')}
+    <label>Giới tính<select name="gioiTinh" ${dis}>${opt(S.lists.gioiTinh, r.gioiTinh || '', '— Chọn —')}</select></label>
     <label>Đơn vị_Phòng ban<select name="phongBan" ${dis}>${opt(S.phongBan, r.phongBan || '', '— Chọn —')}</select></label>
     ${inp('chucDanh', 'Chức danh')}
     ${inp('ngayVao', 'Ngày vào làm', 'date')}

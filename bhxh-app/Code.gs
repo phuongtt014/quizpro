@@ -27,6 +27,9 @@ const YCML_CHO = 'Chờ duyệt';
 const YCML_DUYET = 'Đã duyệt';
 const YCML_TUCHOI = 'Từ chối';
 const YCML_KHOALAI = 'Đã khóa lại';
+const NAM = 'Nam';
+const NU = 'Nữ';
+const GT_KHAC = 'Khác';
 
 const LISTS = {
   role: [ROLE.ADMIN, ROLE.NHAP, ROLE.XEM],
@@ -35,7 +38,8 @@ const LISTS = {
   trangThai: [TT_AD, TT_NGUNG],
   coKhong: [CO, KHONG],
   pqTrangThai: [PQ_HD, PQ_KHOA],
-  ycmlTrangThai: [YCML_CHO, YCML_DUYET, YCML_TUCHOI, YCML_KHOALAI]
+  ycmlTrangThai: [YCML_CHO, YCML_DUYET, YCML_TUCHOI, YCML_KHOALAI],
+  gioiTinh: [NAM, NU, GT_KHAC]
 };
 
 // Cột của hồ sơ nhân viên: [key, tiêu đề cột trên Sheet, kiểu]
@@ -44,6 +48,7 @@ const NV_COLS = [
   ['hoTen', 'Họ và tên', 'text'],
   ['maBHXH', 'Mã số BHXH', 'text'],
   ['ngaySinh', 'Ngày sinh', 'date'],
+  ['gioiTinh', 'Giới tính', 'text'],
   ['phongBan', 'Đơn vị_Phòng ban', 'text'],
   ['chucDanh', 'Chức danh', 'text'],
   ['ngayVao', 'Ngày vào làm', 'date'],
@@ -309,6 +314,7 @@ function khoiTaoCauTruc() {
   v(T.MAPL, 'Trạng thái', LISTS.trangThai);
   [T.NV, T.DLKY].forEach(function (t) {
     v(t, 'Tham gia công đoàn', LISTS.coKhong);
+    v(t, 'Giới tính', LISTS.gioiTinh);
     vr(t, 'Mã phân loại', T.MAPL);
     vr(t, 'Đơn vị_Phòng ban', T.PB);
   });
@@ -1164,6 +1170,14 @@ function checkCongDoan_(v) {
   if (s === normHeader_(KHONG)) return KHONG;
   throw new Error('Tham gia công đoàn "' + v + '" không hợp lệ (chỉ nhận "' + CO + '" hoặc "' + KHONG + '").');
 }
+/** Kiểm tra & chuẩn hoá giá trị "Giới tính" (Nam/Nữ/Khác); để trống thì giữ trống, báo lỗi nếu không khớp. */
+function checkGioiTinh_(v) {
+  if (!v) return '';
+  const s = normHeader_(v);
+  const hit = LISTS.gioiTinh.find(function (x) { return normHeader_(x) === s; });
+  if (!hit) throw new Error('Giới tính "' + v + '" không hợp lệ (chỉ nhận ' + LISTS.gioiTinh.map(function (x) { return '"' + x + '"'; }).join(', ') + ').');
+  return hit;
+}
 function cleanNV_(o, user, maplMapObj, pbMapObj) {
   const r = {};
   NV_COLS.forEach(function (c) { r[c[0]] = o[c[0]] === undefined || o[c[0]] === null ? '' : o[c[0]]; });
@@ -1175,6 +1189,7 @@ function cleanNV_(o, user, maplMapObj, pbMapObj) {
   r.luongDong = luongDong_(r);
   r.phongBan = checkPhongBan_(r.phongBan, pbMapObj);
   r.congDoan = checkCongDoan_(r.congDoan);
+  r.gioiTinh = checkGioiTinh_(r.gioiTinh);
   r.emailQL = String(r.emailQL || '').toLowerCase().trim();
   if (user.role === ROLE.NHAP) r.emailQL = user.email;
   const mm = maplMapObj || maplMap_();
@@ -1970,10 +1985,10 @@ function apiTemplateNV(format) {
   const header = T.NV.cols.map(function (c) { return c[1]; });
   const pb0 = (load_(T.PB).rows[0] || {}).ten || 'Phòng Hành chính - Nhân sự';
   const mau = [
-    { maNV: 'NV001', hoTen: 'Nguyễn Văn A', maBHXH: '0123456789', ngaySinh: '1990-05-20', phongBan: pb0,
+    { maNV: 'NV001', hoTen: 'Nguyễn Văn A', maBHXH: '0123456789', ngaySinh: '1990-05-20', gioiTinh: NAM, phongBan: pb0,
       chucDanh: 'Nhân viên', ngayVao: '2024-01-01', ngayBHXH: '2024-01-01', ngayNghi: '', thangDung: '', luongChinh: 8000000,
       pcKN: 0, pcCV: 0, pcDH: 0, pcKhac: 0, luongDong: 8000000, maPL: 'CT', congDoan: CO, emailQL: '', ghiChu: 'Dòng ví dụ – xóa trước khi nhập' },
-    { maNV: 'NV002', hoTen: 'Trần Thị B', maBHXH: '0987654321', ngaySinh: '1995-11-02', phongBan: pb0,
+    { maNV: 'NV002', hoTen: 'Trần Thị B', maBHXH: '0987654321', ngaySinh: '1995-11-02', gioiTinh: NU, phongBan: pb0,
       chucDanh: 'Chuyên viên', ngayVao: '2023-03-15', ngayBHXH: '2023-03-15', ngayNghi: '', thangDung: '', luongChinh: 12000000,
       pcKN: 0, pcCV: 500000, pcDH: 0, pcKhac: 0, luongDong: 12500000, maPL: 'CT', congDoan: KHONG, emailQL: '', ghiChu: 'Dòng ví dụ – xóa trước khi nhập' }
   ];
@@ -1987,15 +2002,17 @@ function danhMucNVGrid_() {
   const pbRows = load_(T.PB).rows.map(function (r) { return r.ten; }).filter(String);
   const plRows = load_(T.MAPL).rows.filter(function (r) { return r.ma; });
   const cdRows = [CO, KHONG];
-  const n = Math.max(pbRows.length, plRows.length, cdRows.length, 1);
-  const grid = [['Đơn vị_Phòng ban (danh mục)', 'Mã phân loại (danh mục)', 'Mô tả mã phân loại', 'Tham gia công đoàn (danh mục)']];
+  const gtRows = LISTS.gioiTinh;
+  const n = Math.max(pbRows.length, plRows.length, cdRows.length, gtRows.length, 1);
+  const grid = [['Đơn vị_Phòng ban (danh mục)', 'Mã phân loại (danh mục)', 'Mô tả mã phân loại', 'Tham gia công đoàn (danh mục)', 'Giới tính (danh mục)']];
   for (let i = 0; i < n; i++) {
     const pl = plRows[i];
     grid.push([
       pbRows[i] || '',
       pl ? pl.ma : '',
       pl ? (pl.moTa || '') + (pl.trangThai === TT_NGUNG ? ' (Ngừng áp dụng)' : '') : '',
-      cdRows[i] || ''
+      cdRows[i] || '',
+      gtRows[i] || ''
     ]);
   }
   return grid;
@@ -2243,6 +2260,7 @@ function mergeNVPartial_(existing, raw, matchedKeys, user, mm, onlyEmpty, pbMapO
   if (!Object.keys(patch).length) return null;
   if (patch.phongBan !== undefined) patch.phongBan = checkPhongBan_(patch.phongBan, pbMapObj);
   if (patch.congDoan !== undefined) patch.congDoan = checkCongDoan_(patch.congDoan);
+  if (patch.gioiTinh !== undefined) patch.gioiTinh = checkGioiTinh_(patch.gioiTinh);
   if (patch.emailQL !== undefined) {
     patch.emailQL = String(patch.emailQL || '').toLowerCase().trim();
     if (user.role === ROLE.NHAP) patch.emailQL = user.email;
