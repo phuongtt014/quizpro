@@ -106,7 +106,7 @@ Admin có thể đổi *Email NV quản lý hồ sơ* của bất kỳ NV nào �
 
 ## 6. Nhập / xuất Excel, CSV ở tab Nhân viên
 
-Phía trên danh sách có ô tìm kiếm (mã NV/họ tên/mã BHXH) và các bộ lọc: **Phòng ban**, **Mã PL**, trạng thái (Đã nhập tháng dừng đóng / Thiếu mã PL hoặc ngày BHXH), và **Phụ cấp** (PC Kiêm nhiệm / PC Chức vụ / PC Độc hại / PC Khác — chọn để chỉ xem những NV đang có mức phụ cấp đó lớn hơn 0) — có thể kết hợp nhiều bộ lọc cùng lúc.
+Phía trên danh sách có ô tìm kiếm (mã NV/họ tên/mã BHXH) và các bộ lọc: **Phòng ban**, **Mã PL**, trạng thái (Đã nhập tháng dừng đóng / Thiếu mã PL hoặc ngày BHXH), **Phụ cấp** (PC Kiêm nhiệm / PC Chức vụ / PC Độc hại / PC Khác — chọn để chỉ xem những NV đang có mức phụ cấp đó lớn hơn 0), **Tham gia công đoàn** (Có/Không), và **Giới tính** (Nam/Nữ/Khác) — có thể kết hợp nhiều bộ lọc cùng lúc.
 
 Màn hình **Nhân viên** có 4 nút:
 
@@ -224,7 +224,7 @@ Bảng **Truy thu – Thoái thu** có thêm cột **Chênh lệch** (= Lương 
 
 ## 9f. Thêm trường Giới tính
 
-Hồ sơ nhân viên có thêm trường **Giới tính** (dropdown, nằm ngay sau Ngày sinh trong form Nhân viên), chỉ nhận **Nam / Nữ / Khác**, có thể để trống. Trường này được kiểm tra theo đúng danh mục như các dropdown khác (xem mục 6) và có trong file mẫu nhập/xuất cùng sheet "Danh mục". Với các công ty đã cài trước đó, vào Google Sheet → menu **BHXH → 1. Khởi tạo / cập nhật cấu trúc** một lần để Sheet tự thêm cột **"Giới tính"** vào các tab *Danh sách nhân viên* và *Dữ liệu kỳ* (các cột hiện có không bị ảnh hưởng).
+Hồ sơ nhân viên có thêm trường **Giới tính** (dropdown, nằm ngay sau Ngày sinh trong form Nhân viên), chỉ nhận **Nam / Nữ / Khác**, có thể để trống. Trường này được kiểm tra theo đúng danh mục như các dropdown khác (xem mục 6) và có trong file mẫu nhập/xuất cùng sheet "Danh mục". Tab **Nhân viên** có thêm bộ lọc theo **Giới tính** và theo **Tham gia công đoàn** (xem mục 6). Với các công ty đã cài trước đó, vào Google Sheet → menu **BHXH → 1. Khởi tạo / cập nhật cấu trúc** một lần để Sheet tự thêm cột **"Giới tính"** vào các tab *Danh sách nhân viên* và *Dữ liệu kỳ* (các cột hiện có không bị ảnh hưởng).
 
 ## 10. Lưu ý
 

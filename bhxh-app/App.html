@@ -400,6 +400,8 @@ async function vNhanVien() {
       <select id="nvPC" onchange="renderNV()"><option value="">Tất cả phụ cấp</option>
         <option value="pcKN">Đang có PC Kiêm nhiệm</option><option value="pcCV">Đang có PC Chức vụ</option>
         <option value="pcDH">Đang có PC Độc hại</option><option value="pcKhac">Đang có PC Khác</option></select>
+      <select id="nvCD" onchange="renderNV()">${opt(S.lists.coKhong, '', 'Tất cả Tham gia công đoàn')}</select>
+      <select id="nvGT" onchange="renderNV()">${opt(S.lists.gioiTinh, '', 'Tất cả giới tính')}</select>
       <span class="spacer"></span><span id="nvAdd"></span>
     </div>
     <div class="row no-print" style="margin-top:10px">
@@ -519,11 +521,14 @@ function nvImportResult(r) {
 function renderNV() {
   const d = S.nvData; if (!d) return;
   const q = ($('nvQ').value || '').toLowerCase().trim(), pb = $('nvPB').value, pl = $('nvPL').value, f = $('nvF').value, pc = $('nvPC').value;
+  const cd = $('nvCD').value, gt = $('nvGT').value;
   const rows = d.rows.filter((r) => (!q || [r.maNV, r.hoTen, r.maBHXH].join(' ').toLowerCase().includes(q))
     && (!pb || r.phongBan === pb)
     && (!pl || r.maPL === pl)
     && (!f || (f === 'dung' ? !!r.thangDung : (!r.maPL || !r.ngayBHXH)))
-    && (!pc || Number(r[pc]) > 0))
+    && (!pc || Number(r[pc]) > 0)
+    && (!cd || r.congDoan === cd)
+    && (!gt || r.gioiTinh === gt))
     .sort((a, b) => (a.phongBan + a.maNV).localeCompare(b.phongBan + b.maNV, 'vi'));
   const tong = rows.reduce((s, r) => s + (Number(r.luongDong) || 0), 0);
   const sumCol = (k) => rows.reduce((s, r) => s + (Number(r[k]) || 0), 0);
