@@ -275,7 +275,7 @@ const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{co
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
-const APP_VER='v21 · 14/10/2026';
+const APP_VER='v22 · 15/10/2026';
 const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const MAXF=GS?10:15;
@@ -379,11 +379,7 @@ function seed(){
     .map((x,i)=>{const p={id:uid('p_'),code:x[0],name:x[1],slaDays:x[2],effective:iso(-330+i*15),status:'Đang áp dụng',file:null};
       p.versions=[{id:uid('v_'),ver:1,file:null,effective:p.effective,slaDays:p.slaDays,note:'Bản đầu tiên',createdAt:Date.now()-330*dayMs,by:'Trần Thị Phương'}];return p});
   positions[0].versions.push({id:uid('v_'),ver:2,file:null,effective:iso(-30),slaDays:28,note:'Rút ngắn thời hạn tuyển còn 28 ngày; bổ sung yêu cầu chứng chỉ nghiệp vụ sư phạm',createdAt:Date.now()-30*dayMs,by:'Trần Thị Phương'});
-  const templates=[
-    {id:uid('t_'),type:'Thư mời phỏng vấn',name:'Mời phỏng vấn – chuẩn',subject:'[{{cong_ty}}] Thư mời phỏng vấn vị trí {{vi_tri}}',body:'Kính gửi Anh/Chị {{ten_ung_vien}},\n\nCảm ơn Anh/Chị đã quan tâm và ứng tuyển vị trí {{vi_tri}} tại {{phong_ban}} – {{cong_ty}}.\n\nSau khi xem xét hồ sơ, chúng tôi trân trọng mời Anh/Chị tham dự buổi phỏng vấn:\n- Thời gian: {{gio_phong_van}}, ngày {{ngay_phong_van}}\n- Địa điểm: {{dia_diem}}\n\nVui lòng phản hồi email này để xác nhận tham dự. Nếu cần hỗ trợ, Anh/Chị liên hệ trực tiếp với tôi.\n\nTrân trọng,\n{{nguoi_gui}}\nPhòng Nhân sự – {{cong_ty}}'},
-    {id:uid('t_'),type:'Thư mời nhận việc',name:'Thư mời nhận việc (Offer)',subject:'[{{cong_ty}}] Thư mời nhận việc – {{vi_tri}}',body:'Kính gửi Anh/Chị {{ten_ung_vien}},\n\nChúc mừng Anh/Chị đã vượt qua các vòng tuyển chọn. {{cong_ty}} trân trọng mời Anh/Chị về làm việc với nội dung:\n- Vị trí: {{vi_tri}} – {{phong_ban}}\n- Mức lương: {{luong}}\n- Ngày nhận việc dự kiến: {{ngay_nhan_viec}}\n\nVui lòng phản hồi trước ngày {{han_phan_hoi}}. Chi tiết hồ sơ nhận việc sẽ được gửi sau khi Anh/Chị xác nhận.\n\nTrân trọng,\n{{nguoi_gui}}\nPhòng Nhân sự – {{cong_ty}}'},
-    {id:uid('t_'),type:'Thư cảm ơn',name:'Cảm ơn sau phỏng vấn',subject:'[{{cong_ty}}] Cảm ơn Anh/Chị đã tham dự phỏng vấn',body:'Kính gửi Anh/Chị {{ten_ung_vien}},\n\nCảm ơn Anh/Chị đã dành thời gian trao đổi về vị trí {{vi_tri}}. Chúng tôi sẽ thông báo kết quả trong thời gian sớm nhất.\n\nTrân trọng,\n{{nguoi_gui}}\n{{cong_ty}}'},
-    {id:uid('t_'),type:'Thư từ chối',name:'Thông báo chưa phù hợp',subject:'[{{cong_ty}}] Thông báo kết quả ứng tuyển {{vi_tri}}',body:'Kính gửi Anh/Chị {{ten_ung_vien}},\n\nCảm ơn Anh/Chị đã quan tâm đến vị trí {{vi_tri}}. Sau khi cân nhắc, rất tiếc hồ sơ của Anh/Chị chưa phù hợp với yêu cầu ở thời điểm hiện tại. Chúng tôi xin lưu hồ sơ để liên hệ khi có cơ hội phù hợp.\n\nChúc Anh/Chị nhiều thành công.\n\nTrân trọng,\n{{nguoi_gui}}\n{{cong_ty}}'}];
+  const templates=proTemplates().map(t=>({id:uid('t_'),...t}));
   return{v:1,
     cfg:{company:'Trường & Công ty Giáo dục ABC',signDays:3,blocks:['Khối trường','Khối văn phòng'],depts,sources:['TopCV','Facebook','Website trường','Giới thiệu nội bộ','Trực tiếp','Khác'],roles,users,reqFields,candFields},
     reqs:[r1,r2,r3,r4,r5,r6],cands,lib:{positions,templates,forms:[]}};
@@ -462,7 +458,8 @@ function normalize(){
   const C=DB.cfg;C.migr=C.migr||{};if(!C.migr.export){C.roles.forEach(r=>{if(['recruiter','approver'].includes(r.id)&&!r.caps.includes('data.export'))r.caps.push('data.export')});C.migr.export=1}
   if(!Array.isArray(C.signers))C.signers=defaultSigners();C.signCols=C.signCols||4;if(C.signFooter==null)C.signFooter='';
   if(!Array.isArray(C.screenFields))C.screenFields=defScreenFields();if(!Array.isArray(C.interviewFields))C.interviewFields=defInterviewFields();if(!Array.isArray(C.offerFields))C.offerFields=defOfferFields();
-  C.mail=Object.assign({enabled:0,mode:'owner',senderUrl:'',fromAlias:'',senderName:'',replyTo:'',cc:'',bcc:'',signature:'',dailyLimit:200},C.mail||{});
+  if(!C.migr.offer2){defOfferFields().filter(d=>['supervisor','probation','probSalary'].includes(d.k)).forEach(d=>{if(!C.offerFields.some(f=>f.k===d.k)){const at=C.offerFields.findIndex(f=>f.k==='note');C.offerFields.splice(at<0?C.offerFields.length:at,0,d)}});C.migr.offer2=1}
+  C.mail=Object.assign({rich:1,showLogo:1,brandColor:'#8a1538',headerLines:'',enabled:0,mode:'owner',senderUrl:'',fromAlias:'',senderName:'',replyTo:'',cc:'',bcc:'',signature:'',dailyLimit:200},C.mail||{});
   ensureSlugs(C);
   C.rejectReasons=C.rejectReasons||['Không phù hợp chuyên môn','Kỳ vọng lương cao','Nhận được offer tốt hơn','Vấn đề địa điểm','Ứng viên từ chối offer','Lý do khác'];
   C.users.forEach(u=>u.email=u.email||'');DB.reqs.forEach(r=>{r.history=r.history||[];r.v=r.v||{}});DB.cands.forEach(c=>{c.history=c.history||[];c.interviews=c.interviews||[];c.v=c.v||{}});
@@ -473,7 +470,7 @@ function normalize(){
 }
 function defScreenFields(){return[{k:'date',l:'Ngày sơ vấn',t:'date',vis:1},{k:'by',l:'Người thực hiện',t:'text',vis:1},{k:'result',l:'Kết quả',t:'select',opts:['Chờ','Đạt – mời phỏng vấn','Không phù hợp'],req:1,vis:1,lock:1,wide:1},{k:'note',l:'Nhận xét',t:'textarea',vis:1,wide:1}]}
 function defInterviewFields(){return[{k:'name',l:'Tên vòng',t:'text',req:1,vis:1,lock:1,wide:1},{k:'date',l:'Ngày',t:'date',vis:1},{k:'time',l:'Giờ',t:'time',vis:1},{k:'place',l:'Địa điểm / hình thức',t:'text',vis:1,wide:1},{k:'who',l:'Người phỏng vấn',t:'text',vis:1,wide:1},{k:'result',l:'Kết quả',t:'select',opts:['Chờ kết quả','Đạt','Cân nhắc','Không đạt'],req:1,vis:1,lock:1},{k:'score',l:'Điểm (0–10)',t:'number',vis:1},{k:'note',l:'Nhận xét',t:'textarea',vis:1,wide:1}]}
-function defOfferFields(){return[{k:'status',l:'Trạng thái',t:'select',opts:['Chưa gửi','Đã gửi','Chấp nhận','Từ chối'],req:1,vis:1,lock:1},{k:'salary',l:'Mức lương đề nghị',t:'text',vis:1},{k:'startDate',l:'Ngày nhận việc',t:'date',vis:1},{k:'deadline',l:'Hạn phản hồi',t:'date',vis:1},{k:'note',l:'Ghi chú',t:'textarea',vis:1,wide:1}]}
+function defOfferFields(){return[{k:'status',l:'Trạng thái',t:'select',opts:['Chưa gửi','Đã gửi','Chấp nhận','Từ chối'],req:1,vis:1,lock:1},{k:'salary',l:'Mức lương đề nghị',t:'text',vis:1},{k:'supervisor',l:'Cấp trên trực tiếp',t:'text',vis:1},{k:'startDate',l:'Ngày nhận việc',t:'date',vis:1},{k:'probation',l:'Thời gian thử việc',t:'text',vis:1},{k:'probSalary',l:'Thu nhập thử việc tạm tính',t:'text',vis:1},{k:'deadline',l:'Hạn phản hồi',t:'date',vis:1},{k:'note',l:'Ghi chú',t:'textarea',vis:1,wide:1}]}
 function defaultSigners(){return[
   {id:uid('sg'),title:'Người đề xuất',name:'{{nguoi_de_xuat}}',note:'(Ký, ghi rõ họ tên)',showDate:1,block:''},
   {id:uid('sg'),title:'Trưởng bộ phận',name:'',note:'(Ký, ghi rõ họ tên)',showDate:1,block:''},
@@ -1078,7 +1075,7 @@ const BSLUG={candFields:{name:'ten',phone:'sdt',email:'email',reqId:'de_xuat',so
  reqFields:{block:'khoi',dept:'phong_ban',position:'vi_tri',qty:'so_luong',reqType:'loai_de_xuat',neededBy:'ngay_can_nhan_su',salary:'luong_du_kien',reason:'ly_do',notes:'yeu_cau_khac'},
  screenFields:{date:'ngay',by:'nguoi_thuc_hien',result:'ket_qua',note:'nhan_xet'},
  interviewFields:{name:'ten_vong',date:'ngay',time:'gio',place:'dia_diem',who:'nguoi_phong_van',result:'ket_qua',score:'diem',note:'nhan_xet'},
- offerFields:{status:'trang_thai',salary:'luong',startDate:'ngay_nhan_viec',deadline:'han_phan_hoi',note:'ghi_chu'}};
+ offerFields:{status:'trang_thai',salary:'luong',supervisor:'cap_tren_truc_tiep',probation:'thoi_gian_thu_viec',probSalary:'thu_nhap_thu_viec',startDate:'ngay_nhan_viec',deadline:'han_phan_hoi',note:'ghi_chu'}};
 const slugOf=l=>nrm(l).replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,32)||'truong';
 const uniqSlug=(list,base)=>{let x=base,n=2;while(list.some(f=>f.slug===x))x=base+'_'+(n++);return x};
 function ensureSlugs(C){GROUPS.forEach(([p,key])=>{const list=C[key];list.forEach(f=>{if(!f.slug&&BSLUG[key]&&BSLUG[key][f.k])f.slug=BSLUG[key][f.k]});list.forEach(f=>{if(!f.slug)f.slug=uniqSlug(list.filter(x=>x!==f),slugOf(f.l))})})}
@@ -1112,6 +1109,229 @@ function phGroups(){
 }
 const phChipsHTML=()=>phGroups().map(g=>`<div style="margin-top:8px"><div class="small" style="font-weight:600;color:var(--ink2);margin-bottom:4px">${esc(g[0])}</div>${g[1].map(x=>`<button class="chip ph" style="font-family:inherit;font-size:12.5px" data-act="insPh" data-id="${x[0]}" title="{{${x[0]}}}">${esc(x[1])}</button>`).join('')}</div>`).join('');
 let tplFocusId='ff_body';
+/*MR-BEGIN*/
+/* ---- Bộ dựng thư HTML (dùng chung: giao diện xem trước và Code.gs). Cú pháp: # Tiêu đề · ## Mục · | bảng | · - gạch đầu dòng (thụt 2 dấu cách = cấp con) · > ô lưu ý · ~ căn phải · --- đường kẻ · **đậm** · *nghiêng* · <br> xuống dòng */
+function mrEsc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function mrInline(s, col) {
+  var t = mrEsc(s);
+  t = t.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  t = t.replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, '$1<i>$2</i>');
+  t = t.replace(/&lt;br&gt;/g, '<br>');
+  t = t.replace(/(https?:\/\/(?:(?!&quot;)[^\s<])+)/g, '<a href="$1" style="color:' + col + '">$1</a>');
+  return t;
+}
+function mrParse(text) {
+  var lines = String(text || '').replace(/\r/g, '').split('\n'), out = [], i = 0, para = null;
+  function flush() { if (para) { out.push({ t: 'p', v: para.join('<br>') }); para = null; } }
+  while (i < lines.length) {
+    var ln = lines[i], tr = ln.replace(/\s+$/, '');
+    if (!tr.trim()) { flush(); i++; continue; }
+    var m;
+    if ((m = /^#\s+(.*)$/.exec(tr))) { flush(); out.push({ t: 'h1', v: m[1] }); i++; continue; }
+    if ((m = /^##\s+(.*)$/.exec(tr))) { flush(); out.push({ t: 'h2', v: m[1] }); i++; continue; }
+    if (/^-{3,}$/.test(tr.trim())) { flush(); out.push({ t: 'hr' }); i++; continue; }
+    if (/^\|/.test(tr.trim())) {
+      flush(); var rows = [];
+      while (i < lines.length && /^\|/.test(lines[i].trim())) {
+        var cells = lines[i].trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (c) { return c.trim(); });
+        if (!cells.every(function (c) { return /^:?-{2,}:?$/.test(c); })) rows.push(cells);
+        i++;
+      }
+      out.push({ t: 'tbl', v: rows }); continue;
+    }
+    if (/^>\s?/.test(tr)) {
+      flush(); var ps = [];
+      while (i < lines.length && /^>\s?/.test(lines[i])) { var q = lines[i].replace(/^>\s?/, '').trim(); if (q) ps.push(q); i++; }
+      out.push({ t: 'note', v: ps }); continue;
+    }
+    if (/^~\s?/.test(tr)) {
+      flush(); var rs = [];
+      while (i < lines.length && /^~\s?/.test(lines[i])) { rs.push(lines[i].replace(/^~\s?/, '').trim()); i++; }
+      out.push({ t: 'right', v: rs }); continue;
+    }
+    if (/^\s*[-•]\s+/.test(tr)) {
+      flush(); var items = [];
+      while (i < lines.length && /^\s*[-•]\s+/.test(lines[i])) {
+        var mm = /^(\s*)[-•]\s+(.*)$/.exec(lines[i]);
+        items.push({ lv: mm[1].length >= 2 ? 1 : 0, v: mm[2] }); i++;
+      }
+      out.push({ t: 'ul', v: items }); continue;
+    }
+    (para = para || []).push(tr.trim()); i++;
+  }
+  flush();
+  return out;
+}
+/** brand: {color, lines:[...], logo:boolean}. */
+function mrRender(text, brand) {
+  brand = brand || {};
+  var col = /^#[0-9a-fA-F]{6}$/.test(brand.color || '') ? brand.color : '#8a1538';
+  var line = '#ead9de', tint = '#fdf6f7', I = function (s) { return mrInline(s, col); };
+  var h = '';
+  var bl = (brand.lines || []).filter(function (x) { return String(x).trim(); });
+  if (bl.length || brand.logo) {
+    h += '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:6px"><tr><td valign="top" style="font-family:Georgia,\'Times New Roman\',serif;font-size:13px;line-height:1.55;font-weight:bold;color:' + col + '">' +
+      bl.map(function (x) { return /^website/i.test(String(x).trim()) ? '<span style="color:#666">' + mrEsc(x) + '</span>' : mrEsc(x); }).join('<br>') + '</td>' +
+      (brand.logo ? '<td width="110" align="right" valign="top"><img src="cid:vaslogo" width="90" alt="logo" style="display:block;border:0;max-width:90px;height:auto"></td>' : '') + '</tr></table>';
+  }
+  mrParse(text).forEach(function (b) {
+    if (b.t === 'h1') h += '<h1 style="text-align:center;font-size:23px;line-height:1.3;color:' + col + ';margin:26px 0 20px;font-weight:bold">' + I(b.v) + '</h1>';
+    else if (b.t === 'h2') h += '<h2 style="font-size:15px;line-height:1.4;color:' + col + ';margin:22px 0 10px;font-weight:bold">' + I(b.v) + '</h2>';
+    else if (b.t === 'hr') h += '<hr style="border:0;border-top:1px solid ' + line + ';margin:18px 0">';
+    else if (b.t === 'p') h += '<p style="margin:0 0 13px">' + I(b.v) + '</p>';
+    else if (b.t === 'right') h += '<div style="text-align:right;margin:6px 0 0">' + b.v.map(function (x) { return '<div style="margin:0 0 3px">' + I(x) + '</div>'; }).join('') + '</div>';
+    else if (b.t === 'note') {
+      h += '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:16px 0"><tr><td style="background:' + tint + ';border:1px solid ' + line + ';padding:12px 18px;line-height:1.65;font-size:15px">' +
+        b.v.map(function (x, k) { var head = k === 0 && /^\*\*[^*]+\*\*$/.test(x); return '<p style="margin:' + (k ? '8px' : '0') + ' 0 0;' + (head ? 'color:' + col + ';' : '') + '">' + I(x) + '</p>'; }).join('') + '</td></tr></table>';
+    } else if (b.t === 'ul') {
+      var s = '<ul style="margin:0 0 13px;padding-left:22px">', open = 0;
+      b.v.forEach(function (it, k) {
+        if (it.lv === 1 && !open) { s += '<ul style="margin:4px 0 4px;padding-left:22px;list-style-type:circle">'; open = 1; }
+        if (it.lv === 0 && open) { s += '</ul></li>'; open = 0; }
+        else if (it.lv === 0 && k) s += '</li>';
+        if (it.lv === 0) s += '<li style="margin:0 0 5px">' + I(it.v);
+        else s += '<li style="margin:0 0 4px">' + I(it.v) + '</li>';
+      });
+      s += (open ? '</ul>' : '') + '</li></ul>';
+      h += s;
+    } else if (b.t === 'tbl') {
+      var cols = Math.max.apply(null, b.v.map(function (r) { return r.length; }));
+      var t = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:6px 0 16px;border:1px solid ' + line + '">';
+      b.v.forEach(function (r, ri) {
+        t += '<tr>';
+        for (var c = 0; c < cols; c++) {
+          var v = r[c] || '';
+          if (ri === 0) t += '<td align="center" style="background:' + col + ';color:#ffffff;font-weight:bold;text-transform:uppercase;font-size:14px;padding:14px 12px;border:1px solid ' + col + '">' + I(v) + '</td>';
+          else t += '<td valign="top" ' + (cols === 2 ? 'width="' + (c ? '62%' : '38%') + '" ' : '') + 'style="background:' + tint + ';border:1px solid ' + line + ';padding:11px 14px;font-size:14.5px;' + (c && cols === 2 ? 'font-weight:bold' : '') + '">' + I(v) + '</td>';
+        }
+        t += '</tr>';
+      });
+      h += t + '</table>';
+    }
+  });
+  return '<div style="background:#f5f0f2;padding:22px 10px"><div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid ' + line + ';padding:30px 38px;font-family:Georgia,\'Times New Roman\',serif;font-size:15px;line-height:1.65;color:#222222">' + h + '</div></div>';
+}
+/** Bản văn bản thuần (cho phần dự phòng / mở bằng ứng dụng email / sao chép). */
+function mrPlain(text) {
+  var out = [];
+  mrParse(text).forEach(function (b) {
+    var P = function (s) { return String(s).replace(/<br>/g, '\n').replace(/\*\*(.+?)\*\*/g, '$1').replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, '$1$2'); };
+    if (b.t === 'h1' || b.t === 'h2') out.push(P(b.v).toUpperCase());
+    else if (b.t === 'p') out.push(P(b.v));
+    else if (b.t === 'hr') out.push('--------');
+    else if (b.t === 'note' || b.t === 'right') out.push(b.v.map(P).join('\n'));
+    else if (b.t === 'ul') out.push(b.v.map(function (it) { return (it.lv ? '    ◦ ' : '• ') + P(it.v); }).join('\n'));
+    else if (b.t === 'tbl') out.push(b.v.slice(1).map(function (r) { return '• ' + P(r[0] || '') + (r[1] ? ': ' + P(r.slice(1).join(' – ')) : ''); }).join('\n'));
+  });
+  return out.join('\n\n');
+}
+/*MR-END*/
+/* ===== Bộ mẫu thư chuyên nghiệp (cú pháp xem ở khung hướng dẫn trong "Thêm/Sửa mẫu thư") ===== */
+function proTemplates(){
+  const SIGN='\n\nTrân trọng,\n**{{nguoi_gui}}**<br>{{cong_ty}}';
+  return[
+  {type:'Thư mời phỏng vấn',name:'Thư mời phỏng vấn (giao diện chuyên nghiệp)',subject:'[{{cong_ty}}] Thư mời phỏng vấn – {{vi_tri}}',body:
+`# THƯ MỜI PHỎNG VẤN
+
+**Thân gửi Anh/Chị:** {{ten_ung_vien}}
+**Điện thoại:** {{uv_sdt}}
+
+Cảm ơn Anh/Chị đã quan tâm và ứng tuyển vào vị trí **{{vi_tri}}** tại {{cong_ty}}. Sau khi xem xét hồ sơ, chúng tôi trân trọng mời Anh/Chị tham dự buổi phỏng vấn với thông tin như sau:
+
+## I. THÔNG TIN BUỔI PHỎNG VẤN
+| Hạng mục | Chi tiết thông tin |
+| Vị trí ứng tuyển | {{vi_tri}} |
+| Bộ phận / Đơn vị | {{phong_ban}} |
+| Vòng phỏng vấn | {{pv_ten_vong}} |
+| Thời gian | {{gio_phong_van}}, ngày {{ngay_phong_van}} |
+| Địa điểm | {{dia_diem}} |
+| Người phỏng vấn | {{pv_nguoi_phong_van}} |
+
+## II. LƯU Ý CHUẨN BỊ
+- Mang theo giấy tờ tùy thân (CCCD) và bản sao các văn bằng, chứng chỉ liên quan.
+- Có mặt trước giờ hẹn khoảng 10 phút để hoàn tất thủ tục.
+- Chuẩn bị giới thiệu ngắn gọn về kinh nghiệm và định hướng phát triển của bản thân.
+
+> **LƯU Ý VỀ XÁC NHẬN THAM DỰ:**
+> • Anh/Chị vui lòng phản hồi email này để xác nhận tham dự. Nếu cần đổi lịch, xin báo sớm để chúng tôi sắp xếp lại.${SIGN}`},
+  {type:'Thư mời nhận việc',name:'Thư mời nhận việc (BM.09 – giao diện chuyên nghiệp)',subject:'[{{cong_ty}}] Thư mời nhận việc – {{vi_tri}}',body:
+`# THƯ MỜI NHẬN VIỆC
+
+**Thân gửi Anh/Chị:** {{ten_ung_vien}}
+**Điện thoại:** {{uv_sdt}}
+
+Lời đầu tiên, {{cong_ty}} xin chân thành cảm ơn Anh/Chị đã dành thời gian và tâm huyết tham gia vào quá trình tuyển dụng. Chúng tôi rất ấn tượng với năng lực, sự chuyên nghiệp cũng như những định hướng phát triển của Anh/Chị qua các vòng phỏng vấn vừa qua.
+
+Do đó, chúng tôi trân trọng mời Anh/Chị gia nhập đội ngũ nhân sự của {{cong_ty}} với các chi tiết cụ thể như sau:
+
+## I. THÔNG TIN CÔNG VIỆC & THU NHẬP
+| Hạng mục | Chi tiết thông tin |
+| Chức danh công việc | {{vi_tri}} |
+| Cấp trên trực tiếp | {{tm_cap_tren_truc_tiep}} |
+| Ngày nhận việc | {{ngay_nhan_viec}} |
+| Thời gian thử việc | {{tm_thoi_gian_thu_viec}} |
+| Thời gian làm việc | Từ thứ 2 – Thứ 6 (7:30 – 17:00)<br>Thứ 7 (8:00 – 12:00) |
+| Nơi làm việc | {{cong_ty}} |
+| Thu nhập thử việc tạm tính<br>*(Trước thuế TNCN, BHXH-BHYT-BHTN, công đoàn)* | {{tm_thu_nhap_thu_viec}} |
+| Thu nhập chính thức tạm tính<br>*(Trước thuế TNCN, BHXH-BHYT-BHTN, công đoàn)* | {{luong}} |
+
+## II. CÁC QUYỀN LỢI VÀ CHẾ ĐỘ PHÚC LỢI KÈM THEO
+- **Phụ cấp (nếu có):** Theo quy định công ty.
+- **Chế độ ăn uống:** Công ty phục vụ ăn sáng, ăn trưa tại Trường khi học sinh đi học tại trường và bếp ăn phục vụ.
+- **Công tác phí:** Khi đi công tác xa, Công ty sẽ bố trí xe / thanh toán chi phí đi xe theo kế hoạch công tác đã Ban Giám đốc phê duyệt + theo quy định về công tác phí của Công ty.
+- **Trang thiết bị:** Cung cấp đầy đủ trang thiết bị văn phòng phục vụ cho công tác.
+- **Bảo hiểm & Chế độ khác:** Các chế độ khác sẽ áp dụng theo Luật Lao động và chính sách chung của Công ty, cụ thể:
+  - Mức lương đăng ký tham gia BHXH, BHYT, BHTN, … theo quy định hệ thống thang lương của Công ty tại từng thời điểm đăng ký với cơ quan Nhà nước.
+  - Giải quyết các chính sách sau khi chấm dứt Hợp đồng lao động dựa trên cơ sở Hợp đồng lao động đã ký kết giữa hai bên.
+  - Các chế độ đãi ngộ khác sẽ do Tổng Giám Đốc quyết định theo từng thời điểm.
+
+{{cong_ty}} hân hạnh chào đón Anh/Chị trở thành một thành viên của Hệ thống, cùng đồng hành, phát huy năng lực và đóng góp những giá trị tích cực cho sự phát triển chung.
+
+> **LƯU Ý VỀ THỜI GIAN XÁC NHẬN:**
+> • Nếu Anh/Chị đồng ý với các đề nghị nêu trên, xin vui lòng phản hồi email này trước ngày **{{han_phan_hoi}}** để xác nhận sự đồng ý của Anh/Chị đối với các nội dung nêu trên và làm cơ sở cho việc giao kết hợp đồng lao động theo quy định.
+> • Trường hợp Anh/Chị chọn thời gian khác để nhận việc cũng vui lòng phản hồi cho chúng tôi trước ngày **{{han_phan_hoi}}**. Sau thời gian trên, nếu chưa nhận được phản hồi từ Anh/Chị, {{cong_ty}} sẽ ghi nhận rằng lời mời chưa được xác nhận từ bạn tại thời điểm này.
+
+~ **PHẦN XÁC NHẬN CỦA ỨNG VIÊN**
+~ *TP. Hồ Chí Minh, ngày ....... tháng ....... năm .......*
+~ **(Ký & ghi rõ họ tên)**`},
+  {type:'Thư cảm ơn',name:'Cảm ơn sau phỏng vấn (giao diện chuyên nghiệp)',subject:'[{{cong_ty}}] Cảm ơn Anh/Chị đã tham dự phỏng vấn',body:
+`# THƯ CẢM ƠN
+
+**Thân gửi Anh/Chị:** {{ten_ung_vien}}
+
+Cảm ơn Anh/Chị đã dành thời gian trao đổi cùng {{cong_ty}} về vị trí **{{vi_tri}}**. Chúng tôi đánh giá cao sự quan tâm và những chia sẻ của Anh/Chị trong buổi phỏng vấn.
+
+> **THÔNG TIN TIẾP THEO:**
+> • Hội đồng tuyển dụng đang tổng hợp đánh giá và sẽ thông báo kết quả đến Anh/Chị trong thời gian sớm nhất.
+> • Trong thời gian chờ đợi, nếu cần bổ sung thông tin, Anh/Chị vui lòng phản hồi email này.${SIGN}`},
+  {type:'Thư từ chối',name:'Thông báo chưa phù hợp (giao diện chuyên nghiệp)',subject:'[{{cong_ty}}] Thông báo kết quả ứng tuyển – {{vi_tri}}',body:
+`# THÔNG BÁO KẾT QUẢ ỨNG TUYỂN
+
+**Thân gửi Anh/Chị:** {{ten_ung_vien}}
+
+Cảm ơn Anh/Chị đã quan tâm và dành thời gian tham gia quá trình tuyển dụng vị trí **{{vi_tri}}** tại {{cong_ty}}.
+
+Sau khi cân nhắc kỹ lưỡng, rất tiếc hồ sơ của Anh/Chị chưa phù hợp với yêu cầu của vị trí ở thời điểm hiện tại.
+
+> **THÔNG TIN THÊM:**
+> • Chúng tôi xin phép lưu giữ hồ sơ để liên hệ lại khi có cơ hội phù hợp hơn.
+> • Chúc Anh/Chị sớm tìm được công việc như mong muốn và nhiều thành công trong sự nghiệp.${SIGN}`},
+  {type:'Khác',name:'Nhắc xác nhận lịch / phản hồi (giao diện chuyên nghiệp)',subject:'[{{cong_ty}}] Nhắc phản hồi – {{vi_tri}}',body:
+`# THƯ NHẮC PHẢN HỒI
+
+**Thân gửi Anh/Chị:** {{ten_ung_vien}}
+
+Chúng tôi xin phép nhắc Anh/Chị về nội dung liên quan đến vị trí **{{vi_tri}}** tại {{cong_ty}}.
+
+> **ĐỀ NGHỊ ANH/CHỊ:**
+> • Vui lòng phản hồi email này trước ngày **{{han_phan_hoi}}** để chúng tôi kịp sắp xếp.${SIGN}`}];
+}
+function mailBrandCfg(){const m=DB.cfg.mail;return{color:m.brandColor,lines:String(m.headerLines||'').split(/\r?\n/),logo:m.showLogo!==0&&!!tplAt(Date.now()).logoData}}
+/** HTML thư để xem trước (giống thư thật; logo lấy từ Mẫu phiếu đang hiệu lực). */
+function mailPreviewHTML(text){
+  const m=DB.cfg.mail;if(m.rich===0)return'<pre style="white-space:pre-wrap;font:14px/1.55 Arial;padding:14px">'+esc(mrPlain(text))+'</pre>';
+  const b=mailBrandCfg();let h=mrRender(text,b);if(b.logo)h=h.split('cid:vaslogo').join(tplAt(Date.now()).logoData);return h}
+const mailBodyFull=body=>body+(DB.cfg.mail.signature?'\n\n'+DB.cfg.mail.signature:'');
 const merge=(t,v)=>t.replace(/\{\{(\w+)\}\}/g,(m,k)=>v[k]||m);
 
 /* ============ LIBRARY ============ */
@@ -1125,7 +1345,7 @@ function vLib(){
     body=`<div class="alert info" style="margin-bottom:14px">${ic('alert')}<div>Mỗi vị trí có nhiều <b>phiên bản</b> (file scan đã duyệt, ngày hiệu lực, thời hạn tuyển). Khi có bản mới, bấm <b>Bản mới</b>: bản cũ tự hết hiệu lực vào ngày hiệu lực của bản mới và vẫn được lưu để xem lại. <b>Thời hạn tuyển</b> tính từ ngày Ban TGĐ duyệt đến ngày nhân sự vào làm; mỗi đề xuất dùng bản có hiệu lực <b>tại ngày duyệt</b> để tính KPI.</div></div>
     <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Mã vị trí</th><th>Tên vị trí</th><th>Bản hiện hành</th><th>Thời hạn tuyển</th><th>Hiệu lực từ</th><th>Tình trạng</th><th>File scan đã duyệt</th><th></th></tr></thead><tbody>${l.map(p=>{const vs=verList(p),up=vs.find(v=>(v.effective||'')>todayIso());return`<tr><td class="mono">${esc(p.code)}</td><td><b>${esc(p.name)}</b></td><td>${badge('v'+p.curVer,'b-info')}${up?` <span class="badge b-warn">Sắp có v${up.ver} từ ${fmtD(up.effective)}</span>`:''}<div class="muted small">${vs.length} phiên bản</div></td><td>${esc(p.slaDays)} ngày</td><td>${fmtD(p.effective)}</td><td>${badge(p.status,p.status==='Đang áp dụng'?'b-ok':'b-gray')}</td><td>${p.file?`<button class="btn sm" data-act="viewPosFile" data-id="${p.id}">${ic('eye')}Xem tệp</button>`:'<span class="badge b-warn">Chưa có</span>'}</td><td style="text-align:right;white-space:nowrap"><button class="btn sm" data-act="histPos" data-id="${p.id}">${ic('list')}Lịch sử</button>${ed?` <button class="btn sm pri" data-act="newVer" data-id="${p.id}">${ic('plus')}Bản mới</button> <button class="btn sm" data-act="editPos" data-id="${p.id}">${ic('edit')}Sửa</button> <button class="btn sm bad" data-act="delPos" data-id="${p.id}">${ic('trash')}</button>`:''}</td></tr>`}).join('')||`<tr><td colspan="8"><div class="empty">Chưa có vị trí</div></td></tr>`}</tbody></table></div></div>`;
   }else if(ui.lt==='tpl'){
-    act=ed?`<button class="btn pri" data-act="newTpl">${ic('plus')}Thêm mẫu thư</button>`:'';
+    act=ed?`<button class="btn" data-act="tplPro">${ic('mail')}Cài bộ mẫu thư chuyên nghiệp</button> <button class="btn pri" data-act="newTpl">${ic('plus')}Thêm mẫu thư</button>`:'';
     const l=DB.lib.templates.filter(t=>(!ui.tplType||t.type===ui.tplType)&&(!q||(t.name+t.body).toLowerCase().includes(q)));
     body=`<div class="row" style="margin-bottom:14px"><div class="seg"><button class="${!ui.tplType?'on':''}" data-act="tplType" data-id="">Tất cả</button>${TPL_TYPES.map(t=>`<button class="${ui.tplType===t?'on':''}" data-act="tplType" data-id="${t}">${t}</button>`).join('')}</div></div>
     <div class="lib-grid">${l.map(t=>`<div class="card lib-card">${badge(t.type,'b-warn')}<h4>${esc(t.name)}</h4><div class="small muted">Tiêu đề: ${esc(t.subject)}</div><div class="pv">${esc(t.body)}</div><div class="ft"><button class="btn sm" data-act="viewTpl" data-id="${t.id}">${ic('eye')}Xem trước</button>${ed?`<button class="btn sm" data-act="editTpl" data-id="${t.id}">${ic('edit')}Sửa</button><button class="btn sm" data-act="dupTpl" data-id="${t.id}">${ic('copy')}</button><button class="btn sm bad" data-act="delTpl" data-id="${t.id}">${ic('trash')}</button>`:''}</div></div>`).join('')||'<div class="empty">Chưa có mẫu thư</div>'}</div>`;
@@ -1191,7 +1411,10 @@ function histModal(p){
 function tplModal(t){
   const v=t||{type:TPL_TYPES[0],name:'',subject:'',body:''};
   const fields=[{k:'name',l:'Tên mẫu',t:'text',req:1},{k:'type',l:'Loại thư',t:'select',opts:TPL_TYPES,req:1},{k:'subject',l:'Tiêu đề email',t:'text',req:1,wide:1},{k:'body',l:'Nội dung',t:'textarea',req:1,wide:1}];
-  modal({title:t?'Sửa mẫu thư':'Thêm mẫu thư',wide:true,html:formHTML(fields,v)+`<div style="margin-top:12px"><div class="small muted">Bấm để chèn trường thông tin tự động vào ô <b>Tiêu đề</b> hoặc <b>Nội dung</b> (ô nào đang chọn). Các trường tạo mới ở Thiết lập sẽ tự xuất hiện ở đây.</div>${phChipsHTML()}</div>`,after:()=>{tplFocusId='ff_body';$('#ff_body').style.minHeight='240px'},
+  modal({title:t?'Sửa mẫu thư':'Thêm mẫu thư',wide:true,html:formHTML(fields,v)+`<div style="margin-top:12px"><div class="small muted">Bấm để chèn trường thông tin tự động vào ô <b>Tiêu đề</b> hoặc <b>Nội dung</b> (ô nào đang chọn). Các trường tạo mới ở Thiết lập sẽ tự xuất hiện ở đây.</div>${phChipsHTML()}</div>
+    <details style="margin-top:12px"><summary class="small" style="cursor:pointer;font-weight:600">Cách trình bày thư (bảng, mục, ô lưu ý…)</summary><div class="small muted" style="margin-top:6px;line-height:1.7"><code># Tiêu đề lớn</code> · <code>## Mục I, II…</code> · <code>| Hạng mục | Chi tiết |</code> (dòng đầu của bảng là tiêu đề cột) · <code>- Gạch đầu dòng</code> (thụt 2 dấu cách = cấp con) · <code>&gt; Ô lưu ý</code> (dòng đầu nên là <code>**TIÊU ĐỀ**</code>) · <code>~ Dòng căn phải</code> · <code>---</code> đường kẻ · <code>**đậm**</code> · <code>*nghiêng*</code> · <code>&lt;br&gt;</code> xuống dòng trong ô bảng. Thư không dùng ký hiệu nào vẫn hiển thị bình thường.</div></details>
+    <label class="f" style="margin-top:12px">Xem trước (dữ liệu mẫu)</label><iframe id="tpl_pv" sandbox="" style="width:100%;height:520px;border:1px solid var(--line);border-radius:10px;background:#fff"></iframe>`,
+    after:()=>{tplFocusId='ff_body';$('#ff_body').style.minHeight='300px';const pv=()=>{$('#tpl_pv').srcdoc=mailPreviewHTML(mailBodyFull(merge($('#ff_body').value,sampleVars())))};pv();let pt=0;$('#ff_body').addEventListener('input',()=>{clearTimeout(pt);pt=setTimeout(pv,250)});$('#modal').addEventListener('click',e=>{if(e.target.closest('.chip.ph'))setTimeout(pv,50)})},
     buttons:[modalCancel,{label:'Lưu',cls:'pri',icon:'check',fn:()=>{const x=readForm($('#modal'),fields);if(!x)return false;if(t)Object.assign(t,x);else DB.lib.templates.push({id:uid('t_'),...x});commit();toast('Đã lưu mẫu thư','ok')}}]});
 }
 function sampleVars(){return{ten_ung_vien:'Nguyễn Văn A',vi_tri:'Giáo viên Toán THCS',phong_ban:'Tổ Toán – Tin',ngay_phong_van:fmtD(iso(3)),gio_phong_van:'09:00',dia_diem:'Phòng họp A',luong:'15.000.000 đ/tháng',ngay_nhan_viec:fmtD(iso(20)),han_phan_hoi:fmtD(iso(7)),nguoi_gui:me().name,cong_ty:DB.cfg.company}}
@@ -1225,14 +1448,16 @@ function letterModal(c,t){
   const atts=DB.lib.forms.filter(f=>f.file&&f.file.id&&f.file.url);
   modal({title:c?`Soạn thư cho ${c.v.name}`:'Xem trước mẫu thư (dữ liệu mẫu)',wide:true,
     html:`<div id="lt_warn">${warnHTML(subj,body)}</div>${rounds.length>1?`<div class="row" style="margin-bottom:12px"><label class="f" style="margin:0">Dùng thông tin vòng phỏng vấn:</label><select id="lt_round" style="width:auto;max-width:320px">${rounds.map(i=>`<option value="${esc(i.id)}">${esc(i.name||'Vòng')}${i.date?' – '+fmtD(i.date):''}</option>`).join('')}</select><span class="small muted">Đổi vòng sẽ soạn lại thư từ mẫu.</span></div>`:''}
-    <label class="f">Tiêu đề</label><input type="text" id="lt_s" value="${esc(subj)}"><label class="f" style="margin-top:12px">Nội dung</label><textarea id="lt_b" style="min-height:280px">${esc(body)}</textarea>
+    <label class="f">Tiêu đề</label><input type="text" id="lt_s" value="${esc(subj)}"><label class="f" style="margin-top:12px">Nội dung</label><textarea id="lt_b" style="min-height:240px">${esc(body)}</textarea>
+    <div class="row" style="margin-top:12px;justify-content:space-between"><label class="f" style="margin:0">Xem trước thư (đúng giao diện người nhận thấy)</label><span class="small muted">Chỉnh nội dung ở trên, khung này tự cập nhật</span></div>
+    <iframe id="lt_pv" sandbox="" style="width:100%;height:560px;border:1px solid var(--line);border-radius:10px;background:#fff;margin-top:6px"></iframe>
     ${canSend?`<div class="card sec" style="margin-top:14px;border-left:4px solid var(--brand)"><div class="sec-h"><h3>${ic('mail')}Gửi email trực tiếp</h3></div>
       <div class="fgrid"><div><label class="f">Gửi tới</label><input type="text" id="ml_to" value="${esc(c.v.email||'')}" placeholder="email ứng viên"></div><div><label class="f">CC thêm (tuỳ chọn)</label><input type="text" id="ml_cc" placeholder="a@congty.vn, b@congty.vn"></div></div>
       ${atts.length?`<div style="margin-top:10px"><label class="f">Đính kèm biểu mẫu từ Thư viện</label><div id="ml_att">${atts.map(f=>`<label style="display:flex;gap:8px;align-items:center;margin:4px 0"><input type="checkbox" class="chk" value="${esc(f.file.id)}">${esc(f.name)} <span class="muted small">(${fsize(f.file.size)})</span></label>`).join('')}</div></div>`:''}
       <div class="row" style="margin-top:12px"><button class="btn pri" id="ml_send" data-act="mlSend" data-id="${c.id}" data-arg="${t.id}" data-label="${esc('Gửi email ngay')}">${ic('mail')}Gửi email ngay</button><span class="small muted">Gửi từ <b>${esc(mailFromLabel())}</b>. Chữ ký và BCC lưu bản sao thêm tự động.</span></div></div>`:''}`,
-    after:()=>{const sel=$('#lt_round');if(sel){sel.value=dr?dr.id:rounds[rounds.length-1].id;sel.onchange=()=>{rid=sel.value;const x=compose();$('#lt_s').value=x.subj;$('#lt_b').value=x.body;$('#lt_warn').innerHTML=warnHTML(x.subj,x.body)}}},
-    buttons:[modalCancel,{label:'Sao chép',icon:'copy',fn:()=>{copyText($('#lt_s').value+'\n\n'+$('#lt_b').value);toast('Đã sao chép nội dung thư','ok');return false}},
-      ...(c?[{label:'Mở trong ứng dụng email',icon:'mail',fn:()=>{const a=document.createElement('a');a.href=`mailto:${encodeURIComponent(c.v.email||'')}?subject=${encodeURIComponent($('#lt_s').value)}&body=${encodeURIComponent($('#lt_b').value)}`;a.target='_blank';document.body.append(a);a.click();a.remove();return false}},
+    after:()=>{const pv=()=>{const f=$('#lt_pv');if(f)f.srcdoc=mailPreviewHTML(mailBodyFull($('#lt_b').value))};pv();let pt=0;$('#lt_b').addEventListener('input',()=>{clearTimeout(pt);pt=setTimeout(pv,250)});const sel=$('#lt_round');if(sel){sel.value=dr?dr.id:rounds[rounds.length-1].id;sel.onchange=()=>{rid=sel.value;const x=compose();$('#lt_s').value=x.subj;$('#lt_b').value=x.body;$('#lt_warn').innerHTML=warnHTML(x.subj,x.body);pv()}}},
+    buttons:[modalCancel,{label:'Sao chép',icon:'copy',fn:()=>{copyText($('#lt_s').value+'\n\n'+mrPlain($('#lt_b').value));toast('Đã sao chép nội dung thư','ok');return false}},
+      ...(c?[{label:'Mở trong ứng dụng email',icon:'mail',fn:()=>{const a=document.createElement('a');a.href=`mailto:${encodeURIComponent(c.v.email||'')}?subject=${encodeURIComponent($('#lt_s').value)}&body=${encodeURIComponent(mrPlain($('#lt_b').value))}`;a.target='_blank';document.body.append(a);a.click();a.remove();return false}},
       {label:'Ghi nhận đã gửi',cls:canSend?'':'pri',icon:'check',fn:()=>{log(c,`Đã gửi thư: ${t.name}`);commit();toast('Đã ghi nhận vào lịch sử ứng viên','ok')}}]:[])]});
 }
 
@@ -1278,6 +1503,11 @@ function cfgBody(){
       <div><label class="f">CC mặc định (cách nhau bằng dấu phẩy)</label><input type="text" data-cfg="mail.cc" value="${esc(M.cc)}"></div>
       <div><label class="f">BCC lưu bản sao vào hộp thư tuyển dụng</label><input type="text" data-cfg="mail.bcc" value="${esc(M.bcc)}" placeholder="tuyendung@congty.vn"></div>
       <div><label class="f">Giới hạn số email mỗi ngày</label><input type="number" min="1" data-cfg="mail.dailyLimit" value="${esc(M.dailyLimit)}"></div>
+      <div class="wide"><h4 style="margin:6px 0 0">Giao diện thư gửi đi</h4></div>
+      <div><label class="f">Giao diện thư</label><select data-cfg="mail.rich" data-bool="1"><option value="1" ${M.rich===0?'':'selected'}>Chuyên nghiệp (tiêu đề, bảng, ô lưu ý, logo)</option><option value="0" ${M.rich===0?'selected':''}>Văn bản đơn giản</option></select></div>
+      <div><label class="f">Logo đầu thư</label><select data-cfg="mail.showLogo" data-bool="1"><option value="1" ${M.showLogo===0?'':'selected'}>Hiện (lấy từ Thư viện → Mẫu phiếu)</option><option value="0" ${M.showLogo===0?'selected':''}>Ẩn</option></select></div>
+      <div><label class="f">Màu chủ đạo</label><input type="color" data-cfg="mail.brandColor" value="${esc(M.brandColor||'#8a1538')}" style="height:40px;padding:3px"></div>
+      <div class="wide"><label class="f">Thông tin đầu thư (mỗi dòng một nội dung, hiện bên trái logo)</label><textarea data-cfg="mail.headerLines" style="min-height:90px" placeholder="HỆ THỐNG TRƯỜNG VIỆT MỸ (VA SCHOOLS)&#10;Trụ sở: 252 Lạc Long Quân, Phường Bình Thới, TP.HCM&#10;Điện thoại: 028.3858 5300&#10;Website: www.vaschools.edu.vn">${esc(M.headerLines||'')}</textarea></div>
       <div class="wide"><label class="f">Chữ ký email (tự thêm cuối mọi thư)</label><textarea data-cfg="mail.signature" placeholder="Trân trọng,&#10;Phòng Nhân sự – Tên công ty&#10;Hotline: …">${esc(M.signature)}</textarea></div></div>
       <div class="row" style="margin-top:14px"><button class="btn" data-act="mailAliases" ${ENV.gs?'':'disabled'}>${ic('search')}Kiểm tra alias trong Gmail</button><button class="btn pri" data-act="mailTest" ${ENV.gs?'':'disabled'}>${ic('mail')}Gửi thư thử tới email của tôi</button></div>
       ${info?`<p class="small" style="margin-top:12px">Chủ dự án: <b>${esc(info.owner)}</b> · Alias tìm thấy: ${info.aliases.length?info.aliases.map(a=>badge(a,'b-ok')).join(' '):badge('Chưa có alias nào – hãy thêm “Gửi thư với tư cách” trong Gmail','b-warn')} · Hạn mức còn lại hôm nay: <b>${esc(info.quota)}</b> email</p>`:''}
@@ -1574,6 +1804,7 @@ const A={
  viewPosFile:id=>openFile(DB.lib.positions.find(p=>p.id===id).file),
  viewVerFile:(id,el)=>openFile(DB.lib.positions.find(p=>p.id===id).versions.find(v=>v.id===el.dataset.arg).file),
  delPos:id=>confirmBox('Xoá vị trí này cùng toàn bộ phiên bản và file scan?',async()=>{const p=DB.lib.positions.find(x=>x.id===id);DB.lib.positions=DB.lib.positions.filter(x=>x.id!==id);commit();if(p)for(const v of p.versions)await releaseFile(v.file)},'Xoá'),
+ tplPro:()=>{const have=new Set(DB.lib.templates.map(t=>t.name));const add=proTemplates().filter(t=>!have.has(t.name));if(!add.length){toast('Các mẫu chuyên nghiệp đã có trong thư viện','ok');return}confirmBox(`Thêm <b>${add.length}</b> mẫu thư giao diện chuyên nghiệp (mời phỏng vấn, mời nhận việc BM.09, cảm ơn, thông báo kết quả, nhắc phản hồi)? Các mẫu hiện có <b>không bị thay đổi</b>.`,()=>{add.forEach(t=>DB.lib.templates.push({id:uid('t_'),...t}));commit();toast('Đã thêm '+add.length+' mẫu thư','ok')},'Thêm mẫu')},
  newTpl:()=>tplModal(),editTpl:id=>tplModal(DB.lib.templates.find(t=>t.id===id)),
  viewTpl:id=>letterModal(null,DB.lib.templates.find(t=>t.id===id)),
  dupTpl:id=>{const t=DB.lib.templates.find(x=>x.id===id);DB.lib.templates.push({...t,id:uid('t_'),name:t.name+' (bản sao)'});commit();toast('Đã nhân bản','ok')},

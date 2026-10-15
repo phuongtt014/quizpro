@@ -323,9 +323,148 @@ function validateMail_(p, m) {
   return { to: to, subject: subject, ccAll: ccAll, bccAll: bccAll, full: body + (m.signature ? '\n\n' + m.signature : ''), ids: ids };
 }
 
-function mailHtml_(full) {
-  return '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#111">' +
-    escHtml_(full).replace(/\r?\n/g, '<br>') + '</div>';
+/*MR-BEGIN*/
+/* ---- Bộ dựng thư HTML (dùng chung: giao diện xem trước và Code.gs). Cú pháp: # Tiêu đề · ## Mục · | bảng | · - gạch đầu dòng (thụt 2 dấu cách = cấp con) · > ô lưu ý · ~ căn phải · --- đường kẻ · **đậm** · *nghiêng* · <br> xuống dòng */
+function mrEsc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function mrInline(s, col) {
+  var t = mrEsc(s);
+  t = t.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  t = t.replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, '$1<i>$2</i>');
+  t = t.replace(/&lt;br&gt;/g, '<br>');
+  t = t.replace(/(https?:\/\/(?:(?!&quot;)[^\s<])+)/g, '<a href="$1" style="color:' + col + '">$1</a>');
+  return t;
+}
+function mrParse(text) {
+  var lines = String(text || '').replace(/\r/g, '').split('\n'), out = [], i = 0, para = null;
+  function flush() { if (para) { out.push({ t: 'p', v: para.join('<br>') }); para = null; } }
+  while (i < lines.length) {
+    var ln = lines[i], tr = ln.replace(/\s+$/, '');
+    if (!tr.trim()) { flush(); i++; continue; }
+    var m;
+    if ((m = /^#\s+(.*)$/.exec(tr))) { flush(); out.push({ t: 'h1', v: m[1] }); i++; continue; }
+    if ((m = /^##\s+(.*)$/.exec(tr))) { flush(); out.push({ t: 'h2', v: m[1] }); i++; continue; }
+    if (/^-{3,}$/.test(tr.trim())) { flush(); out.push({ t: 'hr' }); i++; continue; }
+    if (/^\|/.test(tr.trim())) {
+      flush(); var rows = [];
+      while (i < lines.length && /^\|/.test(lines[i].trim())) {
+        var cells = lines[i].trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (c) { return c.trim(); });
+        if (!cells.every(function (c) { return /^:?-{2,}:?$/.test(c); })) rows.push(cells);
+        i++;
+      }
+      out.push({ t: 'tbl', v: rows }); continue;
+    }
+    if (/^>\s?/.test(tr)) {
+      flush(); var ps = [];
+      while (i < lines.length && /^>\s?/.test(lines[i])) { var q = lines[i].replace(/^>\s?/, '').trim(); if (q) ps.push(q); i++; }
+      out.push({ t: 'note', v: ps }); continue;
+    }
+    if (/^~\s?/.test(tr)) {
+      flush(); var rs = [];
+      while (i < lines.length && /^~\s?/.test(lines[i])) { rs.push(lines[i].replace(/^~\s?/, '').trim()); i++; }
+      out.push({ t: 'right', v: rs }); continue;
+    }
+    if (/^\s*[-•]\s+/.test(tr)) {
+      flush(); var items = [];
+      while (i < lines.length && /^\s*[-•]\s+/.test(lines[i])) {
+        var mm = /^(\s*)[-•]\s+(.*)$/.exec(lines[i]);
+        items.push({ lv: mm[1].length >= 2 ? 1 : 0, v: mm[2] }); i++;
+      }
+      out.push({ t: 'ul', v: items }); continue;
+    }
+    (para = para || []).push(tr.trim()); i++;
+  }
+  flush();
+  return out;
+}
+/** brand: {color, lines:[...], logo:boolean}. */
+function mrRender(text, brand) {
+  brand = brand || {};
+  var col = /^#[0-9a-fA-F]{6}$/.test(brand.color || '') ? brand.color : '#8a1538';
+  var line = '#ead9de', tint = '#fdf6f7', I = function (s) { return mrInline(s, col); };
+  var h = '';
+  var bl = (brand.lines || []).filter(function (x) { return String(x).trim(); });
+  if (bl.length || brand.logo) {
+    h += '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:6px"><tr><td valign="top" style="font-family:Georgia,\'Times New Roman\',serif;font-size:13px;line-height:1.55;font-weight:bold;color:' + col + '">' +
+      bl.map(function (x) { return /^website/i.test(String(x).trim()) ? '<span style="color:#666">' + mrEsc(x) + '</span>' : mrEsc(x); }).join('<br>') + '</td>' +
+      (brand.logo ? '<td width="110" align="right" valign="top"><img src="cid:vaslogo" width="90" alt="logo" style="display:block;border:0;max-width:90px;height:auto"></td>' : '') + '</tr></table>';
+  }
+  mrParse(text).forEach(function (b) {
+    if (b.t === 'h1') h += '<h1 style="text-align:center;font-size:23px;line-height:1.3;color:' + col + ';margin:26px 0 20px;font-weight:bold">' + I(b.v) + '</h1>';
+    else if (b.t === 'h2') h += '<h2 style="font-size:15px;line-height:1.4;color:' + col + ';margin:22px 0 10px;font-weight:bold">' + I(b.v) + '</h2>';
+    else if (b.t === 'hr') h += '<hr style="border:0;border-top:1px solid ' + line + ';margin:18px 0">';
+    else if (b.t === 'p') h += '<p style="margin:0 0 13px">' + I(b.v) + '</p>';
+    else if (b.t === 'right') h += '<div style="text-align:right;margin:6px 0 0">' + b.v.map(function (x) { return '<div style="margin:0 0 3px">' + I(x) + '</div>'; }).join('') + '</div>';
+    else if (b.t === 'note') {
+      h += '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:16px 0"><tr><td style="background:' + tint + ';border:1px solid ' + line + ';padding:12px 18px;line-height:1.65;font-size:15px">' +
+        b.v.map(function (x, k) { var head = k === 0 && /^\*\*[^*]+\*\*$/.test(x); return '<p style="margin:' + (k ? '8px' : '0') + ' 0 0;' + (head ? 'color:' + col + ';' : '') + '">' + I(x) + '</p>'; }).join('') + '</td></tr></table>';
+    } else if (b.t === 'ul') {
+      var s = '<ul style="margin:0 0 13px;padding-left:22px">', open = 0;
+      b.v.forEach(function (it, k) {
+        if (it.lv === 1 && !open) { s += '<ul style="margin:4px 0 4px;padding-left:22px;list-style-type:circle">'; open = 1; }
+        if (it.lv === 0 && open) { s += '</ul></li>'; open = 0; }
+        else if (it.lv === 0 && k) s += '</li>';
+        if (it.lv === 0) s += '<li style="margin:0 0 5px">' + I(it.v);
+        else s += '<li style="margin:0 0 4px">' + I(it.v) + '</li>';
+      });
+      s += (open ? '</ul>' : '') + '</li></ul>';
+      h += s;
+    } else if (b.t === 'tbl') {
+      var cols = Math.max.apply(null, b.v.map(function (r) { return r.length; }));
+      var t = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:6px 0 16px;border:1px solid ' + line + '">';
+      b.v.forEach(function (r, ri) {
+        t += '<tr>';
+        for (var c = 0; c < cols; c++) {
+          var v = r[c] || '';
+          if (ri === 0) t += '<td align="center" style="background:' + col + ';color:#ffffff;font-weight:bold;text-transform:uppercase;font-size:14px;padding:14px 12px;border:1px solid ' + col + '">' + I(v) + '</td>';
+          else t += '<td valign="top" ' + (cols === 2 ? 'width="' + (c ? '62%' : '38%') + '" ' : '') + 'style="background:' + tint + ';border:1px solid ' + line + ';padding:11px 14px;font-size:14.5px;' + (c && cols === 2 ? 'font-weight:bold' : '') + '">' + I(v) + '</td>';
+        }
+        t += '</tr>';
+      });
+      h += t + '</table>';
+    }
+  });
+  return '<div style="background:#f5f0f2;padding:22px 10px"><div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid ' + line + ';padding:30px 38px;font-family:Georgia,\'Times New Roman\',serif;font-size:15px;line-height:1.65;color:#222222">' + h + '</div></div>';
+}
+/** Bản văn bản thuần (cho phần dự phòng / mở bằng ứng dụng email / sao chép). */
+function mrPlain(text) {
+  var out = [];
+  mrParse(text).forEach(function (b) {
+    var P = function (s) { return String(s).replace(/<br>/g, '\n').replace(/\*\*(.+?)\*\*/g, '$1').replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, '$1$2'); };
+    if (b.t === 'h1' || b.t === 'h2') out.push(P(b.v).toUpperCase());
+    else if (b.t === 'p') out.push(P(b.v));
+    else if (b.t === 'hr') out.push('--------');
+    else if (b.t === 'note' || b.t === 'right') out.push(b.v.map(P).join('\n'));
+    else if (b.t === 'ul') out.push(b.v.map(function (it) { return (it.lv ? '    ◦ ' : '• ') + P(it.v); }).join('\n'));
+    else if (b.t === 'tbl') out.push(b.v.slice(1).map(function (r) { return '• ' + P(r[0] || '') + (r[1] ? ': ' + P(r.slice(1).join(' – ')) : ''); }).join('\n'));
+  });
+  return out.join('\n\n');
+}
+/*MR-END*/
+
+/** Logo dùng cho thư: logo của Mẫu phiếu đang hiệu lực (data URL). */
+function mailLogoData_() {
+  try {
+    const today = today_();
+    const items = readCol_('lib').filter(function (i) { return i._k === 'formTpls' && i.logoData; })
+      .sort(function (a, b) { return String(a.effective || '').localeCompare(String(b.effective || '')); });
+    let pick = items.length ? items[items.length - 1] : null;
+    items.forEach(function (i) { if (String(i.effective || '') <= today) pick = i; });
+    return pick ? String(pick.logoData) : '';
+  } catch (e) { return ''; }
+}
+function logoBlob_(dataUrl) {
+  const mm = /^data:(image\/[a-z+]+);base64,(.+)$/.exec(String(dataUrl || ''));
+  if (!mm) return null;
+  return Utilities.newBlob(Utilities.base64Decode(mm[2]), mm[1], 'logo');
+}
+/** Dựng nội dung HTML của thư theo giao diện cấu hình ở Thiết lập. */
+function mailBuild_(full, m) {
+  if (m.rich === 0 || m.rich === '0') {
+    return { html: '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#111">' + escHtml_(mrPlain(full)).replace(/\r?\n/g, '<br>') + '</div>', logo: '' };
+  }
+  const logo = (m.showLogo === 0 || m.showLogo === '0') ? '' : mailLogoData_();
+  const html = mrRender(full, { color: m.brandColor, lines: String(m.headerLines || '').split(/\r?\n/), logo: !!logo });
+  return { html: html, logo: logo };
 }
 
 function today_() { return Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd'); }
@@ -356,7 +495,9 @@ function api_sendMail(p) {
       options.from = m.fromAlias;
     }
     if (v.ids.length) options.attachments = v.ids.map(function (id) { return DriveApp.getFileById(id).getBlob(); });
-    options.htmlBody = mailHtml_(v.full);
+    const built = mailBuild_(v.full, m);
+    options.htmlBody = built.html;
+    if (built.logo) options.inlineImages = { vaslogo: logoBlob_(built.logo) };
 
     const props = PropertiesService.getScriptProperties();
     const key = 'mail_' + today_();
@@ -370,7 +511,7 @@ function api_sendMail(p) {
       props.setProperty(key, String(used + 1));
     } finally { lock.releaseLock(); }
 
-    GmailApp.sendEmail(v.to, v.subject, v.full, options);
+    GmailApp.sendEmail(v.to, v.subject, mrPlain(v.full), options);
     try { logMail_([new Date(), actor, v.to, v.ccAll.join(', '), v.subject, m.fromAlias || Session.getEffectiveUser().getEmail(), String(p.candidate || ''), 'ĐÃ GỬI']); } catch (x) { /* thư đã gửi; lỗi ghi nhật ký không được báo là gửi thất bại */ }
     return { ok: true, from: m.fromAlias || Session.getEffectiveUser().getEmail(), remaining: MailApp.getRemainingDailyQuota() };
   } catch (e) {
@@ -400,8 +541,9 @@ function api_mailPrepare(p) {
   if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(String(m.senderUrl || ''))) throw new Error('Thiếu hoặc sai địa chỉ bản triển khai "người gửi" trong Thiết lập.');
   const actor = who_();
   const v = validateMail_(p, m);
+  const built = mailBuild_(v.full, m);
   const draft = {
-    email: actor, to: v.to, cc: v.ccAll, bcc: v.bccAll, subject: v.subject, full: v.full, ids: v.ids,
+    email: actor, to: v.to, cc: v.ccAll, bcc: v.bccAll, subject: v.subject, full: v.full, ids: v.ids, html: built.html, logo: built.logo,
     senderName: tplUser_(m.senderName || '{{ten}}', ctx.user, actor),
     replyTo: tplUser_(m.replyTo || '{{email}}', ctx.user, actor),
     fromAlias: String(m.fromAlias || ''), limit: Number(m.dailyLimit) || 200,
@@ -480,7 +622,7 @@ function sender_peek(token) {
   if (d.fromAlias) {
     try { if (GmailApp.getAliases().map(function (a) { return a.toLowerCase(); }).indexOf(d.fromAlias.toLowerCase()) >= 0) from = d.fromAlias; } catch (e) { /* dùng email của bạn */ }
   }
-  return { from: from, to: d.to, cc: d.cc.join(', '), subject: d.subject, body: d.full, attach: d.ids.length };
+  return { from: from, to: d.to, cc: d.cc.join(', '), subject: d.subject, body: mrPlain(d.full), html: d.logo ? String(d.html).split('cid:vaslogo').join(d.logo) : d.html, attach: d.ids.length };
 }
 
 function sender_send(token) {
@@ -498,7 +640,8 @@ function sender_send(token) {
       const used = Number(props.getProperty(key)) || 0;
       if (used >= d.limit) throw new Error('Bạn đã đạt giới hạn ' + d.limit + ' email/ngày đặt trong Thiết lập.');
       if (MailApp.getRemainingDailyQuota() < 1 + d.cc.length + d.bcc.length) throw new Error('Tài khoản của bạn đã hết hạn mức gửi email trong ngày của Google.');
-      const options = { name: d.senderName, replyTo: d.replyTo, htmlBody: mailHtml_(d.full) };
+      const options = { name: d.senderName, replyTo: d.replyTo, htmlBody: d.html };
+      if (d.logo) options.inlineImages = { vaslogo: logoBlob_(d.logo) };
       if (d.cc.length) options.cc = d.cc.join(',');
       if (d.bcc.length) options.bcc = d.bcc.join(',');
       if (d.fromAlias) {
@@ -507,7 +650,7 @@ function sender_send(token) {
       }
       if (d.ids.length) options.attachments = d.ids.map(function (id) { return DriveApp.getFileById(id).getBlob(); });
       props.setProperty(key, String(used + 1));
-      GmailApp.sendEmail(d.to, d.subject, d.full, options);
+      GmailApp.sendEmail(d.to, d.subject, mrPlain(d.full), options);
       cache.put('mailres:' + token, JSON.stringify({ ok: true, from: from }), RESULT_TTL_);
     } catch (e) {
       cache.put('mailres:' + token, JSON.stringify({ ok: false, error: String(e.message || e), from: from }), RESULT_TTL_);
@@ -530,7 +673,7 @@ function senderPage_(token) {
     'function err(x){var m=document.getElementById("m");m.innerHTML="";var d=document.createElement("div");d.className="e";d.textContent=String(x&&x.message||x);m.appendChild(d);document.getElementById("a").innerHTML="";}' +
     'google.script.run.withFailureHandler(err).withSuccessHandler(function(p){var m=document.getElementById("m");m.innerHTML="";' +
     'm.appendChild(row("Từ:",p.from));m.appendChild(row("Đến:",p.to));if(p.cc)m.appendChild(row("CC:",p.cc));m.appendChild(row("Tiêu đề:",p.subject));if(p.attach)m.appendChild(row("Đính kèm:",p.attach+" tệp"));' +
-    'var pre=document.createElement("pre");pre.textContent=p.body;m.appendChild(pre);' +
+    'var pre=document.createElement("iframe");pre.setAttribute("sandbox","");pre.style.cssText="width:100%;height:440px;border:1px solid #ddd;border-radius:8px;background:#fff";pre.srcdoc=p.html;m.appendChild(pre);' +
     'var b=document.createElement("button");b.textContent="Gửi ngay";b.onclick=function(){b.disabled=true;b.textContent="Đang gửi…";' +
     'google.script.run.withFailureHandler(function(e){err(e);}).withSuccessHandler(function(){document.getElementById("a").innerHTML="";var d=document.createElement("div");d.className="o";d.textContent="✓ Đã gửi. Bạn có thể đóng cửa sổ này.";document.getElementById("m").appendChild(d);setTimeout(function(){try{window.close();}catch(x){}},1500);}).sender_send(T);};' +
     'document.getElementById("a").appendChild(b);}).sender_peek(T);' +

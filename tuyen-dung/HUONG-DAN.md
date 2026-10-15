@@ -162,3 +162,34 @@ Lưu ý:
 - Nếu đang đăng nhập nhiều tài khoản Google trong một trình duyệt, hãy mở ứng dụng bằng đúng tài khoản công ty (hoặc dùng cửa sổ ẩn danh/hồ sơ trình duyệt riêng).
 - Bản triển khai "người gửi" **không đọc/ghi dữ liệu**: mọi hàm dữ liệu từ chối nếu không phải bản chính.
 - Quay lại chế độ cũ bất cứ lúc nào bằng cách chọn lại *Tài khoản chủ dự án*.
+
+---
+
+## Giao diện thư chuyên nghiệp (v22)
+
+Thư gửi ứng viên giờ có giao diện như mẫu **BM.09 – Thư mời nhận việc**: đầu thư (thông tin đơn vị + logo), tiêu đề lớn màu chủ đạo, bảng thông tin có hàng tiêu đề, danh sách quyền lợi, ô lưu ý và khối xác nhận của ứng viên.
+
+**Thiết lập một lần** – Thiết lập → *Email gửi ứng viên* → mục *Giao diện thư gửi đi*:
+- *Giao diện thư*: Chuyên nghiệp / Văn bản đơn giản.
+- *Logo đầu thư*: lấy tự động từ **Thư viện → Mẫu phiếu** (logo đang hiệu lực); có thể ẩn.
+- *Màu chủ đạo* và *Thông tin đầu thư* (mỗi dòng một nội dung: tên đơn vị, trụ sở, điện thoại, website).
+
+**Mẫu thư** – Thư viện → Mẫu thư → **Cài bộ mẫu thư chuyên nghiệp** thêm 5 mẫu: Mời phỏng vấn, Mời nhận việc (BM.09), Cảm ơn sau phỏng vấn, Thông báo chưa phù hợp, Nhắc phản hồi. Mẫu cũ **không bị thay đổi** (có thể sửa hoặc xoá thủ công).
+
+Cú pháp trình bày trong ô *Nội dung* của mẫu (có khung hướng dẫn và **xem trước trực tiếp** khi sửa mẫu; khi soạn thư cho ứng viên cũng có khung xem trước đúng như người nhận thấy):
+
+| Gõ | Kết quả |
+|---|---|
+| `# Tiêu đề` | tiêu đề lớn căn giữa |
+| `## I. Mục` | tiêu đề mục |
+| `\| Hạng mục \| Chi tiết \|` | bảng (dòng đầu là hàng tiêu đề) |
+| `- ý` / `  - ý con` | gạch đầu dòng / cấp con |
+| `> **LƯU Ý:**` + `> • nội dung` | ô lưu ý |
+| `~ dòng` | căn phải (khối xác nhận) |
+| `**đậm**`, `*nghiêng*`, `<br>` | định dạng / xuống dòng trong ô bảng |
+
+Thư không dùng ký hiệu nào vẫn hiển thị bình thường. Khi "Sao chép" hoặc "Mở trong ứng dụng email", ký hiệu được chuyển thành văn bản thuần dễ đọc.
+
+**Trường mới cho Thư mời tuyển dụng** (tự thêm vào Thiết lập → Trường – Thư mời): *Cấp trên trực tiếp*, *Thời gian thử việc*, *Thu nhập thử việc tạm tính*; trường *Mức lương đề nghị* dùng cho "Thu nhập chính thức tạm tính" (có thể đổi tên). Điền các trường này ở hồ sơ ứng viên trước khi gửi thư mời nhận việc; trường còn trống sẽ được cảnh báo.
+
+**Cập nhật Code.gs** (bắt buộc để thư gửi đi có giao diện mới) rồi Triển khai phiên bản mới. Logo gửi kèm dạng ảnh nhúng, không bị chặn như ảnh tải từ web. Ở chế độ "Email của chính người bấm gửi", cửa sổ gửi hiển thị luôn bản xem trước này.
