@@ -275,7 +275,7 @@ const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{co
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
-const APP_VER='v23 · 16/10/2026';
+const APP_VER='v24 · 17/10/2026';
 const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const MAXF=GS?10:15;
@@ -1088,6 +1088,7 @@ function letterVars(c,roundId){
   put('uv','candFields',c.v);put('dx','reqFields',r?r.v:{});put('sv','screenFields',sc);put('pv','interviewFields',iv);put('tm','offerFields',o);
   V.uv_de_xuat=r?r.code:'';
   V.ma_de_xuat=r?r.code:'';V.giai_doan=STG[c.stage][1];V.so_vong_pv=String(rounds.length);V.ngay_hom_nay=fmtD(Date.now());
+  {const m=C.mail;let rp=String(m.replyTo||'').trim();if(!rp||/\{\{/.test(rp))rp=m.mode==='user'?(me().email||ENV.email):(m.fromAlias||ENV.email||me().email);V.email_phan_hoi=rp||''}
   V.nguoi_gui=me().name;V.nguoi_gui_chuc_danh=me().title||'';V.cong_ty=C.company;
   /* tên cũ – vẫn dùng được */
   V.ten_ung_vien=V.uv_ten||c.v.name||'';V.vi_tri=V.dx_vi_tri||'';V.phong_ban=V.dx_phong_ban||'';V.ngay_phong_van=V.pv_ngay||'';V.gio_phong_van=V.pv_gio||'';
@@ -1098,12 +1099,12 @@ function sampleVars(){
   const C=DB.cfg;const V={};
   GROUPS.forEach(([p,key])=>C[key].forEach(f=>{if(!f.slug)return;V[p+'_'+f.slug]=f.t==='date'?fmtD(iso(3)):f.t==='number'?'1.000':f.t==='time'?'09:00':f.t==='url'?'https://example.vn':f.t==='file'?'tep-mau.pdf':f.t==='select'&&f.opts&&f.opts.length?f.opts[0]:'Ví dụ: '+f.l}));
   Object.assign(V,{uv_ten:'Nguyễn Văn A',dx_vi_tri:'Giáo viên Toán THCS',dx_phong_ban:'Tổ Toán – Tin',pv_ngay:fmtD(iso(3)),pv_gio:'09:00',pv_dia_diem:'Phòng họp A',tm_luong:'15.000.000 đ/tháng',tm_ngay_nhan_viec:fmtD(iso(20)),tm_han_phan_hoi:fmtD(iso(7)),
-    ma_de_xuat:'ĐX-2026-001',giai_doan:'Phỏng vấn',so_vong_pv:'2',ngay_hom_nay:fmtD(Date.now()),nguoi_gui:me().name,nguoi_gui_chuc_danh:me().title||'',cong_ty:C.company});
+    ma_de_xuat:'ĐX-2026-001',giai_doan:'Phỏng vấn',so_vong_pv:'2',ngay_hom_nay:fmtD(Date.now()),nguoi_gui:me().name,nguoi_gui_chuc_danh:me().title||'',cong_ty:C.company,email_phan_hoi:'tuyendung@congty.vn'});
   Object.assign(V,{ten_ung_vien:V.uv_ten,vi_tri:V.dx_vi_tri,phong_ban:V.dx_phong_ban,ngay_phong_van:V.pv_ngay,gio_phong_van:V.pv_gio,dia_diem:V.pv_dia_diem,luong:V.tm_luong,ngay_nhan_viec:V.tm_ngay_nhan_viec,han_phan_hoi:V.tm_han_phan_hoi});
   return V;
 }
 function phGroups(){
-  const g=[['Chung',[['nguoi_gui','Người gửi'],['nguoi_gui_chuc_danh','Chức danh người gửi'],['cong_ty','Công ty'],['ngay_hom_nay','Ngày hôm nay'],['ma_de_xuat','Mã đề xuất'],['giai_doan','Giai đoạn hiện tại'],['so_vong_pv','Số vòng phỏng vấn']]]];
+  const g=[['Chung',[['nguoi_gui','Người gửi'],['email_phan_hoi','Email nhận phản hồi'],['nguoi_gui_chuc_danh','Chức danh người gửi'],['cong_ty','Công ty'],['ngay_hom_nay','Ngày hôm nay'],['ma_de_xuat','Mã đề xuất'],['giai_doan','Giai đoạn hiện tại'],['so_vong_pv','Số vòng phỏng vấn']]]];
   GROUPS.forEach(([p,key,title])=>g.push([title,DB.cfg[key].filter(f=>f.slug).map(f=>[p+'_'+f.slug,f.l+(f.vis===0||f.vis===false?' (ẩn)':'')])]));
   g.push(['Tên cũ (vẫn dùng được)',PH]);return g;
 }
@@ -1144,6 +1145,11 @@ function mrParse(text) {
       while (i < lines.length && /^>\s?/.test(lines[i])) { var q = lines[i].replace(/^>\s?/, '').trim(); if (q) ps.push(q); i++; }
       out.push({ t: 'note', v: ps }); continue;
     }
+    if (/^@\s+/.test(tr)) {
+      flush(); var bt = [], re = /\[([^\]]+)\]\(([^)]*)\)(?:\{(ok|no)\})?/g, mb;
+      while (i < lines.length && /^@\s+/.test(lines[i])) { re.lastIndex = 0; while ((mb = re.exec(lines[i]))) bt.push({ label: mb[1], url: mb[2], kind: mb[3] || '' }); i++; }
+      out.push({ t: 'btn', v: bt }); continue;
+    }
     if (/^~\s?/.test(tr)) {
       flush(); var rs = [];
       while (i < lines.length && /^~\s?/.test(lines[i])) { rs.push(lines[i].replace(/^~\s?/, '').trim()); i++; }
@@ -1162,6 +1168,18 @@ function mrParse(text) {
   flush();
   return out;
 }
+/** Địa chỉ nút: chỉ cho phép mailto: và https:; mailto được mã hoá phần tiêu đề/nội dung (\\n = xuống dòng). */
+function mrHref(u) {
+  u = String(u || '').trim();
+  if (/^https?:\/\//i.test(u)) return mrEsc(u);
+  if (!/^mailto:/i.test(u)) return '#';
+  var q = u.indexOf('?'), head = q < 0 ? u : u.slice(0, q), rest = q < 0 ? '' : u.slice(q + 1);
+  var ps = rest ? rest.split('&').map(function (kv) {
+    var e = kv.indexOf('='); if (e < 0) return kv;
+    return kv.slice(0, e) + '=' + encodeURIComponent(kv.slice(e + 1).replace(/\\n/g, '\n'));
+  }).join('&') : '';
+  return mrEsc(head + (ps ? '?' + ps : ''));
+}
 /** brand: {color, lines:[...], logo:boolean}. */
 function mrRender(text, brand) {
   brand = brand || {};
@@ -1179,7 +1197,11 @@ function mrRender(text, brand) {
     else if (b.t === 'h2') h += '<h2 style="font-size:15px;line-height:1.4;color:' + col + ';margin:22px 0 10px;font-weight:bold">' + I(b.v) + '</h2>';
     else if (b.t === 'hr') h += '<hr style="border:0;border-top:1px solid ' + line + ';margin:18px 0">';
     else if (b.t === 'p') h += '<p style="margin:0 0 13px">' + I(b.v) + '</p>';
-    else if (b.t === 'right') h += '<div style="text-align:right;margin:6px 0 0">' + b.v.map(function (x) { return '<div style="margin:0 0 3px">' + I(x) + '</div>'; }).join('') + '</div>';
+    else if (b.t === 'right') h += '<table role="presentation" align="right" width="300" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:8px 0 0"><tr><td align="center" style="text-align:center;line-height:1.65;font-size:15px">' + b.v.map(function (x) { return '<div style="margin:0 0 3px">' + I(x) + '</div>'; }).join('') + '</td></tr></table><div style="clear:both;height:1px;line-height:1px">&nbsp;</div>';
+    else if (b.t === 'btn') h += '<div style="text-align:center;margin:18px 0 8px">' + b.v.map(function (x) {
+      var bg = x.kind === 'no' ? '#b42318' : x.kind === 'ok' ? '#1e7e34' : col;
+      return '<a href="' + mrHref(x.url) + '" style="display:inline-block;margin:4px 8px;padding:13px 30px;background:' + bg + ';color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;border-radius:6px;font-family:Arial,Helvetica,sans-serif">' + mrEsc(x.label) + '</a>';
+    }).join('') + '</div>';
     else if (b.t === 'note') {
       h += '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:16px 0"><tr><td style="background:' + tint + ';border:1px solid ' + line + ';padding:12px 18px;line-height:1.65;font-size:15px">' +
         b.v.map(function (x, k) { var head = k === 0 && /^\*\*[^*]+\*\*$/.test(x); return '<p style="margin:' + (k ? '8px' : '0') + ' 0 0;' + (head ? 'color:' + col + ';' : '') + '">' + I(x) + '</p>'; }).join('') + '</td></tr></table>';
@@ -1219,6 +1241,7 @@ function mrPlain(text) {
     if (b.t === 'h1' || b.t === 'h2') out.push(P(b.v).toUpperCase());
     else if (b.t === 'p') out.push(P(b.v));
     else if (b.t === 'hr') out.push('--------');
+    else if (b.t === 'btn') out.push('Phản hồi (trả lời email này): ' + b.v.map(function (x) { return x.label; }).join(' / '));
     else if (b.t === 'note' || b.t === 'right') out.push(b.v.map(P).join('\n'));
     else if (b.t === 'ul') out.push(b.v.map(function (it) { return (it.lv ? '    ◦ ' : '• ') + P(it.v); }).join('\n'));
     else if (b.t === 'tbl') out.push(b.v.slice(1).map(function (r) { return '• ' + P(r[0] || '') + (r[1] ? ': ' + P(r.slice(1).join(' – ')) : ''); }).join('\n'));
@@ -1230,7 +1253,7 @@ function mrPlain(text) {
 function proTemplates(){
   const SIGN='\n\nTrân trọng,\n**{{nguoi_gui}}**<br>{{cong_ty}}';
   return[
-  {type:'Thư mời phỏng vấn',name:'Thư mời phỏng vấn (giao diện chuyên nghiệp)',subject:'[{{cong_ty}}] Thư mời phỏng vấn – {{vi_tri}}',body:
+  {pro:2,type:'Thư mời phỏng vấn',name:'Thư mời phỏng vấn (giao diện chuyên nghiệp)',subject:'[{{cong_ty}}] Thư mời phỏng vấn – {{vi_tri}}',body:
 `# THƯ MỜI PHỎNG VẤN
 
 **Thân gửi Anh/Chị:** {{ten_ung_vien}}
@@ -1254,7 +1277,7 @@ Cảm ơn Anh/Chị đã quan tâm và ứng tuyển vào vị trí **{{vi_tri}}
 
 > **LƯU Ý VỀ XÁC NHẬN THAM DỰ:**
 > • Anh/Chị vui lòng phản hồi email này để xác nhận tham dự. Nếu cần đổi lịch, xin báo sớm để chúng tôi sắp xếp lại.${SIGN}`},
-  {type:'Thư mời nhận việc',name:'Thư mời nhận việc (BM.09 – giao diện chuyên nghiệp)',subject:'[{{cong_ty}}] Thư mời nhận việc – {{vi_tri}}',body:
+  {pro:2,type:'Thư mời nhận việc',name:'Thư mời nhận việc (BM.09 – giao diện chuyên nghiệp)',subject:'[{{cong_ty}}] Thư mời nhận việc – {{vi_tri}}',body:
 `# THƯ MỜI NHẬN VIỆC
 
 **Thân gửi Anh/Chị:** {{ten_ung_vien}}
@@ -1291,10 +1314,17 @@ Do đó, chúng tôi trân trọng mời Anh/Chị gia nhập đội ngũ nhân 
 > • Nếu Anh/Chị đồng ý với các đề nghị nêu trên, xin vui lòng phản hồi email này trước ngày **{{han_phan_hoi}}** để xác nhận sự đồng ý của Anh/Chị đối với các nội dung nêu trên và làm cơ sở cho việc giao kết hợp đồng lao động theo quy định.
 > • Trường hợp Anh/Chị chọn thời gian khác để nhận việc cũng vui lòng phản hồi cho chúng tôi trước ngày **{{han_phan_hoi}}**. Sau thời gian trên, nếu chưa nhận được phản hồi từ Anh/Chị, {{cong_ty}} sẽ ghi nhận rằng lời mời chưa được xác nhận từ bạn tại thời điểm này.
 
+## III. XÁC NHẬN CỦA ANH/CHỊ
+Anh/Chị vui lòng bấm **một trong hai nút** dưới đây. Thư trả lời sẽ được soạn sẵn để gửi về Phòng Nhân sự; nếu chọn **Từ chối**, xin Anh/Chị điền thêm **lý do** vào thư trước khi gửi.
+
+@ [✔ ĐỒNG Ý NHẬN VIỆC](mailto:{{email_phan_hoi}}?subject=ĐỒNG Ý nhận việc - {{ten_ung_vien}} - {{vi_tri}}&body=Kính gửi Phòng Nhân sự,\\n\\nTôi là {{ten_ung_vien}}, xin xác nhận ĐỒNG Ý với các nội dung trong Thư mời nhận việc vị trí {{vi_tri}}.\\nNgày nhận việc: {{ngay_nhan_viec}}.\\n\\nTrân trọng.){ok} [✖ TỪ CHỐI](mailto:{{email_phan_hoi}}?subject=TỪ CHỐI nhận việc - {{ten_ung_vien}} - {{vi_tri}}&body=Kính gửi Phòng Nhân sự,\\n\\nTôi là {{ten_ung_vien}}, xin TỪ CHỐI Thư mời nhận việc vị trí {{vi_tri}}.\\n\\nLý do từ chối (vui lòng điền): \\n\\nTrân trọng.){no}
+
+Hoặc xác nhận bằng chữ ký:
+
 ~ **PHẦN XÁC NHẬN CỦA ỨNG VIÊN**
 ~ *TP. Hồ Chí Minh, ngày ....... tháng ....... năm .......*
 ~ **(Ký & ghi rõ họ tên)**`},
-  {type:'Thư cảm ơn',name:'Cảm ơn sau phỏng vấn (giao diện chuyên nghiệp)',subject:'[{{cong_ty}}] Cảm ơn Anh/Chị đã tham dự phỏng vấn',body:
+  {pro:2,type:'Thư cảm ơn',name:'Cảm ơn sau phỏng vấn (giao diện chuyên nghiệp)',subject:'[{{cong_ty}}] Cảm ơn Anh/Chị đã tham dự phỏng vấn',body:
 `# THƯ CẢM ƠN
 
 **Thân gửi Anh/Chị:** {{ten_ung_vien}}
@@ -1304,7 +1334,7 @@ Cảm ơn Anh/Chị đã dành thời gian trao đổi cùng {{cong_ty}} về v�
 > **THÔNG TIN TIẾP THEO:**
 > • Hội đồng tuyển dụng đang tổng hợp đánh giá và sẽ thông báo kết quả đến Anh/Chị trong thời gian sớm nhất.
 > • Trong thời gian chờ đợi, nếu cần bổ sung thông tin, Anh/Chị vui lòng phản hồi email này.${SIGN}`},
-  {type:'Thư từ chối',name:'Thông báo chưa phù hợp (giao diện chuyên nghiệp)',subject:'[{{cong_ty}}] Thông báo kết quả ứng tuyển – {{vi_tri}}',body:
+  {pro:2,type:'Thư từ chối',name:'Thông báo chưa phù hợp (giao diện chuyên nghiệp)',subject:'[{{cong_ty}}] Thông báo kết quả ứng tuyển – {{vi_tri}}',body:
 `# THÔNG BÁO KẾT QUẢ ỨNG TUYỂN
 
 **Thân gửi Anh/Chị:** {{ten_ung_vien}}
@@ -1316,7 +1346,7 @@ Sau khi cân nhắc kỹ lưỡng, rất tiếc hồ sơ của Anh/Chị chưa p
 > **THÔNG TIN THÊM:**
 > • Chúng tôi xin phép lưu giữ hồ sơ để liên hệ lại khi có cơ hội phù hợp hơn.
 > • Chúc Anh/Chị sớm tìm được công việc như mong muốn và nhiều thành công trong sự nghiệp.${SIGN}`},
-  {type:'Khác',name:'Nhắc xác nhận lịch / phản hồi (giao diện chuyên nghiệp)',subject:'[{{cong_ty}}] Nhắc phản hồi – {{vi_tri}}',body:
+  {pro:2,type:'Khác',name:'Nhắc xác nhận lịch / phản hồi (giao diện chuyên nghiệp)',subject:'[{{cong_ty}}] Nhắc phản hồi – {{vi_tri}}',body:
 `# THƯ NHẮC PHẢN HỒI
 
 **Thân gửi Anh/Chị:** {{ten_ung_vien}}
@@ -1804,7 +1834,9 @@ const A={
  viewPosFile:id=>openFile(DB.lib.positions.find(p=>p.id===id).file),
  viewVerFile:(id,el)=>openFile(DB.lib.positions.find(p=>p.id===id).versions.find(v=>v.id===el.dataset.arg).file),
  delPos:id=>confirmBox('Xoá vị trí này cùng toàn bộ phiên bản và file scan?',async()=>{const p=DB.lib.positions.find(x=>x.id===id);DB.lib.positions=DB.lib.positions.filter(x=>x.id!==id);commit();if(p)for(const v of p.versions)await releaseFile(v.file)},'Xoá'),
- tplPro:()=>{const have=new Set(DB.lib.templates.map(t=>t.name));const add=proTemplates().filter(t=>!have.has(t.name));if(!add.length){toast('Các mẫu chuyên nghiệp đã có trong thư viện','ok');return}confirmBox(`Thêm <b>${add.length}</b> mẫu thư giao diện chuyên nghiệp (mời phỏng vấn, mời nhận việc BM.09, cảm ơn, thông báo kết quả, nhắc phản hồi)? Các mẫu hiện có <b>không bị thay đổi</b>.`,()=>{add.forEach(t=>DB.lib.templates.push({id:uid('t_'),...t}));commit();toast('Đã thêm '+add.length+' mẫu thư','ok')},'Thêm mẫu')},
+ tplPro:()=>{const L=DB.lib.templates,all=proTemplates();const add=[],upd=[];all.forEach(t=>{const x=L.find(y=>y.name===t.name);if(!x)add.push(t);else if((x.pro||0)<t.pro)upd.push([x,t])});
+   if(!add.length&&!upd.length){toast('Các mẫu chuyên nghiệp đã là bản mới nhất','ok');return}
+   confirmBox(`${add.length?`Thêm <b>${add.length}</b> mẫu thư chuyên nghiệp mới.<br>`:''}${upd.length?`Cập nhật <b>${upd.length}</b> mẫu chuyên nghiệp lên bản mới (nội dung mẫu đó sẽ được thay bằng bản mới: ${upd.map(u=>esc(u[0].name)).join('; ')}). Nếu bạn đã tự sửa các mẫu này, hãy nhân bản trước khi tiếp tục.<br>`:''}Các mẫu khác của bạn <b>không bị thay đổi</b>.`,()=>{add.forEach(t=>L.push({id:uid('t_'),...t}));upd.forEach(([x,t])=>{x.subject=t.subject;x.body=t.body;x.type=t.type;x.pro=t.pro});commit();toast(`Đã thêm ${add.length}, cập nhật ${upd.length} mẫu thư`,'ok')},'Đồng ý')},
  newTpl:()=>tplModal(),editTpl:id=>tplModal(DB.lib.templates.find(t=>t.id===id)),
  viewTpl:id=>letterModal(null,DB.lib.templates.find(t=>t.id===id)),
  dupTpl:id=>{const t=DB.lib.templates.find(x=>x.id===id);DB.lib.templates.push({...t,id:uid('t_'),name:t.name+' (bản sao)'});commit();toast('Đã nhân bản','ok')},

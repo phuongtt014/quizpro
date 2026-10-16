@@ -193,3 +193,13 @@ Thư không dùng ký hiệu nào vẫn hiển thị bình thường. Khi "Sao c
 **Trường mới cho Thư mời tuyển dụng** (tự thêm vào Thiết lập → Trường – Thư mời): *Cấp trên trực tiếp*, *Thời gian thử việc*, *Thu nhập thử việc tạm tính*; trường *Mức lương đề nghị* dùng cho "Thu nhập chính thức tạm tính" (có thể đổi tên). Điền các trường này ở hồ sơ ứng viên trước khi gửi thư mời nhận việc; trường còn trống sẽ được cảnh báo.
 
 **Cập nhật Code.gs** (bắt buộc để thư gửi đi có giao diện mới) rồi Triển khai phiên bản mới. Logo gửi kèm dạng ảnh nhúng, không bị chặn như ảnh tải từ web. Ở chế độ "Email của chính người bấm gửi", cửa sổ gửi hiển thị luôn bản xem trước này.
+
+---
+
+## Nút Đồng ý / Từ chối trong thư mời nhận việc và khối chữ ký căn giữa (v24)
+
+- Mẫu **Thư mời nhận việc (BM.09)** có mục *III. Xác nhận của Anh/Chị* với hai nút **ĐỒNG Ý NHẬN VIỆC** và **TỪ CHỐI**. Bấm nút, ứng dụng email của ứng viên mở thư trả lời **soạn sẵn** gửi về *Email nhận phản hồi* (Reply-To trong Thiết lập, nếu trống: email người gửi / alias). Nút **Từ chối** có sẵn dòng *"Lý do từ chối (vui lòng điền): "* để ứng viên nhập.
+- Cách này chạy trên mọi ứng dụng email (không cần máy chủ công khai nên dữ liệu vẫn kín); kết quả nằm ở hộp thư trả lời, bạn cập nhật trạng thái Thư mời của ứng viên như bình thường.
+- Cú pháp nút trong mẫu: `@ [Nhãn](mailto:địa_chỉ?subject=…&body=…){ok} [Nhãn](…){no}` (`{ok}` xanh, `{no}` đỏ, `\n` = xuống dòng). Biến mới: `{{email_phan_hoi}}`.
+- Dòng bắt đầu bằng `~` giờ tạo **khối căn về bên phải nhưng các dòng bên trong canh giữa nhau** (tiêu đề, ngày tháng, "Ký & ghi rõ họ tên").
+- Mẫu đã cài từ v22 sẽ được **cập nhật** khi bấm lại *Cài bộ mẫu thư chuyên nghiệp* (có xác nhận; hãy nhân bản trước nếu bạn đã tự sửa mẫu).

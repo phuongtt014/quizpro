@@ -32,6 +32,11 @@ function mrParse(text) {
       while (i < lines.length && /^>\s?/.test(lines[i])) { var q = lines[i].replace(/^>\s?/, '').trim(); if (q) ps.push(q); i++; }
       out.push({ t: 'note', v: ps }); continue;
     }
+    if (/^@\s+/.test(tr)) {
+      flush(); var bt = [], re = /\[([^\]]+)\]\(([^)]*)\)(?:\{(ok|no)\})?/g, mb;
+      while (i < lines.length && /^@\s+/.test(lines[i])) { re.lastIndex = 0; while ((mb = re.exec(lines[i]))) bt.push({ label: mb[1], url: mb[2], kind: mb[3] || '' }); i++; }
+      out.push({ t: 'btn', v: bt }); continue;
+    }
     if (/^~\s?/.test(tr)) {
       flush(); var rs = [];
       while (i < lines.length && /^~\s?/.test(lines[i])) { rs.push(lines[i].replace(/^~\s?/, '').trim()); i++; }
@@ -50,6 +55,18 @@ function mrParse(text) {
   flush();
   return out;
 }
+/** Địa chỉ nút: chỉ cho phép mailto: và https:; mailto được mã hoá phần tiêu đề/nội dung (\\n = xuống dòng). */
+function mrHref(u) {
+  u = String(u || '').trim();
+  if (/^https?:\/\//i.test(u)) return mrEsc(u);
+  if (!/^mailto:/i.test(u)) return '#';
+  var q = u.indexOf('?'), head = q < 0 ? u : u.slice(0, q), rest = q < 0 ? '' : u.slice(q + 1);
+  var ps = rest ? rest.split('&').map(function (kv) {
+    var e = kv.indexOf('='); if (e < 0) return kv;
+    return kv.slice(0, e) + '=' + encodeURIComponent(kv.slice(e + 1).replace(/\\n/g, '\n'));
+  }).join('&') : '';
+  return mrEsc(head + (ps ? '?' + ps : ''));
+}
 /** brand: {color, lines:[...], logo:boolean}. */
 function mrRender(text, brand) {
   brand = brand || {};
@@ -67,7 +84,11 @@ function mrRender(text, brand) {
     else if (b.t === 'h2') h += '<h2 style="font-size:15px;line-height:1.4;color:' + col + ';margin:22px 0 10px;font-weight:bold">' + I(b.v) + '</h2>';
     else if (b.t === 'hr') h += '<hr style="border:0;border-top:1px solid ' + line + ';margin:18px 0">';
     else if (b.t === 'p') h += '<p style="margin:0 0 13px">' + I(b.v) + '</p>';
-    else if (b.t === 'right') h += '<div style="text-align:right;margin:6px 0 0">' + b.v.map(function (x) { return '<div style="margin:0 0 3px">' + I(x) + '</div>'; }).join('') + '</div>';
+    else if (b.t === 'right') h += '<table role="presentation" align="right" width="300" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:8px 0 0"><tr><td align="center" style="text-align:center;line-height:1.65;font-size:15px">' + b.v.map(function (x) { return '<div style="margin:0 0 3px">' + I(x) + '</div>'; }).join('') + '</td></tr></table><div style="clear:both;height:1px;line-height:1px">&nbsp;</div>';
+    else if (b.t === 'btn') h += '<div style="text-align:center;margin:18px 0 8px">' + b.v.map(function (x) {
+      var bg = x.kind === 'no' ? '#b42318' : x.kind === 'ok' ? '#1e7e34' : col;
+      return '<a href="' + mrHref(x.url) + '" style="display:inline-block;margin:4px 8px;padding:13px 30px;background:' + bg + ';color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;border-radius:6px;font-family:Arial,Helvetica,sans-serif">' + mrEsc(x.label) + '</a>';
+    }).join('') + '</div>';
     else if (b.t === 'note') {
       h += '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:16px 0"><tr><td style="background:' + tint + ';border:1px solid ' + line + ';padding:12px 18px;line-height:1.65;font-size:15px">' +
         b.v.map(function (x, k) { var head = k === 0 && /^\*\*[^*]+\*\*$/.test(x); return '<p style="margin:' + (k ? '8px' : '0') + ' 0 0;' + (head ? 'color:' + col + ';' : '') + '">' + I(x) + '</p>'; }).join('') + '</td></tr></table>';
@@ -107,6 +128,7 @@ function mrPlain(text) {
     if (b.t === 'h1' || b.t === 'h2') out.push(P(b.v).toUpperCase());
     else if (b.t === 'p') out.push(P(b.v));
     else if (b.t === 'hr') out.push('--------');
+    else if (b.t === 'btn') out.push('Phản hồi (trả lời email này): ' + b.v.map(function (x) { return x.label; }).join(' / '));
     else if (b.t === 'note' || b.t === 'right') out.push(b.v.map(P).join('\n'));
     else if (b.t === 'ul') out.push(b.v.map(function (it) { return (it.lv ? '    ◦ ' : '• ') + P(it.v); }).join('\n'));
     else if (b.t === 'tbl') out.push(b.v.slice(1).map(function (r) { return '• ' + P(r[0] || '') + (r[1] ? ': ' + P(r.slice(1).join(' – ')) : ''); }).join('\n'));
