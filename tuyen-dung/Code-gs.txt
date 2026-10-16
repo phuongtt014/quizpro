@@ -325,7 +325,7 @@ function validateMail_(p, m) {
 
 /*MR-BEGIN*/
 /* ---- Bộ dựng thư HTML (dùng chung: giao diện xem trước và Code.gs). Cú pháp: # Tiêu đề · ## Mục · | bảng | · - gạch đầu dòng (thụt 2 dấu cách = cấp con) · > ô lưu ý · ~ căn phải · --- đường kẻ · **đậm** · *nghiêng* · <br> xuống dòng */
-function mrEsc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function mrEsc(s) { return String(s).normalize('NFC').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function mrInline(s, col) {
   var t = mrEsc(s);
   t = t.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
@@ -384,7 +384,7 @@ function mrRender(text, brand) {
   var h = '';
   var bl = (brand.lines || []).filter(function (x) { return String(x).trim(); });
   if (bl.length || brand.logo) {
-    h += '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:6px"><tr><td valign="top" style="font-family:Georgia,\'Times New Roman\',serif;font-size:13px;line-height:1.55;font-weight:bold;color:' + col + '">' +
+    h += '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:6px"><tr><td valign="top" style="font-family:'Times New Roman',Times,serif;font-size:13px;line-height:1.55;font-weight:bold;color:' + col + '">' +
       bl.map(function (x) { return /^website/i.test(String(x).trim()) ? '<span style="color:#666">' + mrEsc(x) + '</span>' : mrEsc(x); }).join('<br>') + '</td>' +
       (brand.logo ? '<td width="110" align="right" valign="top"><img src="cid:vaslogo" width="90" alt="logo" style="display:block;border:0;max-width:90px;height:auto"></td>' : '') + '</tr></table>';
   }
@@ -423,7 +423,7 @@ function mrRender(text, brand) {
       h += t + '</table>';
     }
   });
-  return '<div style="background:#f5f0f2;padding:22px 10px"><div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid ' + line + ';padding:30px 38px;font-family:Georgia,\'Times New Roman\',serif;font-size:15px;line-height:1.65;color:#222222">' + h + '</div></div>';
+  return '<div style="background:#f5f0f2;padding:22px 10px"><div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid ' + line + ';padding:30px 38px;font-family:'Times New Roman',Times,serif;font-size:15px;line-height:1.65;color:#222222">' + h + '</div></div>';
 }
 /** Bản văn bản thuần (cho phần dự phòng / mở bằng ứng dụng email / sao chép). */
 function mrPlain(text) {
