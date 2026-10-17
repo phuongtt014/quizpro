@@ -61,7 +61,7 @@ var COMMIT_TEXT = ['Tôi cam đoan những thông tin cung cấp trên đây là
 
 function doGet(e) {
   const mode = e && e.parameter && e.parameter.m === 'admin' ? 'admin' : 'public';
-  const html = HtmlService.createHtmlOutputFromFile('Index').getContent().split('<!--MODE-->').join('<script>window.__MODE="' + mode + '"</script>');
+  const html = HtmlService.createHtmlOutputFromFile('Index').getContent().split("'__MODE__'").join("'" + mode + "'");
   return HtmlService.createHtmlOutput(html).setTitle('Thông tin ứng viên – VA Schools')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }

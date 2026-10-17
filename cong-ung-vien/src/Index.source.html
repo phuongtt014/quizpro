@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Thông tin ứng viên – VA Schools</title>
-<!--MODE-->
+<script>window.__MODE=window.__MODE||'__MODE__'</script>
 <style>
 :root{--brand:#8a1538;--brand2:#a81d46;--ink:#1f2330;--mut:#6b7280;--line:#e5e1e4;--bg:#f6f3f4;--ok:#1e7e34;--bad:#b42318;--card:#fff}
 *{box-sizing:border-box}html,body{margin:0}body{font-family:"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);font-size:15px;line-height:1.5}
@@ -88,7 +88,7 @@ var TABLES = {
 var HR_STATUS = ['Mới nộp', 'Đã xem', 'Đã liên hệ', 'Đã nhận việc', 'Không tiếp tục'];
 var COMMIT_TEXT = ['Tôi cam đoan những thông tin cung cấp trên đây là chính xác. Tôi chấp nhận việc Công ty xác minh những thông tin trên và cam kết không kiện tổ chức hoặc những cá nhân cung cấp thông tin cho Công ty. Nếu các thông tin trên không đúng sự thật thì tôi chấp nhận việc Công ty chấm dứt HĐLĐ trước thời hạn mà không cần báo trước, đồng thời bồi thường thiệt hại cho Công ty (nếu có).', 'Tôi cam kết bảo mật thông tin của hệ thống Trường Việt Mỹ - VA Schools.', 'Tôi đồng thuận cho VA Schools sử dụng các thông tin cá nhân do tôi cung cấp để phục vụ công tác tuyển dụng, quản lý nhân sự và các nghiệp vụ liên quan của Phòng Hành chính - Nhân sự theo quy định.'];
 /*SCHEMA-END*/
-const MODE=window.__MODE==='admin'?'admin':'public';
+let MODE=window.__MODE==='admin'?'admin':'public';
 const GS=typeof google!=='undefined'&&google.script&&google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{if(!GS)return rej(new Error('Trang này chỉ chạy khi được triển khai bằng Google Apps Script.'));const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const $=(s,r=document)=>r.querySelector(s),qa=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -313,6 +313,9 @@ Object.assign(ACT,{
 function readUsers(){qa('[data-u]').forEach(el=>{const[i,k]=el.dataset.u.split(':');S.adm.users[+i][k]=el.value})}
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;if(el.tagName==='A')e.preventDefault();const f=ACT[el.dataset.act];if(f)f(el.dataset.id,el)});
 (async()=>{
+  /* dự phòng: đọc ?m=admin trực tiếp từ địa chỉ trang (Apps Script cung cấp google.script.url) */
+  if(MODE!=='admin'&&GS&&google.script.url&&google.script.url.getLocation){
+    await new Promise(r=>{const t=setTimeout(r,1500);try{google.script.url.getLocation(l=>{try{if(l&&l.parameter&&[].concat(l.parameter.m)[0]==='admin')MODE='admin'}catch(e){}clearTimeout(t);r()})}catch(e){clearTimeout(t);r()}})}
   render();
   if(MODE==='admin'){try{S.adm.me=await gcall('adm_me');render();admLoad()}catch(e){S.msg=errMsg(e);render()}}
 })();
