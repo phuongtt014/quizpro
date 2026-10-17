@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thông tin ứng viên – VA Schools</title>
+<!--MODE-->
+<style>
+:root{--brand:#8a1538;--brand2:#a81d46;--ink:#1f2330;--mut:#6b7280;--line:#e5e1e4;--bg:#f6f3f4;--ok:#1e7e34;--bad:#b42318;--card:#fff}
+*{box-sizing:border-box}html,body{margin:0}body{font-family:"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);font-size:15px;line-height:1.5}
+.top{background:var(--brand);color:#fff;padding:12px 18px;display:flex;align-items:center;gap:14px}.top img{height:44px;background:#fff;border-radius:8px;padding:3px}.top h1{font-size:17px;margin:0}.top small{opacity:.85}.top .sp{flex:1}
+.top a,.top button.lk{color:#fff;background:transparent;border:1px solid #ffffff66;border-radius:8px;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px;text-decoration:none}
+.wrap{max-width:980px;margin:0 auto;padding:18px 14px 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:16px;box-shadow:0 1px 3px #0000000a}
+h2{font-size:17px;color:var(--brand);margin:0 0 12px}h3{font-size:15px;color:var(--brand);margin:0 0 10px}
+.hero{text-align:center;padding:26px 10px}.hero h2{font-size:24px}.hero p{color:var(--mut);max-width:560px;margin:8px auto 18px}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:14px}.choice{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px;cursor:pointer;text-align:left}.choice:hover{border-color:var(--brand);box-shadow:0 4px 14px #8a153822}.choice b{display:block;font-size:17px;color:var(--brand);margin-bottom:4px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}.grid .wide{grid-column:1/-1}
+label.f{display:block;font-weight:600;font-size:13px;margin-bottom:4px}.req{color:var(--bad)}
+input[type=text],input[type=tel],input[type=email],input[type=date],input[type=month],input[type=number],select,textarea{width:100%;padding:9px 11px;border:1px solid #cfc8cc;border-radius:9px;font:inherit;background:#fff}
+input:focus,select:focus,textarea:focus{outline:2px solid #8a153844;border-color:var(--brand)}
+.bad{border-color:var(--bad)!important;background:#fff7f6}.opts{display:flex;gap:14px;flex-wrap:wrap;padding-top:4px}.opts label{display:flex;gap:6px;align-items:center;font-weight:400}
+.btn{border:1px solid #cfc8cc;background:#fff;border-radius:10px;padding:10px 18px;font:inherit;font-weight:600;cursor:pointer}.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}.btn.pri:hover{background:var(--brand2)}.btn:disabled{opacity:.55;cursor:not-allowed}.btn.sm{padding:6px 12px;font-size:13px}.btn.dng{color:var(--bad);border-color:#e7b4ae}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.sp{flex:1}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}.tbl th{background:var(--brand);color:#fff;padding:9px 8px;font-size:13px;text-align:center}.tbl td{border:1px solid var(--line);padding:4px}.tbl td input,.tbl td select{border-radius:6px;padding:7px 8px}.tbl .lv{font-weight:600;padding:6px 8px;background:#fbf7f8;white-space:nowrap}
+.scroll{overflow-x:auto}.alert{border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:14px}.alert.err{background:#fdecea;color:#7a1b12;border:1px solid #f3c2bc}.alert.ok{background:#e9f6ec;color:#14532d;border:1px solid #b7e1c1}.alert.warn{background:#fff7e0;color:#6b4e00;border:1px solid #f1deaa}.alert.info{background:#f3eef0;color:#4a1a2a;border:1px solid #e3d3d9}
+.secret{font:700 30px/1.2 Consolas,monospace;letter-spacing:3px;color:var(--brand);background:#fbf3f5;border:2px dashed var(--brand);border-radius:12px;padding:14px 18px;display:inline-block}
+.commit{font-size:13.5px;color:#333;background:#fbf9fa;border:1px solid var(--line);border-radius:10px;padding:12px 14px}.commit p{margin:0 0 8px}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;background:#eee}.b-ok{background:#e0f2e6;color:#14532d}.b-warn{background:#fff1cc;color:#6b4e00}.b-bad{background:#fde1de;color:#7a1b12}
+table.list{width:100%;border-collapse:collapse;font-size:14px}table.list th{text-align:left;padding:9px 10px;background:#f3eef0;color:var(--brand);font-size:12.5px}table.list td{padding:9px 10px;border-top:1px solid var(--line)}table.list tr.cl{cursor:pointer}table.list tr.cl:hover{background:#faf4f6}
+.split{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
+.pvdoc{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto;max-height:78vh}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222;color:#fff;border-radius:10px;padding:11px 18px;z-index:99;display:none;max-width:90vw}
+@media(max-width:720px){.grid,.choices,.split{grid-template-columns:1fr}.secret{font-size:24px}.card{padding:16px 14px}}
+</style>
+<script>
+window.__errs=[];
+function bootFail(){var d=document.getElementById('app');if(d)d.innerHTML='<div class="wrap"><div class="alert err"><b>Không khởi động được trang.</b><br>'+window.__errs.join('<br>')+'</div></div>'}
+window.addEventListener('error',function(e){window.__errs.push(String(e.message||e));if(!window.__booted)bootFail()});
+</script>
+</head>
+<body>
+<div id="app"><div class="wrap"><div class="card">Đang tải…</div></div></div>
+<div id="toast"></div>
+<script id="main-js">
+const LOGO='__LOGO_DATAURL__';
+/*SCHEMA-BEGIN*/
+/* ---- Lược đồ biểu mẫu BM.10/HN.QT.01 (dùng chung cho giao diện và Code.gs) ---- */
+var FORM_META = { code: 'BM.10/HN.QT.01', date: '21/09/2026', issue: '01', title: 'THÔNG TIN ỨNG VIÊN', sub: '(Dùng cho cán bộ quản lý, giáo viên và nhân viên văn phòng)' };
+var PF = [
+  { k: 'viTri', l: 'Vị trí ứng tuyển', t: 'text', req: 1, max: 120, wide: 1 },
+  { k: 'hoTen', l: 'Họ và tên', t: 'text', req: 1, max: 80 },
+  { k: 'gioiTinh', l: 'Giới tính', t: 'radio', opts: ['Nam', 'Nữ'], req: 1 },
+  { k: 'ngaySinh', l: 'Ngày sinh', t: 'date', req: 1, birth: 1 },
+  { k: 'noiSinh', l: 'Nơi sinh', t: 'text', req: 1, max: 100 },
+  { k: 'quocTich', l: 'Quốc tịch', t: 'text', max: 60 },
+  { k: 'cccd', l: 'Số CCCD', t: 'cccd', req: 1 },
+  { k: 'ngayCap', l: 'Ngày cấp', t: 'date', req: 1 },
+  { k: 'noiCap', l: 'Nơi cấp', t: 'text', req: 1, max: 100 },
+  { k: 'danToc', l: 'Dân tộc', t: 'text', max: 40 },
+  { k: 'tonGiao', l: 'Tôn giáo', t: 'text', max: 40 },
+  { k: 'honNhan', l: 'Tình trạng hôn nhân', t: 'radio', opts: ['Độc thân', 'Có gia đình'] },
+  { k: 'dienThoai', l: 'Điện thoại di động', t: 'tel', req: 1 },
+  { k: 'thuongTru', l: 'Địa chỉ thường trú (sau sáp nhập)', t: 'text', req: 1, max: 250, wide: 1 },
+  { k: 'tamTru', l: 'Địa chỉ tạm trú / hiện nay', t: 'text', req: 1, max: 250, wide: 1 },
+  { k: 'mangThai', l: 'Đang mang thai', t: 'radio', opts: ['Có', 'Không'], wide: 1 },
+  { k: 'email', l: 'Email', t: 'email', req: 1, max: 120, wide: 1 },
+  { k: 'doanDang', l: 'Đoàn/Đảng', t: 'text', max: 60 },
+  { k: 'nvqs', l: 'Nghĩa vụ quân sự', t: 'check', cb: 'Đã hoàn thành' },
+  { k: 'khanCap', l: 'Người liên hệ khẩn cấp', t: 'text', req: 1, max: 80, wide: 1 },
+  { k: 'quanHe', l: 'Mối quan hệ', t: 'text', req: 1, max: 40 },
+  { k: 'sdtKhanCap', l: 'SĐT người liên hệ khẩn cấp', t: 'tel', req: 1 },
+  { k: 'diaChiLienLac', l: 'Địa chỉ liên lạc', t: 'text', req: 1, max: 250, wide: 1 },
+  { k: 'ngayNhanViec', l: 'Ngày nhận việc chính thức', t: 'date', wide: 1, future: 1 },
+  { k: 'nguon', l: 'Bạn biết thông tin tuyển dụng này thông qua', t: 'multi', opts: ['Website VA Schools', 'Fanpage VA Schools Tuyển dụng', 'Khác'], wide: 1 },
+  { k: 'luong', l: 'Mức lương mong muốn', t: 'text', max: 60, wide: 1 }
+];
+/* các hàng của mục II khi in (theo đúng biểu mẫu) */
+var PRINT_II = [['hoTen', 'gioiTinh'], ['ngaySinh', 'noiSinh'], ['quocTich', 'cccd'], ['ngayCap', 'noiCap'], ['danToc', 'tonGiao'], ['honNhan', 'dienThoai'], ['thuongTru'], ['tamTru'], ['mangThai'], ['email'], ['doanDang', 'nvqs'], ['khanCap'], ['quanHe', 'sdtKhanCap'], ['diaChiLienLac'], ['ngayNhanViec'], ['nguon'], ['luong']];
+var HV_LEVELS = ['Trung học', 'Cao đẳng', 'Đại học', 'Thạc Sĩ', 'Tiến Sĩ', 'Khác'];
+var HV_COLS = [['truong', 'Tên trường', 100], ['nam', 'Năm tốt nghiệp', 4], ['chuyenNganh', 'Chuyên ngành', 100], ['bangCap', 'Bằng cấp', 80], ['heDaoTao', 'Hệ đào tạo', 60]];
+var TABLES = {
+  khoaHoc: { title: 'IV. CÁC KHÓA ĐÀO TẠO KHÁC', rows: 4, maxRows: 8, cols: [['truong', 'Tên trường / trung tâm', 'text', 100], ['noiDung', 'Nội dung khóa học', 'text', 150], ['tu', 'Từ', 'month', 7], ['den', 'Đến', 'month', 7], ['tt', 'Trạng thái', 'tt', 10]] },
+  ngoaiNgu: { title: 'V. CHỨNG CHỈ NGOẠI NGỮ', rows: 3, maxRows: 6, cols: [['ngoaiNgu', 'Ngoại ngữ', 'text', 60], ['chungChi', 'Chứng chỉ / văn bằng', 'text', 100], ['nam', 'Năm đạt chứng chỉ / văn bằng', 'year', 4]] },
+  kinhNghiem: { title: 'VI. KINH NGHIỆM LÀM VIỆC (liệt kê từ gần đây nhất về trước)', rows: 5, maxRows: 10, cols: [['tu', 'Từ (tháng/năm)', 'month', 7], ['den', 'Đến (tháng/năm)', 'month', 7], ['congTy', 'Tên Công ty - Địa điểm, Người tham khảo, chức vụ, SĐT', 'text', 250], ['chucDanh', 'Chức danh công việc', 'text', 100], ['lyDo', 'Lý do thôi việc', 'text', 150]] }
+};
+var HR_STATUS = ['Mới nộp', 'Đã xem', 'Đã liên hệ', 'Đã nhận việc', 'Không tiếp tục'];
+var COMMIT_TEXT = ['Tôi cam đoan những thông tin cung cấp trên đây là chính xác. Tôi chấp nhận việc Công ty xác minh những thông tin trên và cam kết không kiện tổ chức hoặc những cá nhân cung cấp thông tin cho Công ty. Nếu các thông tin trên không đúng sự thật thì tôi chấp nhận việc Công ty chấm dứt HĐLĐ trước thời hạn mà không cần báo trước, đồng thời bồi thường thiệt hại cho Công ty (nếu có).', 'Tôi cam kết bảo mật thông tin của hệ thống Trường Việt Mỹ - VA Schools.', 'Tôi đồng thuận cho VA Schools sử dụng các thông tin cá nhân do tôi cung cấp để phục vụ công tác tuyển dụng, quản lý nhân sự và các nghiệp vụ liên quan của Phòng Hành chính - Nhân sự theo quy định.'];
+/*SCHEMA-END*/
+const MODE=window.__MODE==='admin'?'admin':'public';
+const GS=typeof google!=='undefined'&&google.script&&google.script.run;
+const gcall=(fn,...a)=>new Promise((res,rej)=>{if(!GS)return rej(new Error('Trang này chỉ chạy khi được triển khai bằng Google Apps Script.'));const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
+const $=(s,r=document)=>r.querySelector(s),qa=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmtD=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?`${m[3]}/${m[2]}/${m[1]}`:String(s||'')};
+const fmtM=s=>{const m=/^(\d{4})-(\d{2})$/.exec(String(s||''));return m?`${m[2]}/${m[1]}`:String(s||'')};
+const errMsg=e=>String(e&&e.message||e).replace(/^Error:\s*/,'');
+let toastT=0;function toast(m,k){const t=$('#toast');t.textContent=m;t.style.background=k==='err'?'#b42318':k==='ok'?'#1e7e34':'#222';t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',k==='err'?6000:3000)}
+function copyText(t){try{navigator.clipboard.writeText(t).catch(()=>0)}catch(e){}const a=document.createElement('textarea');a.value=t;a.style.cssText='position:fixed;opacity:0';document.body.append(a);a.select();try{document.execCommand('copy')}catch(e){}a.remove()}
+
+/* ================= ĐỊNH DẠNG HIỂN THỊ / IN ================= */
+const BOXED=(on)=>on?'&#9746;':'&#9744;';
+function docHTML(rec,meta){
+  const d=rec.data||rec,hr=d.hr||{};const F=k=>PF.find(f=>f.k===k);
+  const val=(f)=>{const v=d[f.k];
+    if(f.t==='date')return esc(fmtD(v));
+    if(f.t==='radio')return f.opts.map(o=>`${BOXED(v===o)} ${esc(o)}`).join('&nbsp;&nbsp; ');
+    if(f.t==='check')return `${BOXED(!!v)} ${esc(f.cb)}`;
+    if(f.t==='multi'){const a=v||[];return f.opts.map(o=>o==='Khác'?`${BOXED(a.includes(o))} Khác: ${a.includes(o)&&d.nguonKhac?esc(d.nguonKhac):'....................'}`:`${BOXED(a.includes(o))} ${esc(o)}`).join('&nbsp;&nbsp;&nbsp; ')}
+    return esc(v||'')};
+  const L=f=>`<td class="l">${esc(f.l)}${f.req?'*':''}</td>`;
+  const II=PRINT_II.map(r=>r.length===2?`<tr>${L(F(r[0]))}<td>${val(F(r[0]))}</td>${L(F(r[1]))}<td>${val(F(r[1]))}</td></tr>`:`<tr>${L(F(r[0]))}<td colspan="3">${val(F(r[0]))}</td></tr>`).join('');
+  const hvRows=HV_LEVELS.map((lv,i)=>{const h=(d.hocVan||[])[i]||{};return`<tr><td class="l c">${esc(lv)}</td>${HV_COLS.map(c=>`<td>${esc(h[c[0]]||'')}</td>`).join('')}</tr>`}).join('');
+  const tb=(k)=>{const T=TABLES[k],rows=d[k]||[];const n=Math.max(T.rows,rows.length);let b='';for(let i=0;i<n;i++){const r=rows[i]||{};b+=`<tr>${T.cols.map(c=>{let v=r[c[0]]||'';if(c[2]==='month')v=fmtM(v);return`<td>${esc(v)}</td>`}).join('')}</tr>`}
+    return`<div class="sec">${esc(T.title)}</div><table class="g"><thead><tr>${T.cols.map(c=>`<th>${esc(c[1])}</th>`).join('')}</tr></thead><tbody>${b}</tbody></table>`};
+  const tt=k=>{ // cột Đã học / Đang học tách riêng như biểu mẫu
+    const T=TABLES[k],rows=d[k]||[];const n=Math.max(T.rows,rows.length);let b='';
+    for(let i=0;i<n;i++){const r=rows[i]||{};b+=`<tr><td>${esc(r.truong||'')}</td><td>${esc(r.noiDung||'')}</td><td>${esc(fmtM(r.tu))}</td><td>${esc(fmtM(r.den))}</td><td class="c">${r.tt==='Đã học'?'&#9746;':'&#9744;'}</td><td class="c">${r.tt==='Đang học'?'&#9746;':'&#9744;'}</td></tr>`}
+    return`<div class="sec">${esc(T.title)}</div><table class="g"><thead><tr><th>Tên trường/<br>trung tâm</th><th>Nội dung<br>khóa học</th><th>Từ</th><th>Đến</th><th>Đã học</th><th>Đang học</th></tr></thead><tbody>${b}</tbody></table>`};
+  const code=(meta&&meta.code)||'';
+  return`<div class="bm10"><style>
+.bm10{font-family:Times New Roman,Times,serif;font-size:12.5px;line-height:1.35;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.bm10 table{width:100%;border-collapse:collapse}.bm10 td,.bm10 th{border:1px solid #ccc;padding:3px 6px;vertical-align:middle}
+.bm10 .hd td{border:1px solid #8a1538;padding:8px}.bm10 .hd .t{text-align:center;color:#8a1538}.bm10 .hd .t b{font-size:19px;display:block}.bm10 .hd .t i{font-size:12px}.bm10 .hd .r{font-size:12px;text-align:center;width:24%}
+.bm10 .sec{color:#8a1538;font-weight:bold;margin:12px 0 4px;font-size:13px}.bm10 .l{font-weight:bold;width:19%}.bm10 .c{text-align:center}
+.bm10 th{background:#8a1538;color:#fff;font-size:12px;padding:5px 3px}.bm10 .g td{height:22px}.bm10 .g .l{width:auto}
+.bm10 .cm p{margin:5px 0;text-align:justify}.bm10 .sg{width:300px;margin:10px 0 0 auto;text-align:center}
+</style>
+<table class="hd"><tr><td style="width:22%;text-align:center"><img src="${LOGO}" alt="" style="max-height:70px;max-width:100%"></td><td class="t"><b>${esc(FORM_META.title)}</b><i>${esc(FORM_META.sub)}</i></td><td class="r">MS: ${esc(FORM_META.code)}<br>Ngày BH: ${esc(FORM_META.date)}<br>Lần BH: ${esc(FORM_META.issue)}</td></tr></table>
+<div class="sec">I. THÔNG TIN CHUNG <i>(*Dành cho P. HCNS)</i></div>
+<table><tr><td class="l">Chức danh</td><td>${esc(hr.chucDanh||d.viTri||'')}</td><td class="l">Mã hồ sơ</td><td>${esc(code)}</td></tr><tr><td class="l">Cơ sở</td><td>${esc(hr.coSo||'')}</td><td class="l">Địa điểm</td><td>${esc(hr.diaDiem||'')}</td></tr><tr><td class="l">Thời gian</td><td>${esc(hr.thoiGian||'')}</td><td class="l">MSNV</td><td>${esc(hr.msnv||'')}</td></tr></table>
+<div class="sec">II. THÔNG TIN CÁ NHÂN</div><table>${II}</table>
+<div class="sec">III. QUÁ TRÌNH HỌC TẬP CHUYÊN MÔN</div><table class="g"><thead><tr>${['Trình độ',...HV_COLS.map(c=>c[1])].map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${hvRows}</tbody></table>
+${tt('khoaHoc')}${tb('ngoaiNgu')}${tb('kinhNghiem')}
+<div class="cm" style="margin-top:10px">${COMMIT_TEXT.map(t=>`<p>${esc(t)}</p>`).join('')}</div>
+<div class="sg">TP. Hồ Chí Minh, Ngày ....Tháng….Năm….<br><b>Người khai</b><br><b>(Ký &amp; ghi rõ họ tên)</b><br><br><br><br>${esc(d.hoTen||'')}</div></div>`}
+function printDoc(rec,meta){
+  const w=window.open('','_blank');if(!w){toast('Trình duyệt chặn cửa sổ in – hãy cho phép pop-up','err');return}
+  w.document.write(`<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><title>${esc((meta&&meta.code)||'BM.10')}</title><style>@page{size:A4;margin:12mm 12mm 14mm}body{margin:0;background:#fff}@media screen{body{max-width:820px;margin:24px auto}}tr{page-break-inside:avoid}</style></head><body>${docHTML(rec,meta)}<script>setTimeout(function(){print()},500)<\/script></body></html>`);w.document.close()}
+
+/* ================= BIỂU MẪU NHẬP ================= */
+function fieldInput(f,v,d){
+  const id='f_'+f.k;
+  if(f.t==='radio')return`<div class="opts" data-k="${f.k}">${f.opts.map(o=>`<label><input type="radio" name="${id}" value="${esc(o)}" ${v===o?'checked':''}> ${esc(o)}</label>`).join('')}</div>`;
+  if(f.t==='check')return`<div class="opts"><label><input type="checkbox" id="${id}" ${v?'checked':''}> ${esc(f.cb)}</label></div>`;
+  if(f.t==='multi'){const a=v||[];return`<div class="opts" data-k="${f.k}">${f.opts.map(o=>`<label><input type="checkbox" name="${id}" value="${esc(o)}" ${a.includes(o)?'checked':''}> ${esc(o)}</label>`).join('')}<input type="text" id="f_nguonKhac" maxlength="80" placeholder="Ghi rõ nguồn khác" value="${esc(d.nguonKhac||'')}" style="max-width:260px;${a.includes('Khác')?'':'display:none'}"></div>`}
+  const type=f.t==='date'?'date':f.t==='tel'?'tel':f.t==='email'?'email':'text';
+  return`<input type="${type}" id="${id}" value="${esc(v||'')}" ${f.max?`maxlength="${f.max}"`:''} ${f.t==='cccd'?'inputmode="numeric" maxlength="12"':''} ${f.t==='tel'?'maxlength="16" inputmode="tel"':''} autocomplete="off">`}
+function tableEditor(k,rows){
+  const T=TABLES[k],n=Math.max(T.rows,rows.length);let b='';
+  for(let i=0;i<n;i++){const r=rows[i]||{};b+=`<tr>${T.cols.map(c=>{const id=`t_${k}_${i}_${c[0]}`,v=r[c[0]]||'';
+    if(c[2]==='tt')return`<td><select id="${id}"><option value=""></option><option ${v==='Đã học'?'selected':''}>Đã học</option><option ${v==='Đang học'?'selected':''}>Đang học</option></select></td>`;
+    if(c[2]==='month')return`<td><input type="month" id="${id}" value="${esc(v)}" placeholder="MM/YYYY"></td>`;
+    if(c[2]==='year')return`<td><input type="text" id="${id}" value="${esc(v)}" maxlength="4" inputmode="numeric"></td>`;
+    return`<td><input type="text" id="${id}" value="${esc(v)}" maxlength="${c[3]}"></td>`}).join('')}</tr>`}
+  return`<h3>${esc(T.title)}</h3><div class="scroll"><table class="tbl"><thead><tr>${T.cols.map(c=>`<th>${esc(c[1])}</th>`).join('')}</tr></thead><tbody>${b}</tbody></table></div>${n<T.maxRows?`<div style="margin-top:8px"><button class="btn sm" type="button" data-act="addRow" data-id="${k}">+ Thêm dòng</button></div>`:''}`}
+function formHTML(d,ro){
+  const fields=PF.map(f=>`<div class="${f.wide?'wide':''}"><label class="f">${esc(f.l)}${f.req?' <span class="req">*</span>':''}</label>${fieldInput(f,d[f.k],d)}</div>`).join('');
+  const hv=HV_LEVELS.map((lv,i)=>{const h=(d.hocVan||[])[i]||{};return`<tr><td class="lv">${esc(lv)}</td>${HV_COLS.map(c=>`<td><input type="text" id="hv_${i}_${c[0]}" value="${esc(h[c[0]]||'')}" maxlength="${c[2]}" ${c[0]==='nam'?'inputmode="numeric"':''}></td>`).join('')}</tr>`}).join('');
+  return`<fieldset id="frm" style="border:0;padding:0;margin:0" ${ro?'disabled':''}>
+  <div class="card"><h2>II. THÔNG TIN CÁ NHÂN</h2><div class="grid">${fields}</div></div>
+  <div class="card"><h2>III. QUÁ TRÌNH HỌC TẬP CHUYÊN MÔN</h2><div class="scroll"><table class="tbl"><thead><tr><th>Trình độ</th>${HV_COLS.map(c=>`<th>${esc(c[1])}</th>`).join('')}</tr></thead><tbody>${hv}</tbody></table></div></div>
+  <div class="card">${tableEditor('khoaHoc',d.khoaHoc||[])}</div>
+  <div class="card">${tableEditor('ngoaiNgu',d.ngoaiNgu||[])}</div>
+  <div class="card">${tableEditor('kinhNghiem',d.kinhNghiem||[])}</div>
+  <div class="card"><div class="commit">${COMMIT_TEXT.map(t=>`<p>${esc(t)}</p>`).join('')}</div><label class="opts" style="margin-top:12px;font-weight:600"><input type="checkbox" id="camKet" ${d.camKet?'checked':''}> Tôi đã đọc và đồng ý với các cam đoan trên <span class="req">*</span></label></div></fieldset>`}
+function collect(){
+  const p={};
+  PF.forEach(f=>{const id='f_'+f.k;
+    if(f.t==='radio'){const c=$(`input[name="${id}"]:checked`);p[f.k]=c?c.value:''}
+    else if(f.t==='check')p[f.k]=$('#'+id).checked;
+    else if(f.t==='multi'){p[f.k]=qa(`input[name="${id}"]:checked`).map(x=>x.value);p.nguonKhac=$('#f_nguonKhac').value}
+    else p[f.k]=$('#'+id).value});
+  p.hocVan=HV_LEVELS.map((lv,i)=>{const o={};HV_COLS.forEach(c=>o[c[0]]=$(`#hv_${i}_${c[0]}`).value);return o});
+  Object.keys(TABLES).forEach(k=>{const T=TABLES[k],rows=[];let i=0;while($(`#t_${k}_${i}_${T.cols[0][0]}`)){const o={};T.cols.forEach(c=>o[c[0]]=$(`#t_${k}_${i}_${c[0]}`).value);rows.push(o);i++}p[k]=rows});
+  p.camKet=$('#camKet').checked;return p}
+function validateClient(p){
+  qa('.bad').forEach(x=>x.classList.remove('bad'));let first=null;const miss=[];
+  PF.forEach(f=>{if(!f.req)return;const v=p[f.k];if(v==null||v===''||(Array.isArray(v)&&!v.length)){miss.push(f.l);const el=f.t==='radio'?$(`[data-k="${f.k}"]`):$('#f_'+f.k);if(el){el.classList.add('bad');first=first||el}}});
+  if(!p.camKet){miss.push('Xác nhận cam đoan');const el=$('#camKet');el.classList.add('bad');first=first||el}
+  if(first){first.scrollIntoView({block:'center',behavior:'smooth'});return'Còn thiếu: '+miss.slice(0,5).join(', ')+(miss.length>5?'…':'')}
+  return''}
+
+/* ================= TRẠNG THÁI & MÀN HÌNH ================= */
+const S={view:'home',rec:null,code:'',secret:'',t0:0,busy:false,msg:'',adm:{me:null,list:[],q:'',cur:null,users:null,tab:'list'}};
+const topbar=(extra='')=>`<div class="top"><img src="${LOGO}" alt="VA Schools"><div><h1>${MODE==='admin'?'Quản lý hồ sơ ứng viên':'Thông tin ứng viên'}</h1><small>${esc(FORM_META.code)} · Hệ thống Trường Việt Mỹ – VA Schools</small></div><div class="sp"></div>${extra}</div>`;
+function render(){
+  const app=$('#app');window.__booted=1;
+  if(MODE==='admin'){return renderAdmin(app)}
+  const home=`<a href="#" data-act="home" style="color:#fff;border:1px solid #ffffff66;border-radius:8px;padding:6px 12px;font-size:13px;text-decoration:none">Trang chủ</a>`;
+  let b='';
+  if(S.view==='home')b=`<div class="card hero"><h2>Cổng khai thông tin ứng viên</h2><p>Điền biểu mẫu <b>${esc(FORM_META.code)}</b> trực tuyến, nộp cho Phòng Hành chính – Nhân sự. Sau khi nộp bạn sẽ nhận <b>mã hồ sơ</b> và <b>số xác nhận</b> để tra cứu, chỉnh sửa và in lại hồ sơ.</p></div>
+    <div class="choices"><div class="choice" data-act="new"><b>Điền hồ sơ mới</b>Điền thông tin cá nhân, học vấn, kinh nghiệm làm việc.</div><div class="choice" data-act="lookup"><b>Tra cứu / chỉnh sửa hồ sơ đã nộp</b>Cần mã hồ sơ và số xác nhận được cấp khi nộp.</div></div>`;
+  else if(S.view==='new'||S.view==='edit'){
+    const ro=S.view==='edit'&&S.rec.locked,d=S.view==='edit'?S.rec.data:(S.draft||{});
+    b=`<div class="card"><h2>${S.view==='edit'?`Hồ sơ ${esc(S.rec.code)}`:'Điền hồ sơ ứng viên'}</h2>
+      ${S.view==='edit'?`<div class="row" style="margin-bottom:8px"><span class="badge">Nộp ${esc(S.rec.at.slice(0,16))}</span>${S.rec.rev?`<span class="badge">Đã sửa ${S.rec.rev} lần</span>`:''}${ro?'<span class="badge b-bad">Đã khoá</span>':S.rec.lockUntil?`<span class="badge b-warn">Được sửa đến hết ${esc(fmtD(S.rec.lockUntil))}</span>`:'<span class="badge b-ok">Đang cho phép chỉnh sửa</span>'}</div>${ro?`<div class="alert warn">${esc(S.rec.lockReason||'Hồ sơ đã khoá.')} Nếu cần thay đổi, vui lòng liên hệ Phòng Nhân sự.</div>`:''}`:`<div class="alert info">Các ô đánh dấu <span class="req">*</span> là bắt buộc. Thông tin của bạn chỉ được dùng cho công tác tuyển dụng của VA Schools.</div>`}
+      ${S.msg?`<div class="alert err">${esc(S.msg)}</div>`:''}</div>
+      <div class="hp" aria-hidden="true"><input type="text" id="hp" tabindex="-1" autocomplete="off"></div>
+      ${formHTML(d,ro)}
+      <div class="row"><button class="btn" data-act="home">Huỷ</button><div class="sp"></div>${S.view==='edit'?`<button class="btn" data-act="printCur">In hồ sơ</button>`:''}${ro?'':`<button class="btn pri" data-act="${S.view==='edit'?'saveEdit':'submit'}" ${S.busy?'disabled':''}>${S.busy?'Đang gửi…':S.view==='edit'?'Lưu thay đổi':'Gửi hồ sơ'}</button>`}</div>`}
+  else if(S.view==='done')b=`<div class="card" style="text-align:center"><h2 style="font-size:22px">✔ Đã nộp hồ sơ thành công</h2><p>Mã hồ sơ của bạn</p><div class="secret">${esc(S.code)}</div><p style="margin-top:18px">Số xác nhận <b>(chỉ hiển thị một lần)</b></p><div class="secret">${esc(S.secret)}</div>
+    <div class="alert warn" style="margin:18px auto;max-width:560px;text-align:left">Hãy <b>lưu lại hoặc in</b> mã hồ sơ và số xác nhận này. Bạn cần cả hai để tra cứu, chỉnh sửa và in lại hồ sơ. Phòng Nhân sự không thể xem số xác nhận của bạn, nếu mất chỉ có thể được cấp số mới.</div>
+    <div class="row" style="justify-content:center"><button class="btn" data-act="copyCode">Sao chép</button><button class="btn" data-act="printCur">In hồ sơ</button><button class="btn pri" data-act="openCur">Xem / chỉnh sửa hồ sơ</button></div></div>`;
+  else if(S.view==='lookup')b=`<div class="card" style="max-width:520px;margin:20px auto"><h2>Tra cứu hồ sơ</h2>${S.msg?`<div class="alert err">${esc(S.msg)}</div>`:''}
+    <label class="f">Mã hồ sơ</label><input type="text" id="lk_code" placeholder="HS-2610-0001" autocomplete="off" value="${esc(S.code)}"><label class="f" style="margin-top:12px">Số xác nhận</label><input type="text" id="lk_sec" placeholder="XXXX-XXXX" autocomplete="off" maxlength="12">
+    <div class="row" style="margin-top:16px"><button class="btn" data-act="home">Quay lại</button><div class="sp"></div><button class="btn pri" data-act="doLookup" ${S.busy?'disabled':''}>${S.busy?'Đang tra cứu…':'Tra cứu'}</button></div></div>`;
+  app.innerHTML=topbar(S.view==='home'?'':home)+`<div class="wrap">${b}</div>`;
+  if(S.view==='edit'||S.view==='new'){const nk=$('#f_nguonKhac');qa('input[name="f_nguon"]').forEach(c=>c.addEventListener('change',()=>{nk.style.display=qa('input[name="f_nguon"]').some(x=>x.value==='Khác'&&x.checked)?'':'none'}))}
+  if(S.view==='lookup'){const s=$('#lk_sec');(S.code?s:$('#lk_code')).focus();[$('#lk_code'),s].forEach(i=>i.addEventListener('keydown',e=>{if(e.key==='Enter')ACT.doLookup()}))}
+}
+const ACT={
+  home:()=>{S.view='home';S.msg='';S.draft=null;render()},
+  new:()=>{S.view='new';S.msg='';S.t0=Date.now();S.draft={camKet:0};render()},
+  lookup:()=>{S.view='lookup';S.msg='';S.code='';render()},
+  addRow:id=>{const p=collect();p[id].push({});S.draft=S.view==='new'?p:null;if(S.view==='edit')S.rec.data=Object.assign(S.rec.data,p);render()},
+  copyCode:()=>{copyText(`Mã hồ sơ: ${S.code}\nSố xác nhận: ${S.secret}`);toast('Đã sao chép mã hồ sơ và số xác nhận','ok')},
+  printCur:()=>{if(S.view==='edit')printDoc(S.rec,{code:S.rec.code});else printDoc(S.rec,{code:S.code})},
+  openCur:()=>{S.view='edit';render()},
+  submit:async()=>{
+    if(S.busy)return;const p=collect();S.draft=p;const miss=validateClient(p);if(miss){toast(miss,'err');return}
+    S.busy=true;S.msg='';$('.btn.pri').disabled=true;
+    try{const r=await gcall('pub_submit',p,{hp:$('#hp').value,sec:Math.round((Date.now()-S.t0)/1000)});S.code=r.code;S.secret=r.secret;S.rec={code:r.code,at:r.at,data:p,locked:false};S.view='done';S.draft=null;.style.display='none';window.scrollTo(0,0)}
+    catch(e){S.msg=errMsg(e);toast(S.msg,'err');window.scrollTo(0,0)}
+    S.busy=false;render()},
+  saveEdit:async()=>{
+    if(S.busy)return;const p=collect();const miss=validateClient(p);if(miss){toast(miss,'err');return}
+    S.busy=true;S.msg='';$('.btn.pri').disabled=true;
+    try{S.rec=await gcall('pub_update',S.code,S.secret,p);toast('Đã lưu thay đổi','ok')}catch(e){S.msg=errMsg(e);toast(S.msg,'err');window.scrollTo(0,0)}
+    S.busy=false;render()},
+  doLookup:async()=>{
+    if(S.busy)return;const c=$('#lk_code').value.trim(),s=$('#lk_sec').value.trim();if(!c||!s){toast('Nhập đủ mã hồ sơ và số xác nhận','err');return}
+    S.busy=true;S.msg='';S.code=c.toUpperCase();render();
+    try{const r=await gcall('pub_lookup',c,s);S.rec=r;S.code=r.code;S.secret=s;S.view='edit'}catch(e){S.msg=errMsg(e);S.view='lookup'}
+    S.busy=false;render()}
+};
+
+/* ================= QUẢN TRỊ (HCNS) ================= */
+const RANK={'Xem':1,'Tuyển dụng':2,'Quản trị':3};const canE=()=>S.adm.me&&RANK[S.adm.me.role]>=2;
+function dl(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
+const csvCell=v=>{let s=v==null?'':String(v);if(/^[=+\-@\t\r]/.test(s))s="'"+s;else if(/^0\d{5,}$/.test(s))return'="'+s+'"';return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
+function toCSV(h,rows){return'﻿'+[h,...rows].map(r=>r.map(csvCell).join(',')).join('\r\n')}
+/* xlsx tối giản (zip không nén) */
+const CRC=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return b=>{let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=t[(c^b[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0}})();
+function zip(files){const enc=new TextEncoder(),chunks=[],cd=[];let off=0;const u16=n=>[n&255,n>>8&255],u32=n=>[n&255,n>>8&255,n>>16&255,n>>>24&255];
+  files.forEach(([name,txt])=>{const nb=enc.encode(name),db=enc.encode(txt),crc=CRC(db);const lh=[0x50,0x4b,3,4,20,0,0,8,0,0,0,0,0,0,...u32(crc),...u32(db.length),...u32(db.length),...u16(nb.length),0,0];
+    chunks.push(new Uint8Array(lh),nb,db);cd.push([0x50,0x4b,1,2,20,0,20,0,0,8,0,0,0,0,0,0,...u32(crc),...u32(db.length),...u32(db.length),...u16(nb.length),0,0,0,0,0,0,0,0,0,0,0,0,...u32(off)],nb);off+=lh.length+nb.length+db.length});
+  let cds=0;cd.forEach(x=>cds+=x.length);const cdAll=[];cd.forEach(x=>cdAll.push(x instanceof Uint8Array?x:new Uint8Array(x)));
+  const end=new Uint8Array([0x50,0x4b,5,6,0,0,0,0,...u16(files.length),...u16(files.length),...u32(cds),...u32(off),0,0]);return new Blob([...chunks,...cdAll,end],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})}
+function toXLSX(h,rows){
+  const col=i=>{let s='';i++;while(i>0){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26)}return s};
+  const x=v=>String(v==null?'':v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const row=(r,i,st)=>`<row r="${i}">${r.map((v,j)=>`<c r="${col(j)}${i}" t="inlineStr"${st?' s="1"':''}><is><t xml:space="preserve">${x(v)}</t></is></c>`).join('')}</row>`;
+  const sheet=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetData>${row(h,1,1)}${rows.map((r,i)=>row(r,i+2)).join('')}</sheetData></worksheet>`;
+  return zip([['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+    ['_rels/.rels','<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+    ['xl/workbook.xml','<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="HoSoUngVien" sheetId="1" r:id="rId1"/></sheets></workbook>'],
+    ['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+    ['xl/styles.xml','<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF8A1538"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" fillId="2" applyFont="1" applyFill="1"/></cellXfs></styleSheet>'],
+    ['xl/worksheets/sheet1.xml',sheet]])}
+const stBadge=s=>`<span class="badge ${s==='Đã nhận việc'?'b-ok':s==='Không tiếp tục'?'b-bad':s==='Mới nộp'?'b-warn':''}">${esc(s)}</span>`;
+async function admLoad(){try{S.adm.list=await gcall('adm_list',S.adm.q)}catch(e){S.msg=errMsg(e)}render()}
+function renderAdmin(app){
+  const A=S.adm;
+  if(!A.me){app.innerHTML=topbar()+`<div class="wrap"><div class="card">${S.msg?`<div class="alert err">${esc(S.msg)}</div>`:'Đang kiểm tra quyền truy cập…'}</div></div>`;return}
+  const nav=`<span style="font-size:13px">${esc(A.me.email)} · <b>${esc(A.me.role)}</b></span>${A.me.role==='Quản trị'?`<button class="lk" data-act="admTab" data-id="${A.tab==='users'?'list':'users'}">${A.tab==='users'?'Hồ sơ':'Người dùng'}</button>`:''}`;
+  let b='';
+  if(A.cur){
+    const r=A.cur,hr=r.data.hr||{};
+    b=`<div class="row" style="margin-bottom:12px"><button class="btn" data-act="admBack">← Danh sách</button><div class="sp"></div><button class="btn" data-act="admPrint">In hồ sơ</button></div>${S.msg?`<div class="alert err">${esc(S.msg)}</div>`:''}
+      <div class="split"><div class="pvdoc">${docHTML(r,{code:r.code})}</div>
+      <div class="card"><h3>Xử lý của Phòng Nhân sự</h3>
+        <div class="row" style="margin-bottom:8px"><span class="badge">${esc(r.code)}</span>${r.locked?'<span class="badge b-bad">Đã khoá</span>':'<span class="badge b-ok">Cho sửa</span>'}${r.rev?`<span class="badge">Sửa ${r.rev} lần</span>`:''}</div>
+        <div class="small" style="font-size:12.5px;color:var(--mut);margin-bottom:10px">Nộp: ${esc(r.at)} · Cập nhật: ${esc(r.upd)}${r.lockUntil?` · Hạn sửa: ${esc(fmtD(r.lockUntil))}`:''}</div>
+        <fieldset ${canE()?'':'disabled'} style="border:0;padding:0;margin:0">
+        <label class="f">Trạng thái</label><select id="h_tt">${A.me.statuses.map(s=>`<option ${hr.trangThai===s?'selected':''}>${esc(s)}</option>`).join('')}</select>
+        <label class="f" style="margin-top:8px">Chức danh (nếu khác vị trí ứng tuyển)</label><input type="text" id="h_cd" value="${esc(hr.chucDanh||'')}" maxlength="120">
+        <div class="grid" style="margin-top:8px"><div><label class="f">Cơ sở</label><input type="text" id="h_cs" value="${esc(hr.coSo||'')}" maxlength="120"></div><div><label class="f">Địa điểm</label><input type="text" id="h_dd" value="${esc(hr.diaDiem||'')}" maxlength="120"></div><div><label class="f">Thời gian</label><input type="text" id="h_tg" value="${esc(hr.thoiGian||'')}" maxlength="120"></div><div><label class="f">MSNV</label><input type="text" id="h_ms" value="${esc(hr.msnv||'')}" maxlength="120"></div></div>
+        <label class="f" style="margin-top:8px">Ngày nhận việc (HCNS xác nhận)</label><input type="date" id="h_nv" value="${esc(hr.ngayNhanViecHR||'')}">
+        <label class="f" style="margin-top:8px">Khoá chỉnh sửa của ứng viên</label><select id="h_kh"><option value="" ${!hr.khoa?'selected':''}>Tự động (ngày nhận việc + 3 ngày)</option><option value="lock" ${hr.khoa==='lock'?'selected':''}>Khoá ngay</option><option value="open" ${hr.khoa==='open'?'selected':''}>Mở khoá (cho sửa)</option></select>
+        <label class="f" style="margin-top:8px">Ghi chú nội bộ (ứng viên không thấy)</label><textarea id="h_gc" rows="3" maxlength="500">${esc(hr.ghiChu||'')}</textarea>
+        <div class="row" style="margin-top:12px"><button class="btn pri" data-act="admSave">Lưu</button><button class="btn dng sm" data-act="admReset">Cấp lại số xác nhận</button></div></fieldset>
+        ${canE()?'':'<div class="alert info" style="margin-top:10px">Vai trò "Xem" chỉ được xem và in.</div>'}</div></div>`;
+  }else if(A.tab==='users'){
+    const U=A.users||[];
+    b=`<div class="card"><h2>Người dùng quản lý hồ sơ</h2>${S.msg?`<div class="alert err">${esc(S.msg)}</div>`:''}<div class="alert info">Vai trò: <b>Xem</b> (xem, in) · <b>Tuyển dụng</b> (thêm: sửa xử lý, cấp lại số xác nhận, xuất CSV/Excel) · <b>Quản trị</b> (thêm: quản lý người dùng). Dùng email công ty.</div>
+      <table class="list"><thead><tr><th>Email</th><th>Tên</th><th>Vai trò</th><th></th></tr></thead><tbody>${U.map((u,i)=>`<tr><td><input type="text" data-u="${i}:email" value="${esc(u.email)}"></td><td><input type="text" data-u="${i}:name" value="${esc(u.name)}"></td><td><select data-u="${i}:role">${Object.keys(RANK).map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}</select></td><td><button class="btn sm dng" data-act="admUDel" data-id="${i}">Xoá</button></td></tr>`).join('')}</tbody></table>
+      <div class="row" style="margin-top:12px"><button class="btn" data-act="admUAdd">+ Thêm người dùng</button><div class="sp"></div><button class="btn pri" data-act="admUSave">Lưu danh sách</button></div></div>`;
+  }else{
+    b=`<div class="card"><div class="row"><input type="text" id="q" placeholder="Tìm theo mã, họ tên, SĐT, email, CCCD, vị trí…" value="${esc(A.q)}" style="max-width:420px"><button class="btn" data-act="admSearch">Tìm</button><div class="sp"></div>${canE()?`<button class="btn" data-act="admCSV">Xuất CSV</button><button class="btn pri" data-act="admXLSX">Xuất Excel</button>`:''}</div>${S.msg?`<div class="alert err" style="margin-top:12px">${esc(S.msg)}</div>`:''}
+      <div class="scroll" style="margin-top:12px"><table class="list"><thead><tr><th>Mã hồ sơ</th><th>Họ và tên</th><th>Vị trí</th><th>Điện thoại</th><th>Nộp lúc</th><th>Nhận việc</th><th>Trạng thái</th><th></th></tr></thead><tbody>${A.list.map(r=>`<tr class="cl" data-act="admOpen" data-id="${esc(r.code)}"><td><b>${esc(r.code)}</b></td><td>${esc(r.name)}</td><td>${esc(r.pos)}</td><td>${esc(r.phone)}</td><td>${esc(fmtD(r.at))}</td><td>${esc(fmtD(r.nv))}</td><td>${stBadge(r.status)}</td><td>${r.locked?'🔒':''}</td></tr>`).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--mut)">Chưa có hồ sơ</td></tr>'}</tbody></table></div><div class="small" style="margin-top:8px;color:var(--mut);font-size:12.5px">${A.list.length} hồ sơ</div></div>`;
+  }
+  app.innerHTML=topbar(nav)+`<div class="wrap">${b}</div>`;
+  const q=$('#q');if(q)q.addEventListener('keydown',e=>{if(e.key==='Enter')ACT.admSearch()});
+}
+Object.assign(ACT,{
+  admTab:id=>{S.adm.tab=id;S.adm.cur=null;S.msg='';if(id==='users')gcall('adm_users').then(u=>{S.adm.users=u;render()}).catch(e=>{S.msg=errMsg(e);render()});else{render();admLoad()}},
+  admSearch:()=>{S.adm.q=$('#q').value;S.msg='';admLoad()},
+  admOpen:async id=>{try{S.adm.cur=await gcall('adm_get',id);S.msg=''}catch(e){S.msg=errMsg(e)}render();window.scrollTo(0,0)},
+  admBack:()=>{S.adm.cur=null;S.msg='';render();admLoad()},
+  admPrint:()=>printDoc(S.adm.cur,{code:S.adm.cur.code}),
+  admSave:async()=>{const hr={trangThai:$('#h_tt').value,chucDanh:$('#h_cd').value,coSo:$('#h_cs').value,diaDiem:$('#h_dd').value,thoiGian:$('#h_tg').value,msnv:$('#h_ms').value,ngayNhanViecHR:$('#h_nv').value,khoa:$('#h_kh').value,ghiChu:$('#h_gc').value};
+    try{S.adm.cur=await gcall('adm_saveHr',S.adm.cur.code,hr);S.msg='';toast('Đã lưu','ok')}catch(e){S.msg=errMsg(e)}render()},
+  admReset:()=>{if(!confirm('Cấp số xác nhận mới? Số cũ sẽ không còn dùng được. Chỉ thực hiện sau khi đã xác minh danh tính ứng viên.'))return;
+    gcall('adm_resetSecret',S.adm.cur.code).then(r=>{prompt('Số xác nhận mới của '+r.code+' (đưa cho ứng viên, chỉ hiện một lần):',r.secret)}).catch(e=>toast(errMsg(e),'err'))},
+  admCSV:async()=>{try{toast('Đang xuất…');const e=await gcall('adm_export');dl(`ho-so-ung-vien-${new Date().toISOString().slice(0,10)}.csv`,new Blob([toCSV(e.headers,e.rows)],{type:'text/csv;charset=utf-8'}))}catch(e){toast(errMsg(e),'err')}},
+  admXLSX:async()=>{try{toast('Đang xuất…');const e=await gcall('adm_export');dl(`ho-so-ung-vien-${new Date().toISOString().slice(0,10)}.xlsx`,toXLSX(e.headers,e.rows))}catch(e){toast(errMsg(e),'err')}},
+  admUAdd:()=>{readUsers();S.adm.users.push({email:'',name:'',role:'Xem'});render()},
+  admUDel:id=>{readUsers();S.adm.users.splice(+id,1);render()},
+  admUSave:async()=>{readUsers();try{S.adm.users=await gcall('adm_setUsers',S.adm.users);S.msg='';toast('Đã lưu danh sách','ok')}catch(e){S.msg=errMsg(e)}render()}
+});
+function readUsers(){qa('[data-u]').forEach(el=>{const[i,k]=el.dataset.u.split(':');S.adm.users[+i][k]=el.value})}
+document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;if(el.tagName==='A')e.preventDefault();const f=ACT[el.dataset.act];if(f)f(el.dataset.id,el)});
+(async()=>{
+  render();
+  if(MODE==='admin'){try{S.adm.me=await gcall('adm_me');render();admLoad()}catch(e){S.msg=errMsg(e);render()}}
+})();
+</script>
+</body>
+</html>
