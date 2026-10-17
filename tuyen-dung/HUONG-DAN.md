@@ -203,3 +203,9 @@ Thư không dùng ký hiệu nào vẫn hiển thị bình thường. Khi "Sao c
 - Cú pháp nút trong mẫu: `@ [Nhãn](mailto:địa_chỉ?subject=…&body=…){ok} [Nhãn](…){no}` (`{ok}` xanh, `{no}` đỏ, `\n` = xuống dòng). Biến mới: `{{email_phan_hoi}}`.
 - Dòng bắt đầu bằng `~` giờ tạo **khối căn về bên phải nhưng các dòng bên trong canh giữa nhau** (tiêu đề, ngày tháng, "Ký & ghi rõ họ tên").
 - Mẫu đã cài từ v22 sẽ được **cập nhật** khi bấm lại *Cài bộ mẫu thư chuyên nghiệp* (có xác nhận; hãy nhân bản trước nếu bạn đã tự sửa mẫu).
+
+---
+
+## In thư mời nhận việc (v25)
+
+Hồ sơ ứng viên → **Soạn thư** → chọn mẫu → nút **In thư** (cạnh "Sao chép"): mở bản in khổ A4 có logo, đầu thư, bảng thông tin, ô lưu ý và khối chữ ký; riêng nút *Đồng ý / Từ chối* được đổi thành hai ô tích ☐ kèm dòng "Lý do (nếu từ chối)" để nhân viên tuyển dụng in ra kẹp hồ sơ. Bản in chỉ gồm nội dung thư (không kèm chữ ký email).

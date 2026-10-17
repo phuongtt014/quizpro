@@ -275,7 +275,7 @@ const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{co
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
-const APP_VER='v24 · 17/10/2026';
+const APP_VER='v25 · 17/10/2026';
 const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const MAXF=GS?10:15;
@@ -1198,6 +1198,7 @@ function mrRender(text, brand) {
     else if (b.t === 'hr') h += '<hr style="border:0;border-top:1px solid ' + line + ';margin:18px 0">';
     else if (b.t === 'p') h += '<p style="margin:0 0 13px">' + I(b.v) + '</p>';
     else if (b.t === 'right') h += '<table role="presentation" align="right" width="300" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:8px 0 0"><tr><td align="center" style="text-align:center;line-height:1.65;font-size:15px">' + b.v.map(function (x) { return '<div style="margin:0 0 3px">' + I(x) + '</div>'; }).join('') + '</td></tr></table><div style="clear:both;height:1px;line-height:1px">&nbsp;</div>';
+    else if (b.t === 'btn' && brand.print) h += '<div style="margin:14px 0 10px;font-size:15px">' + b.v.map(function (x) { return '<span style="display:inline-block;margin-right:34px">&#9744; <b>' + mrEsc(String(x.label).replace(/^[^A-Za-zÀ-ỹ]+/, '')) + '</b></span>'; }).join('') + '</div><div style="margin:0 0 10px">Lý do (nếu từ chối): ..................................................................................................</div>';
     else if (b.t === 'btn') h += '<div style="text-align:center;margin:18px 0 8px">' + b.v.map(function (x) {
       var bg = x.kind === 'no' ? '#b42318' : x.kind === 'ok' ? '#1e7e34' : col;
       return '<a href="' + mrHref(x.url) + '" style="display:inline-block;margin:4px 8px;padding:13px 30px;background:' + bg + ';color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;border-radius:6px;font-family:Arial,Helvetica,sans-serif">' + mrEsc(x.label) + '</a>';
@@ -1231,6 +1232,7 @@ function mrRender(text, brand) {
       h += t + '</table>';
     }
   });
+  if (brand.print) return '<div style="font-family:Times New Roman,Times,serif;font-size:15px;line-height:1.6;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact">' + h + '</div>';
   return '<div style="background:#f5f0f2;padding:22px 10px"><div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid ' + line + ';padding:30px 38px;font-family:Times New Roman,Times,serif;font-size:15px;line-height:1.65;color:#222222">' + h + '</div></div>';
 }
 /** Bản văn bản thuần (cho phần dự phòng / mở bằng ứng dụng email / sao chép). */
@@ -1356,6 +1358,10 @@ Chúng tôi xin phép nhắc Anh/Chị về nội dung liên quan đến vị tr
 > **ĐỀ NGHỊ ANH/CHỊ:**
 > • Vui lòng phản hồi email này trước ngày **{{han_phan_hoi}}** để chúng tôi kịp sắp xếp.${SIGN}`}];
 }
+function printLetter(text,title){
+  const b={...mailBrandCfg(),print:1};let h=mrRender(text,b);if(b.logo)h=h.split('cid:vaslogo').join(tplAt(Date.now()).logoData);
+  const w=window.open('','_blank');if(!w){toast('Trình duyệt chặn cửa sổ in','err');return}
+  w.document.write(`<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4;margin:14mm 16mm}body{margin:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}table{page-break-inside:auto}tr{page-break-inside:avoid}h2,h1{page-break-after:avoid}@media screen{body{max-width:800px;margin:24px auto}}</style></head><body>${h}<script>setTimeout(()=>print(),500)<\/script></body></html>`);w.document.close()}
 function mailBrandCfg(){const m=DB.cfg.mail;return{color:m.brandColor,lines:String(m.headerLines||'').split(/\r?\n/),logo:m.showLogo!==0&&!!tplAt(Date.now()).logoData}}
 /** HTML thư để xem trước (giống thư thật; logo lấy từ Mẫu phiếu đang hiệu lực). */
 function mailPreviewHTML(text){
@@ -1486,7 +1492,7 @@ function letterModal(c,t){
       ${atts.length?`<div style="margin-top:10px"><label class="f">Đính kèm biểu mẫu từ Thư viện</label><div id="ml_att">${atts.map(f=>`<label style="display:flex;gap:8px;align-items:center;margin:4px 0"><input type="checkbox" class="chk" value="${esc(f.file.id)}">${esc(f.name)} <span class="muted small">(${fsize(f.file.size)})</span></label>`).join('')}</div></div>`:''}
       <div class="row" style="margin-top:12px"><button class="btn pri" id="ml_send" data-act="mlSend" data-id="${c.id}" data-arg="${t.id}" data-label="${esc('Gửi email ngay')}">${ic('mail')}Gửi email ngay</button><span class="small muted">Gửi từ <b>${esc(mailFromLabel())}</b>. Chữ ký và BCC lưu bản sao thêm tự động.</span></div></div>`:''}`,
     after:()=>{const pv=()=>{const f=$('#lt_pv');if(f)f.srcdoc=mailPreviewHTML(mailBodyFull($('#lt_b').value))};pv();let pt=0;$('#lt_b').addEventListener('input',()=>{clearTimeout(pt);pt=setTimeout(pv,250)});const sel=$('#lt_round');if(sel){sel.value=dr?dr.id:rounds[rounds.length-1].id;sel.onchange=()=>{rid=sel.value;const x=compose();$('#lt_s').value=x.subj;$('#lt_b').value=x.body;$('#lt_warn').innerHTML=warnHTML(x.subj,x.body);pv()}}},
-    buttons:[modalCancel,{label:'Sao chép',icon:'copy',fn:()=>{copyText($('#lt_s').value+'\n\n'+mrPlain($('#lt_b').value));toast('Đã sao chép nội dung thư','ok');return false}},
+    buttons:[modalCancel,{label:'In thư',icon:'print',fn:()=>{printLetter($('#lt_b').value,$('#lt_s').value);return false}},{label:'Sao chép',icon:'copy',fn:()=>{copyText($('#lt_s').value+'\n\n'+mrPlain($('#lt_b').value));toast('Đã sao chép nội dung thư','ok');return false}},
       ...(c?[{label:'Mở trong ứng dụng email',icon:'mail',fn:()=>{const a=document.createElement('a');a.href=`mailto:${encodeURIComponent(c.v.email||'')}?subject=${encodeURIComponent($('#lt_s').value)}&body=${encodeURIComponent(mrPlain($('#lt_b').value))}`;a.target='_blank';document.body.append(a);a.click();a.remove();return false}},
       {label:'Ghi nhận đã gửi',cls:canSend?'':'pri',icon:'check',fn:()=>{log(c,`Đã gửi thư: ${t.name}`);commit();toast('Đã ghi nhận vào lịch sử ứng viên','ok')}}]:[])]});
 }

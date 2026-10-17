@@ -411,6 +411,7 @@ function mrRender(text, brand) {
     else if (b.t === 'hr') h += '<hr style="border:0;border-top:1px solid ' + line + ';margin:18px 0">';
     else if (b.t === 'p') h += '<p style="margin:0 0 13px">' + I(b.v) + '</p>';
     else if (b.t === 'right') h += '<table role="presentation" align="right" width="300" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:8px 0 0"><tr><td align="center" style="text-align:center;line-height:1.65;font-size:15px">' + b.v.map(function (x) { return '<div style="margin:0 0 3px">' + I(x) + '</div>'; }).join('') + '</td></tr></table><div style="clear:both;height:1px;line-height:1px">&nbsp;</div>';
+    else if (b.t === 'btn' && brand.print) h += '<div style="margin:14px 0 10px;font-size:15px">' + b.v.map(function (x) { return '<span style="display:inline-block;margin-right:34px">&#9744; <b>' + mrEsc(String(x.label).replace(/^[^A-Za-zÀ-ỹ]+/, '')) + '</b></span>'; }).join('') + '</div><div style="margin:0 0 10px">Lý do (nếu từ chối): ..................................................................................................</div>';
     else if (b.t === 'btn') h += '<div style="text-align:center;margin:18px 0 8px">' + b.v.map(function (x) {
       var bg = x.kind === 'no' ? '#b42318' : x.kind === 'ok' ? '#1e7e34' : col;
       return '<a href="' + mrHref(x.url) + '" style="display:inline-block;margin:4px 8px;padding:13px 30px;background:' + bg + ';color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;border-radius:6px;font-family:Arial,Helvetica,sans-serif">' + mrEsc(x.label) + '</a>';
@@ -444,6 +445,7 @@ function mrRender(text, brand) {
       h += t + '</table>';
     }
   });
+  if (brand.print) return '<div style="font-family:Times New Roman,Times,serif;font-size:15px;line-height:1.6;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact">' + h + '</div>';
   return '<div style="background:#f5f0f2;padding:22px 10px"><div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid ' + line + ';padding:30px 38px;font-family:Times New Roman,Times,serif;font-size:15px;line-height:1.65;color:#222222">' + h + '</div></div>';
 }
 /** Bản văn bản thuần (cho phần dự phòng / mở bằng ứng dụng email / sao chép). */
