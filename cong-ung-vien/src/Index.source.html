@@ -221,7 +221,7 @@ const ACT={
   submit:async()=>{
     if(S.busy)return;const p=collect();S.draft=p;const miss=validateClient(p);if(miss){toast(miss,'err');return}
     S.busy=true;S.msg='';$('.btn.pri').disabled=true;
-    try{const r=await gcall('pub_submit',p,{hp:$('#hp').value,sec:Math.round((Date.now()-S.t0)/1000)});S.code=r.code;S.secret=r.secret;S.rec={code:r.code,at:r.at,data:p,locked:false};S.view='done';S.draft=null;.style.display='none';window.scrollTo(0,0)}
+    try{const r=await gcall('pub_submit',p,{hp:$('#hp').value,sec:Math.round((Date.now()-S.t0)/1000)});S.code=r.code;S.secret=r.secret;S.rec={code:r.code,at:r.at,data:p,locked:false};S.view='done';S.draft=null;$('#toast').style.display='none';window.scrollTo(0,0)}
     catch(e){S.msg=errMsg(e);toast(S.msg,'err');window.scrollTo(0,0)}
     S.busy=false;render()},
   saveEdit:async()=>{
