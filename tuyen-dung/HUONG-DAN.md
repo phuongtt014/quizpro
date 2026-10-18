@@ -226,3 +226,9 @@ Tab mới **Hồ sơ nhận việc** (cần quyền *Xem hồ sơ nhận việc*
 **Phân quyền:** 4 quyền mới ở *Thiết lập → Phân quyền*: xem hồ sơ nhận việc, tiếp nhận & tạo bàn giao, xác nhận nhận bàn giao (C&B), xem báo cáo. Nhân viên tuyển dụng được cấp sẵn xem/tiếp nhận/báo cáo; có sẵn vai trò **Nhân viên C&B** (thêm người dùng và chọn vai trò này).
 
 **Danh mục hồ sơ (BM.11):** *Thư viện → Hồ sơ nhận việc (BM.11)* – chỉnh/ban hành bản mới (mỗi dòng `Tên | Yêu cầu chi tiết | Số lượng / quy cách`). Hồ sơ đang xử lý giữ danh mục đã chốt lúc bắt đầu tiếp nhận.
+
+### Phân định trách nhiệm (v27)
+Mỗi hồ sơ nhận việc có **hai người chịu trách nhiệm rõ ràng**:
+- **Nhân viên Tuyển dụng phụ trách** – thu hồ sơ bước đầu từ ứng viên và bàn giao cho C&B. Bắt buộc chọn khi bấm *Bắt đầu tiếp nhận* (ứng viên mới tạo bởi nhân viên tuyển dụng tự gán người tạo). KPI thu hồ sơ, bàn giao đúng hạn và số lần bị từ chối **tính cho người này**, không phụ thuộc ai bấm tạo đợt bàn giao.
+- **Nhân viên C&B phụ trách** – kiểm tra và chịu trách nhiệm khi nhận bàn giao. Chọn khi bắt đầu tiếp nhận (hoặc đặt mặc định ở Thiết lập → Hồ sơ nhận việc). Đợt bàn giao chỉ gồm ứng viên của cùng một C&B; chỉ C&B được chọn (hoặc quản trị) mới xác nhận/từ chối đợt đó. Báo cáo có bảng đánh giá riêng cho C&B: số đợt nhận, xác nhận, từ chối, tỷ lệ từ chối, thời gian phản hồi trung bình.
+Cả hai hiển thị ở danh sách, chi tiết hồ sơ, bản in BM.11 (ô ký "Người tiếp nhận" và "Nhân viên HCNS tiếp nhận") và file CSV.

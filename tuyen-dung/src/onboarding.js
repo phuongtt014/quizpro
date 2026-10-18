@@ -13,7 +13,9 @@ const onbItemsFrom=arr=>arr.map((x,i)=>({id:'i'+(i+1),name:x[0],req:x[1]||'',qty
 function defaultOnbTpl(){return{id:'onb_default',code:'BM.11/HN.QT.01',issue:'01',effective:'2026-09-21',title:'PHIẾU TIẾP NHẬN HỒ SƠ NHÂN SỰ',sub:'(Áp dụng cho nhân sự mới khi gia nhập Hệ thống)',note:'Bản đầu tiên',createdAt:Date.now(),by:'',items:onbItemsFrom(ONB_DEF_ITEMS)}}
 const onbTplList=()=>[...DB.lib.onbTpls].sort((a,b)=>(a.effective||'').localeCompare(b.effective||''));
 function onbTplAt(at){const vs=onbTplList();if(!vs.length)return defaultOnbTpl();const d=new Date(at||Date.now()).toISOString().slice(0,10);let cur=vs[0];vs.forEach(v=>{if((v.effective||'')<=d)cur=v});return cur}
-const onbCfg=()=>Object.assign({handoverDays:9,base:'start',sat:0,collectDays:7,portalUrl:''},DB.cfg.onb||{});
+const onbCfg=()=>Object.assign({handoverDays:9,base:'start',sat:0,collectDays:7,portalUrl:'',defaultCnb:''},DB.cfg.onb||{});
+const cnbUsers=()=>DB.cfg.users.filter(u=>roleHas(u,'onb.confirm')).sort((x,y)=>(x.roleId==='admin')-(y.roleId==='admin'));
+const recUsers=()=>DB.cfg.users.filter(u=>roleHas(u,'onb.receive')).sort((x,y)=>(x.roleId==='admin')-(y.roleId==='admin'));
 const hoList=()=>DB.lib.handovers;
 function addWork(dIso,n,sat){let d=new Date(dIso+'T00:00:00Z'),k=0;while(k<n){d=new Date(d.getTime()+dayMs);const w=d.getUTCDay();if(w===0||(w===6&&!sat))continue;k++}return d.toISOString().slice(0,10)}
 const onbStartDate=c=>c.offer&&c.offer.startDate?String(c.offer.startDate).slice(0,10):(c.hiredAt?new Date(c.hiredAt).toISOString().slice(0,10):'');
@@ -22,9 +24,9 @@ function onbDue(c){const g=onbCfg(),b=g.base==='recv'?onbFirstRecv(c):onbStartDa
 function onbCollectDue(c){const s=onbStartDate(c);return s?new Date(new Date(s+'T00:00:00Z').getTime()+(+onbCfg().collectDays||7)*dayMs).toISOString().slice(0,10):''}
 const onbEligible=c=>c.stage!=='rejected'&&((c.offer&&c.offer.status==='Chấp nhận')||c.stage==='hired');
 const onbCands=()=>DB.cands.filter(c=>onbEligible(c)||c.onb);
-function onbStart(c){
+function onbStart(c,owner,cnb){
   if(c.onb)return c.onb;const t=onbTplAt(Date.now());
-  c.onb={tplId:t.id,snap:{code:t.code,issue:t.issue,effective:t.effective,title:t.title,sub:t.sub,items:t.items.map(x=>({...x}))},items:{},owner:c.owner||me().id,note:'',createdAt:Date.now()};
+  c.onb={tplId:t.id,snap:{code:t.code,issue:t.issue,effective:t.effective,title:t.title,sub:t.sub,items:t.items.map(x=>({...x}))},items:{},owner:owner||c.owner||(me().roleId==='admin'?'':me().id),cnb:cnb||onbCfg().defaultCnb||'',note:'',createdAt:Date.now()};
   return c.onb}
 const onbItems=c=>c.onb?c.onb.snap.items:onbTplAt(Date.now()).items;
 function itemHo(candId,itemId){let best=null;hoList().forEach(b=>{if((b.lines||[]).some(l=>l.candId===candId&&l.items.includes(itemId))&&(!best||b.createdAt>best.createdAt))best=b});return best}
@@ -39,6 +41,7 @@ function onbState(c){
   if(s.done===s.n)return['Hoàn tất','b-ok','done'];if(s.got<s.n)return['Đang thu hồ sơ','b-warn','collect'];return['Chờ bàn giao','b-vio','wait']}
 function onbFlags(c){const s=onbStats(c),t=iso(),due=onbDue(c),cd=onbCollectDue(c);return{collectLate:!!(s.got<s.n&&cd&&t>cd),handLate:!!(s.got>s.done&&due&&t>due),due,cd,s}}
 const ownerName=c=>c.onb&&c.onb.owner?userName(c.onb.owner):'—';
+const cnbName=c=>c.onb&&c.onb.cnb?userName(c.onb.cnb):'—';
 const isLate=c=>{const f=onbFlags(c);return f.collectLate||f.handLate};
 /* ---- mốc hoàn thành để chấm KPI ---- */
 function onbCollectedAt(c){const o=c.onb;if(!o)return'';const its=onbItems(c);if(!its.every(i=>o.items[i.id]&&o.items[i.id].got))return'';return its.map(i=>o.items[i.id].at||'').sort().pop()}
@@ -48,14 +51,16 @@ const canRecv=()=>can('onb.receive'),canCnb=()=>can('onb.confirm');
 function seqCode(prefix,list){const ym=iso().slice(2,4)+iso().slice(5,7);const n=list.filter(x=>(x.code||'').startsWith(`${prefix}-${ym}-`)).length+1;return`${prefix}-${ym}-${String(n).padStart(3,'0')}`}
 const ONB_ACTS={
  openOnb:id=>{if(!can('onb.view'))return;openDrawer(()=>onbDrawer(id))},
- onbStartBtn:id=>{const c=DB.cands.find(x=>x.id===id);if(!c||!canRecv())return;onbStart(c);log(c,'Bắt đầu tiếp nhận hồ sơ nhận việc (BM.11)');commit()},
+ onbStartBtn:id=>{const c=DB.cands.find(x=>x.id===id);if(!c||!canRecv())return;const ow=$('#onb_pick_o')?$('#onb_pick_o').value:'',cn=$('#onb_pick_c')?$('#onb_pick_c').value:'';if(!ow){toast('Chọn nhân viên tuyển dụng chịu trách nhiệm thu hồ sơ','err');return}
+   onbStart(c,ow,cn);log(c,`Bắt đầu tiếp nhận hồ sơ nhận việc (BM.11) – Tuyển dụng phụ trách: ${userName(ow)}${cn?` · C&B phụ trách: ${userName(cn)}`:''}`);commit()},
  onbTick:(id,el)=>{const[cid,iid]=id.split('~'),c=DB.cands.find(x=>x.id===cid);if(!c||!canRecv()){render();return}
    const o=onbStart(c),it=o.snap.items.find(x=>x.id===iid),on=el.checked;
    if(!on&&['cho','dong_y'].includes(itemHs(c,iid))){toast('Hồ sơ đã nằm trong một đợt bàn giao – không thể bỏ tích','err');render();return}
    if(on)o.items[iid]={got:1,at:iso(),by:me().id};else delete o.items[iid];
    log(c,`Tiếp nhận hồ sơ: ${it.name} – ${on?'ĐÃ NHẬN':'bỏ nhận'}`);commit()},
  onbNote:(id,el)=>{const c=DB.cands.find(x=>x.id===id);if(!c||!canRecv())return;onbStart(c).note=el.value;save()},
- onbOwner:(id,el)=>{const c=DB.cands.find(x=>x.id===id);if(!c||!canRecv())return;onbStart(c).owner=el.value;log(c,'Đổi nhân viên phụ trách hồ sơ nhận việc → '+userName(el.value));commit()},
+ onbOwner:(id,el)=>{const c=DB.cands.find(x=>x.id===id);if(!c||!canRecv()||!c.onb)return;c.onb.owner=el.value;log(c,'Đổi nhân viên tuyển dụng phụ trách thu hồ sơ → '+userName(el.value));commit()},
+ onbCnb:(id,el)=>{const c=DB.cands.find(x=>x.id===id);if(!c||!canRecv()||!c.onb)return;const busy=hoList().some(b=>b.status==='cho'&&b.lines.some(l=>l.candId===c.id));if(busy){toast('Đang có đợt bàn giao chờ C&B xác nhận – chưa đổi được C&B phụ trách','err');render();return}c.onb.cnb=el.value;log(c,'Đổi nhân viên C&B phụ trách nhận bàn giao → '+(el.value?userName(el.value):'(chưa chọn)'));commit()},
  onbPrint:id=>{const c=DB.cands.find(x=>x.id===id);if(c)printHtml(onbDocHTML(c),'BM.11 – '+c.v.name)},
  onbF:id=>{ui.obf=id;render()},obTab:id=>{ui.ob=id;render()},
  hoNew:id=>hoModal(id?{candId:id}:null),
@@ -82,22 +87,27 @@ function hoLog(b,text){b.lines.forEach(l=>{const c=DB.cands.find(x=>x.id===l.can
 function hoModal(pre){
   if(!canRecv())return;
   const redo=pre&&pre.redo;
-  const rec=DB.cfg.users.filter(u=>roleHas(u,'onb.confirm')).sort((x,y)=>(x.roleId==='admin')-(y.roleId==='admin'));
+  const rec=cnbUsers();
   if(!rec.length){toast('Chưa có người dùng nào có quyền nhận bàn giao (C&B). Hãy gán vai trò ở Thiết lập.','err');return}
-  const pool=onbCands().filter(c=>c.onb&&onbStats(c).avail>0&&(!pre||!pre.candId||c.id===pre.candId)&&(!redo||redo.lines.some(l=>l.candId===c.id)));
+  const base=onbCands().filter(c=>c.onb&&onbStats(c).avail>0&&(!pre||!pre.candId||c.id===pre.candId)&&(!redo||redo.lines.some(l=>l.candId===c.id)));
+  const first=(pre&&pre.candId&&(DB.cands.find(x=>x.id===pre.candId).onb||{}).cnb)||(redo&&redo.toId)||rec[0].id;
+  const pool=base;
   if(!pool.length){toast('Không có hồ sơ nào đã nhận và chưa bàn giao','err');return}
   const pick=(c,id)=>{const hs=itemHs(c,id),g=c.onb.items[id]&&c.onb.items[id].got;return g&&(hs===''||hs==='tu_choi')};
   modal({title:redo?`Làm lại bàn giao (thay đợt ${redo.code})`:'Tạo đợt bàn giao hồ sơ cho C&B',wide:true,html:`
     ${redo?`<div class="alert warn" style="margin-bottom:12px">${ic('alert')}<div><b>C&B đã từ chối:</b> ${esc(redo.reason||'')}<br>Hãy <b>kiểm tra lại hồ sơ</b> theo lý do trên rồi bàn giao lại.</div></div>`:''}
-    <label class="f">Nhân viên C&B nhận bàn giao</label><select id="ho_to">${rec.map(u=>`<option value="${u.id}" ${((redo&&redo.toId)===u.id)?'selected':''}>${esc(u.name)}</option>`).join('')}</select>
-    <div style="margin-top:12px">${pool.map(c=>`<div class="card" style="margin-bottom:10px;padding:12px"><b>${esc(c.v.name)}</b> <span class="muted small">· ${esc(posOf(c))} · nhận việc ${fmtD(onbStartDate(c))}</span>
+    <label class="f">Nhân viên C&B nhận bàn giao <span class="muted small">(người chịu trách nhiệm kiểm tra khi nhận)</span></label><select id="ho_to">${rec.map(u=>`<option value="${u.id}" ${first===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select>
+    <div id="ho_note_cnb" class="small muted" style="margin-top:6px"></div>
+    <div style="margin-top:12px">${pool.map(c=>`<div class="card ho_card" data-c="${c.id}" data-cnb="${esc(c.onb.cnb||'')}" style="margin-bottom:10px;padding:12px"><b>${esc(c.v.name)}</b> <span class="muted small">· ${esc(posOf(c))} · nhận việc ${fmtD(onbStartDate(c))}${c.onb.cnb?` · C&B phụ trách: ${esc(userName(c.onb.cnb))}`:''}</span>
       ${c.onb.snap.items.filter(it=>pick(c,it.id)).map(it=>`<label style="display:flex;gap:8px;align-items:center;margin:5px 0"><input type="checkbox" class="chk ho_pick" data-c="${c.id}" data-i="${it.id}" checked> ${esc(it.name)} <span class="muted small">(${esc(it.qty)})</span></label>`).join('')}</div>`).join('')}</div>
     <label class="f">Ghi chú (tuỳ chọn)</label><input type="text" id="ho_note" placeholder="VD: Bàn giao đợt 1, còn thiếu giấy khám sức khỏe">`,
+    after:()=>{const sync=()=>{const to=$('#ho_to').value;let hid=0;qa('.ho_card').forEach(cd=>{const bad=cd.dataset.cnb&&cd.dataset.cnb!==to;cd.style.display=bad?'none':'';qa('.ho_pick',cd).forEach(x=>{x.disabled=bad;if(bad)x.checked=false});if(bad)hid++});$('#ho_note_cnb').textContent=hid?`${hid} ứng viên do C&B khác phụ trách nên không hiển thị trong đợt này.`:''};$('#ho_to').addEventListener('change',sync);sync()},
     buttons:[modalCancel,{label:redo?'Bàn giao lại':'Tạo đợt bàn giao',cls:'pri',icon:'check',fn:()=>{
-      const sel=qa('.ho_pick').filter(x=>x.checked);if(!sel.length){toast('Chọn ít nhất một hồ sơ','err');return false}
+      const sel=qa('.ho_pick').filter(x=>x.checked&&!x.disabled);if(!sel.length){toast('Chọn ít nhất một hồ sơ','err');return false}
       const lines={};sel.forEach(x=>{(lines[x.dataset.c]=lines[x.dataset.c]||[]).push(x.dataset.i)});
       const b={id:uid('bg_'),code:seqCode('BG',hoList()),createdAt:Date.now(),date:iso(),by:me().id,toId:$('#ho_to').value,lines:Object.entries(lines).map(([candId,items])=>({candId,items})),note:$('#ho_note').value.trim(),status:'cho',attempt:redo?(redo.attempt||1)+1:1};
       if(redo)b.redoOf=redo.id;hoList().push(b);
+      b.lines.forEach(l=>{const c=DB.cands.find(x=>x.id===l.candId);if(c&&c.onb&&!c.onb.cnb)c.onb.cnb=b.toId});
       b.lines.forEach(l=>{const c=DB.cands.find(x=>x.id===l.candId);log(c,`${redo?'Bàn giao lại':'Bàn giao'} hồ sơ cho C&B ${userName(b.toId)} (${b.code}): ${l.items.map(i=>c.onb.snap.items.find(x=>x.id===i).name).join(', ')}`)});
       ui.tab='onb';ui.ob='ho';closeDrawer();commit();toast('Đã tạo đợt bàn giao – chờ C&B xác nhận','ok')}}]});
 }
@@ -116,23 +126,24 @@ function onbRows(){
   const q=(ui.obq||'').toLowerCase(),f=ui.obf||'all';
   return onbCands().filter(c=>{const st=onbState(c)[2];
     if(f==='late'&&!isLate(c))return false;if(f!=='all'&&f!=='late'&&st!==f)return false;
-    return!q||(c.v.name+posOf(c)+ownerName(c)).toLowerCase().includes(q)}).sort((a,b)=>(onbStartDate(a)||'9').localeCompare(onbStartDate(b)||'9'))}
+    return!q||(c.v.name+posOf(c)+ownerName(c)+cnbName(c)).toLowerCase().includes(q)}).sort((a,b)=>(onbStartDate(a)||'9').localeCompare(onbStartDate(b)||'9'))}
 function onbListView(){
   const rows=onbRows(),fl=[['all','Tất cả'],['collect','Đang thu'],['wait','Chờ bàn giao'],['pend','Chờ C&B'],['rej','Bị từ chối'],['done','Hoàn tất'],['late','Quá hạn']];
   return`<div class="row" style="margin-bottom:12px"><div class="seg">${fl.map(t=>`<button class="${(ui.obf||'all')===t[0]?'on':''}" data-act="onbF" data-id="${t[0]}">${t[1]}</button>`).join('')}</div><div class="grow"></div>${searchBox('obq',ui.obq||'','Tìm ứng viên, vị trí, người phụ trách…')}</div>
-  <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Ứng viên</th><th>Vị trí</th><th>Ngày nhận việc</th><th>Phụ trách</th><th>Đã thu</th><th>C&B đã nhận</th><th>Hạn thu đủ</th><th>Hạn bàn giao</th><th>Làm lại</th><th>Trạng thái</th></tr></thead><tbody>
-  ${rows.map(c=>{const s=onbStats(c),f=onbFlags(c),st=onbState(c);return`<tr class="click" data-act="openOnb" data-id="${c.id}"><td><b>${esc(c.v.name)}</b></td><td>${esc(posOf(c))}</td><td>${fmtD(onbStartDate(c))}</td><td>${esc(ownerName(c))}</td>
-    <td>${c.onb?`<b>${s.got}</b>/${s.n}`:'—'}</td><td>${c.onb?`<b>${s.done}</b>/${s.n}`:'—'}</td><td>${f.cd?fmtD(f.cd):'—'}${f.collectLate?` ${badge('Quá hạn','b-bad')}`:''}</td><td>${f.due?fmtD(f.due):'—'}${f.handLate?` ${badge('Quá hạn','b-bad')}`:''}</td><td>${s.redo?badge(s.redo+' lần','b-bad'):'—'}</td><td>${badge(st[0],st[1])}</td></tr>`}).join('')||`<tr><td colspan="10"><div class="empty">Chưa có ứng viên nào chấp nhận thư mời.</div></td></tr>`}</tbody></table></div></div>
+  <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Ứng viên</th><th>Vị trí</th><th>Ngày nhận việc</th><th>Tuyển dụng phụ trách</th><th>C&B phụ trách</th><th>Đã thu</th><th>C&B đã nhận</th><th>Hạn thu đủ</th><th>Hạn bàn giao</th><th>Làm lại</th><th>Trạng thái</th></tr></thead><tbody>
+  ${rows.map(c=>{const s=onbStats(c),f=onbFlags(c),st=onbState(c);return`<tr class="click" data-act="openOnb" data-id="${c.id}"><td><b>${esc(c.v.name)}</b></td><td>${esc(posOf(c))}</td><td>${fmtD(onbStartDate(c))}</td><td>${esc(ownerName(c))}</td><td>${esc(cnbName(c))}</td>
+    <td>${c.onb?`<b>${s.got}</b>/${s.n}`:'—'}</td><td>${c.onb?`<b>${s.done}</b>/${s.n}`:'—'}</td><td>${f.cd?fmtD(f.cd):'—'}${f.collectLate?` ${badge('Quá hạn','b-bad')}`:''}</td><td>${f.due?fmtD(f.due):'—'}${f.handLate?` ${badge('Quá hạn','b-bad')}`:''}</td><td>${s.redo?badge(s.redo+' lần','b-bad'):'—'}</td><td>${badge(st[0],st[1])}</td></tr>`}).join('')||`<tr><td colspan="11"><div class="empty">Chưa có ứng viên nào chấp nhận thư mời.</div></td></tr>`}</tbody></table></div></div>
   <p class="muted small" style="margin-top:10px">Danh sách gồm ứng viên đã <b>chấp nhận thư mời</b> hoặc <b>đã nhận việc</b>. Hạn thu đủ = ngày nhận việc + ${onbCfg().collectDays} ngày; hạn bàn giao = ${onbCfg().handoverDays} ngày làm việc kể từ ${onbCfg().base==='recv'?'ngày nhận hồ sơ đầu tiên':'ngày nhận việc'} (thay đổi ở Thiết lập → Hồ sơ nhận việc).</p>`}
 function onbDrawer(id){
   const c=DB.cands.find(x=>x.id===id);if(!c)return'';
   const o=c.onb,items=onbItems(c),s=onbStats(c),f=onbFlags(c),st=onbState(c),ed=canRecv();
-  const owners=DB.cfg.users.filter(u=>roleHas(u,'onb.receive'));
+  const owners=recUsers(),cnbs=cnbUsers();
   const hist=hoList().filter(b=>b.lines.some(l=>l.candId===c.id)).sort((a,b)=>b.createdAt-a.createdAt);
   return`<div class="dr-h"><div><h2>${esc(c.v.name)}</h2><div class="muted">${esc(posOf(c))} · Nhận việc ${fmtD(onbStartDate(c))}</div></div><button class="btn ghost" data-act="dclose">${ic('x')}</button></div>
   <div class="dr-b"><div class="row" style="margin-bottom:12px">${badge(st[0],st[1])}${f.collectLate?badge('Thu hồ sơ quá hạn','b-bad'):''}${f.handLate?badge('Bàn giao quá hạn','b-bad'):''}${s.redo?badge('Làm lại bàn giao: '+s.redo+' lần','b-bad'):''}</div>
-  ${!o?`<div class="card sec"><p>Chưa bắt đầu tiếp nhận hồ sơ nhận việc cho ứng viên này.</p>${ed?`<button class="btn pri" data-act="onbStartBtn" data-id="${c.id}">Bắt đầu tiếp nhận (theo ${esc(onbTplAt(Date.now()).code)})</button>`:''}</div>`:`
-  <div class="card sec"><div class="sec-h"><h3>Thông tin</h3></div><dl class="kv"><dt>Nhân viên phụ trách</dt><dd>${ed?`<select data-onbo="${c.id}">${owners.map(u=>`<option value="${u.id}" ${o.owner===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}${owners.some(u=>u.id===o.owner)?'':`<option value="${esc(o.owner)}" selected>${esc(userName(o.owner))}</option>`}</select>`:esc(userName(o.owner))}</dd>
+  ${!o?`<div class="card sec"><p>Chưa bắt đầu tiếp nhận hồ sơ nhận việc cho ứng viên này.</p>${ed?`<div class="fgrid" style="margin:10px 0"><div><label class="f">Nhân viên tuyển dụng phụ trách thu hồ sơ <i>*</i></label><select id="onb_pick_o"><option value=""></option>${owners.map(u=>`<option value="${u.id}" ${(c.owner||(me().roleId==='admin'?'':me().id))===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select></div><div><label class="f">Nhân viên C&B phụ trách nhận bàn giao</label><select id="onb_pick_c"><option value=""></option>${cnbs.map(u=>`<option value="${u.id}" ${onbCfg().defaultCnb===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select></div></div><button class="btn pri" data-act="onbStartBtn" data-id="${c.id}">Bắt đầu tiếp nhận (theo ${esc(onbTplAt(Date.now()).code)})</button>`:''}</div>`:`
+  <div class="card sec"><div class="sec-h"><h3>Thông tin</h3></div><dl class="kv"><dt>Tuyển dụng phụ trách<br><span class="muted small">chịu trách nhiệm thu hồ sơ bước đầu từ ứng viên</span></dt><dd>${ed?`<select data-onbo="${c.id}">${owners.map(u=>`<option value="${u.id}" ${o.owner===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}${owners.some(u=>u.id===o.owner)?'':`<option value="${esc(o.owner||'')}" selected>${esc(o.owner?userName(o.owner):'(chưa chọn)')}</option>`}</select>`:esc(o.owner?userName(o.owner):'—')}</dd>
+    <dt>C&B phụ trách<br><span class="muted small">chịu trách nhiệm kiểm tra khi nhận bàn giao</span></dt><dd>${ed?`<select data-onbc="${c.id}"><option value=""></option>${cnbs.map(u=>`<option value="${u.id}" ${o.cnb===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select>`:esc(o.cnb?userName(o.cnb):'—')}</dd>
     <dt>Hạn thu đủ hồ sơ</dt><dd>${f.cd?fmtD(f.cd):'—'}</dd><dt>Hạn bàn giao C&B</dt><dd>${f.due?fmtD(f.due):'—'}</dd><dt>Biểu mẫu</dt><dd>${esc(o.snap.code)} · lần BH ${esc(o.snap.issue)}</dd></dl></div>
   <div class="card sec"><div class="sec-h"><h3>Danh mục hồ sơ (${s.got}/${s.n} đã nhận · ${s.done}/${s.n} C&B đã nhận)</h3><button class="btn sm" data-act="onbPrint" data-id="${c.id}">${ic('print')}In BM.11</button></div>
     <div class="tbl-wrap"><table><thead><tr><th style="width:34px">Nhận</th><th>Hồ sơ</th><th>Ngày nhận</th><th>Bàn giao</th></tr></thead><tbody>${items.map((it,i)=>{const r=o.items[it.id],hs=itemHs(c,it.id),b=hs?BG_ST[hs]:null;
@@ -164,8 +175,11 @@ function onbKpi(){
     const s=onbStats(c),cd=onbCollectDue(c),due=onbDue(c),ca=onbCollectedAt(c),ha=onbHandedAt(c);r.n++;r.cases.push(c);
     if(ca){r.full++;if(!cd||ca<=cd)r.fullOk++;else r.fullLate++;const sd2=onbStartDate(c);if(sd2)r.days.push(Math.round((new Date(ca)-new Date(sd2))/dayMs))}else if(cd&&t>cd)r.miss++;
     if(ha){if(!due||ha<=due)r.hOk++;else r.hLate++}else if(s.got>s.done&&due&&t>due)r.hPend++;});
-  hoList().forEach(x=>{const r=g.get(x.by);if(!r)return;r.batches++;if(x.status==='tu_choi')r.redo++});
+  hoList().forEach(x=>{new Set(x.lines.map(l=>{const c=DB.cands.find(y=>y.id===l.candId);return c&&c.onb?c.onb.owner:null})).forEach(o=>{const r=o!=null&&g.get(o);if(!r)return;r.batches++;if(x.status==='tu_choi')r.redo++})});
   return[...g.values()].sort((x,y)=>y.n-x.n)}
+function cnbKpi(){const[a,b]=kpiRange(),m=new Map();
+  hoList().forEach(x=>{const d=new Date(x.createdAt).toISOString().slice(0,10);if(d<a||d>=b)return;const k=x.toId||'—',r=m.get(k)||{u:k,n:0,ok:0,no:0,pend:0,hrs:[]};m.set(k,r);r.n++;if(x.status==='dong_y')r.ok++;else if(x.status==='tu_choi')r.no++;else r.pend++;if(x.decidedAt)r.hrs.push((x.decidedAt-x.createdAt)/36e5)});
+  return[...m.values()].sort((x,y)=>y.n-x.n)}
 const pct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
 function onbKpiView(){
   const rows=onbKpi(),P=[['month','Tháng này'],['prev','Tháng trước'],['quarter','Quý này'],['year','Năm nay'],['all','Tất cả']],cur=ui.obp||'month';
@@ -175,8 +189,9 @@ function onbKpiView(){
   <div class="kpis" style="margin-bottom:14px">${[['Hồ sơ nhận việc',tot.n||0,'đang theo dõi'],['Thu đủ đúng hạn',pct(tot.fullOk||0,(tot.full||0)+(tot.miss||0)),`${tot.fullOk||0} đúng / ${(tot.fullLate||0)+(tot.miss||0)} trễ hoặc thiếu`],['Bàn giao đúng hạn',pct(tot.hOk||0,(tot.hOk||0)+(tot.hLate||0)+(tot.hPend||0)),`${tot.hOk||0} đúng / ${(tot.hLate||0)+(tot.hPend||0)} trễ`],['Bị C&B từ chối',tot.redo||0,`${pct(tot.redo||0,tot.batches||0)} số đợt bàn giao`]].map(k=>`<div class="card kpi"><div><div class="t">${k[0]}</div><b>${k[1]}</b><small>${k[2]}</small></div></div>`).join('')}</div>
   <div class="card"><div class="card-h"><span>Đánh giá theo nhân viên tuyển dụng phụ trách</span></div><div class="tbl-wrap"><table><thead><tr><th>Nhân viên</th><th>Số hồ sơ</th><th>Thu đủ đúng hạn</th><th>TB ngày thu đủ (so với ngày nhận việc)</th><th>Thiếu quá hạn</th><th>Bàn giao đúng hạn</th><th>Chờ bàn giao quá hạn</th><th>Số đợt</th><th>Bị từ chối</th><th>Tỷ lệ làm lại</th></tr></thead><tbody>
   ${rows.map(r=>`<tr><td><b>${esc(userName(r.owner))}</b></td><td>${r.n}</td><td>${pct(r.fullOk,r.full+r.miss)} <span class="muted small">(${r.fullOk}/${r.full+r.miss})</span></td><td>${r.days.length?(r.days.reduce((a,b)=>a+b,0)/r.days.length).toFixed(1):'—'}</td><td>${r.miss?badge(r.miss,'b-bad'):0}</td><td>${pct(r.hOk,r.hOk+r.hLate+r.hPend)} <span class="muted small">(${r.hOk}/${r.hOk+r.hLate+r.hPend})</span></td><td>${r.hPend?badge(r.hPend,'b-bad'):0}</td><td>${r.batches}</td><td>${r.redo?badge(r.redo,'b-bad'):0}</td><td>${pct(r.redo,r.batches)}</td></tr>`).join('')||'<tr><td colspan="10"><div class="empty">Chưa có dữ liệu trong kỳ</div></td></tr>'}</tbody></table></div></div>
-  <div class="card" style="margin-top:14px"><div class="card-h"><span>Cần xử lý ngay (${late.length})</span></div><div class="tbl-wrap"><table><thead><tr><th>Ứng viên</th><th>Phụ trách</th><th>Ngày nhận việc</th><th>Đã thu</th><th>Vấn đề</th></tr></thead><tbody>${late.map(c=>{const f=onbFlags(c),s=f.s;return`<tr class="click" data-act="openOnb" data-id="${c.id}"><td><b>${esc(c.v.name)}</b></td><td>${esc(ownerName(c))}</td><td>${fmtD(onbStartDate(c))}</td><td>${s.got}/${s.n}</td><td>${f.collectLate?badge(`Thiếu ${s.n-s.got} hồ sơ, quá hạn thu ${fmtD(f.cd)}`,'b-bad')+' ':''}${f.handLate?badge(`${s.got-s.done} hồ sơ chưa bàn giao xong, hạn ${fmtD(f.due)}`,'b-bad'):''}</td></tr>`}).join('')||'<tr><td colspan="5"><div class="empty">Không có hồ sơ quá hạn 🎉</div></td></tr>'}</tbody></table></div></div>
-  <p class="muted small" style="margin-top:10px">Cách tính: <b>thu đủ đúng hạn</b> = thu đủ danh mục trước hạn thu đủ (ngày nhận việc + ${onbCfg().collectDays} ngày), hồ sơ còn thiếu quá hạn tính là trễ; <b>bàn giao đúng hạn</b> = các hồ sơ được C&B nhận với ngày bàn giao không quá hạn (${onbCfg().handoverDays} ngày làm việc); <b>bị từ chối</b> = số đợt bàn giao do nhân viên đó tạo bị C&B từ chối.</p>`}
+  <div class="card" style="margin-top:14px"><div class="card-h"><span>Đánh giá theo nhân viên C&B (người nhận bàn giao)</span></div><div class="tbl-wrap"><table><thead><tr><th>Nhân viên C&B</th><th>Số đợt nhận</th><th>Đã xác nhận</th><th>Từ chối</th><th>Tỷ lệ từ chối</th><th>Chờ xác nhận</th><th>Thời gian phản hồi TB</th></tr></thead><tbody>${cnbKpi().map(r=>`<tr><td><b>${esc(userName(r.u))}</b></td><td>${r.n}</td><td>${r.ok}</td><td>${r.no?badge(r.no,'b-bad'):0}</td><td>${pct(r.no,r.ok+r.no)}</td><td>${r.pend?badge(r.pend,'b-warn'):0}</td><td>${r.hrs.length?(()=>{const h=r.hrs.reduce((a,b)=>a+b,0)/r.hrs.length;return h<48?h.toFixed(1)+' giờ':(h/24).toFixed(1)+' ngày'})():'—'}</td></tr>`).join('')||'<tr><td colspan="7"><div class="empty">Chưa có đợt bàn giao trong kỳ</div></td></tr>'}</tbody></table></div></div>
+  <div class="card" style="margin-top:14px"><div class="card-h"><span>Cần xử lý ngay (${late.length})</span></div><div class="tbl-wrap"><table><thead><tr><th>Ứng viên</th><th>Tuyển dụng phụ trách</th><th>Ngày nhận việc</th><th>Đã thu</th><th>Vấn đề</th></tr></thead><tbody>${late.map(c=>{const f=onbFlags(c),s=f.s;return`<tr class="click" data-act="openOnb" data-id="${c.id}"><td><b>${esc(c.v.name)}</b></td><td>${esc(ownerName(c))}</td><td>${fmtD(onbStartDate(c))}</td><td>${s.got}/${s.n}</td><td>${f.collectLate?badge(`Thiếu ${s.n-s.got} hồ sơ, quá hạn thu ${fmtD(f.cd)}`,'b-bad')+' ':''}${f.handLate?badge(`${s.got-s.done} hồ sơ chưa bàn giao xong, hạn ${fmtD(f.due)}`,'b-bad'):''}</td></tr>`}).join('')||'<tr><td colspan="5"><div class="empty">Không có hồ sơ quá hạn 🎉</div></td></tr>'}</tbody></table></div></div>
+  <p class="muted small" style="margin-top:10px">Cách tính: <b>thu đủ đúng hạn</b> = thu đủ danh mục trước hạn thu đủ (ngày nhận việc + ${onbCfg().collectDays} ngày), hồ sơ còn thiếu quá hạn tính là trễ; <b>bàn giao đúng hạn</b> = các hồ sơ được C&B nhận với ngày bàn giao không quá hạn (${onbCfg().handoverDays} ngày làm việc); <b>bị từ chối</b> = số đợt bàn giao có hồ sơ do nhân viên đó phụ trách bị C&B từ chối (tính cho nhân viên tuyển dụng phụ trách ứng viên, không phụ thuộc ai bấm tạo đợt).</p>`}
 /* ---- in ấn ---- */
 function printHtml(html,title){const w=window.open('','_blank');if(!w){toast('Trình duyệt chặn cửa sổ in','err');return}
   w.document.write(`<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4;margin:12mm 14mm}body{margin:0;background:#fff;font-family:Times New Roman,Times,serif;font-size:13px;line-height:1.4;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}@media screen{body{max-width:820px;margin:24px auto}}table{width:100%;border-collapse:collapse}td,th{border:1px solid #999;padding:5px 7px;vertical-align:top}th{background:#A91D3F;color:#fff;font-size:12.5px}tr{page-break-inside:avoid}.hd td{border:1px solid #A91D3F}.c{text-align:center}.t{color:#A91D3F}.sg td{border:0;text-align:center;padding-top:10px}</style></head><body>${html}<script>setTimeout(function(){print()},500)<\/script></body></html>`);w.document.close()}
@@ -194,7 +209,7 @@ function onbDocHTML(c){
   ${sn.items.map((it,i)=>{const rc=c.onb&&c.onb.items[it.id],b=itemHo(c.id,it.id),done=b&&b.status==='dong_y';return`<tr><td class="c">${i+1}</td><td><b>${esc(it.name)}</b></td><td>${esc(it.req)}</td><td>${esc(it.qty)}<br><span style="font-size:11px;color:#555">${rc&&rc.got?'&#9746; Đã nhận '+fmtD(rc.at):'&#9744; Chưa nhận'}</span></td><td class="c">${done?'&#9746; '+fmtD(b.date):'&#9744;'}</td></tr>`}).join('')}</tbody></table>
   <p style="margin:12px 0 4px"><b>Ghi chú / Hẹn ngày bổ sung hồ sơ còn thiếu</b></p><div style="border:1px solid #999;min-height:46px;padding:6px 8px">${esc(note)}</div>
   <div style="border:1px solid #999;padding:8px 10px;margin-top:10px;text-align:justify"><b>Cam kết hoàn thành hồ sơ nhân sự:</b><br>Tôi cam kết bảo đảm tính chính xác, trung thực của toàn bộ hồ sơ đã nộp. Đối với các chứng từ còn thiếu được ghi nhận tại mục Ghi chú, tôi xin cam kết sẽ hoàn thành việc bổ sung cho Phòng HCNS trong vòng ${String(onbCfg().collectDays).padStart(2,'0')} ngày kể từ ngày nhận việc. Nếu quá thời hạn trên hoặc hồ sơ có sự sai lệch cố ý, tôi xin hoàn toàn chịu trách nhiệm theo Nội quy lao động và Quy định của Hệ thống trường Việt Mỹ.</div>
-  <table class="sg" style="margin-top:6px"><tr><td><b>NGƯỜI NỘP HỒ SƠ</b><br><i>(Ký và ghi rõ họ tên)</i><br><br><br>${esc(c.v.name)}</td><td><b>NGƯỜI TIẾP NHẬN</b><br><i>(Ký, ghi rõ họ tên)</i><br><br><br>${esc(ownerName(c))}</td><td><b>NHÂN VIÊN HCNS TIẾP NHẬN</b><br><i>(Ký, ghi rõ họ tên)</i><br><br><br>${lastB?esc(userName(lastB.decidedBy)):''}</td></tr></table>`}
+  <table class="sg" style="margin-top:6px"><tr><td><b>NGƯỜI NỘP HỒ SƠ</b><br><i>(Ký và ghi rõ họ tên)</i><br><br><br>${esc(c.v.name)}</td><td><b>NGƯỜI TIẾP NHẬN</b><br><i>(Ký, ghi rõ họ tên)</i><br><br><br>${esc(ownerName(c))}</td><td><b>NHÂN VIÊN HCNS TIẾP NHẬN</b><br><i>(Ký, ghi rõ họ tên)</i><br><br><br>${lastB?esc(userName(lastB.decidedBy)):(c.onb&&c.onb.cnb?esc(userName(c.onb.cnb)):'')}</td></tr></table>`}
 function hoDocHTML(b){
   const st=BG_ST[b.status];
   return`${onbHead('BM.11/HN.QT.01 – Phụ lục','01',fmtD(b.date),(DB.cfg.company||'').toUpperCase(),'BIÊN BẢN BÀN GIAO HỒ SƠ NHÂN SỰ','Mã đợt: '+b.code+(b.attempt>1?' (lần '+b.attempt+')':''))}
@@ -230,6 +245,7 @@ function onbCfgView(){
   <div><label class="f">Tính hạn bàn giao từ</label><select data-cfg="onb.base"><option value="start" ${G.base==='start'?'selected':''}>Ngày nhận việc</option><option value="recv" ${G.base==='recv'?'selected':''}>Ngày nhận hồ sơ đầu tiên từ ứng viên</option></select></div>
   <div><label class="f">Tính thứ Bảy là ngày làm việc</label><select data-cfg="onb.sat" data-bool="1"><option value="0" ${G.sat?'':'selected'}>Không (thứ 2 – thứ 6)</option><option value="1" ${G.sat?'selected':''}>Có</option></select></div>
   <div><label class="f">Hạn thu đủ hồ sơ (ngày, kể từ ngày nhận việc)</label><input type="number" min="0" data-cfg="onb.collectDays" value="${esc(G.collectDays)}"></div>
+  <div><label class="f">C&B phụ trách mặc định (gán khi bắt đầu tiếp nhận hồ sơ)</label><select data-cfg="onb.defaultCnb"><option value="">(chọn khi tiếp nhận)</option>${cnbUsers().map(u=>`<option value="${u.id}" ${G.defaultCnb===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select></div>
   <div class="wide"><label class="f">Đường dẫn điền Thông tin ứng viên BM.10 (cổng ứng viên) – chèn vào thư mời bằng biến <span class="mono">{{link_bm10}}</span></label><input type="text" data-cfg="onb.portalUrl" value="${esc(G.portalUrl)}" placeholder="https://script.google.com/macros/s/…/exec"></div></div>
   <p class="muted small" style="margin-top:12px">Ngày nghỉ lễ chưa được loại trừ khỏi ngày làm việc. Danh mục hồ sơ chỉnh ở <b>Thư viện → Hồ sơ nhận việc (BM.11)</b>.</p></div>`}
 /* ---- xuất CSV ---- */
@@ -240,8 +256,8 @@ function onbExport(k){
   if(k==='onbkpi'){downloadCSV('danh-gia-thu-ho-so',[['Nhân viên','Số hồ sơ','Thu đủ đúng hạn','Thu đủ trễ','Thiếu quá hạn','Bàn giao đúng hạn','Bàn giao trễ','Chờ bàn giao quá hạn','Số đợt bàn giao','Bị C&B từ chối','TB ngày thu đủ'],
     ...onbKpi().map(r=>[userName(r.owner),r.n,r.fullOk,r.fullLate,r.miss,r.hOk,r.hLate,r.hPend,r.batches,r.redo,r.days.length?(r.days.reduce((a,b)=>a+b,0)/r.days.length).toFixed(1):''])]);return}
   const tpl=onbTplAt(Date.now());
-  downloadCSV('ho-so-nhan-viec',[['Ứng viên','Vị trí','Ngày nhận việc','Người phụ trách','Trạng thái','Đã thu','C&B đã nhận','Tổng mục','Hạn thu đủ','Hạn bàn giao','Quá hạn thu','Quá hạn bàn giao','Số lần làm lại',...tpl.items.map(i=>'Nhận: '+i.name),'Ghi chú'],
-    ...onbRows().map(c=>{const s=onbStats(c),f=onbFlags(c);return[c.v.name,posOf(c),fmtD(onbStartDate(c)),ownerName(c),onbState(c)[0],s.got,s.done,s.n,f.cd?fmtD(f.cd):'',f.due?fmtD(f.due):'',f.collectLate?'Có':'',f.handLate?'Có':'',s.redo,...tpl.items.map(i=>{const x=c.onb&&c.onb.items[(c.onb.snap.items.find(y=>y.name===i.name)||{}).id];return x&&x.got?fmtD(x.at):''}),c.onb?c.onb.note||'':'']})])}
+  downloadCSV('ho-so-nhan-viec',[['Ứng viên','Vị trí','Ngày nhận việc','Tuyển dụng phụ trách','C&B phụ trách','Trạng thái','Đã thu','C&B đã nhận','Tổng mục','Hạn thu đủ','Hạn bàn giao','Quá hạn thu','Quá hạn bàn giao','Số lần làm lại',...tpl.items.map(i=>'Nhận: '+i.name),'Ghi chú'],
+    ...onbRows().map(c=>{const s=onbStats(c),f=onbFlags(c);return[c.v.name,posOf(c),fmtD(onbStartDate(c)),ownerName(c),cnbName(c),onbState(c)[0],s.got,s.done,s.n,f.cd?fmtD(f.cd):'',f.due?fmtD(f.due):'',f.collectLate?'Có':'',f.handLate?'Có':'',s.redo,...tpl.items.map(i=>{const x=c.onb&&c.onb.items[(c.onb.snap.items.find(y=>y.name===i.name)||{}).id];return x&&x.got?fmtD(x.at):''}),c.onb?c.onb.note||'':'']})])}
 /* thẻ tóm tắt trong hồ sơ ứng viên */
 function onbCandCard(c){
   if(!can('onb.view')||!onbEligible(c))return'';const s=onbStats(c),st=onbState(c);
