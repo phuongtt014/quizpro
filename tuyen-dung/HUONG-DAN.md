@@ -246,3 +246,10 @@ Mặc định thời hạn lấy từ Thiết lập → Hồ sơ nhận việc (
 - Nút **Mặc định** trả về hạn theo Thiết lập.
 - KPI, cảnh báo "Quá hạn" và bộ lọc đều tính theo hạn riêng nếu có. Danh sách đánh dấu ✎ ở hồ sơ có hạn đặt riêng; CSV có cột "Hạn đặt riêng".
 - Bản in BM.11 ghi cam kết bổ sung "trước ngày …" theo hạn riêng.
+
+### Thời hạn riêng cho từng hồ sơ trong danh mục (v30)
+Thiết lập → **Hồ sơ nhận việc** có bảng **"Thời hạn riêng cho từng hồ sơ"**: mỗi hồ sơ của danh mục BM.11 (Sơ yếu lý lịch, Giấy khám sức khỏe, Lý lịch tư pháp…) có hai ô — **hạn thu** (số ngày kể từ ngày nhận việc) và **hạn bàn giao cho C&B** (số ngày làm việc). **Để trống = dùng mặc định chung** (hai ô phía trên). Liên kết theo **tên hồ sơ** (đổi tên hồ sơ ở Thư viện thì phải đặt lại hạn). Hạn áp dụng cho nhân viên tuyển dụng phụ trách thu hồ sơ.
+- Chi tiết hồ sơ nhận việc hiển thị **hạn thu** và **hạn bàn giao** của từng mục, kèm dấu **Quá hạn** khi mục đó chưa thu / chưa bàn giao mà đã quá hạn riêng của mục.
+- Danh sách và bộ lọc "Quá hạn": quá hạn khi có ít nhất một mục quá hạn; cột hạn hiển thị mốc muộn nhất.
+- KPI: **thu đủ đúng hạn** = mọi mục được thu trước hạn riêng của từng mục; **bàn giao đúng hạn** = mọi mục được C&B nhận với ngày bàn giao không quá hạn riêng.
+- Hạn đặt riêng cho **một ứng viên cụ thể** (v29, có lý do và lịch sử) vẫn dùng được và **thay thế** hạn từng hồ sơ cho ứng viên đó.
