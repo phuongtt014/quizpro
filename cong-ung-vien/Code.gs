@@ -18,7 +18,7 @@ const ROLE_RANK = { 'Xem': 1, 'Tuyển dụng': 2, 'Quản trị': 3 };
 /*SCHEMA-BEGIN*/
 /* ---- Lược đồ biểu mẫu BM.10/HN.QT.01 (dùng chung cho giao diện và Code.gs) ---- */
 var FORM_META = { code: 'BM.10/HN.QT.01', date: '21/09/2026', issue: '01', title: 'THÔNG TIN ỨNG VIÊN', sub: '(Dùng cho cán bộ quản lý, giáo viên và nhân viên văn phòng)' };
-var PF = [
+var PF_DEFAULT = [
   { k: 'viTri', l: 'Vị trí ứng tuyển', t: 'text', req: 1, max: 120, wide: 1 },
   { k: 'hoTen', l: 'Họ và tên', t: 'text', req: 1, max: 80 },
   { k: 'gioiTinh', l: 'Giới tính', t: 'radio', opts: ['Nam', 'Nữ'], req: 1 },
@@ -46,6 +46,35 @@ var PF = [
   { k: 'nguon', l: 'Bạn biết thông tin tuyển dụng này thông qua', t: 'multi', opts: ['Website VA Schools', 'Fanpage VA Schools Tuyển dụng', 'Khác'], wide: 1 },
   { k: 'luong', l: 'Mức lương mong muốn', t: 'text', max: 60, wide: 1 }
 ];
+var PF = PF_DEFAULT;
+var FIELD_TYPES = { text: 'Văn bản ngắn', textarea: 'Văn bản dài', number: 'Số', date: 'Ngày', tel: 'Điện thoại', email: 'Email', select: 'Danh sách chọn (dropdown)', radio: 'Chọn một (nút tròn)', multi: 'Chọn nhiều (ô tích)' };
+var LOCKED_FIELDS = { viTri: 1, hoTen: 1, ngaySinh: 1, cccd: 1, dienThoai: 1, email: 1 }; /* không ẩn, không đổi kiểu */
+var TBL_OPTS = { bangCap: [], heDaoTao: [], ngoaiNgu: [] }; /* danh mục (dropdown) cho các cột của bảng; để trống = ô nhập tự do */
+/** Gộp cấu hình đã lưu (danh sách trường theo thứ tự) với trường mặc định. */
+function mergeFields(saved) {
+  var def = {}, out = [], seen = {};
+  PF_DEFAULT.forEach(function (f) { def[f.k] = f; });
+  (Array.isArray(saved) ? saved : []).forEach(function (s) {
+    if (!s || !s.k || seen[s.k]) return;
+    var d = def[s.k], f;
+    if (d) {
+      f = {}; Object.keys(d).forEach(function (x) { f[x] = d[x]; });
+      if (s.l) f.l = String(s.l); if (s.req != null) f.req = s.req ? 1 : 0; f.hide = s.hide ? 1 : 0; if (s.wide != null) f.wide = s.wide ? 1 : 0;
+      if (!LOCKED_FIELDS[s.k] && d.t !== 'check' && s.t && FIELD_TYPES[s.t]) f.t = s.t;
+      if (Array.isArray(s.opts) && s.opts.length) f.opts = s.opts.slice();
+      if (LOCKED_FIELDS[s.k]) f.hide = 0;
+    } else if (s.custom && /^c_[a-z0-9_]{1,24}$/.test(s.k)) {
+      var t = FIELD_TYPES[s.t] ? s.t : 'text';
+      f = { k: s.k, l: String(s.l || s.k), t: t, req: s.req ? 1 : 0, opts: Array.isArray(s.opts) ? s.opts.slice() : [], wide: s.wide ? 1 : 0, custom: 1, hide: s.hide ? 1 : 0 };
+    } else return;
+    if (f.t === 'text' && !f.max) f.max = 120;
+    if (f.t === 'textarea') f.max = 500;
+    if (f.t === 'number') f.max = 20;
+    seen[f.k] = 1; out.push(f);
+  });
+  PF_DEFAULT.forEach(function (d) { if (!seen[d.k]) { var f = {}; Object.keys(d).forEach(function (x) { f[x] = d[x]; }); out.push(f); } });
+  return out;
+}
 /* các hàng của mục II khi in (theo đúng biểu mẫu) */
 var PRINT_II = [['hoTen', 'gioiTinh'], ['ngaySinh', 'noiSinh'], ['quocTich', 'cccd'], ['ngayCap', 'noiCap'], ['danToc', 'tonGiao'], ['honNhan', 'dienThoai'], ['thuongTru'], ['tamTru'], ['mangThai'], ['email'], ['doanDang', 'nvqs'], ['khanCap'], ['quanHe', 'sdtKhanCap'], ['diaChiLienLac'], ['ngayNhanViec'], ['nguon'], ['luong']];
 var HV_LEVELS = ['Trung học', 'Cao đẳng', 'Đại học', 'Thạc Sĩ', 'Tiến Sĩ', 'Khác'];
@@ -127,19 +156,78 @@ function monthNorm_(s) {
   return m ? m[2] + '-' + ('0' + m[1]).slice(-2) : null;
 }
 
+/* ---------------- cấu hình biểu mẫu (trường, danh mục) ---------------- */
+function formCfgRaw_() {
+  const sh = cfgSheet_(), last = sh.getLastRow();
+  if (last > 1) { const v = sh.getRange(2, 1, last - 1, 2).getValues(); for (let i = 0; i < v.length; i++) if (v[i][0] === 'formCfg') { try { return { row: i + 2, cfg: JSON.parse(v[i][1]) }; } catch (e) { return { row: i + 2, cfg: {} }; } } }
+  return { row: 0, cfg: {} };
+}
+/** Nạp cấu hình vào biến toàn cục PF / TBL_OPTS (gọi ở đầu mỗi API dùng lược đồ). */
+function loadFields_() {
+  const c = formCfgRaw_().cfg || {};
+  PF = mergeFields(c.fields);
+  ['bangCap', 'heDaoTao', 'ngoaiNgu'].forEach(function (k) { TBL_OPTS[k] = (c.tbl && Array.isArray(c.tbl[k])) ? c.tbl[k].filter(function (x) { return typeof x === 'string'; }) : []; });
+  return { fields: PF, tbl: TBL_OPTS };
+}
+function pub_config() { return loadFields_(); }
+function adm_setFields(list, tbl) {
+  const u = adm_('Quản trị'), seen = {}, out = [];
+  if (!Array.isArray(list) || list.length > 90) throw new Error('Danh sách trường không hợp lệ.');
+  const defKeys = {}; PF_DEFAULT.forEach(function (f) { defKeys[f.k] = f; });
+  let nCustom = 0;
+  list.forEach(function (x) {
+    const k = cs_(x && x.k, 30); if (!k || seen[k]) throw new Error('Mã trường trùng hoặc trống: ' + k);
+    seen[k] = 1;
+    const isCustom = !defKeys[k];
+    if (isCustom && (!x.custom || !/^c_[a-z0-9_]{1,24}$/.test(k))) throw new Error('Mã trường không hợp lệ: ' + k);
+    if (isCustom && ++nCustom > 40) throw new Error('Tối đa 40 trường thêm mới.');
+    const l = cs_(x.l, 90); if (!l) throw new Error('Trường ' + k + ' chưa có tên hiển thị.');
+    const t = cs_(x.t, 12), o = { k: k, l: l, req: x.req ? 1 : 0, hide: x.hide ? 1 : 0, wide: x.wide ? 1 : 0 };
+    if (isCustom) { o.custom = 1; if (!FIELD_TYPES[t]) throw new Error('Kiểu dữ liệu không hợp lệ: ' + t); o.t = t; }
+    else if (!LOCKED_FIELDS[k] && defKeys[k].t !== 'check' && FIELD_TYPES[t]) o.t = t;
+    else if (LOCKED_FIELDS[k]) o.hide = 0;
+    const tt = o.t || defKeys[k].t;
+    if (tt === 'select' || tt === 'radio' || tt === 'multi') {
+      const opts = (Array.isArray(x.opts) ? x.opts : []).map(function (v) { return cs_(v, 60); }).filter(function (v, i, a) { return v && a.indexOf(v) === i; }).slice(0, 60);
+      if (opts.length < 2) throw new Error('Trường "' + l + '" cần ít nhất 2 lựa chọn trong danh mục.');
+      o.opts = opts;
+    }
+    out.push(o);
+  });
+  const tb = {}; ['bangCap', 'heDaoTao', 'ngoaiNgu'].forEach(function (k) { tb[k] = ((tbl && Array.isArray(tbl[k])) ? tbl[k] : []).map(function (v) { return cs_(v, 60); }).filter(function (v, i, a) { return v && a.indexOf(v) === i; }).slice(0, 60); });
+  const json = JSON.stringify({ fields: out, tbl: tb });
+  if (json.length > 45000) throw new Error('Cấu hình quá dài.');
+  const sh = cfgSheet_(), r = formCfgRaw_();
+  if (r.row) sh.getRange(r.row, 1, 1, 3).setNumberFormat('@').setValues([['formCfg', json, 'Cấu hình trường biểu mẫu (sửa qua trang quản lý)']]);
+  else sh.getRange(sh.getLastRow() + 1, 1, 1, 3).setNumberFormat('@').setValues([['formCfg', json, 'Cấu hình trường biểu mẫu (sửa qua trang quản lý)']]);
+  logAct_('ĐỔI CẤU HÌNH BIỂU MẪU', '', u.email);
+  return loadFields_();
+}
+function adm_resetFields() {
+  const u = adm_('Quản trị'), r = formCfgRaw_();
+  if (r.row) cfgSheet_().deleteRow(r.row);
+  logAct_('KHÔI PHỤC BIỂU MẪU MẶC ĐỊNH', '', u.email);
+  return loadFields_();
+}
+
 /* ---------------- kiểm tra & chuẩn hoá dữ liệu ---------------- */
-function clean_(p) {
-  p = p || {};
+function clean_(p, prev) {
+  p = p || {}; prev = prev || {};
   const out = {}, errs = [], t = today_(), y = +t.slice(0, 4);
   PF.forEach(function (f) {
+    if (f.hide) { if (prev[f.k] !== undefined) out[f.k] = prev[f.k]; if (f.k === 'nguon' && prev.nguonKhac !== undefined) out.nguonKhac = prev.nguonKhac; return; }
     let v = p[f.k];
     if (f.t === 'check') { out[f.k] = (v === true || v === 1 || v === '1' || v === 'true') ? 1 : 0; return; }
     if (f.t === 'multi') {
-      const arr = (Array.isArray(v) ? v : []).map(function (x) { return cs_(x, 40); }).filter(function (x, i, a) { return f.opts.indexOf(x) >= 0 && a.indexOf(x) === i; });
-      out[f.k] = arr; out.nguonKhac = arr.indexOf('Khác') >= 0 ? cs_(p.nguonKhac, 80) : ''; return;
+      const arr = (Array.isArray(v) ? v : []).map(function (x) { return cs_(x, 60); }).filter(function (x, i, a) { return (f.opts || []).indexOf(x) >= 0 && a.indexOf(x) === i; });
+      out[f.k] = arr;
+      if (f.k === 'nguon') out.nguonKhac = arr.indexOf('Khác') >= 0 ? cs_(p.nguonKhac, 80) : '';
+      if (f.req && !arr.length) errs.push(f.l + ' là bắt buộc');
+      return;
     }
-    v = cs_(v, f.t === 'date' ? 10 : (f.max || 80));
-    if (f.t === 'radio' && v && f.opts.indexOf(v) < 0) { errs.push(f.l + ' không hợp lệ'); v = ''; }
+    v = cs_(v, f.t === 'date' ? 10 : (f.max || 120));
+    if ((f.t === 'radio' || f.t === 'select') && v && (f.opts || []).indexOf(v) < 0) { errs.push(f.l + ' không hợp lệ'); v = ''; }
+    if (f.t === 'number' && v && !/^-?\d{1,12}([.,]\d{1,4})?$/.test(v)) { errs.push(f.l + ' phải là số'); v = ''; }
     if (f.t === 'date' && v) {
       if (!isoOk_(v)) { errs.push(f.l + ' không hợp lệ'); v = ''; }
       else if (f.birth && (+v.slice(0, 4) < 1940 || +v.slice(0, 4) > y - 14)) { errs.push('Ngày sinh không hợp lý'); v = ''; }
@@ -156,7 +244,7 @@ function clean_(p) {
   const hv = Array.isArray(p.hocVan) ? p.hocVan : [];
   out.hocVan = HV_LEVELS.map(function (lv, i) {
     const r = hv[i] || {}, o = {};
-    HV_COLS.forEach(function (c) { o[c[0]] = cs_(r[c[0]], c[2]); });
+    HV_COLS.forEach(function (c) { o[c[0]] = cs_(r[c[0]], c[2]); if (TBL_OPTS[c[0]] && TBL_OPTS[c[0]].length && o[c[0]] && TBL_OPTS[c[0]].indexOf(o[c[0]]) < 0) { errs.push(c[1] + ' (' + lv + ') không thuộc danh mục'); o[c[0]] = ''; } });
     if (o.nam && !/^\d{4}$/.test(o.nam)) { errs.push('Năm tốt nghiệp (' + lv + ') phải gồm 4 chữ số'); o.nam = ''; }
     return o;
   });
@@ -169,6 +257,7 @@ function clean_(p) {
         if (c[2] === 'month') { const mn = monthNorm_(v); if (mn === null) { errs.push(T.title.split('.')[0] + ': tháng/năm không hợp lệ'); v = ''; } else v = mn; }
         if (c[2] === 'year' && v && !/^\d{4}$/.test(v)) { errs.push('Năm không hợp lệ (' + c[1] + ')'); v = ''; }
         if (c[2] === 'tt' && v && ['Đã học', 'Đang học'].indexOf(v) < 0) v = '';
+        if (TBL_OPTS[c[0]] && TBL_OPTS[c[0]].length && tk === 'ngoaiNgu' && c[0] === 'ngoaiNgu' && v && TBL_OPTS.ngoaiNgu.indexOf(v) < 0) { errs.push('Ngoại ngữ không thuộc danh mục'); v = ''; }
         if (v) any = true; o[c[0]] = v;
       });
       return any ? o : null;
@@ -265,7 +354,7 @@ function pubView_(m, cfg) {
 
 /* ---------------- API công khai ---------------- */
 function pub_submit(payload, meta) {
-  const cfg = cfg_(); meta = meta || {};
+  const cfg = cfg_(); meta = meta || {}; loadFields_();
   if (meta.hp) throw new Error('Không gửi được hồ sơ.');
   if ((Number(meta.sec) || 0) < cfg.minFillSec) throw new Error('Vui lòng kiểm tra lại thông tin trước khi gửi (gửi quá nhanh).');
   const rec = clean_(payload);
@@ -293,9 +382,10 @@ function pub_lookup(code, secret) {
 function pub_update(code, secret, payload) {
   const lock = LockService.getScriptLock(); lock.waitLock(25000);
   try {
+    loadFields_();
     const a = auth_(code, secret), cfg = cfg_(), li = lockInfo_(a.m, cfg);
     if (li.locked) throw new Error(li.reason || 'Hồ sơ đã khoá, không thể chỉnh sửa.');
-    const rec = clean_(payload); rec.hr = a.m.data.hr || { trangThai: 'Mới nộp' };
+    const rec = clean_(payload, a.m.data); rec.hr = a.m.data.hr || { trangThai: 'Mới nộp' };
     a.m.data = rec; a.m.rev += 1; a.m.upd = now_();
     writeRow_(a.sh, a.row, a.m); SpreadsheetApp.flush(); logAct_('SỬA', a.m.code, '');
     return pubView_(a.m, cfg);
@@ -359,16 +449,17 @@ function fmtD_(s) { s = String(s || ''); const m = /^(\d{4})-(\d{2})-(\d{2})/.ex
 function fmtM_(s) { s = String(s || ''); const m = /^(\d{4})-(\d{2})$/.exec(s); return m ? m[2] + '/' + m[1] : s; }
 /** Xuất toàn bộ hồ sơ dạng bảng phẳng (Tuyển dụng trở lên). Giao diện tự tạo CSV / Excel. */
 function adm_export() {
-  const u = adm_('Tuyển dụng'), sh = dataSheet_(), last = sh.getLastRow();
+  const u = adm_('Tuyển dụng'), sh = dataSheet_(), last = sh.getLastRow(); loadFields_();
   const heads = ['Mã hồ sơ', 'Thời gian nộp', 'Cập nhật lần cuối', 'Số lần sửa', 'Trạng thái', 'Chức danh (HCNS)', 'Cơ sở', 'Địa điểm', 'Thời gian', 'MSNV', 'Ngày nhận việc (HCNS)', 'Khoá'];
-  PF.forEach(function (f) { heads.push(f.l); });
+  const vis = PF.filter(function (f) { return !f.hide; });
+  vis.forEach(function (f) { heads.push(f.l); });
   heads.push('Nguồn khác (ghi rõ)');
   HV_LEVELS.forEach(function (lv) { HV_COLS.forEach(function (c) { heads.push(lv + ' – ' + c[1]); }); });
   heads.push('Các khóa đào tạo khác', 'Chứng chỉ ngoại ngữ', 'Kinh nghiệm làm việc', 'Ghi chú HCNS');
   const rows = [];
   for (let r = 2; r <= last; r++) {
     const m = readRow_(sh, r), d = m.data || {}, hr = d.hr || {}, a = [m.code, m.at, m.upd, m.rev, hr.trangThai || '', hr.chucDanh || '', hr.coSo || '', hr.diaDiem || '', hr.thoiGian || '', hr.msnv || '', fmtD_(hr.ngayNhanViecHR), hr.khoa === 'lock' ? 'Khoá' : hr.khoa === 'open' ? 'Mở' : ''];
-    PF.forEach(function (f) {
+    vis.forEach(function (f) {
       let v = d[f.k];
       if (f.t === 'date') v = fmtD_(v); else if (f.t === 'check') v = v ? f.cb : ''; else if (f.t === 'multi') v = (v || []).join('; ');
       a.push(v == null ? '' : v);

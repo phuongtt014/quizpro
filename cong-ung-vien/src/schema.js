@@ -1,6 +1,6 @@
 /* ---- Lược đồ biểu mẫu BM.10/HN.QT.01 (dùng chung cho giao diện và Code.gs) ---- */
 var FORM_META = { code: 'BM.10/HN.QT.01', date: '21/09/2026', issue: '01', title: 'THÔNG TIN ỨNG VIÊN', sub: '(Dùng cho cán bộ quản lý, giáo viên và nhân viên văn phòng)' };
-var PF = [
+var PF_DEFAULT = [
   { k: 'viTri', l: 'Vị trí ứng tuyển', t: 'text', req: 1, max: 120, wide: 1 },
   { k: 'hoTen', l: 'Họ và tên', t: 'text', req: 1, max: 80 },
   { k: 'gioiTinh', l: 'Giới tính', t: 'radio', opts: ['Nam', 'Nữ'], req: 1 },
@@ -28,6 +28,35 @@ var PF = [
   { k: 'nguon', l: 'Bạn biết thông tin tuyển dụng này thông qua', t: 'multi', opts: ['Website VA Schools', 'Fanpage VA Schools Tuyển dụng', 'Khác'], wide: 1 },
   { k: 'luong', l: 'Mức lương mong muốn', t: 'text', max: 60, wide: 1 }
 ];
+var PF = PF_DEFAULT;
+var FIELD_TYPES = { text: 'Văn bản ngắn', textarea: 'Văn bản dài', number: 'Số', date: 'Ngày', tel: 'Điện thoại', email: 'Email', select: 'Danh sách chọn (dropdown)', radio: 'Chọn một (nút tròn)', multi: 'Chọn nhiều (ô tích)' };
+var LOCKED_FIELDS = { viTri: 1, hoTen: 1, ngaySinh: 1, cccd: 1, dienThoai: 1, email: 1 }; /* không ẩn, không đổi kiểu */
+var TBL_OPTS = { bangCap: [], heDaoTao: [], ngoaiNgu: [] }; /* danh mục (dropdown) cho các cột của bảng; để trống = ô nhập tự do */
+/** Gộp cấu hình đã lưu (danh sách trường theo thứ tự) với trường mặc định. */
+function mergeFields(saved) {
+  var def = {}, out = [], seen = {};
+  PF_DEFAULT.forEach(function (f) { def[f.k] = f; });
+  (Array.isArray(saved) ? saved : []).forEach(function (s) {
+    if (!s || !s.k || seen[s.k]) return;
+    var d = def[s.k], f;
+    if (d) {
+      f = {}; Object.keys(d).forEach(function (x) { f[x] = d[x]; });
+      if (s.l) f.l = String(s.l); if (s.req != null) f.req = s.req ? 1 : 0; f.hide = s.hide ? 1 : 0; if (s.wide != null) f.wide = s.wide ? 1 : 0;
+      if (!LOCKED_FIELDS[s.k] && d.t !== 'check' && s.t && FIELD_TYPES[s.t]) f.t = s.t;
+      if (Array.isArray(s.opts) && s.opts.length) f.opts = s.opts.slice();
+      if (LOCKED_FIELDS[s.k]) f.hide = 0;
+    } else if (s.custom && /^c_[a-z0-9_]{1,24}$/.test(s.k)) {
+      var t = FIELD_TYPES[s.t] ? s.t : 'text';
+      f = { k: s.k, l: String(s.l || s.k), t: t, req: s.req ? 1 : 0, opts: Array.isArray(s.opts) ? s.opts.slice() : [], wide: s.wide ? 1 : 0, custom: 1, hide: s.hide ? 1 : 0 };
+    } else return;
+    if (f.t === 'text' && !f.max) f.max = 120;
+    if (f.t === 'textarea') f.max = 500;
+    if (f.t === 'number') f.max = 20;
+    seen[f.k] = 1; out.push(f);
+  });
+  PF_DEFAULT.forEach(function (d) { if (!seen[d.k]) { var f = {}; Object.keys(d).forEach(function (x) { f[x] = d[x]; }); out.push(f); } });
+  return out;
+}
 /* các hàng của mục II khi in (theo đúng biểu mẫu) */
 var PRINT_II = [['hoTen', 'gioiTinh'], ['ngaySinh', 'noiSinh'], ['quocTich', 'cccd'], ['ngayCap', 'noiCap'], ['danToc', 'tonGiao'], ['honNhan', 'dienThoai'], ['thuongTru'], ['tamTru'], ['mangThai'], ['email'], ['doanDang', 'nvqs'], ['khanCap'], ['quanHe', 'sdtKhanCap'], ['diaChiLienLac'], ['ngayNhanViec'], ['nguon'], ['luong']];
 var HV_LEVELS = ['Trung học', 'Cao đẳng', 'Đại học', 'Thạc Sĩ', 'Tiến Sĩ', 'Khác'];

@@ -39,3 +39,13 @@ Cổng này là **một dự án Apps Script riêng, Google Sheet riêng**, hoà
 - Giới hạn tốc độ nộp hồ sơ, ô bẫy chống tự động, thời gian điền tối thiểu.
 - **Giới hạn:** Apps Script không có CAPTCHA và không biết địa chỉ IP người dùng, nên chống spam ở mức vừa phải (đã có hạn mức giờ/ngày). Google hiển thị dải cảnh báo "ứng dụng do người dùng Apps Script tạo" ở đầu trang với người ngoài tổ chức (có thể nhúng vào Google Sites của trường để đẹp hơn). Thiết lập "Bất kỳ ai" có thể cần quản trị Google Workspace cho phép.
 - Không có tải tệp lên (theo yêu cầu) → không có rủi ro tệp độc hại.
+
+## 6. Cấu hình biểu mẫu (Quản trị)
+Trang nội bộ (`?m=admin`) → tab **Cấu hình biểu mẫu** (chỉ vai trò *Quản trị*):
+- **Sửa từng trường** ở mục II: tên hiển thị, **kiểu dữ liệu** (văn bản ngắn/dài, số, ngày, điện thoại, email, **danh sách chọn – dropdown**, chọn một, chọn nhiều), **bắt buộc**, **ẩn/hiện**, chiếm cả hàng, và **danh mục lựa chọn** (mỗi dòng một mục, tối thiểu 2) cho các kiểu danh sách.
+- **Thêm trường mới** (tối đa 40): tự xuất hiện trên form, bản in (cuối mục II) và file CSV/Excel.
+- **Đổi thứ tự** trên form bằng nút ↑ ↓ (bản in giữ nguyên bố cục BM.10).
+- **Danh mục dropdown cho bảng**: *Bằng cấp*, *Hệ đào tạo* (mục III) và *Ngoại ngữ* (mục V). Để trống = ứng viên tự nhập.
+- Trường 🔒 (vị trí ứng tuyển, họ tên, ngày sinh, CCCD, điện thoại, email) giữ kiểu dữ liệu và luôn hiển thị vì cần kiểm tra định dạng; vẫn đổi được tên và bắt buộc.
+- Máy chủ kiểm tra theo đúng cấu hình: giá trị ngoài danh mục bị từ chối. Cấu hình áp dụng cho hồ sơ nộp/sửa từ thời điểm lưu; dữ liệu cũ giữ nguyên (trường bị ẩn/xoá vẫn còn trong dữ liệu gốc).
+- Cấu hình lưu ở sheet `CauHinh` (dòng `formCfg`). Nút **Khôi phục mặc định** đưa biểu mẫu về như ban đầu.

@@ -48,7 +48,7 @@ const LOGO='__LOGO_DATAURL__';
 /*SCHEMA-BEGIN*/
 /* ---- Lược đồ biểu mẫu BM.10/HN.QT.01 (dùng chung cho giao diện và Code.gs) ---- */
 var FORM_META = { code: 'BM.10/HN.QT.01', date: '21/09/2026', issue: '01', title: 'THÔNG TIN ỨNG VIÊN', sub: '(Dùng cho cán bộ quản lý, giáo viên và nhân viên văn phòng)' };
-var PF = [
+var PF_DEFAULT = [
   { k: 'viTri', l: 'Vị trí ứng tuyển', t: 'text', req: 1, max: 120, wide: 1 },
   { k: 'hoTen', l: 'Họ và tên', t: 'text', req: 1, max: 80 },
   { k: 'gioiTinh', l: 'Giới tính', t: 'radio', opts: ['Nam', 'Nữ'], req: 1 },
@@ -76,6 +76,35 @@ var PF = [
   { k: 'nguon', l: 'Bạn biết thông tin tuyển dụng này thông qua', t: 'multi', opts: ['Website VA Schools', 'Fanpage VA Schools Tuyển dụng', 'Khác'], wide: 1 },
   { k: 'luong', l: 'Mức lương mong muốn', t: 'text', max: 60, wide: 1 }
 ];
+var PF = PF_DEFAULT;
+var FIELD_TYPES = { text: 'Văn bản ngắn', textarea: 'Văn bản dài', number: 'Số', date: 'Ngày', tel: 'Điện thoại', email: 'Email', select: 'Danh sách chọn (dropdown)', radio: 'Chọn một (nút tròn)', multi: 'Chọn nhiều (ô tích)' };
+var LOCKED_FIELDS = { viTri: 1, hoTen: 1, ngaySinh: 1, cccd: 1, dienThoai: 1, email: 1 }; /* không ẩn, không đổi kiểu */
+var TBL_OPTS = { bangCap: [], heDaoTao: [], ngoaiNgu: [] }; /* danh mục (dropdown) cho các cột của bảng; để trống = ô nhập tự do */
+/** Gộp cấu hình đã lưu (danh sách trường theo thứ tự) với trường mặc định. */
+function mergeFields(saved) {
+  var def = {}, out = [], seen = {};
+  PF_DEFAULT.forEach(function (f) { def[f.k] = f; });
+  (Array.isArray(saved) ? saved : []).forEach(function (s) {
+    if (!s || !s.k || seen[s.k]) return;
+    var d = def[s.k], f;
+    if (d) {
+      f = {}; Object.keys(d).forEach(function (x) { f[x] = d[x]; });
+      if (s.l) f.l = String(s.l); if (s.req != null) f.req = s.req ? 1 : 0; f.hide = s.hide ? 1 : 0; if (s.wide != null) f.wide = s.wide ? 1 : 0;
+      if (!LOCKED_FIELDS[s.k] && d.t !== 'check' && s.t && FIELD_TYPES[s.t]) f.t = s.t;
+      if (Array.isArray(s.opts) && s.opts.length) f.opts = s.opts.slice();
+      if (LOCKED_FIELDS[s.k]) f.hide = 0;
+    } else if (s.custom && /^c_[a-z0-9_]{1,24}$/.test(s.k)) {
+      var t = FIELD_TYPES[s.t] ? s.t : 'text';
+      f = { k: s.k, l: String(s.l || s.k), t: t, req: s.req ? 1 : 0, opts: Array.isArray(s.opts) ? s.opts.slice() : [], wide: s.wide ? 1 : 0, custom: 1, hide: s.hide ? 1 : 0 };
+    } else return;
+    if (f.t === 'text' && !f.max) f.max = 120;
+    if (f.t === 'textarea') f.max = 500;
+    if (f.t === 'number') f.max = 20;
+    seen[f.k] = 1; out.push(f);
+  });
+  PF_DEFAULT.forEach(function (d) { if (!seen[d.k]) { var f = {}; Object.keys(d).forEach(function (x) { f[x] = d[x]; }); out.push(f); } });
+  return out;
+}
 /* các hàng của mục II khi in (theo đúng biểu mẫu) */
 var PRINT_II = [['hoTen', 'gioiTinh'], ['ngaySinh', 'noiSinh'], ['quocTich', 'cccd'], ['ngayCap', 'noiCap'], ['danToc', 'tonGiao'], ['honNhan', 'dienThoai'], ['thuongTru'], ['tamTru'], ['mangThai'], ['email'], ['doanDang', 'nvqs'], ['khanCap'], ['quanHe', 'sdtKhanCap'], ['diaChiLienLac'], ['ngayNhanViec'], ['nguon'], ['luong']];
 var HV_LEVELS = ['Trung học', 'Cao đẳng', 'Đại học', 'Thạc Sĩ', 'Tiến Sĩ', 'Khác'];
@@ -102,15 +131,16 @@ function copyText(t){try{navigator.clipboard.writeText(t).catch(()=>0)}catch(e){
 /* ================= ĐỊNH DẠNG HIỂN THỊ / IN ================= */
 const BOXED=(on)=>on?'&#9746;':'&#9744;';
 function docHTML(rec,meta){
-  const d=rec.data||rec,hr=d.hr||{};const F=k=>PF.find(f=>f.k===k);
+  const d=rec.data||rec,hr=d.hr||{};const F=k=>{const f=PF.find(f=>f.k===k);return f&&!f.hide?f:null};
   const val=(f)=>{const v=d[f.k];
     if(f.t==='date')return esc(fmtD(v));
-    if(f.t==='radio')return f.opts.map(o=>`${BOXED(v===o)} ${esc(o)}`).join('&nbsp;&nbsp; ');
+    if(f.t==='radio')return(f.opts||[]).map(o=>`${BOXED(v===o)} ${esc(o)}`).join('&nbsp;&nbsp; ');
     if(f.t==='check')return `${BOXED(!!v)} ${esc(f.cb)}`;
-    if(f.t==='multi'){const a=v||[];return f.opts.map(o=>o==='Khác'?`${BOXED(a.includes(o))} Khác: ${a.includes(o)&&d.nguonKhac?esc(d.nguonKhac):'....................'}`:`${BOXED(a.includes(o))} ${esc(o)}`).join('&nbsp;&nbsp;&nbsp; ')}
+    if(f.t==='multi'){const a=v||[];return(f.opts||[]).map(o=>f.k==='nguon'&&o==='Khác'?`${BOXED(a.includes(o))} Khác: ${a.includes(o)&&d.nguonKhac?esc(d.nguonKhac):'....................'}`:`${BOXED(a.includes(o))} ${esc(o)}`).join('&nbsp;&nbsp;&nbsp; ')}
     return esc(v||'')};
   const L=f=>`<td class="l">${esc(f.l)}${f.req?'*':''}</td>`;
-  const II=PRINT_II.map(r=>r.length===2?`<tr>${L(F(r[0]))}<td>${val(F(r[0]))}</td>${L(F(r[1]))}<td>${val(F(r[1]))}</td></tr>`:`<tr>${L(F(r[0]))}<td colspan="3">${val(F(r[0]))}</td></tr>`).join('');
+  const II=PRINT_II.map(r=>{const fs=r.map(F).filter(Boolean);return fs.length===2?`<tr>${L(fs[0])}<td>${val(fs[0])}</td>${L(fs[1])}<td>${val(fs[1])}</td></tr>`:fs.length===1?`<tr>${L(fs[0])}<td colspan="3">${val(fs[0])}</td></tr>`:''}).join('')
+    +PF.filter(f=>f.custom&&!f.hide).map(f=>`<tr>${L(f)}<td colspan="3">${val(f)}</td></tr>`).join('');
   const hvRows=HV_LEVELS.map((lv,i)=>{const h=(d.hocVan||[])[i]||{};return`<tr><td class="l c">${esc(lv)}</td>${HV_COLS.map(c=>`<td>${esc(h[c[0]]||'')}</td>`).join('')}</tr>`}).join('');
   const tb=(k)=>{const T=TABLES[k],rows=d[k]||[];const n=Math.max(T.rows,rows.length);let b='';for(let i=0;i<n;i++){const r=rows[i]||{};b+=`<tr>${T.cols.map(c=>{let v=r[c[0]]||'';if(c[2]==='month')v=fmtM(v);return`<td>${esc(v)}</td>`}).join('')}</tr>`}
     return`<div class="sec">${esc(T.title)}</div><table class="g"><thead><tr>${T.cols.map(c=>`<th>${esc(c[1])}</th>`).join('')}</tr></thead><tbody>${b}</tbody></table>`};
@@ -142,9 +172,11 @@ function printDoc(rec,meta){
 /* ================= BIỂU MẪU NHẬP ================= */
 function fieldInput(f,v,d){
   const id='f_'+f.k;
-  if(f.t==='radio')return`<div class="opts" data-k="${f.k}">${f.opts.map(o=>`<label><input type="radio" name="${id}" value="${esc(o)}" ${v===o?'checked':''}> ${esc(o)}</label>`).join('')}</div>`;
+  if(f.t==='radio')return`<div class="opts" data-k="${f.k}">${(f.opts||[]).map(o=>`<label><input type="radio" name="${id}" value="${esc(o)}" ${v===o?'checked':''}> ${esc(o)}</label>`).join('')}</div>`;
   if(f.t==='check')return`<div class="opts"><label><input type="checkbox" id="${id}" ${v?'checked':''}> ${esc(f.cb)}</label></div>`;
-  if(f.t==='multi'){const a=v||[];return`<div class="opts" data-k="${f.k}">${f.opts.map(o=>`<label><input type="checkbox" name="${id}" value="${esc(o)}" ${a.includes(o)?'checked':''}> ${esc(o)}</label>`).join('')}<input type="text" id="f_nguonKhac" maxlength="80" placeholder="Ghi rõ nguồn khác" value="${esc(d.nguonKhac||'')}" style="max-width:260px;${a.includes('Khác')?'':'display:none'}"></div>`}
+  if(f.t==='multi'){const a=v||[];return`<div class="opts" data-k="${f.k}">${(f.opts||[]).map(o=>`<label><input type="checkbox" name="${id}" value="${esc(o)}" ${a.includes(o)?'checked':''}> ${esc(o)}</label>`).join('')}${f.k==='nguon'?`<input type="text" id="f_nguonKhac" maxlength="80" placeholder="Ghi rõ nguồn khác" value="${esc(d.nguonKhac||'')}" style="max-width:260px;${a.includes('Khác')?'':'display:none'}">`:''}</div>`}
+  if(f.t==='select')return`<select id="${id}"><option value=""></option>${(f.opts||[]).map(o=>`<option ${v===o?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
+  if(f.t==='textarea')return`<textarea id="${id}" rows="3" maxlength="500">${esc(v||'')}</textarea>`;
   const type=f.t==='date'?'date':f.t==='tel'?'tel':f.t==='email'?'email':'text';
   return`<input type="${type}" id="${id}" value="${esc(v||'')}" ${f.max?`maxlength="${f.max}"`:''} ${f.t==='cccd'?'inputmode="numeric" maxlength="12"':''} ${f.t==='tel'?'maxlength="16" inputmode="tel"':''} autocomplete="off">`}
 function tableEditor(k,rows){
@@ -153,11 +185,12 @@ function tableEditor(k,rows){
     if(c[2]==='tt')return`<td><select id="${id}"><option value=""></option><option ${v==='Đã học'?'selected':''}>Đã học</option><option ${v==='Đang học'?'selected':''}>Đang học</option></select></td>`;
     if(c[2]==='month')return`<td><input type="month" id="${id}" value="${esc(v)}" placeholder="MM/YYYY"></td>`;
     if(c[2]==='year')return`<td><input type="text" id="${id}" value="${esc(v)}" maxlength="4" inputmode="numeric"></td>`;
+    if(k==='ngoaiNgu'&&c[0]==='ngoaiNgu'&&TBL_OPTS.ngoaiNgu.length)return`<td><select id="${id}"><option value=""></option>${TBL_OPTS.ngoaiNgu.map(o=>`<option ${v===o?'selected':''}>${esc(o)}</option>`).join('')}</select></td>`;
     return`<td><input type="text" id="${id}" value="${esc(v)}" maxlength="${c[3]}"></td>`}).join('')}</tr>`}
   return`<h3>${esc(T.title)}</h3><div class="scroll"><table class="tbl"><thead><tr>${T.cols.map(c=>`<th>${esc(c[1])}</th>`).join('')}</tr></thead><tbody>${b}</tbody></table></div>${n<T.maxRows?`<div style="margin-top:8px"><button class="btn sm" type="button" data-act="addRow" data-id="${k}">+ Thêm dòng</button></div>`:''}`}
 function formHTML(d,ro){
-  const fields=PF.map(f=>`<div class="${f.wide?'wide':''}"><label class="f">${esc(f.l)}${f.req?' <span class="req">*</span>':''}</label>${fieldInput(f,d[f.k],d)}</div>`).join('');
-  const hv=HV_LEVELS.map((lv,i)=>{const h=(d.hocVan||[])[i]||{};return`<tr><td class="lv">${esc(lv)}</td>${HV_COLS.map(c=>`<td><input type="text" id="hv_${i}_${c[0]}" value="${esc(h[c[0]]||'')}" maxlength="${c[2]}" ${c[0]==='nam'?'inputmode="numeric"':''}></td>`).join('')}</tr>`}).join('');
+  const fields=PF.filter(f=>!f.hide).map(f=>`<div class="${f.wide?'wide':''}"><label class="f">${esc(f.l)}${f.req?' <span class="req">*</span>':''}</label>${fieldInput(f,d[f.k],d)}</div>`).join('');
+  const hv=HV_LEVELS.map((lv,i)=>{const h=(d.hocVan||[])[i]||{};return`<tr><td class="lv">${esc(lv)}</td>${HV_COLS.map(c=>{const id=`hv_${i}_${c[0]}`,v=h[c[0]]||'',ol=TBL_OPTS[c[0]];return ol&&ol.length?`<td><select id="${id}"><option value=""></option>${ol.map(o=>`<option ${v===o?'selected':''}>${esc(o)}</option>`).join('')}</select></td>`:`<td><input type="text" id="${id}" value="${esc(v)}" maxlength="${c[2]}" ${c[0]==='nam'?'inputmode="numeric"':''}></td>`}).join('')}</tr>`}).join('');
   return`<fieldset id="frm" style="border:0;padding:0;margin:0" ${ro?'disabled':''}>
   <div class="card"><h2>II. THÔNG TIN CÁ NHÂN</h2><div class="grid">${fields}</div></div>
   <div class="card"><h2>III. QUÁ TRÌNH HỌC TẬP CHUYÊN MÔN</h2><div class="scroll"><table class="tbl"><thead><tr><th>Trình độ</th>${HV_COLS.map(c=>`<th>${esc(c[1])}</th>`).join('')}</tr></thead><tbody>${hv}</tbody></table></div></div>
@@ -167,17 +200,17 @@ function formHTML(d,ro){
   <div class="card"><div class="commit">${COMMIT_TEXT.map(t=>`<p>${esc(t)}</p>`).join('')}</div><label class="opts" style="margin-top:12px;font-weight:600"><input type="checkbox" id="camKet" ${d.camKet?'checked':''}> Tôi đã đọc và đồng ý với các cam đoan trên <span class="req">*</span></label></div></fieldset>`}
 function collect(){
   const p={};
-  PF.forEach(f=>{const id='f_'+f.k;
+  PF.filter(f=>!f.hide).forEach(f=>{const id='f_'+f.k;
     if(f.t==='radio'){const c=$(`input[name="${id}"]:checked`);p[f.k]=c?c.value:''}
     else if(f.t==='check')p[f.k]=$('#'+id).checked;
-    else if(f.t==='multi'){p[f.k]=qa(`input[name="${id}"]:checked`).map(x=>x.value);p.nguonKhac=$('#f_nguonKhac').value}
+    else if(f.t==='multi'){p[f.k]=qa(`input[name="${id}"]:checked`).map(x=>x.value);if(f.k==='nguon')p.nguonKhac=$('#f_nguonKhac').value}
     else p[f.k]=$('#'+id).value});
   p.hocVan=HV_LEVELS.map((lv,i)=>{const o={};HV_COLS.forEach(c=>o[c[0]]=$(`#hv_${i}_${c[0]}`).value);return o});
   Object.keys(TABLES).forEach(k=>{const T=TABLES[k],rows=[];let i=0;while($(`#t_${k}_${i}_${T.cols[0][0]}`)){const o={};T.cols.forEach(c=>o[c[0]]=$(`#t_${k}_${i}_${c[0]}`).value);rows.push(o);i++}p[k]=rows});
   p.camKet=$('#camKet').checked;return p}
 function validateClient(p){
   qa('.bad').forEach(x=>x.classList.remove('bad'));let first=null;const miss=[];
-  PF.forEach(f=>{if(!f.req)return;const v=p[f.k];if(v==null||v===''||(Array.isArray(v)&&!v.length)){miss.push(f.l);const el=f.t==='radio'?$(`[data-k="${f.k}"]`):$('#f_'+f.k);if(el){el.classList.add('bad');first=first||el}}});
+  PF.filter(f=>!f.hide).forEach(f=>{if(!f.req)return;const v=p[f.k];if(v==null||v===''||(Array.isArray(v)&&!v.length)){miss.push(f.l);const el=(f.t==='radio'||f.t==='multi')?$(`[data-k="${f.k}"]`):$('#f_'+f.k);if(el){el.classList.add('bad');first=first||el}}});
   if(!p.camKet){miss.push('Xác nhận cam đoan');const el=$('#camKet');el.classList.add('bad');first=first||el}
   if(first){first.scrollIntoView({block:'center',behavior:'smooth'});return'Còn thiếu: '+miss.slice(0,5).join(', ')+(miss.length>5?'…':'')}
   return''}
@@ -207,7 +240,7 @@ function render(){
     <label class="f">Mã hồ sơ</label><input type="text" id="lk_code" placeholder="HS-2610-0001" autocomplete="off" value="${esc(S.code)}"><label class="f" style="margin-top:12px">Số xác nhận</label><input type="text" id="lk_sec" placeholder="XXXX-XXXX" autocomplete="off" maxlength="12">
     <div class="row" style="margin-top:16px"><button class="btn" data-act="home">Quay lại</button><div class="sp"></div><button class="btn pri" data-act="doLookup" ${S.busy?'disabled':''}>${S.busy?'Đang tra cứu…':'Tra cứu'}</button></div></div>`;
   app.innerHTML=topbar(S.view==='home'?'':home)+`<div class="wrap">${b}</div>`;
-  if(S.view==='edit'||S.view==='new'){const nk=$('#f_nguonKhac');qa('input[name="f_nguon"]').forEach(c=>c.addEventListener('change',()=>{nk.style.display=qa('input[name="f_nguon"]').some(x=>x.value==='Khác'&&x.checked)?'':'none'}))}
+  if(S.view==='edit'||S.view==='new'){const nk=$('#f_nguonKhac');if(nk)qa('input[name="f_nguon"]').forEach(c=>c.addEventListener('change',()=>{nk.style.display=qa('input[name="f_nguon"]').some(x=>x.value==='Khác'&&x.checked)?'':'none'}))}
   if(S.view==='lookup'){const s=$('#lk_sec');(S.code?s:$('#lk_code')).focus();[$('#lk_code'),s].forEach(i=>i.addEventListener('keydown',e=>{if(e.key==='Enter')ACT.doLookup()}))}
 }
 const ACT={
@@ -264,7 +297,7 @@ async function admLoad(){try{S.adm.list=await gcall('adm_list',S.adm.q)}catch(e)
 function renderAdmin(app){
   const A=S.adm;
   if(!A.me){app.innerHTML=topbar()+`<div class="wrap"><div class="card">${S.msg?`<div class="alert err">${esc(S.msg)}</div>`:'Đang kiểm tra quyền truy cập…'}</div></div>`;return}
-  const nav=`<span style="font-size:13px">${esc(A.me.email)} · <b>${esc(A.me.role)}</b></span>${A.me.role==='Quản trị'?`<button class="lk" data-act="admTab" data-id="${A.tab==='users'?'list':'users'}">${A.tab==='users'?'Hồ sơ':'Người dùng'}</button>`:''}`;
+  const nav=`<span style="font-size:13px">${esc(A.me.email)} · <b>${esc(A.me.role)}</b></span>${A.me.role==='Quản trị'?[['list','Hồ sơ'],['form','Cấu hình biểu mẫu'],['users','Người dùng']].map(t=>`<button class="lk" style="${A.tab===t[0]&&!A.cur?'background:#ffffff33':''}" data-act="admTab" data-id="${t[0]}">${t[1]}</button>`).join(' '):''}`;
   let b='';
   if(A.cur){
     const r=A.cur,hr=r.data.hr||{};
@@ -282,6 +315,15 @@ function renderAdmin(app){
         <label class="f" style="margin-top:8px">Ghi chú nội bộ (ứng viên không thấy)</label><textarea id="h_gc" rows="3" maxlength="500">${esc(hr.ghiChu||'')}</textarea>
         <div class="row" style="margin-top:12px"><button class="btn pri" data-act="admSave">Lưu</button><button class="btn dng sm" data-act="admReset">Cấp lại số xác nhận</button></div></fieldset>
         ${canE()?'':'<div class="alert info" style="margin-top:10px">Vai trò "Xem" chỉ được xem và in.</div>'}</div></div>`;
+  }else if(A.tab==='form'){
+    const F=A.ff||[],T=A.tb||{};
+    b=`<div class="card"><h2>Cấu hình biểu mẫu ứng viên</h2>${S.msg?`<div class="alert err">${esc(S.msg)}</div>`:''}
+      <div class="alert info">Chỉnh <b>tên hiển thị, kiểu dữ liệu, bắt buộc, hiện/ẩn, danh mục (dropdown)</b> của các trường ở mục II, hoặc <b>thêm trường mới</b> (tự xuất hiện ở form, bản in và file xuất). Trường có dấu 🔒 (họ tên, ngày sinh, CCCD, điện thoại, email, vị trí) không đổi kiểu và không ẩn được. Thay đổi áp dụng cho hồ sơ <b>nộp/sửa từ bây giờ</b>; dữ liệu cũ vẫn được giữ. Thứ tự trên form theo danh sách dưới đây (bản in giữ bố cục BM.10, trường thêm mới nằm cuối mục II).</div>
+      <div class="scroll"><table class="list"><thead><tr><th></th><th>Tên trường</th><th>Kiểu</th><th>Bắt buộc</th><th>Hiển thị</th><th>Danh mục</th><th></th></tr></thead><tbody>${F.map((f,i)=>`<tr><td style="white-space:nowrap"><button class="btn sm" data-act="ffMove" data-id="${i}:-1">↑</button><button class="btn sm" data-act="ffMove" data-id="${i}:1">↓</button></td><td>${LOCKED_FIELDS[f.k]?'🔒 ':''}<b>${esc(f.l)}</b>${f.custom?' <span class="badge b-ok">mới</span>':''}</td><td>${esc(f.t==='check'?'Ô tích':FIELD_TYPES[f.t]||f.t)}</td><td>${f.req?'✔':''}</td><td>${f.hide?'<span class="badge b-bad">Ẩn</span>':'✔'}</td><td>${(f.opts||[]).length?(f.opts.length+' mục'):''}</td><td style="white-space:nowrap"><button class="btn sm" data-act="ffEdit" data-id="${i}">Sửa</button>${f.custom?` <button class="btn sm dng" data-act="ffDel" data-id="${i}">Xoá</button>`:''}</td></tr>`).join('')}</tbody></table></div>
+      <div class="row" style="margin-top:12px"><button class="btn" data-act="ffAdd">+ Thêm trường mới</button></div>
+      <h3 style="margin-top:22px">Danh mục (dropdown) cho các bảng</h3><div class="small" style="font-size:12.5px;color:var(--mut);margin-bottom:8px">Mỗi dòng một lựa chọn. Để trống = ứng viên tự nhập.</div>
+      <div class="grid"><div><label class="f">Bằng cấp (mục III)</label><textarea rows="5" data-tb="bangCap">${esc((T.bangCap||[]).join('\n'))}</textarea></div><div><label class="f">Hệ đào tạo (mục III)</label><textarea rows="5" data-tb="heDaoTao">${esc((T.heDaoTao||[]).join('\n'))}</textarea></div><div><label class="f">Ngoại ngữ (mục V)</label><textarea rows="5" data-tb="ngoaiNgu">${esc((T.ngoaiNgu||[]).join('\n'))}</textarea></div></div>
+      <div class="row" style="margin-top:16px"><button class="btn dng" data-act="ffReset">Khôi phục mặc định</button><div class="sp"></div><button class="btn pri" data-act="ffSave">Lưu cấu hình</button></div></div>`;
   }else if(A.tab==='users'){
     const U=A.users||[];
     b=`<div class="card"><h2>Người dùng quản lý hồ sơ</h2>${S.msg?`<div class="alert err">${esc(S.msg)}</div>`:''}<div class="alert info">Vai trò: <b>Xem</b> (xem, in) · <b>Tuyển dụng</b> (thêm: sửa xử lý, cấp lại số xác nhận, xuất CSV/Excel) · <b>Quản trị</b> (thêm: quản lý người dùng). Dùng email công ty.</div>
@@ -294,8 +336,36 @@ function renderAdmin(app){
   app.innerHTML=topbar(nav)+`<div class="wrap">${b}</div>`;
   const q=$('#q');if(q)q.addEventListener('keydown',e=>{if(e.key==='Enter')ACT.admSearch()});
 }
+function applyCfg(c){PF=mergeFields(c&&c.fields);['bangCap','heDaoTao','ngoaiNgu'].forEach(k=>TBL_OPTS[k]=(c&&c.tbl&&Array.isArray(c.tbl[k]))?c.tbl[k]:[])}
+const cloneF=()=>PF.map(f=>({...f,opts:(f.opts||[]).slice()}));
+function readTb(){qa('[data-tb]').forEach(el=>{S.adm.tb[el.dataset.tb]=el.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)})}
+function closeM(){const m=$('#mdl');if(m)m.remove()}
+function fieldModal(i){
+  const A=S.adm,isNew=i<0,f=isNew?{k:'',l:'',t:'text',req:0,hide:0,wide:0,custom:1,opts:[]}:A.ff[i],lock=!!LOCKED_FIELDS[f.k],tlock=lock||f.t==='check';
+  const m=document.createElement('div');m.id='mdl';m.style.cssText='position:fixed;inset:0;background:#0008;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px';
+  m.innerHTML=`<div class="card" style="max-width:520px;width:100%;max-height:90vh;overflow:auto;margin:0"><h2>${isNew?'Thêm trường mới':'Sửa trường'}</h2><div id="mdl_err"></div>
+   <label class="f">Tên hiển thị</label><input type="text" id="m_l" maxlength="90" value="${esc(f.l)}">
+   <label class="f" style="margin-top:10px">Kiểu dữ liệu</label><select id="m_t" ${tlock?'disabled':''}>${tlock?`<option>${esc(f.t==='check'?'Ô tích':FIELD_TYPES[f.t]||f.t)}</option>`:Object.keys(FIELD_TYPES).map(k=>`<option value="${k}" ${f.t===k?'selected':''}>${esc(FIELD_TYPES[k])}</option>`).join('')}</select>
+   <div id="m_ow" style="margin-top:10px"><label class="f">Danh mục lựa chọn (mỗi dòng một mục, tối thiểu 2)</label><textarea id="m_o" rows="6">${esc((f.opts||[]).join('\n'))}</textarea></div>
+   <div class="opts" style="margin-top:12px"><label><input type="checkbox" id="m_r" ${f.req?'checked':''}> Bắt buộc</label><label><input type="checkbox" id="m_h" ${f.hide?'checked':''} ${lock?'disabled':''}> Ẩn khỏi biểu mẫu</label><label><input type="checkbox" id="m_w" ${f.wide?'checked':''}> Chiếm cả hàng</label></div>
+   <div class="row" style="margin-top:16px"><button class="btn" data-act="mdlClose">Huỷ</button><div class="sp"></div><button class="btn pri" id="m_ok">${isNew?'Thêm':'Lưu'}</button></div></div>`;
+  document.body.append(m);
+  const sync=()=>{const t=tlock?f.t:$('#m_t').value;$('#m_ow').style.display=['select','radio','multi'].includes(t)?'':'none'};sync();if(!tlock)$('#m_t').addEventListener('change',sync);
+  $('#m_ok').onclick=()=>{
+    const l=$('#m_l').value.trim(),t=tlock?f.t:$('#m_t').value,opts=$('#m_o').value.split(/\r?\n/).map(x=>x.trim()).filter((x,j,a)=>x&&a.indexOf(x)===j);
+    const err=m=>{$('#mdl_err').innerHTML=`<div class="alert err">${esc(m)}</div>`};
+    if(!l)return err('Nhập tên hiển thị');if(['select','radio','multi'].includes(t)&&opts.length<2)return err('Kiểu danh sách cần ít nhất 2 lựa chọn (mỗi dòng một mục)');
+    const o={...f,l,t,req:$('#m_r').checked?1:0,hide:lock?0:($('#m_h').checked?1:0),wide:$('#m_w').checked?1:0,opts:['select','radio','multi'].includes(t)?opts:(f.opts||[])};
+    if(isNew){const slug=l.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,14)||'truong';let k='c_'+slug,n=2;while(A.ff.some(x=>x.k===k))k='c_'+slug.slice(0,12)+'_'+(n++);o.k=k;A.ff.push(o)}else A.ff[i]=o;
+    closeM();render()}}
 Object.assign(ACT,{
-  admTab:id=>{S.adm.tab=id;S.adm.cur=null;S.msg='';if(id==='users')gcall('adm_users').then(u=>{S.adm.users=u;render()}).catch(e=>{S.msg=errMsg(e);render()});else{render();admLoad()}},
+  mdlClose:closeM,
+  ffEdit:id=>{readTb();fieldModal(+id)},ffAdd:()=>{readTb();fieldModal(-1)},
+  ffDel:id=>{readTb();if(confirm('Xoá trường này khỏi biểu mẫu? Dữ liệu đã nộp của trường này vẫn nằm trong hồ sơ cũ nhưng sẽ không còn hiển thị.')){S.adm.ff.splice(+id,1);render()}},
+  ffMove:id=>{readTb();const[i,d]=id.split(':').map(Number),a=S.adm.ff,j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];render()},
+  ffSave:async()=>{readTb();try{const r=await gcall('adm_setFields',S.adm.ff.map(f=>({k:f.k,l:f.l,t:f.t,req:f.req,hide:f.hide,wide:f.wide,opts:f.opts,custom:f.custom?1:0})),S.adm.tb);applyCfg(r);S.adm.ff=cloneF();S.adm.tb=JSON.parse(JSON.stringify(TBL_OPTS));S.msg='';toast('Đã lưu cấu hình biểu mẫu','ok')}catch(e){S.msg=errMsg(e);window.scrollTo(0,0)}render()},
+  ffReset:async()=>{if(!confirm('Khôi phục toàn bộ trường và danh mục về mặc định? Các trường thêm mới sẽ bị gỡ khỏi biểu mẫu.'))return;try{applyCfg(await gcall('adm_resetFields'));S.adm.ff=cloneF();S.adm.tb=JSON.parse(JSON.stringify(TBL_OPTS));S.msg='';toast('Đã khôi phục mặc định','ok')}catch(e){S.msg=errMsg(e)}render()},
+  admTab:id=>{S.adm.tab=id;S.adm.cur=null;S.msg='';if(id==='form'){S.adm.ff=cloneF();S.adm.tb=JSON.parse(JSON.stringify(TBL_OPTS));render();return}if(id==='users')gcall('adm_users').then(u=>{S.adm.users=u;render()}).catch(e=>{S.msg=errMsg(e);render()});else{render();admLoad()}},
   admSearch:()=>{S.adm.q=$('#q').value;S.msg='';admLoad()},
   admOpen:async id=>{try{S.adm.cur=await gcall('adm_get',id);S.msg=''}catch(e){S.msg=errMsg(e)}render();window.scrollTo(0,0)},
   admBack:()=>{S.adm.cur=null;S.msg='';render();admLoad()},
@@ -316,6 +386,7 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if
   /* dự phòng: đọc ?m=admin trực tiếp từ địa chỉ trang (Apps Script cung cấp google.script.url) */
   if(MODE!=='admin'&&GS&&google.script.url&&google.script.url.getLocation){
     await new Promise(r=>{const t=setTimeout(r,1500);try{google.script.url.getLocation(l=>{try{if(l&&l.parameter&&[].concat(l.parameter.m)[0]==='admin')MODE='admin'}catch(e){}clearTimeout(t);r()})}catch(e){clearTimeout(t);r()}})}
+  try{applyCfg(await gcall('pub_config'))}catch(e){}
   render();
   if(MODE==='admin'){try{S.adm.me=await gcall('adm_me');render();admLoad()}catch(e){S.msg=errMsg(e);render()}}
 })();
