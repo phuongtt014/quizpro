@@ -209,3 +209,20 @@ Thư không dùng ký hiệu nào vẫn hiển thị bình thường. Khi "Sao c
 ## In thư mời nhận việc (v25)
 
 Hồ sơ ứng viên → **Soạn thư** → chọn mẫu → nút **In thư** (cạnh "Sao chép"): mở bản in khổ A4 có logo, đầu thư, bảng thông tin, ô lưu ý và khối chữ ký; riêng nút *Đồng ý / Từ chối* được đổi thành hai ô tích ☐ kèm dòng "Lý do (nếu từ chối)" để nhân viên tuyển dụng in ra kẹp hồ sơ. Bản in chỉ gồm nội dung thư (không kèm chữ ký email).
+
+---
+
+## Hồ sơ nhận việc (BM.11) & bàn giao cho C&B (v26)
+
+Tab mới **Hồ sơ nhận việc** (cần quyền *Xem hồ sơ nhận việc*). Quy trình:
+1. **Thư mời nhận việc** (mẫu BM.09 bản mới – bấm lại *Thư viện → Mẫu thư → Cài bộ mẫu thư chuyên nghiệp*) liệt kê sẵn **danh mục hồ sơ cần chuẩn bị** (biến `{{ho_so_can_chuan_bi}}`) và đường dẫn điền BM.10 (biến `{{link_bm10}}`, khai báo ở Thiết lập → Hồ sơ nhận việc).
+2. Ứng viên **chấp nhận thư mời** (hoặc đã nhận việc) → xuất hiện trong tab *Tiếp nhận hồ sơ*. Nhân viên tuyển dụng mở hồ sơ → **Bắt đầu tiếp nhận** → tích từng hồ sơ **đã nhận** (có hoặc không; ngày nhận và người nhận tự ghi). Ghi chú / hẹn ngày bổ sung nhập ở cuối. Có nút **In BM.11** (cột "Nhân viên HCNS nhận" tự điền theo các đợt bàn giao đã được C&B xác nhận).
+3. **Bàn giao cho C&B (nhiều đợt):** nút *Tạo đợt bàn giao* → chọn nhân viên C&B nhận, chọn các hồ sơ (của một hoặc nhiều ứng viên) đã nhận và chưa bàn giao → đợt ở trạng thái *Chờ C&B xác nhận*. Hồ sơ đã nằm trong đợt không bỏ tích được.
+4. **C&B xác nhận trong ứng dụng:** tích từng hồ sơ sau khi đối chiếu với hồ sơ thực nhận → **Xác nhận đã nhận đủ** (từ lúc này C&B chịu trách nhiệm) hoặc **Từ chối** kèm **lý do bắt buộc** (hồ sơ chưa tích được ghi là *không khớp*). Có **In biên bản bàn giao** cho từng đợt.
+5. Nếu bị từ chối: nhân viên tuyển dụng kiểm tra lại, bấm **Kiểm tra lại & làm lại bàn giao** (đợt mới, đánh dấu *lần 2…*). Hệ thống **đếm số lần bị từ chối / làm lại** theo ứng viên và theo nhân viên.
+
+**Hạn & KPI** (Thiết lập → *Hồ sơ nhận việc*): hạn bàn giao **9 ngày làm việc** (mặc định tính từ **ngày nhận việc**; có thể đổi sang "ngày nhận hồ sơ đầu tiên", và chọn tính thứ Bảy), hạn thu đủ hồ sơ = ngày nhận việc + **7 ngày** (theo cam kết BM.11). Ngày lễ chưa được loại trừ. Tab *Báo cáo & đánh giá*: theo từng nhân viên tuyển dụng phụ trách – tỷ lệ thu đủ đúng hạn, số ngày thu đủ trung bình, hồ sơ thiếu quá hạn, bàn giao đúng hạn, chờ bàn giao quá hạn, số đợt, bị từ chối, tỷ lệ làm lại; danh sách "cần xử lý ngay"; xuất CSV.
+
+**Phân quyền:** 4 quyền mới ở *Thiết lập → Phân quyền*: xem hồ sơ nhận việc, tiếp nhận & tạo bàn giao, xác nhận nhận bàn giao (C&B), xem báo cáo. Nhân viên tuyển dụng được cấp sẵn xem/tiếp nhận/báo cáo; có sẵn vai trò **Nhân viên C&B** (thêm người dùng và chọn vai trò này).
+
+**Danh mục hồ sơ (BM.11):** *Thư viện → Hồ sơ nhận việc (BM.11)* – chỉnh/ban hành bản mới (mỗi dòng `Tên | Yêu cầu chi tiết | Số lượng / quy cách`). Hồ sơ đang xử lý giữ danh mục đã chốt lúc bắt đầu tiếp nhận.
