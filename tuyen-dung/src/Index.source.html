@@ -275,7 +275,7 @@ const idbOp=async(mode,fn)=>{const d=await idb;return new Promise((res,rej)=>{co
 const fput=(id,b)=>idbOp('readwrite',s=>s.put(b,id));
 const fget=id=>idbOp('readonly',s=>s.get(id));
 const fdel=id=>idbOp('readwrite',s=>s.delete(id));
-const APP_VER='v28 · 22/10/2026';
+const APP_VER='v29 · 23/10/2026';
 const GS=typeof google!=='undefined'&&!!google.script&&!!google.script.run;
 const gcall=(fn,...a)=>new Promise((res,rej)=>{const r=google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e));r[fn](...a)});
 const MAXF=GS?10:15;
@@ -298,7 +298,7 @@ const CAPS=[
  ['req.create','Tạo đề xuất tuyển dụng'],['req.all','Xem đề xuất của mọi phòng ban'],['req.approve','Phê duyệt / từ chối đề xuất (Ban TGĐ)'],
  ['req.sign','Tải lên bản scan đã ký'],['cand.view','Xem ứng viên'],['cand.edit','Thêm / sửa ứng viên, ghi nhận sơ vấn – phỏng vấn'],
  ['cand.move','Chuyển giai đoạn, soạn thư mời / thư gửi ứng viên'],['lib.view','Xem thư viện'],['lib.edit','Chỉnh sửa thư viện'],
- ['onb.view','Xem hồ sơ nhận việc (BM.11)'],['onb.receive','Tiếp nhận hồ sơ nhận việc & tạo đợt bàn giao cho C&B'],['onb.confirm','Xác nhận / từ chối nhận bàn giao hồ sơ (Nhân viên C&B)'],['onb.report','Xem báo cáo đánh giá thu hồ sơ & bàn giao'],
+ ['onb.view','Xem hồ sơ nhận việc (BM.11)'],['onb.receive','Tiếp nhận hồ sơ nhận việc & tạo đợt bàn giao cho C&B'],['onb.confirm','Xác nhận / từ chối nhận bàn giao hồ sơ (Nhân viên C&B)'],['onb.report','Xem báo cáo đánh giá thu hồ sơ & bàn giao'],['onb.deadline','Đặt thời hạn thu / bàn giao riêng cho từng hồ sơ nhận việc'],
  ['report.view','Xem tổng quan & báo cáo'],['data.export','Xuất dữ liệu ra file CSV'],['cfg.manage','Xem Thiết lập (chỉ đọc)'],['cfg.edit','Chỉnh sửa Thiết lập (danh mục, trường, người dùng, phân quyền)']
 ];
 const TPL_TYPES=['Thư mời phỏng vấn','Thư mời nhận việc','Thư cảm ơn','Thư từ chối','Khác'];
@@ -1950,8 +1950,11 @@ const hoList=()=>DB.lib.handovers;
 function addWork(dIso,n,sat){let d=new Date(dIso+'T00:00:00Z'),k=0;while(k<n){d=new Date(d.getTime()+dayMs);const w=d.getUTCDay();if(w===0||(w===6&&!sat))continue;k++}return d.toISOString().slice(0,10)}
 const onbStartDate=c=>c.offer&&c.offer.startDate?String(c.offer.startDate).slice(0,10):(c.hiredAt?new Date(c.hiredAt).toISOString().slice(0,10):'');
 const onbFirstRecv=c=>Object.values((c.onb&&c.onb.items)||{}).filter(x=>x.got&&x.at).map(x=>x.at).sort()[0]||'';
-function onbDue(c){const g=onbCfg(),b=g.base==='recv'?onbFirstRecv(c):onbStartDate(c);return b?addWork(b,+g.handoverDays||9,+g.sat):''}
-function onbCollectDue(c){const s=onbStartDate(c);return s?new Date(new Date(s+'T00:00:00Z').getTime()+(+onbCfg().collectDays||7)*dayMs).toISOString().slice(0,10):''}
+function onbDefDue(c){const g=onbCfg(),b=g.base==='recv'?onbFirstRecv(c):onbStartDate(c);return b?addWork(b,+g.handoverDays||9,+g.sat):''}
+function onbDefCollectDue(c){const s=onbStartDate(c);return s?new Date(new Date(s+'T00:00:00Z').getTime()+(+onbCfg().collectDays||7)*dayMs).toISOString().slice(0,10):''}
+/* thời hạn áp dụng: ưu tiên mốc đặt riêng cho từng hồ sơ, nếu không dùng mặc định ở Thiết lập */
+const onbDue=c=>(c.onb&&c.onb.dueHand)||onbDefDue(c);
+const onbCollectDue=c=>(c.onb&&c.onb.dueCollect)||onbDefCollectDue(c);
 const onbEligible=c=>c.stage!=='rejected'&&((c.offer&&c.offer.status==='Chấp nhận')||c.stage==='hired');
 const onbCands=()=>DB.cands.filter(c=>onbEligible(c)||c.onb);
 function onbStart(c,owner,cnb){
@@ -2077,8 +2080,8 @@ function onbListView(){
   return`<div class="row" style="margin-bottom:12px"><div class="seg">${fl.map(t=>`<button class="${(ui.obf||'all')===t[0]?'on':''}" data-act="onbF" data-id="${t[0]}">${t[1]}</button>`).join('')}</div><div class="grow"></div>${searchBox('obq',ui.obq||'','Tìm ứng viên, vị trí, người phụ trách…')}</div>
   <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Ứng viên</th><th>Vị trí</th><th>Ngày nhận việc</th><th>Tuyển dụng phụ trách</th><th>C&B phụ trách</th><th>Đã thu</th><th>C&B đã nhận</th><th>Hạn thu đủ</th><th>Hạn bàn giao</th><th>Làm lại</th><th>Trạng thái</th></tr></thead><tbody>
   ${rows.map(c=>{const s=onbStats(c),f=onbFlags(c),st=onbState(c);return`<tr class="click" data-act="openOnb" data-id="${c.id}"><td><b>${esc(c.v.name)}</b></td><td>${esc(posOf(c))}</td><td>${fmtD(onbStartDate(c))}</td><td>${esc(ownerName(c))}</td><td>${esc(cnbName(c))}</td>
-    <td>${c.onb?`<b>${s.got}</b>/${s.n}`:'—'}</td><td>${c.onb?`<b>${s.done}</b>/${s.n}`:'—'}</td><td>${f.cd?fmtD(f.cd):'—'}${f.collectLate?` ${badge('Quá hạn','b-bad')}`:''}</td><td>${f.due?fmtD(f.due):'—'}${f.handLate?` ${badge('Quá hạn','b-bad')}`:''}</td><td>${s.redo?badge(s.redo+' lần','b-bad'):'—'}</td><td>${badge(st[0],st[1])}</td></tr>`}).join('')||`<tr><td colspan="11"><div class="empty">Chưa có ứng viên nào chấp nhận thư mời.</div></td></tr>`}</tbody></table></div></div>
-  <p class="muted small" style="margin-top:10px">Danh sách gồm ứng viên đã <b>chấp nhận thư mời</b> hoặc <b>đã nhận việc</b>. Hạn thu đủ = ngày nhận việc + ${onbCfg().collectDays} ngày; hạn bàn giao = ${onbCfg().handoverDays} ngày làm việc kể từ ${onbCfg().base==='recv'?'ngày nhận hồ sơ đầu tiên':'ngày nhận việc'} (thay đổi ở Thiết lập → Hồ sơ nhận việc).</p>`}
+    <td>${c.onb?`<b>${s.got}</b>/${s.n}`:'—'}</td><td>${c.onb?`<b>${s.done}</b>/${s.n}`:'—'}</td><td>${f.cd?fmtD(f.cd):'—'}${c.onb&&c.onb.dueCollect?' ✎':''}${f.collectLate?` ${badge('Quá hạn','b-bad')}`:''}</td><td>${f.due?fmtD(f.due):'—'}${c.onb&&c.onb.dueHand?' ✎':''}${f.handLate?` ${badge('Quá hạn','b-bad')}`:''}</td><td>${s.redo?badge(s.redo+' lần','b-bad'):'—'}</td><td>${badge(st[0],st[1])}</td></tr>`}).join('')||`<tr><td colspan="11"><div class="empty">Chưa có ứng viên nào chấp nhận thư mời.</div></td></tr>`}</tbody></table></div></div>
+  <p class="muted small" style="margin-top:10px">Danh sách gồm ứng viên đã <b>chấp nhận thư mời</b> hoặc <b>đã nhận việc</b>. Hạn thu đủ = ngày nhận việc + ${onbCfg().collectDays} ngày; hạn bàn giao = ${onbCfg().handoverDays} ngày làm việc kể từ ${onbCfg().base==='recv'?'ngày nhận hồ sơ đầu tiên':'ngày nhận việc'} (thay đổi ở Thiết lập → Hồ sơ nhận việc). Dấu ✎ = thời hạn được đặt riêng cho hồ sơ đó.</p>`}
 function onbDrawer(id){
   const c=DB.cands.find(x=>x.id===id);if(!c)return'';
   const o=c.onb,items=onbItems(c),s=onbStats(c),f=onbFlags(c),st=onbState(c),ed=canRecv();
@@ -2089,7 +2092,7 @@ function onbDrawer(id){
   ${!o?`<div class="card sec"><p>Chưa bắt đầu tiếp nhận hồ sơ nhận việc cho ứng viên này.</p>${ed?`<div class="fgrid" style="margin:10px 0"><div><label class="f">Nhân viên tuyển dụng phụ trách thu hồ sơ <i>*</i></label><select id="onb_pick_o"><option value=""></option>${owners.map(u=>`<option value="${u.id}" ${(c.owner||(me().roleId==='admin'?'':me().id))===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select></div><div><label class="f">Nhân viên C&B phụ trách nhận bàn giao</label><select id="onb_pick_c"><option value=""></option>${cnbs.map(u=>`<option value="${u.id}" ${onbCfg().defaultCnb===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select></div></div><button class="btn pri" data-act="onbStartBtn" data-id="${c.id}">Bắt đầu tiếp nhận (theo ${esc(onbTplAt(Date.now()).code)})</button>`:''}</div>`:`
   <div class="card sec"><div class="sec-h"><h3>Thông tin</h3></div><dl class="kv"><dt>Tuyển dụng phụ trách<br><span class="muted small">chịu trách nhiệm thu hồ sơ bước đầu từ ứng viên</span></dt><dd>${ed?`<select data-onbo="${c.id}">${owners.map(u=>`<option value="${u.id}" ${o.owner===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}${owners.some(u=>u.id===o.owner)?'':`<option value="${esc(o.owner||'')}" selected>${esc(o.owner?userName(o.owner):'(chưa chọn)')}</option>`}</select>`:esc(o.owner?userName(o.owner):'—')}</dd>
     <dt>C&B phụ trách<br><span class="muted small">chịu trách nhiệm kiểm tra khi nhận bàn giao</span></dt><dd>${ed?`<select data-onbc="${c.id}"><option value=""></option>${cnbs.map(u=>`<option value="${u.id}" ${o.cnb===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select>`:esc(o.cnb?userName(o.cnb):'—')}</dd>
-    <dt>Hạn thu đủ hồ sơ</dt><dd>${f.cd?fmtD(f.cd):'—'}</dd><dt>Hạn bàn giao C&B</dt><dd>${f.due?fmtD(f.due):'—'}</dd><dt>Biểu mẫu</dt><dd>${esc(o.snap.code)} · lần BH ${esc(o.snap.issue)}</dd></dl></div>
+    <dt>Hạn thu đủ hồ sơ</dt><dd>${f.cd?fmtD(f.cd):'—'}${o.dueCollect?` <span class="badge b-warn">đặt riêng</span>`:''}</dd><dt>Hạn bàn giao C&B</dt><dd>${f.due?fmtD(f.due):'—'}${o.dueHand?` <span class="badge b-warn">đặt riêng</span>`:''}</dd><dt>Biểu mẫu</dt><dd>${esc(o.snap.code)} · lần BH ${esc(o.snap.issue)}</dd></dl>${can('onb.deadline')?`<button class="btn sm" data-act="onbDue" data-id="${c.id}">${ic('edit')}Đặt thời hạn thu / bàn giao</button>`:''}${(o.dueLog||[]).length?`<div class="small muted" style="margin-top:8px">Đã đổi thời hạn ${o.dueLog.length} lần – gần nhất: ${esc((o.dueLog[o.dueLog.length-1]).why)} (${esc(userName(o.dueLog[o.dueLog.length-1].by))})</div>`:''}</div>
   <div class="card sec"><div class="sec-h"><h3>Danh mục hồ sơ (${s.got}/${s.n} đã nhận · ${s.done}/${s.n} C&B đã nhận)</h3><button class="btn sm" data-act="onbPrint" data-id="${c.id}">${ic('print')}In BM.11</button></div>
     <div class="tbl-wrap"><table><thead><tr><th style="width:34px">Nhận</th><th>Hồ sơ</th><th>Ngày nhận</th><th>Bàn giao</th></tr></thead><tbody>${items.map((it,i)=>{const r=o.items[it.id],hs=itemHs(c,it.id),b=hs?BG_ST[hs]:null;
       return`<tr><td><input type="checkbox" class="chk" data-act="onbTick" data-id="${c.id}~${it.id}" ${r&&r.got?'checked':''} ${ed?'':'disabled'}></td><td><b>${i+1}. ${esc(it.name)}</b><div class="muted small">${esc(it.req)}</div><div class="small" style="color:var(--brand)">${esc(it.qty)}</div>${r&&r.invalid?`<div class="small" style="margin-top:4px;color:${r.invalid.resolvedAt?'var(--ok)':'var(--bad)'}">${r.invalid.resolvedAt?`✔ Đã khắc phục ${fmtD(r.invalid.resolvedAt)} (${esc(userName(r.invalid.resolvedBy))})`:`⚠ Không hợp lệ – C&B thu bổ sung: ${esc(r.invalid.reason)} (${fmtD(r.invalid.at)}, ${esc(userName(r.invalid.by))})`}</div>${!r.invalid.resolvedAt&&canCnb()?`<button class="btn sm" style="margin-top:4px" data-act="onbFixDone" data-id="${c.id}~${it.id}">Đã thu đủ hợp lệ</button>`:''}`:''}</td><td>${r&&r.got?fmtD(r.at):'—'}${r&&r.by?`<div class="muted small">${esc(userName(r.by))}</div>`:''}</td><td>${b?badge(b[0],b[1]):'<span class="muted">Chưa bàn giao</span>'}</td></tr>`}).join('')}</tbody></table></div>
@@ -2156,7 +2159,7 @@ function onbDocHTML(c){
   <table><thead><tr><th style="width:36px">STT</th><th style="width:20%">Danh mục hồ sơ</th><th>Yêu cầu chi tiết &amp; Quy cách giấy tờ</th><th style="width:17%">Số lượng</th><th style="width:19%">Nhân viên HCNS nhận</th></tr></thead><tbody>
   ${sn.items.map((it,i)=>{const rc=c.onb&&c.onb.items[it.id],b=itemHo(c.id,it.id),done=b&&b.status==='dong_y';return`<tr><td class="c">${i+1}</td><td><b>${esc(it.name)}</b></td><td>${esc(it.req)}</td><td>${esc(it.qty)}<br><span style="font-size:11px;color:#555">${rc&&rc.got?'&#9746; Đã nhận '+fmtD(rc.at):'&#9744; Chưa nhận'}</span></td><td class="c">${rc&&rc.invalid&&!rc.invalid.resolvedAt?'&#9888; Chưa hợp lệ<br><span style="font-size:11px">C&amp;B thu bổ sung</span>':done?'&#9746; '+fmtD(b.date):'&#9744;'}</td></tr>`}).join('')}</tbody></table>
   <p style="margin:12px 0 4px"><b>Ghi chú / Hẹn ngày bổ sung hồ sơ còn thiếu</b></p><div style="border:1px solid #999;min-height:46px;padding:6px 8px">${esc(note)}</div>
-  <div style="border:1px solid #999;padding:8px 10px;margin-top:10px;text-align:justify"><b>Cam kết hoàn thành hồ sơ nhân sự:</b><br>Tôi cam kết bảo đảm tính chính xác, trung thực của toàn bộ hồ sơ đã nộp. Đối với các chứng từ còn thiếu được ghi nhận tại mục Ghi chú, tôi xin cam kết sẽ hoàn thành việc bổ sung cho Phòng HCNS trong vòng ${String(onbCfg().collectDays).padStart(2,'0')} ngày kể từ ngày nhận việc. Nếu quá thời hạn trên hoặc hồ sơ có sự sai lệch cố ý, tôi xin hoàn toàn chịu trách nhiệm theo Nội quy lao động và Quy định của Hệ thống trường Việt Mỹ.</div>
+  <div style="border:1px solid #999;padding:8px 10px;margin-top:10px;text-align:justify"><b>Cam kết hoàn thành hồ sơ nhân sự:</b><br>Tôi cam kết bảo đảm tính chính xác, trung thực của toàn bộ hồ sơ đã nộp. Đối với các chứng từ còn thiếu được ghi nhận tại mục Ghi chú, tôi xin cam kết sẽ hoàn thành việc bổ sung cho Phòng HCNS ${c.onb&&c.onb.dueCollect?'trước ngày '+fmtD(c.onb.dueCollect):'trong vòng '+String(onbCfg().collectDays).padStart(2,'0')+' ngày kể từ ngày nhận việc'}. Nếu quá thời hạn trên hoặc hồ sơ có sự sai lệch cố ý, tôi xin hoàn toàn chịu trách nhiệm theo Nội quy lao động và Quy định của Hệ thống trường Việt Mỹ.</div>
   <table class="sg" style="margin-top:6px"><tr><td><b>NGƯỜI NỘP HỒ SƠ</b><br><i>(Ký và ghi rõ họ tên)</i><br><br><br>${esc(c.v.name)}</td><td><b>NGƯỜI TIẾP NHẬN</b><br><i>(Ký, ghi rõ họ tên)</i><br><br><br>${esc(ownerName(c))}</td><td><b>NHÂN VIÊN HCNS TIẾP NHẬN</b><br><i>(Ký, ghi rõ họ tên)</i><br><br><br>${lastB?esc(userName(lastB.decidedBy)):(c.onb&&c.onb.cnb?esc(userName(c.onb.cnb)):'')}</td></tr></table>`}
 function hoDocHTML(b){
   const st=BG_ST[b.status];
@@ -2184,6 +2187,25 @@ function onbTplModal(id){
       if(old)Object.assign(old,x,{items:its});else DB.lib.onbTpls.push({id:uid('ot_'),title:src.title,sub:src.sub,...x,items:its,createdAt:Date.now(),by:me().name});
       commit();toast('Đã lưu danh mục hồ sơ','ok')}}]});
 }
+A.onbDue=id=>{
+  const c=DB.cands.find(x=>x.id===id);if(!c||!c.onb||!can('onb.deadline'))return;
+  const dc=onbDefCollectDue(c),dh=onbDefDue(c),cc=onbCollectDue(c),ch=onbDue(c),log0=c.onb.dueLog||[];
+  modal({title:'Thời hạn thu & bàn giao – '+c.v.name,html:`<div class="alert info" style="margin-bottom:12px">${ic('alert')}<div>Đặt thời hạn riêng cho hồ sơ này với <b>${esc(ownerName(c))}</b> (Tuyển dụng phụ trách). KPI và cảnh báo quá hạn sẽ tính theo mốc này. Để về mặc định, chọn lại đúng ngày mặc định hoặc bấm “Mặc định”.</div></div>
+    <div class="fgrid"><div><label class="f">Hạn thu đủ hồ sơ từ ứng viên</label><input type="date" id="du_c" value="${esc(cc)}"><div class="small muted" style="margin-top:4px">Mặc định: ${dc?fmtD(dc):'—'} (ngày nhận việc + ${esc(onbCfg().collectDays)} ngày) <button class="btn ghost sm" data-act="duFill" data-id="du_c|${esc(dc)}">Mặc định</button></div></div>
+    <div><label class="f">Hạn bàn giao cho C&B</label><input type="date" id="du_h" value="${esc(ch)}"><div class="small muted" style="margin-top:4px">Mặc định: ${dh?fmtD(dh):'—'} (${esc(onbCfg().handoverDays)} ngày làm việc) <button class="btn ghost sm" data-act="duFill" data-id="du_h|${esc(dh)}">Mặc định</button></div></div>
+    <div class="wide"><label class="f">Lý do thay đổi thời hạn <i>*</i> <span class="muted small">(bắt buộc khi đổi mốc)</span></label><input type="text" id="du_why" placeholder="VD: Ứng viên đang chờ cấp lý lịch tư pháp"></div></div>
+    ${log0.length?`<div class="small muted" style="margin-top:12px"><b>Lịch sử thay đổi:</b><br>${log0.slice().reverse().map(x=>`${fmtDT(x.t)} · ${esc(userName(x.by))}: ${x.f==='c'?'Hạn thu':'Hạn bàn giao'} ${fmtD(x.from)} → ${fmtD(x.to)} (${esc(x.why)})`).join('<br>')}</div>`:''}`,
+    buttons:[modalCancel,{label:'Lưu thời hạn',cls:'pri',icon:'check',fn:()=>{
+      const nc=$('#du_c').value,nh=$('#du_h').value,why=$('#du_why').value.trim();
+      if(!nc||!nh){toast('Nhập đủ hai mốc thời hạn','err');return false}
+      const chC=nc!==cc,chH=nh!==ch;if(!chC&&!chH){return}
+      if(!why){toast('Vui lòng nhập lý do thay đổi','err');return false}
+      c.onb.dueLog=c.onb.dueLog||[];
+      if(chC){c.onb.dueLog.push({t:Date.now(),by:me().id,f:'c',from:cc,to:nc,why});if(nc===dc)delete c.onb.dueCollect;else c.onb.dueCollect=nc}
+      if(chH){c.onb.dueLog.push({t:Date.now(),by:me().id,f:'h',from:ch,to:nh,why});if(nh===dh)delete c.onb.dueHand;else c.onb.dueHand=nh}
+      log(c,`Đổi thời hạn hồ sơ nhận việc (${why}):${chC?` thu đủ ${fmtD(cc)} → ${fmtD(nc)};`:''}${chH?` bàn giao ${fmtD(ch)} → ${fmtD(nh)};`:''}`);
+      commit();toast('Đã cập nhật thời hạn','ok')}}]})};
+A.duFill=id=>{const[k,v]=id.split('|');if(v)$('#'+k).value=v};
 A.onbTplNew=()=>can('lib.edit')&&onbTplModal();A.onbTplEdit=id=>can('lib.edit')&&onbTplModal(id);
 /* ---- thiết lập ---- */
 function onbCfgView(){
@@ -2204,8 +2226,8 @@ function onbExport(k){
   if(k==='onbkpi'){downloadCSV('danh-gia-thu-ho-so',[['Nhân viên','Số hồ sơ','Thu đủ đúng hạn','Thu đủ trễ','Thiếu quá hạn','Bàn giao đúng hạn','Bàn giao trễ','Chờ bàn giao quá hạn','Số đợt bàn giao','Bị C&B từ chối','TB ngày thu đủ'],
     ...onbKpi().map(r=>[userName(r.owner),r.n,r.fullOk,r.fullLate,r.miss,r.hOk,r.hLate,r.hPend,r.batches,r.redo,r.days.length?(r.days.reduce((a,b)=>a+b,0)/r.days.length).toFixed(1):''])]);return}
   const tpl=onbTplAt(Date.now());
-  downloadCSV('ho-so-nhan-viec',[['Ứng viên','Vị trí','Ngày nhận việc','Tuyển dụng phụ trách','C&B phụ trách','Trạng thái','Đã thu','C&B đã nhận','Tổng mục','Hạn thu đủ','Hạn bàn giao','Quá hạn thu','Quá hạn bàn giao','Số lần làm lại',...tpl.items.map(i=>'Nhận: '+i.name),'Ghi chú'],
-    ...onbRows().map(c=>{const s=onbStats(c),f=onbFlags(c);return[c.v.name,posOf(c),fmtD(onbStartDate(c)),ownerName(c),cnbName(c),onbState(c)[0],s.got,s.done,s.n,f.cd?fmtD(f.cd):'',f.due?fmtD(f.due):'',f.collectLate?'Có':'',f.handLate?'Có':'',s.redo,...tpl.items.map(i=>{const x=c.onb&&c.onb.items[(c.onb.snap.items.find(y=>y.name===i.name)||{}).id];return x&&x.got?fmtD(x.at):''}),c.onb?c.onb.note||'':'']})])}
+  downloadCSV('ho-so-nhan-viec',[['Ứng viên','Vị trí','Ngày nhận việc','Tuyển dụng phụ trách','C&B phụ trách','Trạng thái','Đã thu','C&B đã nhận','Tổng mục','Hạn thu đủ','Hạn bàn giao','Hạn đặt riêng','Quá hạn thu','Quá hạn bàn giao','Số lần làm lại',...tpl.items.map(i=>'Nhận: '+i.name),'Ghi chú'],
+    ...onbRows().map(c=>{const s=onbStats(c),f=onbFlags(c);return[c.v.name,posOf(c),fmtD(onbStartDate(c)),ownerName(c),cnbName(c),onbState(c)[0],s.got,s.done,s.n,f.cd?fmtD(f.cd):'',f.due?fmtD(f.due):'',c.onb&&(c.onb.dueCollect||c.onb.dueHand)?'Có':'',f.collectLate?'Có':'',f.handLate?'Có':'',s.redo,...tpl.items.map(i=>{const x=c.onb&&c.onb.items[(c.onb.snap.items.find(y=>y.name===i.name)||{}).id];return x&&x.got?fmtD(x.at):''}),c.onb?c.onb.note||'':'']})])}
 /* thẻ tóm tắt trong hồ sơ ứng viên */
 function onbCandCard(c){
   if(!can('onb.view')||!onbEligible(c))return'';const s=onbStats(c),st=onbState(c);

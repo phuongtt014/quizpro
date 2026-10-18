@@ -239,3 +239,10 @@ Cả hai hiển thị ở danh sách, chi tiết hồ sơ, bản in BM.11 (ô k�
 - Trạng thái hồ sơ nhận việc chuyển sang **"Chưa hợp lệ – C&B thu bổ sung"**: **C&B trực tiếp làm việc với ứng viên để thu đủ**, nhân viên tuyển dụng không phải bàn giao lại (và không bị tính quá hạn bàn giao vì hồ sơ này).
 - Khi thu đủ, C&B mở chi tiết hồ sơ → **Đã thu đủ hợp lệ** (ghi ngày và người xác nhận). Hồ sơ chỉ **Hoàn tất** khi không còn hồ sơ chưa hợp lệ.
 - Hiển thị trong chi tiết hồ sơ, bản in BM.11 (ô "Nhân viên HCNS nhận" và Ghi chú), lịch sử ứng viên và CSV bàn giao. Có thêm bộ lọc "C&B thu bổ sung" và số đếm trên tab cho C&B.
+
+### Thời hạn thu & bàn giao theo từng hồ sơ (v29)
+Mặc định thời hạn lấy từ Thiết lập → Hồ sơ nhận việc (thu đủ = ngày nhận việc + 7 ngày; bàn giao = 9 ngày làm việc). Người có quyền mới **"Đặt thời hạn thu / bàn giao riêng cho từng hồ sơ nhận việc"** (quản trị có sẵn; cấp thêm cho trưởng nhóm ở *Phân quyền*) mở chi tiết hồ sơ → **Đặt thời hạn thu / bàn giao**: chọn riêng **hạn thu đủ từ ứng viên** và **hạn bàn giao cho C&B** cho nhân viên tuyển dụng phụ trách hồ sơ đó.
+- **Bắt buộc ghi lý do** khi đổi mốc; lịch sử thay đổi (ai, lúc nào, từ → đến, lý do) lưu trong hồ sơ và hiện trong hộp thoại; ghi vào lịch sử ứng viên.
+- Nút **Mặc định** trả về hạn theo Thiết lập.
+- KPI, cảnh báo "Quá hạn" và bộ lọc đều tính theo hạn riêng nếu có. Danh sách đánh dấu ✎ ở hồ sơ có hạn đặt riêng; CSV có cột "Hạn đặt riêng".
+- Bản in BM.11 ghi cam kết bổ sung "trước ngày …" theo hạn riêng.
