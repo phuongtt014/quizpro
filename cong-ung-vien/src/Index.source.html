@@ -116,6 +116,9 @@ var TABLES = {
 };
 var HR_STATUS = ['Mới nộp', 'Đã xem', 'Đã liên hệ', 'Đã nhận việc', 'Không tiếp tục'];
 var COMMIT_TEXT = ['Tôi cam đoan những thông tin cung cấp trên đây là chính xác. Tôi chấp nhận việc Công ty xác minh những thông tin trên và cam kết không kiện tổ chức hoặc những cá nhân cung cấp thông tin cho Công ty. Nếu các thông tin trên không đúng sự thật thì tôi chấp nhận việc Công ty chấm dứt HĐLĐ trước thời hạn mà không cần báo trước, đồng thời bồi thường thiệt hại cho Công ty (nếu có).', 'Tôi cam kết bảo mật thông tin của hệ thống Trường Việt Mỹ - VA Schools.', 'Tôi đồng thuận cho VA Schools sử dụng các thông tin cá nhân do tôi cung cấp để phục vụ công tác tuyển dụng, quản lý nhân sự và các nghiệp vụ liên quan của Phòng Hành chính - Nhân sự theo quy định.'];
+var COMMIT_DEFAULT = COMMIT_TEXT.slice();
+var COMMIT_LABEL = 'Tôi đã đọc và đồng ý với các cam đoan trên';
+var COMMIT_LABEL_DEFAULT = COMMIT_LABEL;
 /*SCHEMA-END*/
 let MODE=window.__MODE==='admin'?'admin':'public';
 const GS=typeof google!=='undefined'&&google.script&&google.script.run;
@@ -163,7 +166,7 @@ function docHTML(rec,meta){
 <div class="sec">II. THÔNG TIN CÁ NHÂN</div><table>${II}</table>
 <div class="sec">III. QUÁ TRÌNH HỌC TẬP CHUYÊN MÔN</div><table class="g"><thead><tr>${['Trình độ',...HV_COLS.map(c=>c[1])].map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${hvRows}</tbody></table>
 ${tt('khoaHoc')}${tb('ngoaiNgu')}${tb('kinhNghiem')}
-<div class="cm" style="margin-top:10px">${COMMIT_TEXT.map(t=>`<p>${esc(t)}</p>`).join('')}</div>
+<div class="cm" style="margin-top:10px">${(d.camKetText||COMMIT_TEXT).map(t=>`<p>${esc(t)}</p>`).join('')}</div>
 <div class="sg">TP. Hồ Chí Minh, Ngày ....Tháng….Năm….<br><b>Người khai</b><br><b>(Ký &amp; ghi rõ họ tên)</b><br><br><br><br>${esc(d.hoTen||'')}</div></div>`}
 function printDoc(rec,meta){
   const w=window.open('','_blank');if(!w){toast('Trình duyệt chặn cửa sổ in – hãy cho phép pop-up','err');return}
@@ -197,7 +200,7 @@ function formHTML(d,ro){
   <div class="card">${tableEditor('khoaHoc',d.khoaHoc||[])}</div>
   <div class="card">${tableEditor('ngoaiNgu',d.ngoaiNgu||[])}</div>
   <div class="card">${tableEditor('kinhNghiem',d.kinhNghiem||[])}</div>
-  <div class="card"><div class="commit">${COMMIT_TEXT.map(t=>`<p>${esc(t)}</p>`).join('')}</div><label class="opts" style="margin-top:12px;font-weight:600"><input type="checkbox" id="camKet" ${d.camKet?'checked':''}> Tôi đã đọc và đồng ý với các cam đoan trên <span class="req">*</span></label></div></fieldset>`}
+  <div class="card"><div class="commit">${(ro&&d.camKetText?d.camKetText:COMMIT_TEXT).map(t=>`<p>${esc(t)}</p>`).join('')}</div><label class="opts" style="margin-top:12px;font-weight:600"><input type="checkbox" id="camKet" ${(ro?d.camKet:(S.view==='edit'?S.ck:d.camKet))?'checked':''}> ${esc(COMMIT_LABEL)} <span class="req">*</span></label></div></fieldset>`}
 function collect(){
   const p={};
   PF.filter(f=>!f.hide).forEach(f=>{const id='f_'+f.k;
@@ -207,7 +210,7 @@ function collect(){
     else p[f.k]=$('#'+id).value});
   p.hocVan=HV_LEVELS.map((lv,i)=>{const o={};HV_COLS.forEach(c=>o[c[0]]=$(`#hv_${i}_${c[0]}`).value);return o});
   Object.keys(TABLES).forEach(k=>{const T=TABLES[k],rows=[];let i=0;while($(`#t_${k}_${i}_${T.cols[0][0]}`)){const o={};T.cols.forEach(c=>o[c[0]]=$(`#t_${k}_${i}_${c[0]}`).value);rows.push(o);i++}p[k]=rows});
-  p.camKet=$('#camKet').checked;return p}
+  p.camKet=$('#camKet').checked;S.ck=p.camKet;return p}
 function validateClient(p){
   qa('.bad').forEach(x=>x.classList.remove('bad'));let first=null;const miss=[];
   PF.filter(f=>!f.hide).forEach(f=>{if(!f.req)return;const v=p[f.k];if(v==null||v===''||(Array.isArray(v)&&!v.length)){miss.push(f.l);const el=(f.t==='radio'||f.t==='multi')?$(`[data-k="${f.k}"]`):$('#f_'+f.k);if(el){el.classList.add('bad');first=first||el}}});
@@ -250,7 +253,7 @@ const ACT={
   addRow:id=>{const p=collect();p[id].push({});S.draft=S.view==='new'?p:null;if(S.view==='edit')S.rec.data=Object.assign(S.rec.data,p);render()},
   copyCode:()=>{copyText(`Mã hồ sơ: ${S.code}\nSố xác nhận: ${S.secret}`);toast('Đã sao chép mã hồ sơ và số xác nhận','ok')},
   printCur:()=>{if(S.view==='edit')printDoc(S.rec,{code:S.rec.code});else printDoc(S.rec,{code:S.code})},
-  openCur:()=>{S.view='edit';render()},
+  openCur:()=>{S.view='edit';S.ck=false;render()},
   submit:async()=>{
     if(S.busy)return;const p=collect();S.draft=p;const miss=validateClient(p);if(miss){toast(miss,'err');return}
     S.busy=true;S.msg='';$('.btn.pri').disabled=true;
@@ -260,12 +263,12 @@ const ACT={
   saveEdit:async()=>{
     if(S.busy)return;const p=collect();const miss=validateClient(p);if(miss){toast(miss,'err');return}
     S.busy=true;S.msg='';$('.btn.pri').disabled=true;
-    try{S.rec=await gcall('pub_update',S.code,S.secret,p);toast('Đã lưu thay đổi','ok')}catch(e){S.msg=errMsg(e);toast(S.msg,'err');window.scrollTo(0,0)}
+    try{S.rec=await gcall('pub_update',S.code,S.secret,p);S.ck=false;toast('Đã lưu thay đổi','ok')}catch(e){S.msg=errMsg(e);toast(S.msg,'err');window.scrollTo(0,0)}
     S.busy=false;render()},
   doLookup:async()=>{
     if(S.busy)return;const c=$('#lk_code').value.trim(),s=$('#lk_sec').value.trim();if(!c||!s){toast('Nhập đủ mã hồ sơ và số xác nhận','err');return}
     S.busy=true;S.msg='';S.code=c.toUpperCase();render();
-    try{const r=await gcall('pub_lookup',c,s);S.rec=r;S.code=r.code;S.secret=s;S.view='edit'}catch(e){S.msg=errMsg(e);S.view='lookup'}
+    try{const r=await gcall('pub_lookup',c,s);S.rec=r;S.code=r.code;S.secret=s;S.ck=false;S.view='edit'}catch(e){S.msg=errMsg(e);S.view='lookup'}
     S.busy=false;render()}
 };
 
@@ -323,6 +326,9 @@ function renderAdmin(app){
       <div class="row" style="margin-top:12px"><button class="btn" data-act="ffAdd">+ Thêm trường mới</button></div>
       <h3 style="margin-top:22px">Danh mục (dropdown) cho các bảng</h3><div class="small" style="font-size:12.5px;color:var(--mut);margin-bottom:8px">Mỗi dòng một lựa chọn. Để trống = ứng viên tự nhập.</div>
       <div class="grid"><div><label class="f">Bằng cấp (mục III)</label><textarea rows="5" data-tb="bangCap">${esc((T.bangCap||[]).join('\n'))}</textarea></div><div><label class="f">Hệ đào tạo (mục III)</label><textarea rows="5" data-tb="heDaoTao">${esc((T.heDaoTao||[]).join('\n'))}</textarea></div><div><label class="f">Ngoại ngữ (mục V)</label><textarea rows="5" data-tb="ngoaiNgu">${esc((T.ngoaiNgu||[]).join('\n'))}</textarea></div></div>
+      <h3 style="margin-top:22px">Nội dung cam kết cuối biểu mẫu</h3><div class="small" style="font-size:12.5px;color:var(--mut);margin-bottom:8px">Mỗi đoạn cách nhau một dòng trống. Hiển thị trên form, bản in và được lưu kèm hồ sơ (hồ sơ cũ giữ nguyên nội dung ứng viên đã đồng ý lúc nộp).</div>
+      <textarea rows="12" data-cm="paras">${esc((S.adm.cm?S.adm.cm.paras:COMMIT_TEXT).join('\n\n'))}</textarea>
+      <label class="f" style="margin-top:10px">Nội dung ô tích xác nhận</label><input type="text" data-cm="label" maxlength="200" value="${esc(S.adm.cm?S.adm.cm.label:COMMIT_LABEL)}">
       <div class="row" style="margin-top:16px"><button class="btn dng" data-act="ffReset">Khôi phục mặc định</button><div class="sp"></div><button class="btn pri" data-act="ffSave">Lưu cấu hình</button></div></div>`;
   }else if(A.tab==='users'){
     const U=A.users||[];
@@ -336,9 +342,10 @@ function renderAdmin(app){
   app.innerHTML=topbar(nav)+`<div class="wrap">${b}</div>`;
   const q=$('#q');if(q)q.addEventListener('keydown',e=>{if(e.key==='Enter')ACT.admSearch()});
 }
-function applyCfg(c){PF=mergeFields(c&&c.fields);['bangCap','heDaoTao','ngoaiNgu'].forEach(k=>TBL_OPTS[k]=(c&&c.tbl&&Array.isArray(c.tbl[k]))?c.tbl[k]:[])}
+function applyCfg(c){const cm=(c&&c.commit)||{};COMMIT_TEXT=Array.isArray(cm.paras)&&cm.paras.length?cm.paras:COMMIT_DEFAULT.slice();COMMIT_LABEL=cm.label||COMMIT_LABEL_DEFAULT;PF=mergeFields(c&&c.fields);['bangCap','heDaoTao','ngoaiNgu'].forEach(k=>TBL_OPTS[k]=(c&&c.tbl&&Array.isArray(c.tbl[k]))?c.tbl[k]:[])}
 const cloneF=()=>PF.map(f=>({...f,opts:(f.opts||[]).slice()}));
-function readTb(){qa('[data-tb]').forEach(el=>{S.adm.tb[el.dataset.tb]=el.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)})}
+function readCm(){const p=$('[data-cm=paras]'),l=$('[data-cm=label]');if(p)S.adm.cm={paras:p.value.split(/\r?\n\s*\r?\n/).map(x=>x.replace(/\s*\r?\n\s*/g,' ').trim()).filter(Boolean),label:l?l.value.trim():''}}
+function readTb(){readCm();qa('[data-tb]').forEach(el=>{S.adm.tb[el.dataset.tb]=el.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)})}
 function closeM(){const m=$('#mdl');if(m)m.remove()}
 function fieldModal(i){
   const A=S.adm,isNew=i<0,f=isNew?{k:'',l:'',t:'text',req:0,hide:0,wide:0,custom:1,opts:[]}:A.ff[i],lock=!!LOCKED_FIELDS[f.k],tlock=lock||f.t==='check';
@@ -363,9 +370,9 @@ Object.assign(ACT,{
   ffEdit:id=>{readTb();fieldModal(+id)},ffAdd:()=>{readTb();fieldModal(-1)},
   ffDel:id=>{readTb();if(confirm('Xoá trường này khỏi biểu mẫu? Dữ liệu đã nộp của trường này vẫn nằm trong hồ sơ cũ nhưng sẽ không còn hiển thị.')){S.adm.ff.splice(+id,1);render()}},
   ffMove:id=>{readTb();const[i,d]=id.split(':').map(Number),a=S.adm.ff,j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];render()},
-  ffSave:async()=>{readTb();try{const r=await gcall('adm_setFields',S.adm.ff.map(f=>({k:f.k,l:f.l,t:f.t,req:f.req,hide:f.hide,wide:f.wide,opts:f.opts,custom:f.custom?1:0})),S.adm.tb);applyCfg(r);S.adm.ff=cloneF();S.adm.tb=JSON.parse(JSON.stringify(TBL_OPTS));S.msg='';toast('Đã lưu cấu hình biểu mẫu','ok')}catch(e){S.msg=errMsg(e);window.scrollTo(0,0)}render()},
-  ffReset:async()=>{if(!confirm('Khôi phục toàn bộ trường và danh mục về mặc định? Các trường thêm mới sẽ bị gỡ khỏi biểu mẫu.'))return;try{applyCfg(await gcall('adm_resetFields'));S.adm.ff=cloneF();S.adm.tb=JSON.parse(JSON.stringify(TBL_OPTS));S.msg='';toast('Đã khôi phục mặc định','ok')}catch(e){S.msg=errMsg(e)}render()},
-  admTab:id=>{S.adm.tab=id;S.adm.cur=null;S.msg='';if(id==='form'){S.adm.ff=cloneF();S.adm.tb=JSON.parse(JSON.stringify(TBL_OPTS));render();return}if(id==='users')gcall('adm_users').then(u=>{S.adm.users=u;render()}).catch(e=>{S.msg=errMsg(e);render()});else{render();admLoad()}},
+  ffSave:async()=>{readTb();try{const r=await gcall('adm_setFields',S.adm.ff.map(f=>({k:f.k,l:f.l,t:f.t,req:f.req,hide:f.hide,wide:f.wide,opts:f.opts,custom:f.custom?1:0})),S.adm.tb,S.adm.cm);applyCfg(r);S.adm.cm=null;S.adm.ff=cloneF();S.adm.tb=JSON.parse(JSON.stringify(TBL_OPTS));S.msg='';toast('Đã lưu cấu hình biểu mẫu','ok')}catch(e){S.msg=errMsg(e);window.scrollTo(0,0)}render()},
+  ffReset:async()=>{if(!confirm('Khôi phục toàn bộ trường và danh mục về mặc định? Các trường thêm mới sẽ bị gỡ khỏi biểu mẫu.'))return;try{applyCfg(await gcall('adm_resetFields'));S.adm.cm=null;S.adm.ff=cloneF();S.adm.tb=JSON.parse(JSON.stringify(TBL_OPTS));S.msg='';toast('Đã khôi phục mặc định','ok')}catch(e){S.msg=errMsg(e)}render()},
+  admTab:id=>{S.adm.tab=id;S.adm.cur=null;S.msg='';if(id==='form'){S.adm.cm=null;S.adm.ff=cloneF();S.adm.tb=JSON.parse(JSON.stringify(TBL_OPTS));render();return}if(id==='users')gcall('adm_users').then(u=>{S.adm.users=u;render()}).catch(e=>{S.msg=errMsg(e);render()});else{render();admLoad()}},
   admSearch:()=>{S.adm.q=$('#q').value;S.msg='';admLoad()},
   admOpen:async id=>{try{S.adm.cur=await gcall('adm_get',id);S.msg=''}catch(e){S.msg=errMsg(e)}render();window.scrollTo(0,0)},
   admBack:()=>{S.adm.cur=null;S.msg='';render();admLoad()},

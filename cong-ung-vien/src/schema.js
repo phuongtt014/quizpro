@@ -68,3 +68,6 @@ var TABLES = {
 };
 var HR_STATUS = ['Mới nộp', 'Đã xem', 'Đã liên hệ', 'Đã nhận việc', 'Không tiếp tục'];
 var COMMIT_TEXT = ['Tôi cam đoan những thông tin cung cấp trên đây là chính xác. Tôi chấp nhận việc Công ty xác minh những thông tin trên và cam kết không kiện tổ chức hoặc những cá nhân cung cấp thông tin cho Công ty. Nếu các thông tin trên không đúng sự thật thì tôi chấp nhận việc Công ty chấm dứt HĐLĐ trước thời hạn mà không cần báo trước, đồng thời bồi thường thiệt hại cho Công ty (nếu có).', 'Tôi cam kết bảo mật thông tin của hệ thống Trường Việt Mỹ - VA Schools.', 'Tôi đồng thuận cho VA Schools sử dụng các thông tin cá nhân do tôi cung cấp để phục vụ công tác tuyển dụng, quản lý nhân sự và các nghiệp vụ liên quan của Phòng Hành chính - Nhân sự theo quy định.'];
+var COMMIT_DEFAULT = COMMIT_TEXT.slice();
+var COMMIT_LABEL = 'Tôi đã đọc và đồng ý với các cam đoan trên';
+var COMMIT_LABEL_DEFAULT = COMMIT_LABEL;

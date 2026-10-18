@@ -86,6 +86,9 @@ var TABLES = {
 };
 var HR_STATUS = ['Mới nộp', 'Đã xem', 'Đã liên hệ', 'Đã nhận việc', 'Không tiếp tục'];
 var COMMIT_TEXT = ['Tôi cam đoan những thông tin cung cấp trên đây là chính xác. Tôi chấp nhận việc Công ty xác minh những thông tin trên và cam kết không kiện tổ chức hoặc những cá nhân cung cấp thông tin cho Công ty. Nếu các thông tin trên không đúng sự thật thì tôi chấp nhận việc Công ty chấm dứt HĐLĐ trước thời hạn mà không cần báo trước, đồng thời bồi thường thiệt hại cho Công ty (nếu có).', 'Tôi cam kết bảo mật thông tin của hệ thống Trường Việt Mỹ - VA Schools.', 'Tôi đồng thuận cho VA Schools sử dụng các thông tin cá nhân do tôi cung cấp để phục vụ công tác tuyển dụng, quản lý nhân sự và các nghiệp vụ liên quan của Phòng Hành chính - Nhân sự theo quy định.'];
+var COMMIT_DEFAULT = COMMIT_TEXT.slice();
+var COMMIT_LABEL = 'Tôi đã đọc và đồng ý với các cam đoan trên';
+var COMMIT_LABEL_DEFAULT = COMMIT_LABEL;
 /*SCHEMA-END*/
 
 function doGet(e) {
@@ -167,10 +170,14 @@ function loadFields_() {
   const c = formCfgRaw_().cfg || {};
   PF = mergeFields(c.fields);
   ['bangCap', 'heDaoTao', 'ngoaiNgu'].forEach(function (k) { TBL_OPTS[k] = (c.tbl && Array.isArray(c.tbl[k])) ? c.tbl[k].filter(function (x) { return typeof x === 'string'; }) : []; });
-  return { fields: PF, tbl: TBL_OPTS };
+  const cm = c.commit || {};
+  COMMIT_TEXT = (Array.isArray(cm.paras) && cm.paras.length) ? cm.paras.filter(function (x) { return typeof x === 'string' && x.trim(); }).slice(0, 10) : COMMIT_DEFAULT.slice();
+  if (!COMMIT_TEXT.length) COMMIT_TEXT = COMMIT_DEFAULT.slice();
+  COMMIT_LABEL = (typeof cm.label === 'string' && cm.label.trim()) ? cm.label.trim().slice(0, 200) : COMMIT_LABEL_DEFAULT;
+  return { fields: PF, tbl: TBL_OPTS, commit: { paras: COMMIT_TEXT, label: COMMIT_LABEL } };
 }
 function pub_config() { return loadFields_(); }
-function adm_setFields(list, tbl) {
+function adm_setFields(list, tbl, commit) {
   const u = adm_('Quản trị'), seen = {}, out = [];
   if (!Array.isArray(list) || list.length > 90) throw new Error('Danh sách trường không hợp lệ.');
   const defKeys = {}; PF_DEFAULT.forEach(function (f) { defKeys[f.k] = f; });
@@ -195,7 +202,10 @@ function adm_setFields(list, tbl) {
     out.push(o);
   });
   const tb = {}; ['bangCap', 'heDaoTao', 'ngoaiNgu'].forEach(function (k) { tb[k] = ((tbl && Array.isArray(tbl[k])) ? tbl[k] : []).map(function (v) { return cs_(v, 60); }).filter(function (v, i, a) { return v && a.indexOf(v) === i; }).slice(0, 60); });
-  const json = JSON.stringify({ fields: out, tbl: tb });
+  const paras = ((commit && Array.isArray(commit.paras)) ? commit.paras : []).map(function (x) { return String(x == null ? '' : x).replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, ' ').replace(/[ \t]+/g, ' ').trim().slice(0, 1500); }).filter(Boolean).slice(0, 10);
+  if (!paras.length) throw new Error('Nội dung cam kết không được để trống (hoặc bấm Khôi phục mặc định).');
+  const label = cs_(commit && commit.label, 200) || COMMIT_LABEL_DEFAULT;
+  const json = JSON.stringify({ fields: out, tbl: tb, commit: { paras: paras, label: label } });
   if (json.length > 45000) throw new Error('Cấu hình quá dài.');
   const sh = cfgSheet_(), r = formCfgRaw_();
   if (r.row) sh.getRange(r.row, 1, 1, 3).setNumberFormat('@').setValues([['formCfg', json, 'Cấu hình trường biểu mẫu (sửa qua trang quản lý)']]);
@@ -265,6 +275,7 @@ function clean_(p, prev) {
   });
   out.camKet = (p.camKet === true || p.camKet === 1 || p.camKet === '1' || p.camKet === 'true') ? 1 : 0;
   if (!out.camKet) errs.push('Bạn cần tích xác nhận cam đoan');
+  out.camKetText = COMMIT_TEXT.slice();
   if (errs.length) throw new Error(errs.slice(0, 5).join('; ') + (errs.length > 5 ? '; …' : ''));
   if (JSON.stringify(out).length > 38000) throw new Error('Nội dung quá dài, vui lòng rút gọn.');
   return out;

@@ -49,3 +49,6 @@ Trang nội bộ (`?m=admin`) → tab **Cấu hình biểu mẫu** (chỉ vai tr
 - Trường 🔒 (vị trí ứng tuyển, họ tên, ngày sinh, CCCD, điện thoại, email) giữ kiểu dữ liệu và luôn hiển thị vì cần kiểm tra định dạng; vẫn đổi được tên và bắt buộc.
 - Máy chủ kiểm tra theo đúng cấu hình: giá trị ngoài danh mục bị từ chối. Cấu hình áp dụng cho hồ sơ nộp/sửa từ thời điểm lưu; dữ liệu cũ giữ nguyên (trường bị ẩn/xoá vẫn còn trong dữ liệu gốc).
 - Cấu hình lưu ở sheet `CauHinh` (dòng `formCfg`). Nút **Khôi phục mặc định** đưa biểu mẫu về như ban đầu.
+
+### Nội dung cam kết
+Tab **Cấu hình biểu mẫu** → cuối trang: sửa **nội dung cam kết** (mỗi đoạn cách nhau một dòng trống, tối đa 10 đoạn) và **nội dung ô tích xác nhận**. Nội dung hiển thị trên form và bản in. Mỗi hồ sơ **lưu kèm đúng nội dung cam kết ứng viên đã đồng ý lúc nộp/sửa**, nên đổi nội dung sau này không làm thay đổi hồ sơ cũ. Khi ứng viên mở lại hồ sơ để sửa, họ cần tích xác nhận lại (theo nội dung hiện hành).
