@@ -232,3 +232,10 @@ Mỗi hồ sơ nhận việc có **hai người chịu trách nhiệm rõ ràng*
 - **Nhân viên Tuyển dụng phụ trách** – thu hồ sơ bước đầu từ ứng viên và bàn giao cho C&B. Bắt buộc chọn khi bấm *Bắt đầu tiếp nhận* (ứng viên mới tạo bởi nhân viên tuyển dụng tự gán người tạo). KPI thu hồ sơ, bàn giao đúng hạn và số lần bị từ chối **tính cho người này**, không phụ thuộc ai bấm tạo đợt bàn giao.
 - **Nhân viên C&B phụ trách** – kiểm tra và chịu trách nhiệm khi nhận bàn giao. Chọn khi bắt đầu tiếp nhận (hoặc đặt mặc định ở Thiết lập → Hồ sơ nhận việc). Đợt bàn giao chỉ gồm ứng viên của cùng một C&B; chỉ C&B được chọn (hoặc quản trị) mới xác nhận/từ chối đợt đó. Báo cáo có bảng đánh giá riêng cho C&B: số đợt nhận, xác nhận, từ chối, tỷ lệ từ chối, thời gian phản hồi trung bình.
 Cả hai hiển thị ở danh sách, chi tiết hồ sơ, bản in BM.11 (ô ký "Người tiếp nhận" và "Nhân viên HCNS tiếp nhận") và file CSV.
+
+### Hồ sơ không hợp lệ sau khi C&B đã xác nhận (v28)
+Ở tab *Bàn giao cho C&B*, đợt đã **C&B nhận** có nút **Báo hồ sơ không hợp lệ sau xác nhận…** (C&B được chọn hoặc quản trị): chọn hồ sơ, nhập lý do. Khi đó:
+- Hồ sơ được ghi nhận **không hợp lệ sau khi C&B xác nhận** → tính vào **đánh giá C&B** (cột "Xác nhận rồi mới phát hiện không hợp lệ" và "Đã khắc phục"), không tính lỗi cho nhân viên tuyển dụng.
+- Trạng thái hồ sơ nhận việc chuyển sang **"Chưa hợp lệ – C&B thu bổ sung"**: **C&B trực tiếp làm việc với ứng viên để thu đủ**, nhân viên tuyển dụng không phải bàn giao lại (và không bị tính quá hạn bàn giao vì hồ sơ này).
+- Khi thu đủ, C&B mở chi tiết hồ sơ → **Đã thu đủ hợp lệ** (ghi ngày và người xác nhận). Hồ sơ chỉ **Hoàn tất** khi không còn hồ sơ chưa hợp lệ.
+- Hiển thị trong chi tiết hồ sơ, bản in BM.11 (ô "Nhân viên HCNS nhận" và Ghi chú), lịch sử ứng viên và CSV bàn giao. Có thêm bộ lọc "C&B thu bổ sung" và số đếm trên tab cho C&B.
