@@ -7,7 +7,7 @@
 const SH = {
   USERS: 'NguoiDung', ROLEPERM: 'PQ_VaiTro', USERCAMP: 'PQ_CoSo', CAMPUS: 'CoSo',
   STAFF: 'NhanSu', CLASS: 'Lop', ASSIGN: 'PhanCong',
-  CT: 'CauHinh_Lop', BAND: 'CauHinh_Khung', POS: 'CauHinh_CoSo', PARAM: 'CauHinh_ThamSo', AUDIT: 'NhatKy', HIST: 'LichSu'
+  CT: 'CauHinh_Lop', BAND: 'CauHinh_Khung', POS: 'CauHinh_CoSo', PARAM: 'CauHinh_ThamSo', AUDIT: 'NhatKy', HIST: 'LichSu', PD: 'PheDuyet', PDDL: 'PheDuyet_DL'
 };
 
 const PERMS = [
@@ -22,15 +22,18 @@ const PERMS = [
   { key: 'admin.perm', label: 'Phân quyền & người dùng' },
   { key: 'audit.view', label: 'Xem nhật ký' },
   { key: 'history.view', label: 'Xem lịch sử phân công' },
-  { key: 'history.snapshot', label: 'Chốt kỳ phân công' }
+  { key: 'history.snapshot', label: 'Chốt kỳ phân công' },
+  { key: 'approval.submit', label: 'Gửi phê duyệt' },
+  { key: 'approval.approve', label: 'Được chọn làm người phê duyệt' },
+  { key: 'approval.viewall', label: 'Xem mọi hồ sơ phê duyệt' }
 ];
 
 const ROLE_ADMIN = 'Admin';
 const DEFAULT_ROLES = {
   'Admin': PERMS.map(p => p.key),
-  'Chủ tịch HĐHT Mầm non': ['dash.view', 'report.export', 'staff.view', 'class.view', 'config.edit', 'audit.view', 'history.view'],
-  'Nhân sự': ['dash.view', 'report.export', 'staff.view', 'staff.import', 'class.view', 'audit.view', 'history.view', 'history.snapshot'],
-  'Hiệu trưởng/Quản lý cơ sở': ['dash.view', 'report.export', 'staff.view', 'staff.assign', 'class.view', 'class.edit', 'history.view', 'history.snapshot'],
+  'Chủ tịch HĐHT Mầm non': ['dash.view', 'report.export', 'staff.view', 'class.view', 'config.edit', 'audit.view', 'history.view', 'approval.approve', 'approval.viewall'],
+  'Nhân sự': ['dash.view', 'report.export', 'staff.view', 'staff.import', 'class.view', 'audit.view', 'history.view', 'history.snapshot', 'approval.submit', 'approval.approve', 'approval.viewall'],
+  'Hiệu trưởng/Quản lý cơ sở': ['dash.view', 'report.export', 'staff.view', 'staff.assign', 'class.view', 'class.edit', 'history.view', 'history.snapshot', 'approval.submit'],
   'Người xem': ['dash.view', 'staff.view', 'class.view', 'history.view']
 };
 
@@ -48,11 +51,13 @@ const HEADERS = {
   CauHinh_Khung: ['MaKhung', 'Nhan', 'Tu', 'Den'],
   CauHinh_ThamSo: ['Khoa', 'GiaTri', 'MoTa'],
   NhatKy: ['ThoiGian', 'Email', 'HanhDong', 'ChiTiet'],
-  LichSu: ['Ky', 'MaCoSo', 'ChotLuc', 'NguoiChot', 'GhiChu', 'DuLieu']
+  LichSu: ['Ky', 'MaCoSo', 'ChotLuc', 'NguoiChot', 'GhiChu', 'DuLieu'],
+  PheDuyet: ['MaPD', 'Loai', 'Ky', 'MaCoSo', 'TieuDe', 'GhiChu', 'NguoiGui', 'TenNguoiGui', 'GuiLuc', 'CheDo', 'TrangThai', 'Luong', 'KetThucLuc'],
+  PheDuyet_DL: ['MaPD', 'DuLieu']
 };
-const TEXT_COLS = { NhanSu: ['MaNV', 'MaCoSo', 'SoDT'], Lop: ['MaLop', 'MaCoSo', 'SoThuTu'], PhanCong: ['MaLop', 'MaNV'], PQ_CoSo: ['MaCoSo'], CoSo: ['MaCoSo'], LichSu: ['Ky', 'MaCoSo', 'DuLieu'] };
+const TEXT_COLS = { NhanSu: ['MaNV', 'MaCoSo', 'SoDT'], Lop: ['MaLop', 'MaCoSo', 'SoThuTu'], PhanCong: ['MaLop', 'MaNV'], PQ_CoSo: ['MaCoSo'], CoSo: ['MaCoSo'], LichSu: ['Ky', 'MaCoSo', 'DuLieu'], PheDuyet: ['MaPD', 'Ky', 'MaCoSo'], PheDuyet_DL: ['MaPD', 'DuLieu'] };
 const NOCACHE = {};
-NOCACHE[SH.AUDIT] = 1; NOCACHE[SH.HIST] = 1;
+NOCACHE[SH.AUDIT] = 1; NOCACHE[SH.HIST] = 1; NOCACHE[SH.PDDL] = 1;
 
 /* ===================== WEB APP ===================== */
 
@@ -301,7 +306,14 @@ const ACTIONS = {
   auditList: { perm: 'audit.view', fn: auditList_ },
   historyList: { perm: 'history.view', fn: historyList_ },
   historyGet: { perm: 'history.view', fn: historyGet_ },
-  historySnapshot: { perm: 'history.snapshot', write: true, fn: historySnapshot_ }
+  historySnapshot: { perm: 'history.snapshot', write: true, fn: historySnapshot_ },
+  classPreview: { perm: 'class.edit', fn: classPreview_ },
+  approvalList: { fn: (c) => pdList_(c) },
+  approvalCandidates: { perm: 'approval.submit', fn: approverCandidates_ },
+  approvalSubmit: { perm: 'approval.submit', write: true, fn: approvalSubmit_ },
+  approvalGet: { fn: approvalGet_ },
+  approvalAct: { perm: 'approval.approve', write: true, fn: approvalAct_ },
+  approvalWithdraw: { perm: 'approval.submit', write: true, fn: approvalWithdraw_ }
 };
 
 /* ===================== CONFIG ===================== */
@@ -335,7 +347,8 @@ function loadAll_(c) {
     boot: bootstrap_(c),
     report: has('dash.view') ? reportGet_(c, {}) : null,
     staff: has('staff.view') ? staffList_(c, {}) : [],
-    classes: has('class.view') ? classList_(c, {}) : []
+    classes: has('class.view') ? classList_(c, {}) : [],
+    approvals: (has('approval.submit') || has('approval.approve') || has('approval.viewall')) ? pdList_(c) : []
   };
 }
 
@@ -486,9 +499,10 @@ function classSave_(c, p) {
   if (all.some(l => str_(l.MaLop) !== id && str_(l.MaCoSo) === str_(r.MaCoSo) && l.TenLop === name)) throw new Error('Cơ sở đã có lớp ' + name);
   const row = { MaLop: id, MaCoSo: str_(r.MaCoSo), MaNhom: ct.MaNhom, SoThuTu: stt, TenLop: name, SiSo: si, GiuCho: gc, GhiChu: str_(r.GhiChu) };
   const i = all.findIndex(l => str_(l.MaLop) === id);
+  const was = i >= 0 ? num_(all[i].SiSo) + '+' + num_(all[i].GiuCho) + ' → ' : '';
   if (i >= 0) { needCampus_(c, all[i].MaCoSo); if (str_(all[i].MaCoSo) !== row.MaCoSo) throw new Error('Không đổi cơ sở của lớp đã tạo'); all[i] = row; } else all.push(row);
   put_(SH.CLASS, all);
-  log_(c, 'classSave', name + ' @' + row.MaCoSo + ' ' + si + '+' + gc);
+  log_(c, 'classSave', name + ' @' + row.MaCoSo + ' sĩ số+giữ chỗ: ' + was + si + '+' + gc);
   return true;
 }
 
@@ -704,6 +718,148 @@ function historyGet_(c, p) {
     out.b.Ky = 'current'; out.b.ChotLuc = 'Hiện tại';
   } else if (p.vs) out.b = find(p.vs);
   return out;
+}
+
+/* ===================== XEM TRƯỚC TÁC ĐỘNG KHI ĐỔI SĨ SỐ ===================== */
+
+function brief_(r, tenLop) {
+  const cl = r.classes.find(l => l.TenLop === tenLop);
+  return { total: r.total, band: r.band, status: r.status, positions: r.positions.map(p => ({ viTri: p.viTri, min: p.min, max: p.max, actual: p.actual, status: p.status })), cls: cl ? { students: cl.students, gv: cl.gv, bm: cl.bm, stdGV: cl.stdGV, stdBM: cl.stdBM, tiLe: cl.tiLe, capacity: cl.capacity, status: cl.status, issues: cl.issues, canPropose: cl.canPropose } : null };
+}
+/* Tính thử (không ghi) cơ sở sẽ ra sao nếu lớp có sĩ số/giữ chỗ mới */
+function classPreview_(c, p) {
+  const r = p.row; needCampus_(c, r.MaCoSo);
+  const cfg = loadCfg_(), ct = cfg.classTypes.find(t => t.MaNhom === str_(r.MaNhom));
+  if (!ct) throw new Error('Nhóm tuổi không hợp lệ');
+  const campus = c.campuses.find(x => x.MaCoSo === str_(r.MaCoSo));
+  const staff = read_(SH.STAFF), asg = read_(SH.ASSIGN), classes = read_(SH.CLASS);
+  const name = ct.VietTat + (str_(r.SoThuTu) || '1');
+  const row = { MaLop: str_(r.MaLop) || '__moi', MaCoSo: campus.MaCoSo, MaNhom: ct.MaNhom, SoThuTu: str_(r.SoThuTu) || '1', TenLop: name, SiSo: num_(r.SiSo), GiuCho: num_(r.GiuCho) };
+  const i = classes.findIndex(l => str_(l.MaLop) === row.MaLop);
+  const after = classes.slice(); if (i >= 0) after[i] = row; else after.push(row);
+  const b = evalCampus_(campus, staff, classes, asg, cfg), a = evalCampus_(campus, staff, after, asg, cfg);
+  return { name, isNew: i < 0, before: brief_(b, i >= 0 ? classes[i].TenLop : name), after: brief_(a, name), extra: num_(cfg.params.ChenhLech, 2) };
+}
+
+/* ===================== GỬI & PHÊ DUYỆT ===================== */
+/* Người gửi chọn danh sách người duyệt (tuần tự hoặc đồng thời). Hồ sơ đính kèm ảnh chụp phân công/định biên tại thời điểm gửi.
+   Khi tất cả đồng ý → trạng thái "Đã duyệt" và ảnh chụp được ghi vào Lịch sử phân công của kỳ đó. */
+
+const PD_WAIT = 'Chờ duyệt', PD_OK = 'Đã duyệt', PD_NO = 'Từ chối', PD_BACK = 'Đã thu hồi';
+
+function nowStr_() { return Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd HH:mm'); }
+
+function approverCandidates_(c) {
+  const grid = {}; read_(SH.ROLEPERM).forEach(r => grid[r.VaiTro] = r);
+  return read_(SH.USERS).filter(u => bool_(u.KichHoat) && str_(u.Email).toLowerCase() !== c.email &&
+    (u.VaiTro === ROLE_ADMIN || (grid[u.VaiTro] && bool_(grid[u.VaiTro]['approval.approve']))))
+    .map(u => ({ Email: str_(u.Email).toLowerCase(), HoTen: u.HoTen, VaiTro: u.VaiTro }));
+}
+
+function pdItem_(r, c, camp) {
+  let l = []; try { l = JSON.parse(r.Luong || '[]'); } catch (e) {}
+  const me = c.email, involved = str_(r.NguoiGui).toLowerCase() === me || l.some(x => x.email === me);
+  let toiDuyet = false;
+  if (r.TrangThai === PD_WAIT) {
+    if (r.CheDo === 'Tuần tự') { const cur = l.find(x => x.tt === 'cho'); toiDuyet = !!cur && cur.email === me; }
+    else toiDuyet = l.some(x => x.email === me && x.tt === 'cho');
+  }
+  return { MaPD: str_(r.MaPD), Loai: r.Loai, Ky: str_(r.Ky), MaCoSo: str_(r.MaCoSo), TenCoSo: camp[str_(r.MaCoSo)] || str_(r.MaCoSo), TieuDe: r.TieuDe, GhiChu: r.GhiChu,
+    NguoiGui: str_(r.NguoiGui), TenNguoiGui: r.TenNguoiGui, GuiLuc: str_(r.GuiLuc), CheDo: r.CheDo, TrangThai: r.TrangThai, KetThucLuc: str_(r.KetThucLuc), luong: l, involved, toiDuyet, laNguoiGui: str_(r.NguoiGui).toLowerCase() === me };
+}
+function pdList_(c) {
+  const camp = {}; read_(SH.CAMPUS).forEach(x => camp[str_(x.MaCoSo)] = x.TenCoSo);
+  const all = c.perms.indexOf('approval.viewall') >= 0;
+  return read_(SH.PD).map(r => pdItem_(r, c, camp)).filter(x => all || x.involved).sort((a, b) => a.MaPD < b.MaPD ? 1 : -1);
+}
+
+function notify_(to, subject, html) {
+  try {
+    const url = ScriptApp.getService().getUrl();
+    (Array.isArray(to) ? to : [to]).filter(Boolean).forEach(addr => MailApp.sendEmail({ to: addr, subject: '[Định biên MN] ' + subject, htmlBody: html + (url ? '<p><a href="' + url + '">Mở hệ thống</a></p>' : '') }));
+  } catch (e) { /* không gửi được mail (hạn mức/quyền): bỏ qua, hồ sơ vẫn hợp lệ */ }
+}
+
+function approvalSubmit_(c, p) {
+  const ky = str_(p.ky);
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(ky)) throw new Error('Kỳ phải có dạng YYYY-MM');
+  needCampus_(c, p.campus);
+  const che = p.cheDo === 'Đồng thời' ? 'Đồng thời' : 'Tuần tự';
+  const emails = (p.approvers || []).map(x => str_(x).toLowerCase());
+  if (!emails.length) throw new Error('Chọn ít nhất một người phê duyệt');
+  if (emails.length > 10 || new Set(emails).size !== emails.length) throw new Error('Danh sách người duyệt trùng lặp hoặc quá 10 người');
+  const cand = approverCandidates_(c), byMail = {}; cand.forEach(x => byMail[x.Email] = x);
+  emails.forEach(e => { if (!byMail[e]) throw new Error(e + ' không thuộc danh sách người có thể phê duyệt'); });
+  if (!str_(p.tieuDe)) throw new Error('Nhập tiêu đề');
+  const rows = read_(SH.PD);
+  if (rows.some(r => str_(r.Ky) === ky && str_(r.MaCoSo) === str_(p.campus) && r.Loai === str_(p.loai) && r.TrangThai === PD_WAIT)) throw new Error('Đã có hồ sơ cùng loại của kỳ ' + ky + ' đang chờ duyệt. Hãy thu hồi hồ sơ cũ nếu muốn gửi lại.');
+  const campus = c.campuses.find(x => x.MaCoSo === str_(p.campus));
+  const json = JSON.stringify(snapOf_(campus, read_(SH.STAFF), read_(SH.CLASS), read_(SH.ASSIGN), loadCfg_()));
+  if (json.length > 49000) throw new Error('Dữ liệu cơ sở quá lớn để đính kèm hồ sơ.');
+  const n = rows.reduce((m, r) => Math.max(m, Number(String(r.MaPD).replace(/\D/g, '')) || 0), 0) + 1, id = 'PD' + ('0000' + n).slice(-4);
+  const luong = emails.map(e => ({ email: e, hoTen: byMail[e].HoTen, tt: 'cho', yKien: '', luc: '' }));
+  rows.push({ MaPD: id, Loai: str_(p.loai) || 'Phân công & định biên', Ky: ky, MaCoSo: campus.MaCoSo, TieuDe: str_(p.tieuDe), GhiChu: str_(p.ghiChu), NguoiGui: c.email, TenNguoiGui: c.name, GuiLuc: nowStr_(), CheDo: che, TrangThai: PD_WAIT, Luong: JSON.stringify(luong), KetThucLuc: '' });
+  put_(SH.PD, rows);
+  const dl = read_(SH.PDDL); dl.push({ MaPD: id, DuLieu: json }); put_(SH.PDDL, dl);
+  const first = che === 'Tuần tự' ? [emails[0]] : emails;
+  notify_(first, 'Đề nghị phê duyệt ' + id, '<p>' + c.name + ' gửi hồ sơ <b>' + str_(p.tieuDe) + '</b> (' + campus.TenCoSo + ', kỳ ' + ky + ') chờ bạn phê duyệt.</p>');
+  log_(c, 'approvalSubmit', id + ' · ' + campus.MaCoSo + ' · ' + ky + ' → ' + emails.join(', ') + ' (' + che + ')');
+  return id;
+}
+
+function approvalGet_(c, p) {
+  const camp = {}; read_(SH.CAMPUS).forEach(x => camp[str_(x.MaCoSo)] = x.TenCoSo);
+  const r = read_(SH.PD).find(x => str_(x.MaPD) === str_(p.id));
+  if (!r) throw new Error('Không tìm thấy hồ sơ');
+  const it = pdItem_(r, c, camp);
+  if (!it.involved && c.perms.indexOf('approval.viewall') < 0) throw new Error('Bạn không có quyền xem hồ sơ này');
+  const dl = read_(SH.PDDL).find(x => str_(x.MaPD) === str_(p.id));
+  it.snapshot = dl ? JSON.parse(dl.DuLieu) : null;
+  return it;
+}
+
+function approvalAct_(c, p) {
+  const rows = read_(SH.PD), r = rows.find(x => str_(x.MaPD) === str_(p.id));
+  if (!r) throw new Error('Không tìm thấy hồ sơ');
+  const it = pdItem_(r, c, {});
+  if (!it.toiDuyet) throw new Error(r.TrangThai !== PD_WAIT ? 'Hồ sơ không còn ở trạng thái chờ duyệt' : 'Chưa đến lượt bạn hoặc bạn không nằm trong luồng phê duyệt');
+  const ok = p.decision === 'approve', ykien = str_(p.yKien);
+  if (!ok && !ykien) throw new Error('Vui lòng nhập lý do từ chối');
+  const l = it.luong, me = l.find(x => x.email === c.email && x.tt === 'cho');
+  me.tt = ok ? 'duyet' : 'tuchoi'; me.yKien = ykien; me.luc = nowStr_();
+  r.Luong = JSON.stringify(l);
+  const sender = str_(r.NguoiGui);
+  if (!ok) {
+    r.TrangThai = PD_NO; r.KetThucLuc = nowStr_();
+    notify_(sender, 'Hồ sơ ' + r.MaPD + ' bị từ chối', '<p>' + c.name + ' đã từ chối <b>' + r.TieuDe + '</b>.</p><p>Lý do: ' + ykien + '</p>');
+  } else if (l.every(x => x.tt === 'duyet')) {
+    r.TrangThai = PD_OK; r.KetThucLuc = nowStr_();
+    const dl = read_(SH.PDDL).find(x => str_(x.MaPD) === str_(r.MaPD));
+    if (dl) {
+      const hist = read_(SH.HIST), i = hist.findIndex(h => str_(h.Ky) === str_(r.Ky) && str_(h.MaCoSo) === str_(r.MaCoSo));
+      const row = { Ky: str_(r.Ky), MaCoSo: str_(r.MaCoSo), ChotLuc: nowStr_(), NguoiChot: 'Phê duyệt ' + r.MaPD, GhiChu: 'Đã phê duyệt: ' + r.TieuDe, DuLieu: dl.DuLieu };
+      if (i >= 0) hist[i] = row; else hist.push(row);
+      put_(SH.HIST, hist);
+    }
+    notify_(sender, 'Hồ sơ ' + r.MaPD + ' đã được phê duyệt', '<p><b>' + r.TieuDe + '</b> đã được tất cả người phê duyệt đồng ý.</p>');
+  } else if (r.CheDo === 'Tuần tự') {
+    const next = l.find(x => x.tt === 'cho');
+    if (next) notify_(next.email, 'Đến lượt bạn phê duyệt ' + r.MaPD, '<p>Hồ sơ <b>' + r.TieuDe + '</b> của ' + r.TenNguoiGui + ' chờ bạn phê duyệt (' + c.name + ' đã đồng ý).</p>');
+  }
+  put_(SH.PD, rows);
+  log_(c, 'approvalAct', r.MaPD + ' · ' + (ok ? 'đồng ý' : 'từ chối') + (ykien ? ' · ' + ykien : ''));
+  return r.TrangThai;
+}
+
+function approvalWithdraw_(c, p) {
+  const rows = read_(SH.PD), r = rows.find(x => str_(x.MaPD) === str_(p.id));
+  if (!r) throw new Error('Không tìm thấy hồ sơ');
+  if (str_(r.NguoiGui).toLowerCase() !== c.email) throw new Error('Chỉ người gửi mới được thu hồi');
+  if (r.TrangThai !== PD_WAIT) throw new Error('Hồ sơ không còn ở trạng thái chờ duyệt');
+  r.TrangThai = PD_BACK; r.KetThucLuc = nowStr_();
+  put_(SH.PD, rows);
+  log_(c, 'approvalWithdraw', r.MaPD);
+  return true;
 }
 
 /* Tự động chốt kỳ của tháng trước vào ngày 1 hằng tháng (không ghi đè kỳ đã chốt thủ công) */

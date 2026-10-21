@@ -42,3 +42,22 @@ Căn cứ: *Quy định tên lớp học – Định biên nhân sự Khối M�
 - **Tự động**: chạy menu *Định biên › 3. Bật tự động chốt kỳ hằng tháng* — 1h sáng ngày 1 hệ thống chốt kỳ của tháng trước (không ghi đè kỳ đã chốt tay).
 - Quyền mới trong ma trận phân quyền: *Xem lịch sử phân công*, *Chốt kỳ phân công* (Hiệu trưởng chỉ chốt được cơ sở của mình).
 - **Nâng cấp từ bản cũ**: dán lại `Code.gs`, `Index.html`, `appsscript.json`, chạy lại `setup` một lần (tự sửa sheet Nhật ký bị thiếu tiêu đề, thêm 2 quyền mới mà không đổi các tick cũ), rồi triển khai phiên bản mới.
+
+## Gửi & phê duyệt (tab "Phê duyệt")
+- Người có quyền *Gửi phê duyệt* tạo hồ sơ: chọn loại (Phân công & định biên / Đề xuất bổ sung nhân sự – tách lớp / Khác), cơ sở, kỳ, tiêu đề, nội dung và **chọn tên người duyệt** từ danh sách người dùng được tick quyền *Được chọn làm người phê duyệt* (xếp thứ tự bằng ↑↓).
+- Cách duyệt: **Tuần tự** (lần lượt từng người) hoặc **Đồng thời** (tất cả cùng duyệt). Ai từ chối (bắt buộc ghi lý do) → hồ sơ "Từ chối". Người gửi có thể **thu hồi** khi chưa duyệt xong.
+- Hồ sơ tự đính kèm ảnh chụp nhân sự – vai trò – lớp – sĩ số – kết luận định biên **tại thời điểm gửi** (không đổi dù sau đó phân công thay đổi). Duyệt xong → ảnh chụp được ghi vào *Lịch sử phân công* của kỳ.
+- Hệ thống gửi email thông báo (người duyệt kế tiếp / kết quả cho người gửi). Email gửi từ tài khoản chủ web app, nếu bị chặn hạn mức thì hồ sơ vẫn hợp lệ. Cần cấp quyền gửi mail khi triển khai lại.
+- Ai xem được hồ sơ: người gửi, người trong luồng, và người có quyền *Xem mọi hồ sơ phê duyệt*.
+
+## In & xuất Excel
+- Nút **⬇ Excel** (.xlsx nhiều sheet) ở: Tổng quan, Báo cáo cơ sở, Nhân sự (theo bộ lọc đang chọn), Lịch sử (kèm sheet "Thay đổi" khi so sánh), Phiếu phê duyệt.
+- Nút **🖨 In** (A4 ngang, ẩn menu/nút): Tổng quan, Báo cáo cơ sở, Lịch sử, Phiếu phê duyệt (có cột ký tên).
+- Xuất Excel dùng thư viện SheetJS tải từ cdnjs; nếu mạng chặn, tự chuyển sang CSV.
+
+## Khi sĩ số lớp thay đổi
+1. *Lớp học › Sửa* (quyền *Quản lý lớp & sĩ số*): nhập sĩ số thực học và giữ chỗ mới. **Khung "Tác động"** hiện ngay trước khi lưu: tổng sĩ số cơ sở và khung định biên có đổi không, lớp còn đủ GV/bảo mẫu không, có vượt tỉ lệ / đủ điều kiện đề xuất (≥ sức chứa chuẩn + 2) không, vị trí nào đổi từ Đạt sang Thiếu.
+2. Sau khi lưu, mọi báo cáo tính lại tức thì; nhật ký ghi "sĩ số cũ → mới".
+3. Lớp mới/tách lớp: *+ Thêm lớp* rồi phân GV; lớp đóng: *Xoá*. 
+4. Cần xin thêm người: *Phê duyệt › Gửi phê duyệt* (loại "Đề xuất bổ sung…") đính kèm đúng số liệu.
+5. Cuối tháng *Chốt kỳ* (hoặc tự động): so sánh hai kỳ có bảng "Sĩ số lớp thay đổi".
