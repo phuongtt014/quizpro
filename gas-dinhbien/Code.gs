@@ -62,7 +62,7 @@ const HEADERS = {
   CauHinh_ThamSo: ['Khoa', 'GiaTri', 'MoTa'],
   NhatKy: ['ThoiGian', 'Email', 'HanhDong', 'ChiTiet'],
   LichSu: ['Ky', 'MaCoSo', 'ChotLuc', 'NguoiChot', 'GhiChu', 'DuLieu'],
-  PheDuyet: ['MaPD', 'Loai', 'Ky', 'MaCoSo', 'TieuDe', 'GhiChu', 'NguoiGui', 'TenNguoiGui', 'GuiLuc', 'CheDo', 'TrangThai', 'Luong', 'KetThucLuc', 'ThongBao'],
+  PheDuyet: ['MaPD', 'Loai', 'Ky', 'MaCoSo', 'TieuDe', 'GhiChu', 'NguoiGui', 'TenNguoiGui', 'GuiLuc', 'CheDo', 'TrangThai', 'Luong', 'KetThucLuc'],
   PheDuyet_DL: ['MaPD', 'DuLieu']
 };
 const TEXT_COLS = { NhanSu: ['MaNV', 'MaCoSo', 'SoDT'], Lop: ['MaLop', 'MaCoSo', 'SoThuTu'], PhanCong: ['MaLop', 'MaNV'], PQ_CoSo: ['MaCoSo'], CoSo: ['MaCoSo'], LichSu: ['Ky', 'MaCoSo', 'DuLieu'], PheDuyet: ['MaPD', 'Ky', 'MaCoSo'], PheDuyet_DL: ['MaPD', 'DuLieu'] };
@@ -876,7 +876,24 @@ function approverCandidates_(c) {
     .map(u => ({ Email: str_(u.Email).toLowerCase(), HoTen: u.HoTen, VaiTro: u.VaiTro }));
 }
 
-/* Kênh thông báo của hồ sơ: gmail = người thao tác tự gửi bằng Gmail của họ (client soạn sẵn); he_thong/mail = server gửi; tat = không gửi */
+
+function pdItem_(r, c, camp) {
+  let l = []; try { l = JSON.parse(r.Luong || '[]'); } catch (e) {}
+  const me = c.email, involved = str_(r.NguoiGui).toLowerCase() === me || l.some(x => x.email === me);
+  let toiDuyet = false;
+  if (r.TrangThai === PD_WAIT) {
+    if (r.CheDo === 'Tuần tự') { const cur = l.find(x => x.tt === 'cho'); toiDuyet = !!cur && cur.email === me; }
+    else toiDuyet = l.some(x => x.email === me && x.tt === 'cho');
+  }
+  return { MaPD: str_(r.MaPD), Loai: r.Loai, Ky: str_(r.Ky), MaCoSo: str_(r.MaCoSo), TenCoSo: camp[str_(r.MaCoSo)] || str_(r.MaCoSo), TieuDe: r.TieuDe, GhiChu: r.GhiChu,
+    NguoiGui: str_(r.NguoiGui), TenNguoiGui: r.TenNguoiGui, GuiLuc: str_(r.GuiLuc), CheDo: r.CheDo, TrangThai: r.TrangThai, KetThucLuc: str_(r.KetThucLuc), luong: l, involved, toiDuyet, laNguoiGui: str_(r.NguoiGui).toLowerCase() === me };
+}
+function pdList_(c) {
+  const camp = {}; read_(SH.CAMPUS).forEach(x => camp[str_(x.MaCoSo)] = x.TenCoSo);
+  const all = c.perms.indexOf('approval.viewall') >= 0;
+  return read_(SH.PD).map(r => pdItem_(r, c, camp)).filter(x => all || x.involved).sort((a, b) => a.MaPD < b.MaPD ? 1 : -1);
+}
+
 /* ===== Gửi email tự động: ẩn tên/địa chỉ chủ web app =====
    - Tên hiển thị = TenGui (mặc định "Hệ thống Định biên Khối Mầm non"), thêm ghi chú "email tự động, không trả lời".
    - KhongTraLoi=1: dùng noReply (Google Workspace gửi từ địa chỉ noreply@<tên miền>). Nếu tài khoản không hỗ trợ → gửi thường
@@ -905,33 +922,14 @@ function mailTest_(c) {
   return { to: c.email, mode: r.mode };
 }
 
-function mailOn_(r) { const v = str_(r.ThongBao); return v !== 'tat' && v !== 'gmail'; }
-
-function pdItem_(r, c, camp) {
-  let l = []; try { l = JSON.parse(r.Luong || '[]'); } catch (e) {}
-  const me = c.email, involved = str_(r.NguoiGui).toLowerCase() === me || l.some(x => x.email === me);
-  let toiDuyet = false;
-  if (r.TrangThai === PD_WAIT) {
-    if (r.CheDo === 'Tuần tự') { const cur = l.find(x => x.tt === 'cho'); toiDuyet = !!cur && cur.email === me; }
-    else toiDuyet = l.some(x => x.email === me && x.tt === 'cho');
-  }
-  return { MaPD: str_(r.MaPD), Loai: r.Loai, Ky: str_(r.Ky), MaCoSo: str_(r.MaCoSo), TenCoSo: camp[str_(r.MaCoSo)] || str_(r.MaCoSo), TieuDe: r.TieuDe, GhiChu: r.GhiChu,
-    NguoiGui: str_(r.NguoiGui), TenNguoiGui: r.TenNguoiGui, GuiLuc: str_(r.GuiLuc), CheDo: r.CheDo, TrangThai: r.TrangThai, KetThucLuc: str_(r.KetThucLuc), ThongBao: str_(r.ThongBao), luong: l, involved, toiDuyet, laNguoiGui: str_(r.NguoiGui).toLowerCase() === me };
-}
-function pdList_(c) {
-  const camp = {}; read_(SH.CAMPUS).forEach(x => camp[str_(x.MaCoSo)] = x.TenCoSo);
-  const all = c.perms.indexOf('approval.viewall') >= 0;
-  return read_(SH.PD).map(r => pdItem_(r, c, camp)).filter(x => all || x.involved).sort((a, b) => a.MaPD < b.MaPD ? 1 : -1);
-}
-
-/* Chế độ "hệ thống tự gửi" (ThongBao = he_thong/mail): gửi qua sendMail_ (ẩn tên chủ web app). Nội dung luôn ghi rõ người thao tác. */
-function notify_(to, subject, html, actor, cc) {
+/* Mọi thông báo phê duyệt do hệ thống tự gửi qua sendMail_ (ẩn tên chủ web app). Nội dung luôn ghi rõ người thao tác. */
+function notify_(to, subject, html, actor) {
   try {
     const url = ScriptApp.getService().getUrl();
     (Array.isArray(to) ? to : [to]).filter(Boolean).forEach(addr => {
       const m = { to: addr, subject: '[Định biên MN] ' + subject,
         htmlBody: html + (actor ? '<p style="color:#666">Người thao tác: <b>' + actor.name + '</b> (' + actor.email + ')</p>' : '') + (url ? '<p><a href="' + url + '">Mở hệ thống</a></p>' : '') };
-      if (actor) { m.name = actor.name + ' (' + sysName_() + ')'; m.replyTo = actor.email; if (cc) m.cc = actor.email; }
+      if (actor) { m.name = actor.name + ' (' + sysName_() + ')'; m.replyTo = actor.email; }
       sendMail_(m);
     });
   } catch (e) { /* không gửi được mail (hạn mức/quyền): bỏ qua, hồ sơ vẫn hợp lệ */ }
@@ -955,12 +953,11 @@ function approvalSubmit_(c, p) {
   if (json.length > 49000) throw new Error('Dữ liệu cơ sở quá lớn để đính kèm hồ sơ.');
   const n = rows.reduce((m, r) => Math.max(m, Number(String(r.MaPD).replace(/\D/g, '')) || 0), 0) + 1, id = 'PD' + ('0000' + n).slice(-4);
   const luong = emails.map(e => ({ email: e, hoTen: byMail[e].HoTen, tt: 'cho', yKien: '', luc: '' }));
-  const kenh = ['gmail', 'he_thong', 'tat'].indexOf(p.kenh) >= 0 ? p.kenh : (p.guiMail === false ? 'tat' : 'he_thong');
-  rows.push({ MaPD: id, Loai: str_(p.loai) || 'Phân công & định biên', Ky: ky, MaCoSo: campus.MaCoSo, TieuDe: str_(p.tieuDe), GhiChu: str_(p.ghiChu), NguoiGui: c.email, TenNguoiGui: c.name, GuiLuc: nowStr_(), CheDo: che, TrangThai: PD_WAIT, Luong: JSON.stringify(luong), KetThucLuc: '', ThongBao: kenh });
+  rows.push({ MaPD: id, Loai: str_(p.loai) || 'Phân công & định biên', Ky: ky, MaCoSo: campus.MaCoSo, TieuDe: str_(p.tieuDe), GhiChu: str_(p.ghiChu), NguoiGui: c.email, TenNguoiGui: c.name, GuiLuc: nowStr_(), CheDo: che, TrangThai: PD_WAIT, Luong: JSON.stringify(luong), KetThucLuc: '' });
   put_(SH.PD, rows);
   const dl = read_(SH.PDDL); dl.push({ MaPD: id, DuLieu: json }); put_(SH.PDDL, dl);
   const first = che === 'Tuần tự' ? [emails[0]] : emails;
-  if (kenh === 'he_thong') notify_(first, 'Đề nghị phê duyệt ' + id, '<p>' + c.name + ' gửi hồ sơ <b>' + str_(p.tieuDe) + '</b> (' + campus.TenCoSo + ', kỳ ' + ky + ') chờ bạn phê duyệt.</p>' + (str_(p.ghiChu) ? '<p>Nội dung: ' + str_(p.ghiChu) + '</p>' : ''), c, p.ccToi === true);
+  notify_(first, 'Đề nghị phê duyệt ' + id, '<p>' + c.name + ' gửi hồ sơ <b>' + str_(p.tieuDe) + '</b> (' + campus.TenCoSo + ', kỳ ' + ky + ') chờ bạn phê duyệt.</p>' + (str_(p.ghiChu) ? '<p>Nội dung: ' + str_(p.ghiChu) + '</p>' : ''), c);
   log_(c, 'approvalSubmit', id + ' · ' + campus.MaCoSo + ' · ' + ky + ' → ' + emails.join(', ') + ' (' + che + ')');
   return id;
 }
@@ -989,7 +986,7 @@ function approvalAct_(c, p) {
   const sender = str_(r.NguoiGui);
   if (!ok) {
     r.TrangThai = PD_NO; r.KetThucLuc = nowStr_();
-    if (mailOn_(r)) notify_(sender, 'Hồ sơ ' + r.MaPD + ' bị từ chối', '<p>' + c.name + ' đã từ chối <b>' + r.TieuDe + '</b>.</p><p>Lý do: ' + ykien + '</p>', c);
+    notify_(sender, 'Hồ sơ ' + r.MaPD + ' bị từ chối', '<p>' + c.name + ' đã từ chối <b>' + r.TieuDe + '</b>.</p><p>Lý do: ' + ykien + '</p>', c);
   } else if (l.every(x => x.tt === 'duyet')) {
     r.TrangThai = PD_OK; r.KetThucLuc = nowStr_();
     const dl = read_(SH.PDDL).find(x => str_(x.MaPD) === str_(r.MaPD));
@@ -999,10 +996,10 @@ function approvalAct_(c, p) {
       if (i >= 0) hist[i] = row; else hist.push(row);
       put_(SH.HIST, hist);
     }
-    if (mailOn_(r)) notify_(sender, 'Hồ sơ ' + r.MaPD + ' đã được phê duyệt', '<p><b>' + r.TieuDe + '</b> đã được tất cả người phê duyệt đồng ý.</p>', c);
+    notify_(sender, 'Hồ sơ ' + r.MaPD + ' đã được phê duyệt', '<p><b>' + r.TieuDe + '</b> đã được tất cả người phê duyệt đồng ý.</p>', c);
   } else if (r.CheDo === 'Tuần tự') {
     const next = l.find(x => x.tt === 'cho');
-    if (next && mailOn_(r)) notify_(next.email, 'Đến lượt bạn phê duyệt ' + r.MaPD, '<p>Hồ sơ <b>' + r.TieuDe + '</b> của ' + r.TenNguoiGui + ' chờ bạn phê duyệt (' + c.name + ' đã đồng ý).</p>', c);
+    if (next) notify_(next.email, 'Đến lượt bạn phê duyệt ' + r.MaPD, '<p>Hồ sơ <b>' + r.TieuDe + '</b> của ' + r.TenNguoiGui + ' chờ bạn phê duyệt (' + c.name + ' đã đồng ý).</p>', c);
   }
   put_(SH.PD, rows);
   log_(c, 'approvalAct', r.MaPD + ' · ' + (ok ? 'đồng ý' : 'từ chối') + (ykien ? ' · ' + ykien : ''));
