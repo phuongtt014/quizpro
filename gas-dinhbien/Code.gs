@@ -436,6 +436,7 @@ function bootstrap_(c) {
     me: { email: c.email, name: c.name, role: c.role, perms: c.perms },
     campuses: c.campuses,
     allCampuses: read_(SH.CAMPUS).map(x => ({ MaCoSo: str_(x.MaCoSo), TenCoSo: x.TenCoSo, KichHoat: bool_(x.KichHoat) })),
+    appUrl: (function () { try { return ScriptApp.getService().getUrl() || ''; } catch (e) { return ''; } })(),
     cfg, classRoles: CLASS_ROLES, roleOptions: CLASS_ROLES.concat(positionNames_(cfg)), perms: PERMS
   };
 }
@@ -856,7 +857,8 @@ function approverCandidates_(c) {
     .map(u => ({ Email: str_(u.Email).toLowerCase(), HoTen: u.HoTen, VaiTro: u.VaiTro }));
 }
 
-function mailOn_(r) { return str_(r.ThongBao) !== 'tat'; }
+/* Kênh thông báo của hồ sơ: gmail = người thao tác tự gửi bằng Gmail của họ (client soạn sẵn); he_thong/mail = server gửi; tat = không gửi */
+function mailOn_(r) { const v = str_(r.ThongBao); return v !== 'tat' && v !== 'gmail'; }
 
 function pdItem_(r, c, camp) {
   let l = []; try { l = JSON.parse(r.Luong || '[]'); } catch (e) {}
@@ -867,7 +869,7 @@ function pdItem_(r, c, camp) {
     else toiDuyet = l.some(x => x.email === me && x.tt === 'cho');
   }
   return { MaPD: str_(r.MaPD), Loai: r.Loai, Ky: str_(r.Ky), MaCoSo: str_(r.MaCoSo), TenCoSo: camp[str_(r.MaCoSo)] || str_(r.MaCoSo), TieuDe: r.TieuDe, GhiChu: r.GhiChu,
-    NguoiGui: str_(r.NguoiGui), TenNguoiGui: r.TenNguoiGui, GuiLuc: str_(r.GuiLuc), CheDo: r.CheDo, TrangThai: r.TrangThai, KetThucLuc: str_(r.KetThucLuc), luong: l, involved, toiDuyet, laNguoiGui: str_(r.NguoiGui).toLowerCase() === me };
+    NguoiGui: str_(r.NguoiGui), TenNguoiGui: r.TenNguoiGui, GuiLuc: str_(r.GuiLuc), CheDo: r.CheDo, TrangThai: r.TrangThai, KetThucLuc: str_(r.KetThucLuc), ThongBao: str_(r.ThongBao), luong: l, involved, toiDuyet, laNguoiGui: str_(r.NguoiGui).toLowerCase() === me };
 }
 function pdList_(c) {
   const camp = {}; read_(SH.CAMPUS).forEach(x => camp[str_(x.MaCoSo)] = x.TenCoSo);
@@ -906,11 +908,12 @@ function approvalSubmit_(c, p) {
   if (json.length > 49000) throw new Error('Dữ liệu cơ sở quá lớn để đính kèm hồ sơ.');
   const n = rows.reduce((m, r) => Math.max(m, Number(String(r.MaPD).replace(/\D/g, '')) || 0), 0) + 1, id = 'PD' + ('0000' + n).slice(-4);
   const luong = emails.map(e => ({ email: e, hoTen: byMail[e].HoTen, tt: 'cho', yKien: '', luc: '' }));
-  rows.push({ MaPD: id, Loai: str_(p.loai) || 'Phân công & định biên', Ky: ky, MaCoSo: campus.MaCoSo, TieuDe: str_(p.tieuDe), GhiChu: str_(p.ghiChu), NguoiGui: c.email, TenNguoiGui: c.name, GuiLuc: nowStr_(), CheDo: che, TrangThai: PD_WAIT, Luong: JSON.stringify(luong), KetThucLuc: '', ThongBao: p.guiMail === false ? 'tat' : 'mail' });
+  const kenh = ['gmail', 'he_thong', 'tat'].indexOf(p.kenh) >= 0 ? p.kenh : (p.guiMail === false ? 'tat' : 'he_thong');
+  rows.push({ MaPD: id, Loai: str_(p.loai) || 'Phân công & định biên', Ky: ky, MaCoSo: campus.MaCoSo, TieuDe: str_(p.tieuDe), GhiChu: str_(p.ghiChu), NguoiGui: c.email, TenNguoiGui: c.name, GuiLuc: nowStr_(), CheDo: che, TrangThai: PD_WAIT, Luong: JSON.stringify(luong), KetThucLuc: '', ThongBao: kenh });
   put_(SH.PD, rows);
   const dl = read_(SH.PDDL); dl.push({ MaPD: id, DuLieu: json }); put_(SH.PDDL, dl);
   const first = che === 'Tuần tự' ? [emails[0]] : emails;
-  if (p.guiMail !== false) notify_(first, 'Đề nghị phê duyệt ' + id, '<p>' + c.name + ' gửi hồ sơ <b>' + str_(p.tieuDe) + '</b> (' + campus.TenCoSo + ', kỳ ' + ky + ') chờ bạn phê duyệt.</p>' + (str_(p.ghiChu) ? '<p>Nội dung: ' + str_(p.ghiChu) + '</p>' : ''), c, p.ccToi === true);
+  if (kenh === 'he_thong') notify_(first, 'Đề nghị phê duyệt ' + id, '<p>' + c.name + ' gửi hồ sơ <b>' + str_(p.tieuDe) + '</b> (' + campus.TenCoSo + ', kỳ ' + ky + ') chờ bạn phê duyệt.</p>' + (str_(p.ghiChu) ? '<p>Nội dung: ' + str_(p.ghiChu) + '</p>' : ''), c, p.ccToi === true);
   log_(c, 'approvalSubmit', id + ' · ' + campus.MaCoSo + ' · ' + ky + ' → ' + emails.join(', ') + ' (' + che + ')');
   return id;
 }

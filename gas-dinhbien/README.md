@@ -69,7 +69,9 @@ Căn cứ: *Quy định tên lớp học – Định biên nhân sự Khối M�
 - Menu *Định biên › 4. Đăng xuất mọi phiên* đổi khoá ký, buộc mọi người nhập lại mã (dùng khi nghi lộ phiên).
 - Lưu ý: mã gửi bằng MailApp (hạn mức ~1.500 mail/ngày với Workspace); thư báo phê duyệt cũng tính vào hạn mức này.
 
-## Email thông báo phê duyệt
-- Thư đi từ tài khoản chủ web app (Google không cho giả địa chỉ gửi của người khác khi web app chạy "Thực thi bằng: Tôi"). Hệ thống hiển thị **tên người thao tác** ("Nguyễn A (Định biên MN)"), đặt **Reply-To = email người đó** và ghi rõ người gửi trong nội dung.
-- Khi gửi phê duyệt có thể: tắt gửi mail thông báo, hoặc tick **CC cho tôi**.
-- Muốn thư đi đúng từ hộp thư từng người phải triển khai "Thực thi bằng: Người dùng truy cập" – khi đó mọi người phải có quyền sửa Google Sheet dữ liệu, làm mất cơ chế phân quyền theo cơ sở, nên không khuyến nghị.
+## Email thông báo phê duyệt – 3 cách gửi (người gửi chọn khi tạo hồ sơ)
+1. **Gửi bằng Gmail của tôi (mặc định, khuyên dùng)**: hệ thống soạn sẵn người nhận, tiêu đề, nội dung + đường dẫn và mở Gmail của *chính người thao tác* (`authuser=<email của họ>`); họ bấm **Gửi** nên thư đi **từ hộp thư của họ**, không dùng tài khoản chủ web app. Áp dụng cho từng bước: người gửi → người duyệt đầu tiên; người duyệt đồng ý → người duyệt kế tiếp; duyệt xong/từ chối → người gửi. Người gửi còn có nút **✉ Nhắc người duyệt**.
+2. **Hệ thống tự gửi**: tự động, nhưng địa chỉ gửi là tài khoản chủ web app (Google không cho giả địa chỉ khi web app chạy "Thực thi bằng: Tôi"); hiện tên người thao tác, Reply-To về email họ, có thể CC cho họ.
+3. **Không gửi thư**: người duyệt vẫn thấy hồ sơ và số báo trong tab Phê duyệt.
+- Lý do cách 1 cần thao tác bấm Gửi: gửi thay mặt hộp thư của người khác chỉ làm được khi web app chạy "Thực thi bằng: Người dùng truy cập" — khi đó mọi người phải có quyền sửa Google Sheet dữ liệu, mất cơ chế phân quyền theo cơ sở nên không khuyến nghị.
+- Thư mã xác nhận đăng nhập (OTP) luôn do hệ thống gửi.

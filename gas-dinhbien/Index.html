@@ -53,6 +53,7 @@ td.cell.ok{background:var(--ok-l)}td.cell.thieu{background:var(--bad-l)}td.cell.
 #login input{width:100%;font-size:26px;letter-spacing:10px;text-align:center;padding:10px}
 #login .err{color:var(--bad);min-height:20px;margin:8px 0;font-size:13px}
 #login button.b{width:100%;margin-top:8px;padding:10px}
+a.b{display:inline-block;text-decoration:none;color:inherit;padding:6px 12px;border:1px solid #ccd3dd;border-radius:6px;background:#fff}a.b.p{background:var(--pri);border-color:var(--pri);color:#fff}
 .flow{display:flex;gap:4px;flex-wrap:wrap}.flow .tag{font-weight:500}
 .impact{background:#f4f8f7;border:1px solid #cfe6df;border-radius:8px;padding:10px 12px;margin-top:12px;font-size:13px}
 .impact b{font-weight:600}.impact ul{margin:6px 0 0;padding-left:18px}
@@ -104,7 +105,7 @@ async function act(fn){try{return await fn()}catch(e){toast(e.message,true);thro
 function modal(title,body,ok,opts={}){
   $('#modal').innerHTML=`<div class="mask"><div class="modal ${opts.wide?'w':''}"><h3>${title}</h3>${body}<div class="act"><button class="b" id="mc">${ok?'Huỷ':'Đóng'}</button>${ok?'<button class="b p" id="mo">'+(opts.okText||'Lưu')+'</button>':''}</div></div></div>`;
   $('#mc').onclick=closeModal;
-  if(ok)$('#mo').onclick=async()=>{try{await ok();closeModal()}catch(e){toast(e.message,true)}};
+  if(ok)$('#mo').onclick=async()=>{try{await ok();closeModal();if(S.afterModal){const f=S.afterModal;S.afterModal=null;f()}}catch(e){toast(e.message,true)}};
 }
 function closeModal(){$('#modal').innerHTML=''}
 const val=id=>document.getElementById(id).value;
@@ -369,10 +370,11 @@ function submitForm(){
   <div class="hint">Hồ sơ tự đính kèm <b>ảnh chụp phân công, sĩ số và kết luận định biên</b> của cơ sở tại thời điểm gửi. Khi được duyệt, ảnh chụp này được ghi vào Lịch sử phân công của kỳ.</div>
   <div class="row"><div><label>Cách duyệt</label><select id="s_che" style="width:auto"><option>Tuần tự</option><option>Đồng thời</option></select></div><div class="hint grow" style="margin-top:18px">Tuần tự: lần lượt từng người theo thứ tự bên dưới · Đồng thời: tất cả cùng duyệt, đủ mọi người đồng ý mới được duyệt.</div></div>
   <label>Người phê duyệt (chọn tên theo luồng)</label><div id="alist"></div>
-  <div class="impact" style="margin-top:14px"><label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px;margin:0"><input type="checkbox" id="s_mail" checked style="width:auto"> Gửi email thông báo cho người phê duyệt</label>
-   <label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px;margin:6px 0 0"><input type="checkbox" id="s_cc" style="width:auto"> Gửi bản sao (CC) cho tôi — ${esc(S.boot.me.email)}</label>
-   <div class="hint" style="margin:6px 0 0">Email hiển thị tên <b>${esc(S.boot.me.name)}</b>; người nhận bấm <b>Trả lời</b> sẽ gửi về <b>${esc(S.boot.me.email)}</b>. (Địa chỉ gửi đi là tài khoản của hệ thống do Google không cho gửi đi dưới địa chỉ người khác.)</div></div>
-  <div class="row" style="margin-top:6px"><select id="apick" style="width:auto;min-width:260px"></select><button class="b" data-do="addAp">+ Thêm vào luồng</button></div>`;
+  <div class="row" style="margin-top:6px"><select id="apick" style="width:auto;min-width:260px"></select><button class="b" data-do="addAp">+ Thêm vào luồng</button></div>
+  <div class="impact" style="margin-top:14px"><b>Cách gửi thông báo cho người phê duyệt</b>
+   <label style="display:flex;gap:8px;align-items:flex-start;color:var(--ink);font-size:14px;margin:8px 0 0"><input type="radio" name="s_kenh" value="gmail" checked style="width:auto;margin-top:3px"><span><b>Gửi bằng Gmail của tôi</b> (khuyên dùng) — hệ thống soạn sẵn thư, tôi chỉ bấm Gửi; thư đi từ chính email <b>${esc(S.boot.me.email)}</b>.</span></label>
+   <label style="display:flex;gap:8px;align-items:flex-start;color:var(--ink);font-size:14px;margin:6px 0 0"><input type="radio" name="s_kenh" value="he_thong" style="width:auto;margin-top:3px"><span>Hệ thống tự gửi — hiển thị tên <b>${esc(S.boot.me.name)}</b>, Reply-To về email tôi (địa chỉ gửi là tài khoản hệ thống). <label style="display:inline;color:var(--ink);font-size:13px"><input type="checkbox" id="s_cc" style="width:auto"> CC cho tôi</label></span></label>
+   <label style="display:flex;gap:8px;align-items:flex-start;color:var(--ink);font-size:14px;margin:6px 0 0"><input type="radio" name="s_kenh" value="tat" style="width:auto;margin-top:3px"><span>Không gửi thư (người duyệt vẫn thấy hồ sơ trong tab Phê duyệt)</span></label></div>`;
 }
 function renderAList(){
   const S2=S.sub,byMail={};S2.cand.forEach(x=>byMail[x.Email]=x);
@@ -385,8 +387,9 @@ async function openSubmit(){
   if(!cand.length)return toast('Chưa có ai được cấp quyền "Được chọn làm người phê duyệt". Nhờ Admin tick trong ma trận phân quyền.',true);
   S.sub={approvers:[],cand};
   modal('Gửi phê duyệt',submitForm(),async()=>{
-    const id=await call('approvalSubmit',{loai:val('s_loai'),campus:val('s_cs'),ky:val('s_ky'),tieuDe:val('s_title'),ghiChu:val('s_note'),cheDo:val('s_che'),guiMail:$('#s_mail').checked,ccToi:$('#s_cc').checked,approvers:S.sub.approvers});
-    toast('Đã gửi hồ sơ '+id);S.apf='mine';await refresh()},{wide:true,okText:'Gửi phê duyệt'});
+    const kenh=document.querySelector('input[name=s_kenh]:checked').value;
+    const id=await call('approvalSubmit',{loai:val('s_loai'),campus:val('s_cs'),ky:val('s_ky'),tieuDe:val('s_title'),ghiChu:val('s_note'),cheDo:val('s_che'),kenh:document.querySelector('input[name=s_kenh]:checked').value,ccToi:$('#s_cc').checked,approvers:S.sub.approvers});
+    toast('Đã gửi hồ sơ '+id);S.apf='mine';await refresh();if(kenh==='gmail')S.afterModal=()=>noticeMail(id,'next')},{wide:true,okText:'Gửi phê duyệt'});
   renderAList();autoTitle();
 }
 async function openPD(id){
@@ -405,13 +408,39 @@ function pdBody(d){
   <div class="card"><h3>Luồng phê duyệt (${esc(d.CheDo)})</h3><table><thead><tr><th>#</th><th>Người duyệt</th><th>Kết quả</th><th>Thời gian</th><th>Ý kiến</th><th style="width:140px">Ký tên</th></tr></thead><tbody>
   ${d.luong.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.hoTen)}</td><td>${x.tt==='duyet'?'<span class="tag ok">Đồng ý</span>':x.tt==='tuchoi'?'<span class="tag thieu">Từ chối</span>':(d.TrangThai==='Chờ duyệt'&&(d.CheDo==='Đồng thời'||i===cs)?'<span class="tag thua">Đang chờ</span>':'<span class="tag trong">'+(d.TrangThai==='Chờ duyệt'?'Chưa đến lượt':'—')+'</span>')}</td><td>${esc(x.luc)}</td><td>${esc(x.yKien)}</td><td></td></tr>`).join('')}</tbody></table></div>
   ${d.toiDuyet?`<div class="card noprint"><h3>Ý kiến của bạn</h3><textarea id="pd_note" rows="2" style="width:100%" placeholder="Ý kiến (bắt buộc khi từ chối)"></textarea><div class="row" style="margin:10px 0 0"><button class="b p" data-do="pdOk">✔ Phê duyệt</button><button class="b d" data-do="pdNo">✖ Từ chối</button></div></div>`:''}
-  ${d.laNguoiGui&&d.TrangThai==='Chờ duyệt'?'<div class="noprint" style="margin-bottom:12px"><button class="b d" data-do="pdBack">↩ Thu hồi hồ sơ</button></div>':''}
+  ${d.laNguoiGui&&d.TrangThai==='Chờ duyệt'?'<div class="noprint" style="margin-bottom:12px"><button class="b d" data-do="pdBack">↩ Thu hồi hồ sơ</button> '+(d.ThongBao==='gmail'?'<button class="b" data-do="pdRemind">✉ Nhắc người duyệt (Gmail của tôi)</button>':'')+'</div>':''}
   ${d.snapshot?'<div class="hint">Dữ liệu đính kèm: ảnh chụp tại thời điểm gửi ('+esc(d.GuiLuc)+').</div>'+snapSections(Object.assign({},d.snapshot,{Ky:d.Ky})):''}`;
 }
 async function pdDecide(decision){
   const r=await act(()=>call('approvalAct',{id:S.pd.MaPD,decision,yKien:($('#pd_note')||{}).value||''}));
   toast(r==='Đã duyệt'?'Hồ sơ đã được phê duyệt hoàn tất':r==='Từ chối'?'Đã từ chối hồ sơ':'Đã ghi nhận phê duyệt của bạn');
-  closeModal();await refresh();
+  const id=S.pd.MaPD;closeModal();await refresh();
+  const it=(S.cache.approvals||[]).find(x=>x.MaPD===id);
+  if(it&&it.ThongBao==='gmail')noticeMail(id,it.TrangThai==='Chờ duyệt'?'next':'done');
+}
+/* Thư soạn sẵn để người thao tác gửi bằng Gmail của chính họ */
+function mailDraft(it,ev){
+  const pend=it.luong.filter(x=>x.tt==='cho'),me=S.boot.me.name,link=S.boot.appUrl?'\n\nMở hệ thống: '+S.boot.appUrl:'';
+  const ref='Hồ sơ '+it.MaPD+' – '+it.TieuDe+' ('+it.TenCoSo+', kỳ '+it.Ky+')';
+  if(ev==='done'){
+    const bad=it.luong.find(x=>x.tt==='tuchoi'),ok=it.TrangThai==='Đã duyệt';
+    return {to:[it.NguoiGui],su:'[Định biên MN] '+it.MaPD+' – '+it.TrangThai,
+      body:'Kính gửi '+it.TenNguoiGui+',\n\n'+ref+' '+(ok?'đã được phê duyệt hoàn tất.':'đã bị '+(bad?bad.hoTen+' ':'')+'từ chối.'+(bad&&bad.yKien?'\nLý do: '+bad.yKien:''))+link+'\n\nTrân trọng,\n'+me};
+  }
+  const to=(it.CheDo==='Tuần tự'?pend.slice(0,1):pend);
+  return {to:to.map(x=>x.email),su:'[Định biên MN] Đề nghị phê duyệt '+it.MaPD,
+    body:'Kính gửi '+to.map(x=>x.hoTen).join(', ')+',\n\n'+it.TenNguoiGui+' đề nghị phê duyệt: '+ref+'.'+(it.GhiChu?'\nNội dung: '+it.GhiChu:'')+link+'\n\nTrân trọng,\n'+me};
+}
+function noticeMail(id,ev){
+  const it=(S.cache.approvals||[]).find(x=>x.MaPD===id);if(!it)return;
+  const m=mailDraft(it,ev);if(!m.to.length)return;
+  const q=encodeURIComponent,me=S.boot.me.email;
+  const gm='https://mail.google.com/mail/?authuser='+q(me)+'&view=cm&fs=1&to='+q(m.to.join(','))+'&su='+q(m.su)+'&body='+q(m.body);
+  const mt='mailto:'+m.to.map(q).join(',')+'?subject='+q(m.su)+'&body='+q(m.body);
+  modal('Gửi thông báo từ email của bạn',`<p>Hồ sơ <b>${esc(id)}</b> đã được ghi nhận. Để người nhận biết, hãy gửi thư thông báo từ chính hộp thư <b>${esc(me)}</b>:</p>
+   <div class="impact"><div><b>Đến:</b> ${m.to.map(esc).join(', ')}</div><div><b>Tiêu đề:</b> ${esc(m.su)}</div><pre style="white-space:pre-wrap;font:inherit;margin:8px 0 0">${esc(m.body)}</pre></div>
+   <div class="row" style="margin-top:12px"><a class="b p" target="_blank" rel="noopener" href="${esc(gm)}">✉ Mở Gmail để gửi</a><a class="b" href="${esc(mt)}">Dùng ứng dụng mail khác</a></div>
+   <div class="hint">Thư đã soạn sẵn người nhận, tiêu đề và nội dung — bạn chỉ cần bấm <b>Gửi</b> trong Gmail. Nếu chưa gửi, người nhận vẫn thấy hồ sơ (có số báo) trong tab Phê duyệt.</div>`,null);
 }
 
 /* ---------- Lịch sử phân công (chốt kỳ) ---------- */
@@ -521,6 +550,7 @@ document.addEventListener('click',async e=>{
     hxlsx:()=>{const{a,b}=S.hv;xlsx('phan-cong-'+a.Ky+'-'+a.MaCoSo,snapSheets(a,b,S.hv.diff))},
     hprint:()=>printNow('Phân công & định biên '+S.hv.a.TenCoSo+' · kỳ '+S.hv.a.Ky),
     newPD:openSubmit,openPD:()=>openPD(d.id),
+    pdRemind:()=>{closeModal();noticeMail(S.pd.MaPD,'next')},
     pdOk:()=>pdDecide('approve'),pdNo:()=>pdDecide('reject'),
     pdBack:async()=>{if(confirm('Thu hồi hồ sơ này?')){await act(()=>call('approvalWithdraw',{id:S.pd.MaPD}));toast('Đã thu hồi');closeModal();await refresh()}},
     pdxlsx:()=>{const x=S.pd,hdr=[['Mã hồ sơ',x.MaPD],['Loại',x.Loai],['Tiêu đề',x.TieuDe],['Cơ sở',x.TenCoSo],['Kỳ',x.Ky],['Người gửi',x.TenNguoiGui],['Gửi lúc',x.GuiLuc],['Nội dung',x.GhiChu],['Cách duyệt',x.CheDo],['Trạng thái',x.TrangThai],[],['#','Người duyệt','Kết quả','Thời gian','Ý kiến']].concat(x.luong.map((l,i)=>[i+1,l.hoTen,l.tt==='duyet'?'Đồng ý':l.tt==='tuchoi'?'Từ chối':'Chưa duyệt',l.luc,l.yKien]));xlsx('phe-duyet-'+x.MaPD,[{name:'Phiếu',rows:hdr}].concat(x.snapshot?snapSheets(Object.assign({},x.snapshot,{Ky:x.Ky})):[]))},
