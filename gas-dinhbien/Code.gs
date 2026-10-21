@@ -28,6 +28,16 @@ const PERMS = [
   { key: 'approval.viewall', label: 'Xem mọi hồ sơ phê duyệt' }
 ];
 
+const SYS_NAME = 'Hệ thống Định biên Khối Mầm non';
+const PARAM_DEF = [
+  { Khoa: 'NamHoc', GiaTri: '2026 - 2027', MoTa: 'Năm học hiển thị trên báo cáo' },
+  { Khoa: 'ChenhLech', GiaTri: '2', MoTa: 'Lớp đạt tỉ lệ định biên + N học sinh thì đủ điều kiện đề xuất bổ sung GV/bảo mẫu' },
+  { Khoa: 'XacThucOTP', GiaTri: '1', MoTa: '1 = bắt buộc nhập mã xác nhận gửi qua email khi vào hệ thống; 0 = tắt' },
+  { Khoa: 'PhienGio', GiaTri: '8', MoTa: 'Số giờ một lần xác nhận có hiệu lực (1–72)' },
+  { Khoa: 'TenGui', GiaTri: SYS_NAME, MoTa: 'Tên hiển thị của email tự động (thay cho tên chủ web app)' },
+  { Khoa: 'KhongTraLoi', GiaTri: '1', MoTa: '1 = email tự động ghi chú "không trả lời" và dùng địa chỉ no-reply nếu tài khoản hỗ trợ; 0 = cho phép trả lời' }
+];
+const PARAM_SECURE = ['XacThucOTP', 'PhienGio', 'TenGui', 'KhongTraLoi'];   // chỉ Admin được đổi
 const ROLE_ADMIN = 'Admin';
 const DEFAULT_ROLES = {
   'Admin': PERMS.map(p => p.key),
@@ -201,12 +211,7 @@ function setup() {
       P('Bảo vệ', ['1-2', '1-2', 2, 2, 2, 2])
     ], 'all');
   }
-  const defParams = [
-    { Khoa: 'NamHoc', GiaTri: '2026 - 2027', MoTa: 'Năm học hiển thị trên báo cáo' },
-    { Khoa: 'ChenhLech', GiaTri: '2', MoTa: 'Lớp đạt tỉ lệ định biên + N học sinh thì đủ điều kiện đề xuất bổ sung GV/bảo mẫu' },
-    { Khoa: 'XacThucOTP', GiaTri: '1', MoTa: '1 = bắt buộc nhập mã xác nhận gửi qua email khi vào hệ thống; 0 = tắt' },
-    { Khoa: 'PhienGio', GiaTri: '8', MoTa: 'Số giờ một lần xác nhận có hiệu lực (1–72)' }
-  ];
+  const defParams = PARAM_DEF;
   const haveP = read_(SH.PARAM);
   const addP = defParams.filter(d => !haveP.some(h => h.Khoa === d.Khoa));
   if (addP.length) put_(SH.PARAM, haveP.concat(addP));
@@ -362,7 +367,7 @@ function authAction_(action, p, token) {
     if (cache.get(kCd)) throw new Error('Vui lòng chờ ' + OTP_COOLDOWN + ' giây giữa các lần gửi mã.');
     const code = ('000000' + (parseInt(Utilities.getUuid().replace(/-/g, '').slice(0, 8), 16) % 1000000)).slice(-6);
     try {
-      MailApp.sendEmail({ to: email, name: 'Định biên MN', subject: 'Mã xác nhận đăng nhập: ' + code,
+      sendMail_({ to: email, subject: 'Mã xác nhận đăng nhập: ' + code,
         htmlBody: '<p>Xin chào ' + u.HoTen + ',</p><p>Mã xác nhận đăng nhập hệ thống Định biên & Phân công của bạn là:</p><p style="font-size:28px;letter-spacing:6px"><b>' + code + '</b></p><p>Mã có hiệu lực ' + (OTP_TTL / 60) + ' phút. Tuyệt đối không chia sẻ mã này. Nếu không phải bạn đang đăng nhập, hãy bỏ qua email này và báo Admin.</p>' });
     } catch (e) { throw new Error('Không gửi được email mã xác nhận: ' + e.message); }
     cache.put(kOtp, JSON.stringify({ h: otpHash_(code, email), e: Date.now() + OTP_TTL * 1000, t: 0 }), OTP_TTL);
@@ -408,6 +413,7 @@ const ACTIONS = {
   historyGet: { perm: 'history.view', fn: historyGet_ },
   historySnapshot: { perm: 'history.snapshot', write: true, fn: historySnapshot_ },
   classPreview: { perm: 'class.edit', fn: classPreview_ },
+  mailTest: { perm: 'admin.perm', fn: mailTest_ },
   approvalList: { fn: (c) => pdList_(c) },
   approvalCandidates: { perm: 'approval.submit', fn: approverCandidates_ },
   approvalSubmit: { perm: 'approval.submit', write: true, fn: approvalSubmit_ },
@@ -466,7 +472,20 @@ function configSave_(c, p) {
     const bands = p.bands ? p.bands : read_(SH.BAND);
     writeAll_(SH.POS, ['ViTri'].concat(bands.map(b => str_(b.MaKhung))), p.positions.filter(x => str_(x.ViTri)), 'all');
   }
-  if (p.params) put_(SH.PARAM, p.params.map(x => ({ Khoa: x.Khoa, GiaTri: str_(x.GiaTri), MoTa: x.MoTa || '' })));
+  if (p.params) {
+    const cur = {}; read_(SH.PARAM).forEach(r => cur[r.Khoa] = str_(r.GiaTri));
+    const inc = {}; p.params.forEach(x => inc[x.Khoa] = str_(x.GiaTri));
+    const isAdmin = c.perms.indexOf('admin.perm') >= 0;
+    const out = PARAM_DEF.map(d => {
+      let v = inc[d.Khoa];
+      if (v === undefined || (PARAM_SECURE.indexOf(d.Khoa) >= 0 && !isAdmin)) v = cur[d.Khoa] !== undefined ? cur[d.Khoa] : d.GiaTri;
+      if ((d.Khoa === 'XacThucOTP' || d.Khoa === 'KhongTraLoi') && v !== '0' && v !== '1') throw new Error('Giá trị ' + d.Khoa + ' chỉ nhận 0 hoặc 1');
+      if (d.Khoa === 'PhienGio') v = String(Math.min(72, Math.max(1, num_(v, 8))));
+      if (d.Khoa === 'TenGui') v = (v || '').slice(0, 60) || SYS_NAME;
+      return { Khoa: d.Khoa, GiaTri: v, MoTa: d.MoTa };
+    });
+    put_(SH.PARAM, out);
+  }
   if (p.campuses) {
     const seen = {};
     p.campuses.forEach(x => { const id = str_(x.MaCoSo); if (!id) throw new Error('Cơ sở thiếu mã.'); if (seen[id]) throw new Error('Trùng mã cơ sở ' + id); seen[id] = 1; });
@@ -858,6 +877,34 @@ function approverCandidates_(c) {
 }
 
 /* Kênh thông báo của hồ sơ: gmail = người thao tác tự gửi bằng Gmail của họ (client soạn sẵn); he_thong/mail = server gửi; tat = không gửi */
+/* ===== Gửi email tự động: ẩn tên/địa chỉ chủ web app =====
+   - Tên hiển thị = TenGui (mặc định "Hệ thống Định biên Khối Mầm non"), thêm ghi chú "email tự động, không trả lời".
+   - KhongTraLoi=1: dùng noReply (Google Workspace gửi từ địa chỉ noreply@<tên miền>). Nếu tài khoản không hỗ trợ → gửi thường
+     nhưng đặt Reply-To = noreply@<tên miền> để không ai trả lời nhầm vào hộp thư chủ.
+   - KhongTraLoi=0: dùng tên/Reply-To của người thao tác (m.name, m.replyTo) nếu có. */
+function sysName_() { return str_(param_('TenGui', SYS_NAME)) || SYS_NAME; }
+function sendMail_(m) {
+  const noReply = param_('KhongTraLoi', '1') !== '0', name = sysName_();
+  const o = { to: m.to, subject: m.subject, name };
+  if (m.cc) o.cc = m.cc;
+  if (!noReply) {
+    o.htmlBody = m.htmlBody;
+    if (m.name) o.name = m.name;
+    if (m.replyTo) o.replyTo = m.replyTo;
+    MailApp.sendEmail(o); return { noReply: false, mode: 'reply' };
+  }
+  o.htmlBody = m.htmlBody + '<hr style="border:0;border-top:1px solid #ddd;margin:18px 0 8px"><p style="color:#777;font-size:12px;margin:0">Đây là email tự động của ' + name + '. Vui lòng không trả lời email này.</p>';
+  try { MailApp.sendEmail(Object.assign({}, o, { noReply: true })); return { noReply: true, mode: 'noreply' }; }
+  catch (e) { /* tài khoản không hỗ trợ noReply (không phải Workspace) hoặc lỗi tạm: gửi thường, Reply-To về địa chỉ không tồn tại */ }
+  const dom = (Session.getEffectiveUser().getEmail() || '').split('@')[1];
+  if (dom) o.replyTo = 'noreply@' + dom;
+  MailApp.sendEmail(o); return { noReply: false, mode: 'fallback' };
+}
+function mailTest_(c) {
+  const r = sendMail_({ to: c.email, subject: 'Thử email tự động – ' + sysName_(), htmlBody: '<p>Đây là email thử do ' + c.name + ' yêu cầu để xem cách hiển thị người gửi.</p>' });
+  return { to: c.email, mode: r.mode };
+}
+
 function mailOn_(r) { const v = str_(r.ThongBao); return v !== 'tat' && v !== 'gmail'; }
 
 function pdItem_(r, c, camp) {
@@ -877,15 +924,15 @@ function pdList_(c) {
   return read_(SH.PD).map(r => pdItem_(r, c, camp)).filter(x => all || x.involved).sort((a, b) => a.MaPD < b.MaPD ? 1 : -1);
 }
 
-/* Thư gửi từ tài khoản chủ web app (Google không cho giả địa chỉ gửi), nhưng hiện TÊN người thao tác
-   và đặt Reply-To = email người đó để người nhận bấm "Trả lời" là về đúng người. */
+/* Chế độ "hệ thống tự gửi" (ThongBao = he_thong/mail): gửi qua sendMail_ (ẩn tên chủ web app). Nội dung luôn ghi rõ người thao tác. */
 function notify_(to, subject, html, actor, cc) {
   try {
     const url = ScriptApp.getService().getUrl();
     (Array.isArray(to) ? to : [to]).filter(Boolean).forEach(addr => {
-      const m = { to: addr, subject: '[Định biên MN] ' + subject, htmlBody: html + (actor ? '<p style="color:#666">Gửi bởi ' + actor.name + ' (' + actor.email + ') qua hệ thống Định biên MN – bấm Trả lời để phản hồi trực tiếp.</p>' : '') + (url ? '<p><a href="' + url + '">Mở hệ thống</a></p>' : '') };
-      if (actor) { m.replyTo = actor.email; m.name = actor.name + ' (Định biên MN)'; if (cc) m.cc = actor.email; }
-      MailApp.sendEmail(m);
+      const m = { to: addr, subject: '[Định biên MN] ' + subject,
+        htmlBody: html + (actor ? '<p style="color:#666">Người thao tác: <b>' + actor.name + '</b> (' + actor.email + ')</p>' : '') + (url ? '<p><a href="' + url + '">Mở hệ thống</a></p>' : '') };
+      if (actor) { m.name = actor.name + ' (' + sysName_() + ')'; m.replyTo = actor.email; if (cc) m.cc = actor.email; }
+      sendMail_(m);
     });
   } catch (e) { /* không gửi được mail (hạn mức/quyền): bỏ qua, hồ sơ vẫn hợp lệ */ }
 }

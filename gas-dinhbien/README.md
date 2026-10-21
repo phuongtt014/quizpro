@@ -75,3 +75,12 @@ Căn cứ: *Quy định tên lớp học – Định biên nhân sự Khối M�
 3. **Không gửi thư**: người duyệt vẫn thấy hồ sơ và số báo trong tab Phê duyệt.
 - Lý do cách 1 cần thao tác bấm Gửi: gửi thay mặt hộp thư của người khác chỉ làm được khi web app chạy "Thực thi bằng: Người dùng truy cập" — khi đó mọi người phải có quyền sửa Google Sheet dữ liệu, mất cơ chế phân quyền theo cơ sở nên không khuyến nghị.
 - Thư mã xác nhận đăng nhập (OTP) luôn do hệ thống gửi.
+
+## Ẩn email chủ sở hữu trong thư tự động
+Áp dụng cho thư mã xác nhận đăng nhập và thư "hệ thống tự gửi" (cách 2 ở trên). Admin chỉnh ở *Cấu hình › Tham số*:
+- **Tên hiển thị của email tự động** (mặc định "Hệ thống Định biên Khối Mầm non") — người nhận thấy tên này thay cho tên chủ web app.
+- **Ghi chú "email tự động – không trả lời"** (mặc định Bật): thêm dòng cuối thư *"Đây là email tự động của … Vui lòng không trả lời email này."* và gửi bằng địa chỉ **no-reply** (`noreply@<tên miền>`) nếu tài khoản chủ web app thuộc Google Workspace. Nếu Google không cho dùng no-reply, thư vẫn đi từ địa chỉ chủ web app nhưng Reply-To đặt về địa chỉ không tồn tại, nên chỉ ẩn được **tên**, chưa ẩn được **địa chỉ**.
+- Nút **✉ Gửi email thử cho tôi** để xem đúng cách người nhận thấy người gửi.
+- Muốn một địa chỉ riêng như `dinhbien@tên-miền`: triển khai web app dưới một tài khoản dùng chung do IT cấp (tài khoản chủ web app chính là địa chỉ gửi).
+- Bốn tham số *Xác nhận bằng mã, Thời hạn phiên, Tên hiển thị, Ghi chú không trả lời* **chỉ Admin được đổi** (người có quyền "Cấu hình" khác không đổi được).
+- Thư gửi bằng Gmail cá nhân (cách 1) không bị ảnh hưởng: vẫn đi từ hộp thư người thao tác.
