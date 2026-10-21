@@ -2,6 +2,7 @@
 <html lang="vi">
 <head>
 <base target="_top">
+<style id="pgstyle"></style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -47,6 +48,16 @@ td.cell.ok{background:var(--ok-l)}td.cell.thieu{background:var(--bad-l)}td.cell.
 .loading{padding:40px;text-align:center;color:var(--mut)}
 @media(max-width:700px){main{padding:10px}}
 .printonly{display:none}
+.sgn{margin-top:9mm;break-inside:avoid;page-break-inside:avoid;font-size:12px;color:#000}
+.sgn .dt{text-align:right;font-style:italic;margin-bottom:3mm}
+.sgn .row2{display:flex;flex-wrap:wrap;justify-content:center;row-gap:6mm}
+.sgn .col{display:flex;flex-direction:column;text-align:center;padding:0 4mm;box-sizing:border-box}
+.sgn .col b.t{display:block;text-transform:uppercase;letter-spacing:.2px}
+.sgn .col i{display:block;font-size:10.5px;color:#333}
+.sgn .col .sp{flex:1 1 auto;min-height:24mm}
+.sgn .col b.n{display:block}
+.sgn .opn{margin-bottom:5mm;break-inside:avoid}
+.sgn .opn div.ln{border-bottom:1px dotted #555;height:7mm}
 .psign{display:inline-block;position:relative;margin-right:6px;font-size:12px;vertical-align:middle}.psign summary{cursor:pointer;display:inline;color:var(--pri)}
 .psign .pop{position:absolute;z-index:30;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 12px;box-shadow:0 6px 20px #0002;min-width:260px;right:0;white-space:nowrap;text-align:left}
 .psign .pop label{display:flex;gap:6px;align-items:center;margin:4px 0;color:var(--ink)}
@@ -82,7 +93,6 @@ a.b{display:inline-block;text-decoration:none;color:inherit;padding:6px 12px;bor
 .impact b{font-weight:600}.impact ul{margin:6px 0 0;padding-left:18px}
 .ap{display:flex;gap:6px;align-items:center;background:#f4f6f8;border-radius:8px;padding:6px 10px;margin:4px 0}
 @media print{
- @page{size:A4 landscape;margin:10mm}
  body{background:#fff;font-size:11px}
  header,nav,#toast,.noprint{display:none!important}
  .printonly{display:block;margin-bottom:8px}
@@ -189,22 +199,44 @@ function xlsx(file,sheets){
 }
 const signers=()=>S.boot.cfg.signers||[];
 const signSel=()=>{const ids=signers().map(x=>x.Id);if(!S.signSel)S.signSel=signers().filter(x=>x.MacDinh).map(x=>x.Id);return S.signSel.filter(id=>ids.indexOf(id)>=0)};
-const printCtl=(act,label)=>{const sg=signers(),sel=signSel();
-  return `<label class="noprint" style="font-size:12px;margin-right:4px;white-space:nowrap"><input type="checkbox" data-sign ${S.sign?'checked':''} style="width:auto"> Kèm phần ký BTGĐ</label>`+
+const ORI_DEF={dash:'landscape',campus:'landscape',hist:'landscape',pd:'portrait'};
+const oriGet=k=>{if(!S.orient){let o={};try{o=JSON.parse(localStorage.getItem('vm_orient')||'{}')}catch(e){}S.orient=o}return S.orient[k]||ORI_DEF[k]||'landscape'};
+const printCtl=(act,kind,label)=>{const sg=signers(),sel=signSel(),o=oriGet(kind);
+  return `<select class="noprint" data-orient="${kind}" title="Hướng giấy khi in (A4)" style="width:auto;font-size:12px;padding:4px 6px;margin-right:4px"><option value="landscape" ${o==='landscape'?'selected':''}>A4 ngang</option><option value="portrait" ${o==='portrait'?'selected':''}>A4 dọc</option></select>`+
+  `<label class="noprint" style="font-size:12px;margin-right:4px;white-space:nowrap"><input type="checkbox" data-sign ${S.sign?'checked':''} style="width:auto"> Kèm phần ký BTGĐ</label>`+
   (sg.length?`<details class="noprint psign"><summary>▾ Người ký (${sel.length})</summary><div class="pop">${sg.map(x=>`<label><input type="checkbox" data-signer="${esc(x.Id)}" ${sel.indexOf(x.Id)>=0?'checked':''} style="width:auto"> <span><b>${esc(x.ChucDanh)}</b>${x.HoTen?' – '+esc(x.HoTen):''}</span></label>`).join('')}</div></details>`:'')+
   `<button class="b" data-do="${act}">${label||'🖨 In'}</button>`};
-/* Khối ký cuối bản in: chỉ Ban Tổng giám đốc (người được chọn), họ tên lấy từ Cấu hình */
-function signHtml(){
+/* Khối ký cuối bản in: chỉ Ban Tổng giám đốc (người được chọn). Bố cục theo khổ giấy và loại văn bản:
+   - 1 người: ký ở bên phải · 2–3 người: chia đều cột · nhiều hơn: xuống hàng (dọc 3 cột/hàng, ngang 5 cột/hàng), hàng lẻ căn giữa.
+   - Phiếu phê duyệt/đề xuất ('pd'): thêm khung "Ý kiến của Ban Tổng giám đốc" trước chữ ký. */
+function signHtml(kind,orient){
   const sg=signers().filter(x=>signSel().indexOf(x.Id)>=0);
   if(!sg.length)return '';
-  return `<div style="margin-top:26px;break-inside:avoid"><div style="text-align:right;font-style:italic">TP. Hồ Chí Minh, ngày ……… tháng ……… năm 20……</div>
-  <table style="width:100%;border:0;text-align:center;margin-top:8px"><tr>${sg.map(x=>`<td style="width:${(100/sg.length).toFixed(1)}%;vertical-align:top"><b>${esc(x.ChucDanh.toUpperCase())}</b><div style="font-style:italic;font-size:11px">(Ký, ghi rõ họ tên)</div><div style="height:90px"></div>${x.HoTen?'<b>'+esc(x.HoTen)+'</b>':''}</td>`).join('')}</tr></table></div>`;
+  const n=sg.length,per=orient==='landscape'?5:3,k=Math.min(n,per);
+  const basis=n===1?'42%':(100/k).toFixed(3)+'%';
+  const sp=orient==='landscape'?'20mm':'26mm';
+  return `<div class="sgn">
+  ${kind==='pd'?`<div class="opn"><b>Ý kiến của Ban Tổng giám đốc:</b>${'<div class="ln"></div>'.repeat(3)}</div>`:''}
+  <div class="dt">TP. Hồ Chí Minh, ngày ……… tháng ……… năm 20……</div>
+  <div class="row2" style="${n===1?'justify-content:flex-end':''}">${sg.map(x=>`<div class="col" style="flex:0 0 ${basis};max-width:${basis}"><b class="t">${esc(x.ChucDanh)}</b><i>(Ký, ghi rõ họ tên)</i><div class="sp" style="min-height:${sp}"></div><b class="n">${esc(x.HoTen||'')}</b></div>`).join('')}</div></div>`;
 }
-function printNow(title){
-  $('#signblk').innerHTML=S.sign?signHtml():'';
+/* In: đặt khổ A4 ngang/dọc, tự co bảng rộng cho vừa bề ngang giấy (lề 12mm), thêm khối ký nếu chọn */
+function printNow(title,kind){
+  const o=oriGet(kind),land=o==='landscape',avail=(land?273:186)*3.7795;
+  $('#pgstyle').textContent='@page{size:A4 '+o+';margin:12mm}';
+  $('#signblk').innerHTML=S.sign?signHtml(kind,o):'';
   $('#ptitle').textContent=title+' · In ngày '+new Date().toLocaleDateString('vi-VN')+' · '+S.boot.me.name;
-  document.body.classList.toggle('pm',!!$('#modal').innerHTML);
-  setTimeout(()=>{window.print();setTimeout(()=>document.body.classList.remove('pm'),500)},50);
+  const modal=!!$('#modal').innerHTML;document.body.classList.toggle('pm',modal);
+  const tg=[modal?$('#modal .modal'):$('main')].filter(Boolean);
+  const setW=(el,px)=>el.style.setProperty('width',px,'important');
+  tg.forEach(el=>{el.style.maxWidth='none';setW(el,avail+'px')});            // đo bề rộng tự nhiên của bảng ở khổ giấy
+  let need=avail;tg.forEach(el=>el.querySelectorAll('.tw').forEach(w=>{need=Math.max(need,w.scrollWidth)}));
+  const z=Math.max(.4,Math.min(1,avail/need));
+  if(!land&&need>avail*1.5)toast('Bảng khá rộng nên chữ in dọc sẽ nhỏ – nên chọn A4 ngang để dễ đọc hơn.');
+  tg.forEach(el=>{el.style.zoom=z;setW(el,(100/z)+'%')});
+  const undo=()=>{tg.forEach(el=>{el.style.zoom='';el.style.maxWidth='';el.style.removeProperty('width')});document.body.classList.remove('pm')};
+  S.printUndo=undo;
+  setTimeout(()=>{window.print();setTimeout(undo,1500)},50);
 }
 function reportSheets(list,po){
   const m=[['Cơ sở','Tổng sĩ số','Khung',...po.map(x=>x+' (thực tế / định biên)'),'Kết luận']];
@@ -294,7 +326,7 @@ VIEWS.dash=async()=>{
    <div class="kpi"><b>${s.surplus}</b><span>Tổng vị trí đang thừa</span></div>
   </div>
   <div class="card"><div class="row"><h3 class="grow" style="margin:0">Đối chiếu định biên theo cơ sở – NH ${esc(r.namHoc||'')}</h3>
-   ${can('report.export')?'<span class="noprint"><button class="b" data-do="xdash">⬇ Excel</button> '+printCtl('pdash')+'</span>':''}</div>
+   ${can('report.export')?'<span class="noprint"><button class="b" data-do="xdash">⬇ Excel</button> '+printCtl('pdash','dash')+'</span>':''}</div>
    <div class="hint noprint">Mỗi ô: số thực tế (dòng nhỏ: định biên theo khung sĩ số). Xanh = đạt · Đỏ = thiếu · Vàng = thừa. Bấm tên cơ sở để xem chi tiết.</div>
    <div class="tw"><table class="mx"><thead><tr><th>Cơ sở</th><th class="c">Sĩ số</th><th>Khung</th>${po.map(p=>`<th class="rot">${esc(p)}</th>`).join('')}<th class="c">Lớp thiếu</th><th class="c">Đủ ĐK đề xuất</th><th>Kết luận</th></tr></thead><tbody>
    ${r.campuses.map(c=>`<tr><td style="white-space:nowrap"><a href="#" data-campus="${esc(c.MaCoSo)}"><b>${esc(c.TenCoSo)}</b></a></td><td class="c">${c.total}</td><td style="white-space:nowrap">${esc(c.band?c.band.Nhan:'—')}</td>${c.positions.map(cellOf).join('')}
@@ -306,7 +338,7 @@ VIEWS.dash=async()=>{
 VIEWS.campus=async()=>{
   if(!S.campus&&S.boot.campuses.length)S.campus=S.boot.campuses[0].MaCoSo;
   const c=S.cache.report.campuses.find(x=>x.MaCoSo===S.campus);
-  const head=`<div class="row noprint">${campusSel('csel',false)}<span class="grow"></span>${can('report.export')?'<button class="b" data-do="xcampus">⬇ Excel</button> '+printCtl('pcampus')+'':''}</div>`;
+  const head=`<div class="row noprint">${campusSel('csel',false)}<span class="grow"></span>${can('report.export')?'<button class="b" data-do="xcampus">⬇ Excel</button> '+printCtl('pcampus','campus')+'':''}</div>`;
   if(!c){$('#main').innerHTML=head+'<div class="card">Chưa có dữ liệu.</div>';bindSel();return}
   $('#main').innerHTML=head+`
   <div class="kpis">
@@ -522,7 +554,7 @@ async function openPD(id){
 }
 function pdBody(d){
   const cs=curStep(d);
-  return `<div class="row noprint"><span class="grow"></span><button class="b" data-do="pdxlsx">⬇ Excel</button> ${printCtl('pdprint','🖨 In phiếu')}</div>
+  return `<div class="row noprint"><span class="grow"></span><button class="b" data-do="pdxlsx">⬇ Excel</button> ${printCtl('pdprint','pd','🖨 In phiếu')}</div>
   <div class="printonly" style="text-align:center;font-size:15px"><b>PHIẾU ĐỀ XUẤT PHÊ DUYỆT – ${esc(d.MaPD)}</b></div>
   <div class="card"><h3>${esc(d.TieuDe)} ${pdTag(d.TrangThai)}</h3>
    <table><tbody><tr><td class="muted" width="130">Loại hồ sơ</td><td>${esc(d.Loai)}</td><td class="muted" width="130">Cơ sở · Kỳ</td><td>${esc(d.TenCoSo)} · ${esc(d.Ky)}</td></tr>
@@ -596,7 +628,7 @@ function histBody(d){
   const lbl=x=>x.Ky==='current'?'Hiện tại':'Kỳ '+x.Ky;
   let h=`<div class="row"><div class="grow"><b>${esc(a.TenCoSo)} · Kỳ ${esc(a.Ky)}</b><div class="muted">Chốt ${esc(a.ChotLuc)} bởi ${esc(a.NguoiChot)}${a.GhiChu?' · '+esc(a.GhiChu):''}</div></div>
    <label style="margin:0">So sánh với</label><select id="hvs" data-hvs="1" style="width:auto"><option value="">— không —</option><option value="current" ${S.hv.vs==='current'?'selected':''}>Hiện tại</option>${others.map(o=>`<option value="${esc(o.Ky)}" ${S.hv.vs===o.Ky?'selected':''}>Kỳ ${esc(o.Ky)}</option>`).join('')}</select>
-   <span class="noprint"><button class="b" data-do="hxlsx">⬇ Excel</button> ${printCtl('hprint')}</span></div>
+   <span class="noprint"><button class="b" data-do="hxlsx">⬇ Excel</button> ${printCtl('hprint','hist')}</span></div>
    <div class="kpis"><div class="kpi"><b>${r.total}</b><span>Tổng sĩ số</span></div><div class="kpi"><b style="font-size:15px">${esc(r.band?r.band.Nhan:'—')}</b><span>Khung</span></div><div class="kpi"><b>${a.staff.filter(x=>x.TrangThai!=='Nghỉ việc').length}</b><span>Nhân sự</span></div><div class="kpi"><b>${tag(r.status)}</b><span>Kết luận kỳ đó</span></div></div>`;
   if(b){const df=diffSnap(a,b);
     h+=`<div class="card"><h3>Thay đổi: ${lbl(a)} → ${lbl(b)} (${df.length})</h3>${df.length?`<div class="tw"><table><thead><tr><th>Mã NV</th><th>Họ tên</th><th>Loại</th><th>${lbl(a)} (vai trò | lớp)</th><th>${lbl(b)} (vai trò | lớp)</th></tr></thead><tbody>${df.map(x=>`<tr>${x.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'<div class="muted">Không có thay đổi phân công.</div>'}</div>`;
@@ -650,18 +682,18 @@ document.addEventListener('click',async e=>{
     gSave:async()=>{const r=await act(()=>call('guideSave',{items:S.gedit}));S.cache.guide=r;S.gedit=null;toast('Đã lưu hướng dẫn');renderGuide()},
     gReset:async()=>{if(confirm('Khôi phục toàn bộ hướng dẫn về nội dung mặc định? Các chỉnh sửa hiện tại sẽ mất.')){const r=await act(()=>call('guideReset'));S.cache.guide=r;S.gedit=JSON.parse(JSON.stringify(r));toast('Đã khôi phục mặc định');renderGuideEdit()}},
     xdash:()=>{const r=S.cache.report;xlsx('bao-cao-dinh-bien-'+today(),reportSheets(r.campuses,r.positionOrder))},
-    pdash:()=>printNow('Báo cáo đối chiếu định biên theo cơ sở'),
+    pdash:()=>printNow('Báo cáo đối chiếu định biên theo cơ sở','dash'),
     xcampus:()=>{const c=S.cache.report.campuses.find(x=>x.MaCoSo===S.campus);if(c)xlsx('dinh-bien-'+c.MaCoSo+'-'+today(),reportSheets([c],S.cache.report.positionOrder))},
-    pcampus:()=>{const c=S.cache.report.campuses.find(x=>x.MaCoSo===S.campus);printNow('Báo cáo định biên – '+(c?c.TenCoSo:''))},
+    pcampus:()=>{const c=S.cache.report.campuses.find(x=>x.MaCoSo===S.campus);printNow('Báo cáo định biên – '+(c?c.TenCoSo:''),'campus')},
     xstaff:()=>xlsx('nhan-su-'+today(),[{name:'Nhân sự',rows:[['Mã NV','Họ tên','Cơ sở','Chức danh HR','Trạng thái','Vai trò định biên','Lớp phụ trách','Nhóm']].concat(sortedStaff(filteredStaff()).map(({s,k})=>[s.MaNV,s.HoTen,campName(s.MaCoSo),s.ChucDanhHR,s.TrangThai,s.VaiTroDB,s.lop.map(id=>{const l=S.cache.classes.find(x=>x.MaLop===id);return l?l.TenLop:id}).join('; '),k.label]))}]),
     hxlsx:()=>{const{a,b}=S.hv;xlsx('phan-cong-'+a.Ky+'-'+a.MaCoSo,snapSheets(a,b,S.hv.diff))},
-    hprint:()=>printNow('Phân công & định biên '+S.hv.a.TenCoSo+' · kỳ '+S.hv.a.Ky),
+    hprint:()=>printNow('Phân công & định biên '+S.hv.a.TenCoSo+' · kỳ '+S.hv.a.Ky,'hist'),
     newPD:openSubmit,openPD:()=>openPD(d.id),
     mailTest:async()=>{const r=await act(()=>call('mailTest'));alert('Đã gửi email thử tới '+r.to+'.\n\n'+(r.mode==='noreply'?'Đã gửi bằng địa chỉ no-reply của Google Workspace.':r.mode==='fallback'?'Tài khoản chủ web app không hỗ trợ địa chỉ no-reply: thư vẫn đi từ địa chỉ chủ web app (chỉ ẩn được TÊN; Reply-To đã đặt về địa chỉ không tồn tại).':'Thư gửi theo chế độ cho phép trả lời (Tên + Reply-To người thao tác).')+'\n\nHãy mở email để kiểm tra tên và địa chỉ người gửi hiển thị.')},
     pdOk:()=>pdDecide('approve'),pdNo:()=>pdDecide('reject'),
     pdBack:async()=>{if(confirm('Thu hồi hồ sơ này?')){await act(()=>call('approvalWithdraw',{id:S.pd.MaPD}));toast('Đã thu hồi');closeModal();await refresh()}},
     pdxlsx:()=>{const x=S.pd,hdr=[['Mã hồ sơ',x.MaPD],['Loại',x.Loai],['Tiêu đề',x.TieuDe],['Cơ sở',x.TenCoSo],['Kỳ',x.Ky],['Người gửi',x.TenNguoiGui],['Gửi lúc',x.GuiLuc],['Nội dung',x.GhiChu],['Cách duyệt',x.CheDo],['Trạng thái',x.TrangThai],[],['#','Người duyệt','Kết quả','Thời gian','Ý kiến']].concat(x.luong.map((l,i)=>[i+1,l.hoTen,l.tt==='duyet'?'Đồng ý':l.tt==='tuchoi'?'Từ chối':'Chưa duyệt',l.luc,l.yKien]));xlsx('phe-duyet-'+x.MaPD,[{name:'Phiếu',rows:hdr}].concat(x.snapshot?snapSheets(Object.assign({},x.snapshot,{Ky:x.Ky})):[]))},
-    pdprint:()=>printNow('Phiếu phê duyệt '+S.pd.MaPD),
+    pdprint:()=>printNow('Phiếu phê duyệt '+S.pd.MaPD,'pd'),
     addAp:()=>{const v=val('apick');if(v){S.sub.approvers.push(v);renderAList()}},
     apUp:()=>{const a=S.sub.approvers,i=+d.i;[a[i-1],a[i]]=[a[i],a[i-1]];renderAList()},
     apDown:()=>{const a=S.sub.approvers,i=+d.i;[a[i+1],a[i]]=[a[i],a[i+1]];renderAList()},
@@ -710,6 +742,8 @@ document.addEventListener('input',e=>{
   else if(e.target.id==='s_title')e.target.dataset.auto='0';
 });
 document.addEventListener('change',async e=>{
+  if(e.target.dataset&&e.target.dataset.orient!==undefined){
+    oriGet('dash');S.orient[e.target.dataset.orient]=e.target.value;try{localStorage.setItem('vm_orient',JSON.stringify(S.orient))}catch(er){}return}
   if(e.target.dataset&&e.target.dataset.signer!==undefined){
     const id=e.target.dataset.signer,a=signSel().slice(),k=a.indexOf(id);if(e.target.checked&&k<0)a.push(id);if(!e.target.checked&&k>=0)a.splice(k,1);S.signSel=a;
     const sm=e.target.closest('details').querySelector('summary');sm.textContent='▾ Người ký ('+a.length+')';return}

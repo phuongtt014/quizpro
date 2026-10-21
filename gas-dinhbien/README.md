@@ -102,3 +102,8 @@ Lớp được ghi nhận **Thiếu** GV/bảo mẫu khi **một trong hai** đi
 
 ## Tab Nhân sự – thứ tự sắp xếp
 Trong từng cơ sở: **Hiệu trưởng → Hiệu phó → giáo viên/bảo mẫu theo lớp** (Pre-N → N → Pre-K.A → Pre-K.B → K, rồi số lớp; trong lớp giáo viên trước bảo mẫu) → giáo viên/bảo mẫu chưa phân lớp → **nhân sự không phân lớp** (theo thứ tự vị trí trong Cấu hình: Tư vấn, Y tế, Cấp dưỡng, Bảo vệ…, người chưa phân vai trò cuối nhóm) → **nhân sự đã nghỉ việc**. Mỗi nhóm có dòng tiêu đề; file Excel xuất ra cùng thứ tự và có cột "Nhóm".
+
+## In: hướng giấy và bố cục khối ký
+- Cạnh nút **🖨 In** có ô chọn **A4 ngang / A4 dọc** (nhớ lựa chọn theo từng loại bản in). Mặc định: báo cáo in ngang, phiếu phê duyệt in dọc. Lề 12mm; bảng rộng tự co cho vừa bề ngang giấy (nếu in dọc mà bảng quá rộng sẽ có nhắc nên chọn in ngang).
+- **Khối ký Ban TGĐ** tự dàn theo khổ giấy: 1 người → ký bên phải; 2–3 người → chia đều cột; nhiều hơn → xuống hàng (dọc 3 người/hàng, ngang 5 người/hàng), hàng lẻ căn giữa; họ tên luôn thẳng hàng ở cuối mỗi hàng; chỗ ký cao 20mm (ngang) / 26mm (dọc).
+- **Loại văn bản**: báo cáo (Tổng quan, Báo cáo cơ sở, Lịch sử) chỉ có dòng ngày + chữ ký; **Phiếu phê duyệt/đề xuất** thêm khung *"Ý kiến của Ban Tổng giám đốc"* (3 dòng kẻ chấm) phía trên chữ ký.
