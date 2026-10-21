@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1c2430;--mut:#6b7686;--line:#e3e7ee;--pri:#0f6e56;--pri-l:#e1f5ee;--ok:#1a7f4b;--ok-l:#e3f5ea;--warn:#a96a00;--warn-l:#fdf1d9;--bad:#b42318;--bad-l:#fde8e6;--over:#7a3db8;--over-l:#f0e6fa}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--pri);color:#fff;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;flex:1;min-width:200px}header small{opacity:.85}
+nav{display:flex;gap:2px;background:#fff;border-bottom:1px solid var(--line);padding:0 8px;overflow-x:auto}
+nav button{border:0;background:none;padding:11px 14px;cursor:pointer;color:var(--mut);font:inherit;white-space:nowrap;border-bottom:3px solid transparent}
+nav button.on{color:var(--pri);border-color:var(--pri);font-weight:600}
+main{padding:16px;max-width:1500px;margin:auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+.card h3{margin:0 0 10px;font-size:15px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.grow{flex:1}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px}.kpi b{font-size:24px;display:block}.kpi span{color:var(--mut);font-size:12px}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{background:#fafbfc;font-size:12px;color:var(--mut);font-weight:600;position:sticky;top:0;white-space:nowrap}
+td.c,th.c{text-align:center}tr:hover td{background:#fafcfb}
+input,select,textarea{font:inherit;padding:6px 8px;border:1px solid #ccd3dd;border-radius:6px;background:#fff;max-width:100%}
+input[type=checkbox]{width:17px;height:17px;accent-color:var(--pri)}
+button.b{font:inherit;padding:6px 12px;border-radius:6px;border:1px solid #ccd3dd;background:#fff;cursor:pointer}
+button.b:hover{background:#f0f3f6}button.p{background:var(--pri);border-color:var(--pri);color:#fff}button.p:hover{background:#0b5a46}
+button.d{color:var(--bad);border-color:#f2c4bf}button.s{padding:3px 8px;font-size:12px}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
+.ok{background:var(--ok-l);color:var(--ok)}.thieu{background:var(--bad-l);color:var(--bad)}.thua{background:var(--warn-l);color:var(--warn)}.vuot{background:var(--over-l);color:var(--over)}.trong{background:#eef0f3;color:var(--mut)}
+td.cell{text-align:center;font-weight:600;white-space:nowrap}td.cell small{display:block;font-weight:400;color:var(--mut);font-size:11px}
+td.cell.ok{background:var(--ok-l)}td.cell.thieu{background:var(--bad-l)}td.cell.thua{background:var(--warn-l)}
+.chip{display:inline-block;background:var(--pri-l);color:var(--pri);border-radius:6px;padding:1px 7px;margin:1px;font-size:12px}
+.muted{color:var(--mut)}.warn{background:var(--warn-l);color:var(--warn);padding:8px 12px;border-radius:8px;margin-bottom:8px}
+.mask{position:fixed;inset:0;background:rgba(15,25,40,.45);display:flex;align-items:flex-start;justify-content:center;padding:5vh 12px;overflow:auto;z-index:20}
+.modal{background:#fff;border-radius:12px;padding:18px;width:min(560px,100%)}.modal.w{width:min(900px,100%)}
+.modal h3{margin:0 0 12px}.modal label{display:block;margin:8px 0 3px;font-size:12px;color:var(--mut)}.modal input,.modal select,.modal textarea{width:100%}
+.modal .act{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1c2430;color:#fff;padding:9px 16px;border-radius:8px;z-index:50;display:none;max-width:90vw}
+#toast.err{background:var(--bad)}
+.sub{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}.sub button{border-radius:99px}.sub button.on{background:var(--pri-l);border-color:var(--pri);color:var(--pri)}
+.mx th.rot{white-space:normal;min-width:92px;text-align:center}
+.hint{font-size:12px;color:var(--mut);margin:4px 0 10px}
+.loading{padding:40px;text-align:center;color:var(--mut)}
+@media(max-width:700px){main{padding:10px}}
+</style>
+</head>
+<body>
+<header><h1>Định biên & Phân công nhân sự – Khối Mầm non Việt Mỹ <small id="nh"></small></h1><small id="who"></small></header>
+<nav id="nav"></nav>
+<main id="main"><div class="loading">Đang tải…</div></main>
+<div id="toast"></div>
+<div id="modal"></div>
+
+<script>
+const S={boot:null,tab:'dash',campus:'',cache:{}};
+const $=s=>document.querySelector(s);
+const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const can=p=>S.boot.me.perms.indexOf(p)>=0;
+const ST={ok:'Đạt',thieu:'Thiếu',thua:'Thừa',vuot:'Vượt tỉ lệ',trong:'Chưa có sĩ số'};
+const tag=s=>`<span class="tag ${s}">${ST[s]||s}</span>`;
+
+function call(action,payload){
+  return new Promise((res,rej)=>google.script.run
+    .withSuccessHandler(r=>r&&r.ok?res(r.data):rej(new Error(r?r.error:'Lỗi không xác định')))
+    .withFailureHandler(e=>rej(new Error(e.message||e)))
+    .api(action,payload||{}));
+}
+function toast(m,err){const t=$('#toast');t.textContent=m;t.className=err?'err':'';t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',err?6000:2500)}
+async function act(fn){try{return await fn()}catch(e){toast(e.message,true);throw e}}
+function modal(title,body,ok,opts={}){
+  $('#modal').innerHTML=`<div class="mask"><div class="modal ${opts.wide?'w':''}"><h3>${title}</h3>${body}<div class="act"><button class="b" id="mc">${ok?'Huỷ':'Đóng'}</button>${ok?'<button class="b p" id="mo">'+(opts.okText||'Lưu')+'</button>':''}</div></div></div>`;
+  $('#mc').onclick=closeModal;
+  if(ok)$('#mo').onclick=async()=>{try{await ok();closeModal()}catch(e){toast(e.message,true)}};
+}
+function closeModal(){$('#modal').innerHTML=''}
+const val=id=>document.getElementById(id).value;
+
+/* ---------- khởi động ---------- */
+async function init(){
+  try{S.boot=await call('bootstrap')}catch(e){$('#main').innerHTML=`<div class="card"><h3>Không thể truy cập</h3><p>${esc(e.message)}</p></div>`;return}
+  $('#who').textContent=S.boot.me.name+' · '+S.boot.me.role;
+  $('#nh').textContent='· NH '+(S.boot.cfg.params.NamHoc||'');
+  S.campus=S.boot.campuses.length===1?S.boot.campuses[0].MaCoSo:'';
+  const tabs=[['dash','Tổng quan','dash.view'],['campus','Báo cáo cơ sở','dash.view'],['staff','Nhân sự','staff.view'],['classes','Lớp học','class.view'],['config','Cấu hình','config.edit'],['perm','Phân quyền','admin.perm'],['audit','Nhật ký','audit.view']].filter(t=>can(t[2]));
+  $('#nav').innerHTML=tabs.map(t=>`<button data-tab="${t[0]}">${t[1]}</button>`).join('');
+  if(!tabs.length){$('#main').innerHTML='<div class="card">Tài khoản chưa được cấp chức năng nào.</div>';return}
+  go(tabs[0][0]);
+}
+async function go(tab){
+  S.tab=tab;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  $('#main').innerHTML='<div class="loading">Đang tải…</div>';
+  try{await VIEWS[tab]()}catch(e){$('#main').innerHTML=`<div class="card warn">${esc(e.message)}</div>`}
+}
+const campusSel=(id,all=true)=>`<select id="${id}">${all?'<option value="">— Tất cả cơ sở —</option>':''}${S.boot.campuses.map(c=>`<option value="${esc(c.MaCoSo)}" ${S.campus===c.MaCoSo?'selected':''}>${esc(c.TenCoSo)}</option>`).join('')}</select>`;
+const campName=id=>(S.boot.allCampuses.find(c=>c.MaCoSo===id)||{}).TenCoSo||id;
+
+/* ---------- Tổng quan ---------- */
+const VIEWS={};
+VIEWS.dash=async()=>{
+  const r=S.cache.report=await call('report');
+  const s=r.summary,po=r.positionOrder;
+  const cellOf=p=>`<td class="cell ${p.status}">${p.actual}<small>${p.min===p.max?p.min:p.min+'–'+p.max}</small></td>`;
+  $('#main').innerHTML=`
+  <div class="kpis">
+   <div class="kpi"><b>${s.campuses}</b><span>Cơ sở</span></div>
+   <div class="kpi"><b style="color:var(--ok)">${s.ok}</b><span>Đạt định biên</span></div>
+   <div class="kpi"><b style="color:var(--bad)">${s.thieu}</b><span>Thiếu nhân sự</span></div>
+   <div class="kpi"><b style="color:var(--over)">${s.vuot}</b><span>Vượt tỉ lệ lớp</span></div>
+   <div class="kpi"><b style="color:var(--warn)">${s.thua}</b><span>Thừa so với định biên</span></div>
+   <div class="kpi"><b>${s.short}</b><span>Tổng vị trí còn thiếu</span></div>
+   <div class="kpi"><b>${s.surplus}</b><span>Tổng vị trí đang thừa</span></div>
+  </div>
+  <div class="card"><div class="row"><h3 class="grow" style="margin:0">Đối chiếu định biên theo cơ sở – NH ${esc(r.namHoc||'')}</h3>
+   ${can('report.export')?'<button class="b" data-do="csv">Xuất CSV</button>':''}</div>
+   <div class="hint">Mỗi ô: số thực tế (dòng nhỏ: định biên theo khung sĩ số). Xanh = đạt · Đỏ = thiếu · Vàng = thừa. Bấm tên cơ sở để xem chi tiết.</div>
+   <div class="tw"><table class="mx"><thead><tr><th>Cơ sở</th><th class="c">Sĩ số</th><th>Khung</th>${po.map(p=>`<th class="rot">${esc(p)}</th>`).join('')}<th class="c">Lớp thiếu</th><th class="c">Đủ ĐK đề xuất</th><th>Kết luận</th></tr></thead><tbody>
+   ${r.campuses.map(c=>`<tr><td style="white-space:nowrap"><a href="#" data-campus="${esc(c.MaCoSo)}"><b>${esc(c.TenCoSo)}</b></a></td><td class="c">${c.total}</td><td style="white-space:nowrap">${esc(c.band?c.band.Nhan:'—')}</td>${c.positions.map(cellOf).join('')}
+   <td class="c">${c.classes.filter(l=>l.status==='thieu').length}/${c.classes.length}</td><td class="c">${c.canPropose?'✔':''}</td><td>${tag(c.status)}</td></tr>`).join('')||'<tr><td colspan="9" class="muted">Chưa có cơ sở nào.</td></tr>'}
+   </tbody></table></div></div>`;
+};
+
+/* ---------- Báo cáo cơ sở ---------- */
+VIEWS.campus=async()=>{
+  if(!S.campus&&S.boot.campuses.length)S.campus=S.boot.campuses[0].MaCoSo;
+  const r=await call('report',{campus:S.campus});const c=r.campuses[0];
+  const head=`<div class="row">${campusSel('csel',false)}<span class="grow"></span></div>`;
+  if(!c){$('#main').innerHTML=head+'<div class="card">Chưa có dữ liệu.</div>';bindSel();return}
+  $('#main').innerHTML=head+`
+  <div class="kpis">
+   <div class="kpi"><b>${c.total}</b><span>Tổng sĩ số (thực học + giữ chỗ)</span></div>
+   <div class="kpi"><b style="font-size:16px">${esc(c.band?c.band.Nhan:'—')}</b><span>Khung định biên áp dụng</span></div>
+   <div class="kpi"><b>${c.staffActive}</b><span>Nhân sự đang làm</span></div>
+   <div class="kpi"><b>${tag(c.status)}</b><span>Kết luận chung</span></div></div>
+  ${c.warnings.map(w=>`<div class="warn">⚠ ${esc(w)}</div>`).join('')}
+  <div class="card"><h3>Định biên nhân sự tại cơ sở (theo tổng sĩ số)</h3><div class="tw"><table><thead><tr><th>Vị trí</th><th class="c">Định biên</th><th class="c">Thực tế</th><th class="c">Chênh lệch</th><th>Kết luận</th></tr></thead><tbody>
+  ${c.positions.map(p=>{const d=p.actual<p.min?p.actual-p.min:p.actual>p.max?p.actual-p.max:0;return`<tr><td>${esc(p.viTri)}</td><td class="c">${p.min===p.max?p.min:p.min+'–'+p.max}</td><td class="c">${p.actual}</td><td class="c">${d>0?'+'+d:d||'—'}</td><td>${tag(p.status)}</td></tr>`}).join('')}</tbody></table></div></div>
+  <div class="card"><h3>Cơ cấu lớp học & tỉ lệ học sinh : giáo viên</h3><div class="tw"><table><thead><tr><th>Lớp</th><th>Lứa tuổi</th><th class="c">Sĩ số</th><th class="c">Giữ chỗ</th><th class="c">GV</th><th class="c">Bảo mẫu</th><th class="c">Tỉ lệ chuẩn</th><th class="c">Tỉ lệ thực</th><th>Nhân sự</th><th>Kết luận</th></tr></thead><tbody>
+  ${c.classes.map(l=>`<tr><td><b>${esc(l.TenLop)}</b></td><td>${esc(l.LuaTuoi)}</td><td class="c">${l.siSo}</td><td class="c">${l.giuCho}</td><td class="c">${l.gv}/${l.stdGV}</td><td class="c">${l.bm}/${l.stdBM}</td><td class="c">${l.tiLe}:1</td><td class="c">${l.ratioActual==null?'—':l.ratioActual+':1'}</td>
+  <td>${l.members.map(m=>`<span class="chip">${esc(m.HoTen)}</span>`).join('')||'<span class="muted">chưa phân</span>'}</td>
+  <td>${tag(l.status)}${l.issues.map(i=>`<div class="muted" style="font-size:12px">${esc(i)}</div>`).join('')}${l.canPropose?'<div style="font-size:12px;color:var(--pri)">✔ Đủ ĐK đề xuất bổ sung / tách lớp (≥ định biên +'+(S.boot.cfg.params.ChenhLech||2)+' HS)</div>':''}</td></tr>`).join('')||'<tr><td colspan="10" class="muted">Chưa có lớp.</td></tr>'}</tbody></table></div></div>`;
+  bindSel();
+};
+function bindSel(){const e=$('#csel');if(e)e.onchange=()=>{S.campus=e.value;go(S.tab)}}
+
+/* ---------- Nhân sự ---------- */
+VIEWS.staff=async()=>{
+  const [staff,classes]=await Promise.all([call('staffList',{}),can('class.view')?call('classList',{}):[]]);
+  S.cache.staff=staff;S.cache.classes=classes;
+  renderStaff();
+};
+function renderStaff(){
+  const f={cs:S.campus,q:(S.q||'').toLowerCase(),only:S.onlyNoRole};
+  let rows=S.cache.staff.filter(s=>(!f.cs||s.MaCoSo===f.cs)&&(!f.q||(s.HoTen+s.MaNV+s.ChucDanhHR).toLowerCase().indexOf(f.q)>=0)&&(!f.only||(!s.VaiTroDB&&s.TrangThai!=='Nghỉ việc')));
+  const cn=id=>{const l=S.cache.classes.find(x=>x.MaLop===id);return l?l.TenLop:id};
+  const assign=can('staff.assign'),edit=can('staff.import');
+  $('#main').innerHTML=`<div class="row">${campusSel('csel')}<input id="q" placeholder="Tìm tên / mã NV / chức danh" value="${esc(S.q||'')}" class="grow">
+   <label><input type="checkbox" id="nr" ${f.only?'checked':''}> Chưa phân vai trò</label>
+   ${edit?'<button class="b" data-do="addStaff">+ Thêm</button><button class="b p" data-do="importStaff">Nhập từ Excel</button>':''}</div>
+   <div class="card"><div class="muted" style="margin-bottom:8px">${rows.length} nhân sự</div><div class="tw"><table><thead><tr><th>Mã NV</th><th>Họ tên</th><th>Cơ sở</th><th>Chức danh (HR)</th><th>Trạng thái</th><th>Vai trò định biên</th><th>Lớp phụ trách</th><th></th></tr></thead><tbody>
+   ${rows.map(s=>`<tr><td>${esc(s.MaNV)}</td><td>${esc(s.HoTen)}</td><td>${esc(campName(s.MaCoSo))}</td><td>${esc(s.ChucDanhHR)}</td><td>${s.TrangThai===  'Nghỉ việc'?'<span class="tag trong">Nghỉ việc</span>':esc(s.TrangThai)}</td>
+   <td>${assign?`<select data-role="${esc(s.MaNV)}"><option value="">— chưa phân —</option>${S.boot.roleOptions.map(o=>`<option ${o===s.VaiTroDB?'selected':''}>${esc(o)}</option>`).join('')}</select>`:(esc(s.VaiTroDB)||'<span class="muted">—</span>')}</td>
+   <td>${s.lop.map(id=>`<span class="chip">${esc(cn(id))}</span>`).join('')}${assign&&S.boot.classRoles.indexOf(s.VaiTroDB)>=0?` <button class="b s" data-do="assignClass" data-id="${esc(s.MaNV)}">Phân lớp</button>`:''}</td>
+   <td style="white-space:nowrap">${edit?`<button class="b s" data-do="editStaff" data-id="${esc(s.MaNV)}">Sửa</button> <button class="b s d" data-do="delStaff" data-id="${esc(s.MaNV)}">Xoá</button>`:''}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">Không có dữ liệu.</td></tr>'}
+   </tbody></table></div></div>`;
+  const cs=$('#csel');cs.onchange=()=>{S.campus=cs.value;renderStaff()};
+  $('#q').oninput=e=>{S.q=e.target.value;clearTimeout(renderStaff.t);renderStaff.t=setTimeout(()=>{renderStaff();const q=$('#q');q.focus();q.setSelectionRange(99,99)},250)};
+  $('#nr').onchange=e=>{S.onlyNoRole=e.target.checked;renderStaff()};
+}
+function staffForm(s){
+  s=s||{};
+  return `<label>Mã nhân viên</label><input id="f_id" value="${esc(s.MaNV)}" ${s.MaNV?'disabled':''}>
+  <label>Họ tên</label><input id="f_name" value="${esc(s.HoTen)}">
+  <label>Cơ sở</label><select id="f_cs">${S.boot.campuses.map(c=>`<option value="${esc(c.MaCoSo)}" ${c.MaCoSo===(s.MaCoSo||S.campus)?'selected':''}>${esc(c.TenCoSo)}</option>`).join('')}</select>
+  <label>Chức danh theo hợp đồng / HR</label><input id="f_title" value="${esc(s.ChucDanhHR)}">
+  <label>Trạng thái</label><select id="f_st"><option>Đang làm</option><option ${s.TrangThai==='Nghỉ việc'?'selected':''}>Nghỉ việc</option></select>
+  <label>Ghi chú</label><input id="f_note" value="${esc(s.GhiChu)}">`;
+}
+async function saveStaffForm(){
+  await call('staffSave',{row:{MaNV:val('f_id'),HoTen:val('f_name'),MaCoSo:val('f_cs'),ChucDanhHR:val('f_title'),TrangThai:val('f_st'),GhiChu:val('f_note')}});
+  toast('Đã lưu');go('staff');
+}
+function parsePaste(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());if(!lines.length)return[];
+  const sp=l=>l.indexOf('\t')>=0?l.split('\t'):l.split(/[;,]/);
+  const norm=x=>x.toLowerCase().replace(/\s+/g,'');
+  const keys={manv:'MaNV',mãnv:'MaNV',mãnhânviên:'MaNV',hotên:'HoTen',họtên:'HoTen',họvàtên:'HoTen',cơsở:'CoSo',cosở:'CoSo',đơnvị:'CoSo',chứcdanh:'ChucDanhHR',chứcvụ:'ChucDanhHR',chứcvụchính:'ChucDanhHR',trạngthái:'TrangThai'};
+  let cols=['MaNV','HoTen','CoSo','ChucDanhHR','TrangThai'],start=0;
+  const first=sp(lines[0]).map(norm);
+  if(first.some(x=>keys[x])){cols=first.map(x=>keys[x]||'');start=1}
+  return lines.slice(start).map(l=>{const c=sp(l),o={};cols.forEach((k,i)=>{if(k)o[k]=(c[i]||'').trim()});return o});
+}
+
+/* ---------- Lớp học ---------- */
+VIEWS.classes=async()=>{
+  S.cache.classes=await call('classList',{});
+  const ed=can('class.edit');
+  const rows=S.cache.classes.filter(l=>!S.campus||l.MaCoSo===S.campus);
+  const gvOf=(l,r)=>l.members.filter(m=>m.VaiTro===r).map(m=>`<span class="chip">${esc(m.HoTen)}</span>`).join('');
+  $('#main').innerHTML=`<div class="row">${campusSel('csel')}<span class="grow"></span>${ed?'<button class="b p" data-do="addClass">+ Thêm lớp</button>':''}</div>
+  <div class="card"><div class="tw"><table><thead><tr><th>Cơ sở</th><th>Lớp</th><th>Lứa tuổi</th><th class="c">Sĩ số thực học</th><th class="c">Giữ chỗ</th><th class="c">Tổng</th><th>Giáo viên</th><th>Bảo mẫu</th><th></th></tr></thead><tbody>
+  ${rows.map(l=>{const ct=S.boot.cfg.classTypes.find(t=>t.MaNhom===l.MaNhom)||{};return`<tr><td>${esc(campName(l.MaCoSo))}</td><td><b>${esc(l.TenLop)}</b></td><td>${esc(ct.LuaTuoi||'')}</td><td class="c">${l.SiSo}</td><td class="c">${l.GiuCho}</td><td class="c"><b>${l.SiSo+l.GiuCho}</b></td><td>${gvOf(l,'Giáo viên')}</td><td>${gvOf(l,'Bảo mẫu')}</td>
+  <td style="white-space:nowrap">${ed?`<button class="b s" data-do="editClass" data-id="${esc(l.MaLop)}">Sửa</button> <button class="b s d" data-do="delClass" data-id="${esc(l.MaLop)}">Xoá</button>`:''}</td></tr>`}).join('')||'<tr><td colspan="9" class="muted">Chưa có lớp.</td></tr>'}</tbody></table></div></div>`;
+  const cs=$('#csel');cs.onchange=()=>{S.campus=cs.value;go('classes')};
+};
+function classForm(l){
+  l=l||{};
+  return `<label>Cơ sở</label><select id="c_cs" ${l.MaLop?'disabled':''}>${S.boot.campuses.map(c=>`<option value="${esc(c.MaCoSo)}" ${c.MaCoSo===(l.MaCoSo||S.campus)?'selected':''}>${esc(c.TenCoSo)}</option>`).join('')}</select>
+  <label>Nhóm tuổi (tên lớp theo quy định nội bộ)</label><select id="c_ng">${S.boot.cfg.classTypes.map(t=>`<option value="${esc(t.MaNhom)}" ${t.MaNhom===l.MaNhom?'selected':''}>${esc(t.LuaTuoi)} – ${esc(t.VietTat)} (${t.TiLe}:1)</option>`).join('')}</select>
+  <label>Số thứ tự lớp (VD: 1 → Pre-N1)</label><input id="c_stt" value="${esc(l.SoThuTu||'1')}">
+  <label>Sĩ số thực học</label><input id="c_si" type="number" min="0" value="${l.SiSo||0}">
+  <label>Đã đăng ký giữ chỗ</label><input id="c_gc" type="number" min="0" value="${l.GiuCho||0}">
+  <label>Ghi chú</label><input id="c_note" value="${esc(l.GhiChu)}">`;
+}
+
+/* ---------- Cấu hình ---------- */
+VIEWS.config=async()=>{
+  S.boot=await call('bootstrap');S.cfgEdit=JSON.parse(JSON.stringify({cfg:S.boot.cfg,campuses:S.boot.allCampuses}));
+  renderConfig();
+};
+function renderConfig(){
+  const t=S.cfgTab||'ct',E=S.cfgEdit,cfg=E.cfg;
+  const tabs=[['ct','Lớp & tỉ lệ HS:GV'],['band','Khung sĩ số'],['pos','Định biên cơ sở'],['par','Tham số'],['cp','Cơ sở']];
+  const inp=(path,v,w)=>`<input data-path="${path}" value="${esc(v)}" style="width:${w||'100%'}">`;
+  let body='';
+  if(t==='ct')body=`<div class="hint">Sức chứa chuẩn của lớp = Tỉ lệ × (số GV + số bảo mẫu định biên). Bảng theo mục 2 của đề án.</div><table><thead><tr><th>Mã</th><th>Lứa tuổi</th><th>Tên lớp</th><th>Viết tắt</th><th>Tỉ lệ HS:GV</th><th>Số GV</th><th>Bảo mẫu</th><th>Tên theo Bộ GD&ĐT</th><th></th></tr></thead><tbody>${cfg.classTypes.map((r,i)=>`<tr>${['MaNhom','LuaTuoi','TenLop','VietTat','TiLe','SoGV','SoBM','TenBoGD'].map(k=>`<td>${inp('classTypes.'+i+'.'+k,r[k],/Ti|So/.test(k)?'70px':'')}</td>`).join('')}<td><button class="b s d" data-del="classTypes.${i}">✕</button></td></tr>`).join('')}</tbody></table><button class="b" data-add="classTypes">+ Thêm nhóm tuổi</button>`;
+  if(t==='band')body=`<div class="hint">Khung tổng sĩ số (thực học + giữ chỗ) của cơ sở. Để trống "Đến" nếu không giới hạn trên.</div><table><thead><tr><th>Mã khung</th><th>Nhãn</th><th>Từ</th><th>Đến</th><th></th></tr></thead><tbody>${cfg.bands.map((r,i)=>`<tr>${['MaKhung','Nhan','Tu','Den'].map(k=>`<td>${inp('bands.'+i+'.'+k,r[k]===null?'':r[k])}</td>`).join('')}<td><button class="b s d" data-del="bands.${i}">✕</button></td></tr>`).join('')}</tbody></table><button class="b" data-add="bands">+ Thêm khung</button>`;
+  if(t==='pos')body=`<div class="hint">Mỗi ô là một số (VD 2) hoặc khoảng (VD 1-2). Cột tương ứng khung sĩ số. Tên vị trí chính là danh mục "Vai trò định biên" đơn vị dùng khi phân công.</div><div class="tw"><table><thead><tr><th>Vị trí</th>${cfg.bands.map(b=>`<th>${esc(b.Nhan)}</th>`).join('')}<th></th></tr></thead><tbody>${cfg.positions.map((r,i)=>`<tr><td>${inp('positions.'+i+'.ViTri',r.ViTri)}</td>${cfg.bands.map(b=>`<td>${inp('positions.'+i+'.'+b.MaKhung,r[b.MaKhung]||'','80px')}</td>`).join('')}<td><button class="b s d" data-del="positions.${i}">✕</button></td></tr>`).join('')}</tbody></table></div><button class="b" data-add="positions">+ Thêm vị trí</button>`;
+  if(t==='par')body=`<table><thead><tr><th>Tham số</th><th>Giá trị</th><th>Mô tả</th></tr></thead><tbody><tr><td>Năm học</td><td>${inp('params.NamHoc',cfg.params.NamHoc||'')}</td><td class="muted">Hiển thị trên báo cáo</td></tr><tr><td>Chênh lệch đề xuất</td><td>${inp('params.ChenhLech',cfg.params.ChenhLech||2)}</td><td class="muted">Lớp đạt tỉ lệ định biên + N học sinh thì đủ điều kiện đề xuất bổ sung GV/bảo mẫu (mục 4 đề án)</td></tr></tbody></table>`;
+  if(t==='cp')body=`<table><thead><tr><th>Mã cơ sở</th><th>Tên cơ sở</th><th>Hoạt động</th><th></th></tr></thead><tbody>${E.campuses.map((r,i)=>`<tr><td>${inp('campuses.'+i+'.MaCoSo',r.MaCoSo)}</td><td>${inp('campuses.'+i+'.TenCoSo',r.TenCoSo)}</td><td><input type="checkbox" data-path="campuses.${i}.KichHoat" ${r.KichHoat!==false?'checked':''}></td><td></td></tr>`).join('')}</tbody></table><button class="b" data-add="campuses">+ Thêm cơ sở</button>`;
+  $('#main').innerHTML=`<div class="sub">${tabs.map(x=>`<button class="b ${x[0]===t?'on':''}" data-ctab="${x[0]}">${x[1]}</button>`).join('')}<span class="grow"></span><button class="b p" data-do="saveCfg">Lưu cấu hình</button></div><div class="card tw">${body}</div>`;
+}
+function setPath(path,v){
+  const p=path.split('.');let o=S.cfgEdit;
+  const root=p[0]==='campuses'?S.cfgEdit:S.cfgEdit.cfg;
+  o=root;for(let i=0;i<p.length-1;i++)o=o[p[i]];o[p[p.length-1]]=v;
+}
+function getList(name){return name==='campuses'?S.cfgEdit.campuses:S.cfgEdit.cfg[name]}
+
+/* ---------- Phân quyền ---------- */
+VIEWS.perm=async()=>{S.pm=await call('permGet');renderPerm()};
+function renderPerm(){
+  const d=S.pm,t=S.permTab||'role';
+  const roleOpts=r=>d.roles.map(x=>`<option ${x===r?'selected':''}>${esc(x)}</option>`).join('');
+  const m1=`<div class="hint">Tick quyền chức năng cho từng vai trò. Vai trò Admin luôn có toàn quyền.</div><div class="tw"><table class="mx"><thead><tr><th>Quyền \\ Vai trò</th>${d.roles.map(r=>`<th class="rot">${esc(r)}</th>`).join('')}</tr></thead><tbody>${d.perms.map(p=>`<tr><td>${esc(p.label)}</td>${d.roles.map(r=>`<td class="c"><input type="checkbox" data-rp="${esc(r)}|${p.key}" ${d.roleGrid[r][p.key]?'checked':''} ${r==='Admin'?'disabled':''}></td>`).join('')}</tr>`).join('')}</tbody></table></div><div class="row" style="margin-top:10px"><input id="nrole" placeholder="Tên vai trò mới"><button class="b" data-do="addRole">+ Thêm vai trò</button></div>`;
+  const m2=`<div class="hint">Mỗi người dùng một vai trò (quyền chức năng) và được tick các cơ sở được truy cập. Admin tự động truy cập mọi cơ sở. Email phải là tài khoản Google của tổ chức.</div><div class="tw"><table class="mx"><thead><tr><th>Email</th><th>Họ tên</th><th>Vai trò</th><th class="c">Kích hoạt</th>${d.campuses.map(c=>`<th class="rot">${esc(c.TenCoSo)}</th>`).join('')}<th></th></tr></thead><tbody>${d.users.map((u,i)=>`<tr><td><input data-u="${i}|Email" value="${esc(u.Email)}" style="width:210px"></td><td><input data-u="${i}|HoTen" value="${esc(u.HoTen)}" style="width:150px"></td><td><select data-u="${i}|VaiTro">${roleOpts(u.VaiTro)}</select></td><td class="c"><input type="checkbox" data-u="${i}|KichHoat" ${u.KichHoat?'checked':''}></td>${d.campuses.map(c=>`<td class="c"><input type="checkbox" data-uc="${i}|${esc(c.MaCoSo)}" ${u.VaiTro==='Admin'||u.campuses.indexOf(c.MaCoSo)>=0?'checked':''} ${u.VaiTro==='Admin'?'disabled':''}></td>`).join('')}<td><button class="b s d" data-delu="${i}">✕</button></td></tr>`).join('')}</tbody></table></div><div class="row" style="margin-top:10px"><button class="b" data-do="addUser">+ Thêm người dùng</button></div>`;
+  $('#main').innerHTML=`<div class="sub"><button class="b ${t==='role'?'on':''}" data-ptab="role">Ma trận Quyền × Vai trò</button><button class="b ${t==='user'?'on':''}" data-ptab="user">Ma trận Người dùng × Cơ sở</button><span class="grow"></span><button class="b p" data-do="savePerm">Lưu phân quyền</button></div><div class="card">${t==='role'?m1:m2}</div>`;
+}
+
+/* ---------- Nhật ký ---------- */
+VIEWS.audit=async()=>{
+  const rows=await call('auditList');
+  $('#main').innerHTML=`<div class="card tw"><table><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Chi tiết</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.ThoiGian)}</td><td>${esc(r.Email)}</td><td>${esc(r.HanhDong)}</td><td>${esc(r.ChiTiet)}</td></tr>`).join('')}</tbody></table></div>`;
+};
+
+/* ---------- Xuất CSV ---------- */
+function exportCsv(){
+  const r=S.cache.report,q=v=>'"'+String(v).replace(/"/g,'""')+'"';
+  const lines=[['Cơ sở','Tổng sĩ số','Khung','Vị trí','Định biên tối thiểu','Định biên tối đa','Thực tế','Kết luận'].map(q).join(',')];
+  r.campuses.forEach(c=>c.positions.forEach(p=>lines.push([c.TenCoSo,c.total,c.band?c.band.Nhan:'',p.viTri,p.min,p.max,p.actual,ST[p.status]].map(q).join(','))));
+  lines.push('');lines.push(['Cơ sở','Lớp','Sĩ số+giữ chỗ','GV','Bảo mẫu','Tỉ lệ chuẩn','Kết luận','Ghi chú'].map(q).join(','));
+  r.campuses.forEach(c=>c.classes.forEach(l=>lines.push([c.TenCoSo,l.TenLop,l.students,l.gv+'/'+l.stdGV,l.bm+'/'+l.stdBM,l.tiLe+':1',ST[l.status],l.issues.join('; ')].map(q).join(','))));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download='bao-cao-dinh-bien.csv';document.body.appendChild(a);a.click();a.remove();
+}
+
+/* ---------- Sự kiện ---------- */
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('[data-tab],[data-campus],[data-do],[data-ctab],[data-add],[data-del],[data-ptab],[data-delu]');if(!t)return;
+  const d=t.dataset;
+  if(d.tab)return go(d.tab);
+  if(d.campus){e.preventDefault();S.campus=d.campus;return go('campus')}
+  if(d.ctab){S.cfgTab=d.ctab;return renderConfig()}
+  if(d.ptab){S.permTab=d.ptab;return renderPerm()}
+  if(d.add){const n=d.add,l=getList(n),B=S.cfgEdit.cfg.bands;
+    l.push(n==='classTypes'?{MaNhom:'',LuaTuoi:'',TenLop:'',VietTat:'',TiLe:0,SoGV:2,SoBM:0,TenBoGD:''}:n==='bands'?{MaKhung:'B'+(l.length+1),Nhan:'',Tu:0,Den:null}:n==='positions'?{ViTri:''}:{MaCoSo:'',TenCoSo:'',KichHoat:true});
+    return renderConfig()}
+  if(d.del){const [n,i]=d.del.split('.');getList(n).splice(+i,1);return renderConfig()}
+  if(d.delu){S.pm.users.splice(+d.delu,1);return renderPerm()}
+  const A={
+    csv:exportCsv,
+    addStaff:()=>modal('Thêm nhân sự',staffForm(),()=>act(saveStaffForm)),
+    editStaff:()=>modal('Sửa nhân sự',staffForm(S.cache.staff.find(s=>s.MaNV===d.id)),()=>act(saveStaffForm)),
+    delStaff:async()=>{if(confirm('Xoá nhân sự '+d.id+'? (cũng xoá phân công lớp)')){await act(()=>call('staffDelete',{maNV:d.id}));toast('Đã xoá');go('staff')}},
+    importStaff:()=>modal('Nhập nhân sự từ Excel',`<div class="hint">Dán dữ liệu copy từ Excel/Google Sheets. Thứ tự cột: <b>Mã NV · Họ tên · Cơ sở (mã hoặc tên) · Chức danh · Trạng thái</b> (có thể có dòng tiêu đề). Mã NV đã có sẽ được cập nhật; vai trò định biên đã phân được giữ nguyên. NV mới được gợi ý vai trò từ chức danh, đơn vị điều chỉnh sau.</div><textarea id="paste" rows="10" placeholder="VA011239&#9;Thạch Vàng&#9;CS01&#9;Giáo viên&#9;Đang làm"></textarea>`,async()=>{
+      const rows=parsePaste(val('paste'));if(!rows.length)throw new Error('Chưa có dữ liệu');
+      const r=await call('staffImport',{rows});
+      if(r.errors.length)alert('Thêm '+r.added+', cập nhật '+r.updated+'.\nLỗi ('+r.errors.length+'):\n'+r.errors.slice(0,20).join('\n'));else toast('Thêm '+r.added+', cập nhật '+r.updated);
+      go('staff')},{okText:'Nhập',wide:true}),
+    assignClass:()=>{
+      const s=S.cache.staff.find(x=>x.MaNV===d.id),ls=S.cache.classes.filter(l=>l.MaCoSo===s.MaCoSo);
+      modal('Phân lớp – '+esc(s.HoTen),ls.length?ls.map(l=>`<label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px"><input type="checkbox" style="width:auto" class="lc" value="${esc(l.MaLop)}" ${s.lop.indexOf(l.MaLop)>=0?'checked':''}> ${esc(l.TenLop)} <span class="muted">(${l.SiSo+l.GiuCho} HS)</span></label>`).join(''):'<p class="muted">Cơ sở chưa có lớp. Hãy tạo lớp trước.</p>',ls.length?()=>act(async()=>{
+        await call('staffAssign',{maNV:s.MaNV,vaiTro:s.VaiTroDB,lop:[...document.querySelectorAll('.lc:checked')].map(x=>x.value)});toast('Đã lưu phân lớp');go('staff')}):null)},
+    addClass:()=>modal('Thêm lớp',classForm(),()=>act(saveClassForm)),
+    editClass:()=>modal('Sửa lớp',classForm(S.cache.classes.find(l=>l.MaLop===d.id)),()=>act(()=>saveClassForm(d.id))),
+    delClass:async()=>{if(confirm('Xoá lớp này và các phân công liên quan?')){await act(()=>call('classDelete',{maLop:d.id}));toast('Đã xoá');go('classes')}},
+    saveCfg:async()=>{const E=S.cfgEdit,c=E.cfg;
+      const p={classTypes:c.classTypes,bands:c.bands.map(b=>({...b,Den:b.Den===''?null:b.Den})),positions:c.positions,campuses:E.campuses,params:[{Khoa:'NamHoc',GiaTri:c.params.NamHoc},{Khoa:'ChenhLech',GiaTri:c.params.ChenhLech}]};
+      S.boot=Object.assign(S.boot,await act(()=>call('configSave',p)));toast('Đã lưu cấu hình');go('config')},
+    addRole:()=>{const n=val('nrole').trim();if(!n||S.pm.roleGrid[n])return toast('Tên vai trò trống hoặc đã tồn tại',true);S.pm.roleGrid[n]={};S.pm.roles.push(n);renderPerm()},
+    addUser:()=>{S.pm.users.push({Email:'',HoTen:'',VaiTro:S.pm.roles[S.pm.roles.length-1],KichHoat:true,campuses:[]});S.permTab='user';renderPerm()},
+    savePerm:async()=>{const d=await act(()=>call('permSave',{roleGrid:S.pm.roleGrid,users:S.pm.users}));S.pm=d;toast('Đã lưu phân quyền');renderPerm()}
+  };
+  if(A[d.do])A[d.do]();
+});
+async function saveClassForm(id){
+  await call('classSave',{row:{MaLop:id||'',MaCoSo:val('c_cs'),MaNhom:val('c_ng'),SoThuTu:val('c_stt'),SiSo:val('c_si'),GiuCho:val('c_gc'),GhiChu:val('c_note')}});
+  toast('Đã lưu');go('classes');
+}
+document.addEventListener('change',async e=>{
+  const t=e.target,d=t.dataset;
+  if(d.role!==undefined){
+    const s=S.cache.staff.find(x=>x.MaNV===d.role);
+    try{await call('staffAssign',{maNV:s.MaNV,vaiTro:t.value,lop:S.boot.classRoles.indexOf(t.value)>=0?s.lop:[]});s.VaiTroDB=t.value;if(S.boot.classRoles.indexOf(t.value)<0)s.lop=[];toast('Đã cập nhật vai trò');renderStaff()}catch(er){toast(er.message,true);renderStaff()}
+  }else if(d.path!==undefined)setPath(d.path,t.type==='checkbox'?t.checked:t.value);
+  else if(d.rp){const [r,k]=d.rp.split('|');S.pm.roleGrid[r][k]=t.checked}
+  else if(d.u){const [i,k]=d.u.split('|'),u=S.pm.users[+i];u[k]=t.type==='checkbox'?t.checked:t.value;if(k==='VaiTro')renderPerm()}
+  else if(d.uc){const [i,m]=d.uc.split('|'),u=S.pm.users[+i],a=u.campuses;const x=a.indexOf(m);if(t.checked&&x<0)a.push(m);if(!t.checked&&x>=0)a.splice(x,1)}
+});
+init();
+</script>
+</body>
+</html>
