@@ -52,7 +52,7 @@ const HEADERS = {
   CauHinh_ThamSo: ['Khoa', 'GiaTri', 'MoTa'],
   NhatKy: ['ThoiGian', 'Email', 'HanhDong', 'ChiTiet'],
   LichSu: ['Ky', 'MaCoSo', 'ChotLuc', 'NguoiChot', 'GhiChu', 'DuLieu'],
-  PheDuyet: ['MaPD', 'Loai', 'Ky', 'MaCoSo', 'TieuDe', 'GhiChu', 'NguoiGui', 'TenNguoiGui', 'GuiLuc', 'CheDo', 'TrangThai', 'Luong', 'KetThucLuc'],
+  PheDuyet: ['MaPD', 'Loai', 'Ky', 'MaCoSo', 'TieuDe', 'GhiChu', 'NguoiGui', 'TenNguoiGui', 'GuiLuc', 'CheDo', 'TrangThai', 'Luong', 'KetThucLuc', 'ThongBao'],
   PheDuyet_DL: ['MaPD', 'DuLieu']
 };
 const TEXT_COLS = { NhanSu: ['MaNV', 'MaCoSo', 'SoDT'], Lop: ['MaLop', 'MaCoSo', 'SoThuTu'], PhanCong: ['MaLop', 'MaNV'], PQ_CoSo: ['MaCoSo'], CoSo: ['MaCoSo'], LichSu: ['Ky', 'MaCoSo', 'DuLieu'], PheDuyet: ['MaPD', 'Ky', 'MaCoSo'], PheDuyet_DL: ['MaPD', 'DuLieu'] };
@@ -72,6 +72,7 @@ function onOpen() {
     .addItem('1. Khởi tạo hệ thống (chạy lần đầu)', 'setup')
     .addItem('2. Nạp dữ liệu mẫu để chạy thử', 'seedDemo')
     .addItem('3. Bật tự động chốt kỳ hằng tháng', 'installMonthlyTrigger')
+    .addItem('4. Đăng xuất mọi phiên (bắt nhập lại mã)', 'revokeAllSessions')
     .addToUi();
 }
 
@@ -200,10 +201,16 @@ function setup() {
       P('Bảo vệ', ['1-2', '1-2', 2, 2, 2, 2])
     ], 'all');
   }
-  if (empty(SH.PARAM)) put_(SH.PARAM, [
+  const defParams = [
     { Khoa: 'NamHoc', GiaTri: '2026 - 2027', MoTa: 'Năm học hiển thị trên báo cáo' },
-    { Khoa: 'ChenhLech', GiaTri: '2', MoTa: 'Lớp đạt tỉ lệ định biên + N học sinh thì đủ điều kiện đề xuất bổ sung GV/bảo mẫu' }
-  ]);
+    { Khoa: 'ChenhLech', GiaTri: '2', MoTa: 'Lớp đạt tỉ lệ định biên + N học sinh thì đủ điều kiện đề xuất bổ sung GV/bảo mẫu' },
+    { Khoa: 'XacThucOTP', GiaTri: '1', MoTa: '1 = bắt buộc nhập mã xác nhận gửi qua email khi vào hệ thống; 0 = tắt' },
+    { Khoa: 'PhienGio', GiaTri: '8', MoTa: 'Số giờ một lần xác nhận có hiệu lực (1–72)' }
+  ];
+  const haveP = read_(SH.PARAM);
+  const addP = defParams.filter(d => !haveP.some(h => h.Khoa === d.Khoa));
+  if (addP.length) put_(SH.PARAM, haveP.concat(addP));
+  authSecret_();
   log_(null, 'setup', 'Khởi tạo hệ thống');
   SpreadsheetApp.getActive().toast('Đã khởi tạo. Triển khai Web app rồi truy cập bằng đường link.', 'Định biên', 8);
 }
@@ -270,8 +277,13 @@ function needCampus_(c, id) { if (c.allowed.indexOf(str_(id)) < 0) throw new Err
 
 /* ===================== API DISPATCH ===================== */
 
-function api(action, payload) {
+function api(action, payload, token) {
   try {
+    if (AUTH_FREE[action]) return { ok: true, data: authAction_(action, payload || {}, token) };
+    if (otpOn_()) {
+      const em = (Session.getActiveUser().getEmail() || '').toLowerCase();
+      if (!tokenOk_(token, em)) return { ok: false, auth: true, error: 'Cần xác nhận đăng nhập bằng mã gửi qua email.' };
+    }
     const a = ACTIONS[action];
     if (!a) throw new Error('Hành động không hợp lệ: ' + action);
     const c = ctx_();
@@ -286,6 +298,94 @@ function api(action, payload) {
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };
   }
+}
+
+/* ===================== XÁC NHẬN ĐĂNG NHẬP BẰNG MÃ (OTP QUA EMAIL) ===================== */
+/* Sau khi Google xác định tài khoản, người dùng phải nhập mã 6 số gửi tới email của chính họ.
+   Thành công → cấp token ký HMAC (không lưu máy chủ) có hạn PhienGio giờ, gắn với đúng email đó. */
+
+const AUTH_FREE = { authStatus: 1, authSend: 1, authVerify: 1 };
+const OTP_TTL = 300, OTP_MAX_TRY = 5, OTP_LOCK = 900, OTP_COOLDOWN = 60;
+
+function param_(k, d) { const r = read_(SH.PARAM).find(x => x.Khoa === k); return r ? str_(r.GiaTri) : d; }
+function otpOn_() { return param_('XacThucOTP', '1') !== '0'; }
+function sessionHours_() { return Math.max(1, Math.min(72, num_(param_('PhienGio', '8'), 8))); }
+
+function authSecret_() {
+  const pr = PropertiesService.getScriptProperties();
+  let k = pr.getProperty('AUTH_SECRET');
+  if (!k) {
+    const lock = LockService.getScriptLock(); lock.waitLock(10000);
+    try { k = pr.getProperty('AUTH_SECRET'); if (!k) { k = Utilities.getUuid() + Utilities.getUuid(); pr.setProperty('AUTH_SECRET', k); } } finally { lock.releaseLock(); }
+  }
+  return k;
+}
+/* Đăng xuất toàn bộ phiên hiện có (đổi khoá ký) – chạy từ menu Định biên */
+function revokeAllSessions() {
+  PropertiesService.getScriptProperties().setProperty('AUTH_SECRET', Utilities.getUuid() + Utilities.getUuid());
+  log_(null, 'revokeSessions', 'Đăng xuất mọi phiên');
+  SpreadsheetApp.getActive().toast('Đã đăng xuất mọi người dùng. Mọi người sẽ phải nhập lại mã xác nhận.', 'Định biên', 8);
+}
+function sign_(payload) { return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payload, authSecret_())); }
+function makeToken_(email, expSec) {
+  const payload = email + '|' + expSec;
+  return Utilities.base64EncodeWebSafe(payload) + '.' + sign_(payload);
+}
+function tokenOk_(token, email) {
+  try {
+    if (!token || !email) return false;
+    const parts = String(token).split('.');
+    if (parts.length !== 2) return false;
+    const payload = Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString();
+    if (sign_(payload) !== parts[1]) return false;
+    const at = payload.lastIndexOf('|');
+    return payload.slice(0, at) === email && Number(payload.slice(at + 1)) > Date.now() / 1000;
+  } catch (e) { return false; }
+}
+function otpHash_(code, email) {
+  return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, code + '|' + email + '|' + authSecret_()));
+}
+function maskEmail_(e) { const p = e.split('@'); return p[0].slice(0, 2) + '***@' + (p[1] || ''); }
+
+function authAction_(action, p, token) {
+  const email = (Session.getActiveUser().getEmail() || '').toLowerCase();
+  if (!email) throw new Error('Không xác định được tài khoản Google. Hãy đăng nhập bằng tài khoản của tổ chức.');
+  const cache = CacheService.getScriptCache(), kOtp = 'otp_' + email, kLock = 'otplock_' + email, kCd = 'otpcd_' + email;
+  const on = otpOn_();
+  if (action === 'authStatus') return { required: on, valid: !on || tokenOk_(token, email), masked: maskEmail_(email), hours: sessionHours_() };
+  if (!on) throw new Error('Hệ thống không bật xác nhận bằng mã.');
+  const u = read_(SH.USERS).find(x => str_(x.Email).toLowerCase() === email && bool_(x.KichHoat));
+  if (!u) throw new Error('Tài khoản ' + email + ' chưa được cấp quyền sử dụng. Vui lòng liên hệ Admin.');
+  if (cache.get(kLock)) throw new Error('Tài khoản tạm khoá 15 phút do nhập sai mã nhiều lần.');
+
+  if (action === 'authSend') {
+    if (cache.get(kCd)) throw new Error('Vui lòng chờ ' + OTP_COOLDOWN + ' giây giữa các lần gửi mã.');
+    const code = ('000000' + (parseInt(Utilities.getUuid().replace(/-/g, '').slice(0, 8), 16) % 1000000)).slice(-6);
+    try {
+      MailApp.sendEmail({ to: email, name: 'Định biên MN', subject: 'Mã xác nhận đăng nhập: ' + code,
+        htmlBody: '<p>Xin chào ' + u.HoTen + ',</p><p>Mã xác nhận đăng nhập hệ thống Định biên & Phân công của bạn là:</p><p style="font-size:28px;letter-spacing:6px"><b>' + code + '</b></p><p>Mã có hiệu lực ' + (OTP_TTL / 60) + ' phút. Tuyệt đối không chia sẻ mã này. Nếu không phải bạn đang đăng nhập, hãy bỏ qua email này và báo Admin.</p>' });
+    } catch (e) { throw new Error('Không gửi được email mã xác nhận: ' + e.message); }
+    cache.put(kOtp, JSON.stringify({ h: otpHash_(code, email), e: Date.now() + OTP_TTL * 1000, t: 0 }), OTP_TTL);
+    cache.put(kCd, '1', OTP_COOLDOWN);
+    log_({ email }, 'otpSend', 'Gửi mã xác nhận');
+    return { sent: true, masked: maskEmail_(email), cooldown: OTP_COOLDOWN, minutes: OTP_TTL / 60 };
+  }
+  if (action === 'authVerify') {
+    const raw = cache.get(kOtp);
+    if (!raw) throw new Error('Mã đã hết hạn hoặc chưa được gửi. Hãy bấm "Gửi mã".');
+    const o = JSON.parse(raw), code = str_(p.code).replace(/\D/g, '');
+    if (otpHash_(code, email) !== o.h) {
+      o.t = (o.t || 0) + 1;
+      if (o.t >= OTP_MAX_TRY) { cache.remove(kOtp); cache.put(kLock, '1', OTP_LOCK); log_({ email }, 'otpFail', 'Sai mã ' + OTP_MAX_TRY + ' lần – khoá 15 phút'); throw new Error('Nhập sai quá ' + OTP_MAX_TRY + ' lần. Tài khoản tạm khoá 15 phút.'); }
+      cache.put(kOtp, JSON.stringify(o), Math.max(1, Math.ceil((o.e - Date.now()) / 1000)));
+      throw new Error('Mã không đúng. Còn ' + (OTP_MAX_TRY - o.t) + ' lần thử.');
+    }
+    cache.remove(kOtp);
+    const hours = sessionHours_(), exp = Math.floor(Date.now() / 1000) + hours * 3600;
+    log_({ email }, 'login', 'Đăng nhập bằng mã xác nhận (phiên ' + hours + ' giờ)');
+    return { token: makeToken_(email, exp), exp, hours };
+  }
+  throw new Error('Hành động không hợp lệ');
 }
 
 const ACTIONS = {
@@ -756,6 +856,8 @@ function approverCandidates_(c) {
     .map(u => ({ Email: str_(u.Email).toLowerCase(), HoTen: u.HoTen, VaiTro: u.VaiTro }));
 }
 
+function mailOn_(r) { return str_(r.ThongBao) !== 'tat'; }
+
 function pdItem_(r, c, camp) {
   let l = []; try { l = JSON.parse(r.Luong || '[]'); } catch (e) {}
   const me = c.email, involved = str_(r.NguoiGui).toLowerCase() === me || l.some(x => x.email === me);
@@ -773,10 +875,16 @@ function pdList_(c) {
   return read_(SH.PD).map(r => pdItem_(r, c, camp)).filter(x => all || x.involved).sort((a, b) => a.MaPD < b.MaPD ? 1 : -1);
 }
 
-function notify_(to, subject, html) {
+/* Thư gửi từ tài khoản chủ web app (Google không cho giả địa chỉ gửi), nhưng hiện TÊN người thao tác
+   và đặt Reply-To = email người đó để người nhận bấm "Trả lời" là về đúng người. */
+function notify_(to, subject, html, actor, cc) {
   try {
     const url = ScriptApp.getService().getUrl();
-    (Array.isArray(to) ? to : [to]).filter(Boolean).forEach(addr => MailApp.sendEmail({ to: addr, subject: '[Định biên MN] ' + subject, htmlBody: html + (url ? '<p><a href="' + url + '">Mở hệ thống</a></p>' : '') }));
+    (Array.isArray(to) ? to : [to]).filter(Boolean).forEach(addr => {
+      const m = { to: addr, subject: '[Định biên MN] ' + subject, htmlBody: html + (actor ? '<p style="color:#666">Gửi bởi ' + actor.name + ' (' + actor.email + ') qua hệ thống Định biên MN – bấm Trả lời để phản hồi trực tiếp.</p>' : '') + (url ? '<p><a href="' + url + '">Mở hệ thống</a></p>' : '') };
+      if (actor) { m.replyTo = actor.email; m.name = actor.name + ' (Định biên MN)'; if (cc) m.cc = actor.email; }
+      MailApp.sendEmail(m);
+    });
   } catch (e) { /* không gửi được mail (hạn mức/quyền): bỏ qua, hồ sơ vẫn hợp lệ */ }
 }
 
@@ -798,11 +906,11 @@ function approvalSubmit_(c, p) {
   if (json.length > 49000) throw new Error('Dữ liệu cơ sở quá lớn để đính kèm hồ sơ.');
   const n = rows.reduce((m, r) => Math.max(m, Number(String(r.MaPD).replace(/\D/g, '')) || 0), 0) + 1, id = 'PD' + ('0000' + n).slice(-4);
   const luong = emails.map(e => ({ email: e, hoTen: byMail[e].HoTen, tt: 'cho', yKien: '', luc: '' }));
-  rows.push({ MaPD: id, Loai: str_(p.loai) || 'Phân công & định biên', Ky: ky, MaCoSo: campus.MaCoSo, TieuDe: str_(p.tieuDe), GhiChu: str_(p.ghiChu), NguoiGui: c.email, TenNguoiGui: c.name, GuiLuc: nowStr_(), CheDo: che, TrangThai: PD_WAIT, Luong: JSON.stringify(luong), KetThucLuc: '' });
+  rows.push({ MaPD: id, Loai: str_(p.loai) || 'Phân công & định biên', Ky: ky, MaCoSo: campus.MaCoSo, TieuDe: str_(p.tieuDe), GhiChu: str_(p.ghiChu), NguoiGui: c.email, TenNguoiGui: c.name, GuiLuc: nowStr_(), CheDo: che, TrangThai: PD_WAIT, Luong: JSON.stringify(luong), KetThucLuc: '', ThongBao: p.guiMail === false ? 'tat' : 'mail' });
   put_(SH.PD, rows);
   const dl = read_(SH.PDDL); dl.push({ MaPD: id, DuLieu: json }); put_(SH.PDDL, dl);
   const first = che === 'Tuần tự' ? [emails[0]] : emails;
-  notify_(first, 'Đề nghị phê duyệt ' + id, '<p>' + c.name + ' gửi hồ sơ <b>' + str_(p.tieuDe) + '</b> (' + campus.TenCoSo + ', kỳ ' + ky + ') chờ bạn phê duyệt.</p>');
+  if (p.guiMail !== false) notify_(first, 'Đề nghị phê duyệt ' + id, '<p>' + c.name + ' gửi hồ sơ <b>' + str_(p.tieuDe) + '</b> (' + campus.TenCoSo + ', kỳ ' + ky + ') chờ bạn phê duyệt.</p>' + (str_(p.ghiChu) ? '<p>Nội dung: ' + str_(p.ghiChu) + '</p>' : ''), c, p.ccToi === true);
   log_(c, 'approvalSubmit', id + ' · ' + campus.MaCoSo + ' · ' + ky + ' → ' + emails.join(', ') + ' (' + che + ')');
   return id;
 }
@@ -831,7 +939,7 @@ function approvalAct_(c, p) {
   const sender = str_(r.NguoiGui);
   if (!ok) {
     r.TrangThai = PD_NO; r.KetThucLuc = nowStr_();
-    notify_(sender, 'Hồ sơ ' + r.MaPD + ' bị từ chối', '<p>' + c.name + ' đã từ chối <b>' + r.TieuDe + '</b>.</p><p>Lý do: ' + ykien + '</p>');
+    if (mailOn_(r)) notify_(sender, 'Hồ sơ ' + r.MaPD + ' bị từ chối', '<p>' + c.name + ' đã từ chối <b>' + r.TieuDe + '</b>.</p><p>Lý do: ' + ykien + '</p>', c);
   } else if (l.every(x => x.tt === 'duyet')) {
     r.TrangThai = PD_OK; r.KetThucLuc = nowStr_();
     const dl = read_(SH.PDDL).find(x => str_(x.MaPD) === str_(r.MaPD));
@@ -841,10 +949,10 @@ function approvalAct_(c, p) {
       if (i >= 0) hist[i] = row; else hist.push(row);
       put_(SH.HIST, hist);
     }
-    notify_(sender, 'Hồ sơ ' + r.MaPD + ' đã được phê duyệt', '<p><b>' + r.TieuDe + '</b> đã được tất cả người phê duyệt đồng ý.</p>');
+    if (mailOn_(r)) notify_(sender, 'Hồ sơ ' + r.MaPD + ' đã được phê duyệt', '<p><b>' + r.TieuDe + '</b> đã được tất cả người phê duyệt đồng ý.</p>', c);
   } else if (r.CheDo === 'Tuần tự') {
     const next = l.find(x => x.tt === 'cho');
-    if (next) notify_(next.email, 'Đến lượt bạn phê duyệt ' + r.MaPD, '<p>Hồ sơ <b>' + r.TieuDe + '</b> của ' + r.TenNguoiGui + ' chờ bạn phê duyệt (' + c.name + ' đã đồng ý).</p>');
+    if (next && mailOn_(r)) notify_(next.email, 'Đến lượt bạn phê duyệt ' + r.MaPD, '<p>Hồ sơ <b>' + r.TieuDe + '</b> của ' + r.TenNguoiGui + ' chờ bạn phê duyệt (' + c.name + ' đã đồng ý).</p>', c);
   }
   put_(SH.PD, rows);
   log_(c, 'approvalAct', r.MaPD + ' · ' + (ok ? 'đồng ý' : 'từ chối') + (ykien ? ' · ' + ykien : ''));

@@ -61,3 +61,15 @@ Căn cứ: *Quy định tên lớp học – Định biên nhân sự Khối M�
 3. Lớp mới/tách lớp: *+ Thêm lớp* rồi phân GV; lớp đóng: *Xoá*. 
 4. Cần xin thêm người: *Phê duyệt › Gửi phê duyệt* (loại "Đề xuất bổ sung…") đính kèm đúng số liệu.
 5. Cuối tháng *Chốt kỳ* (hoặc tự động): so sánh hai kỳ có bảng "Sĩ số lớp thay đổi".
+
+## Đăng nhập bằng mã xác nhận (OTP qua email)
+- Sau khi Google nhận diện tài khoản, người dùng phải nhập **mã 6 số gửi tới email của chính họ** (hiệu lực 5 phút, dùng 1 lần). Đúng mã → được dùng liên tục *PhienGio* giờ (mặc định 8), tải lại trang vẫn giữ phiên; hết hạn hoặc bấm **Đăng xuất** thì phải nhập lại.
+- Bảo mật: mã lưu dạng băm; sai 5 lần → khoá 15 phút; gửi lại cách nhau 60 giây; phiên là token ký HMAC gắn với đúng email (đổi email/sửa token đều bị từ chối); kiểm tra ở **mọi** lệnh gọi phía máy chủ, không chỉ ở giao diện. Tài khoản chưa được cấp quyền không nhận được mã. Đăng nhập/sai mã/gửi mã đều ghi *Nhật ký*.
+- Bật/tắt và đổi thời hạn ở *Cấu hình › Tham số*. Tắt khẩn cấp (vd. không gửi được mail): sửa ô `GiaTri` của `XacThucOTP` thành `0` trong sheet `CauHinh_ThamSo`.
+- Menu *Định biên › 4. Đăng xuất mọi phiên* đổi khoá ký, buộc mọi người nhập lại mã (dùng khi nghi lộ phiên).
+- Lưu ý: mã gửi bằng MailApp (hạn mức ~1.500 mail/ngày với Workspace); thư báo phê duyệt cũng tính vào hạn mức này.
+
+## Email thông báo phê duyệt
+- Thư đi từ tài khoản chủ web app (Google không cho giả địa chỉ gửi của người khác khi web app chạy "Thực thi bằng: Tôi"). Hệ thống hiển thị **tên người thao tác** ("Nguyễn A (Định biên MN)"), đặt **Reply-To = email người đó** và ghi rõ người gửi trong nội dung.
+- Khi gửi phê duyệt có thể: tắt gửi mail thông báo, hoặc tick **CC cho tôi**.
+- Muốn thư đi đúng từ hộp thư từng người phải triển khai "Thực thi bằng: Người dùng truy cập" – khi đó mọi người phải có quyền sửa Google Sheet dữ liệu, làm mất cơ chế phân quyền theo cơ sở, nên không khuyến nghị.

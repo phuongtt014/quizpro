@@ -47,6 +47,12 @@ td.cell.ok{background:var(--ok-l)}td.cell.thieu{background:var(--bad-l)}td.cell.
 .loading{padding:40px;text-align:center;color:var(--mut)}
 @media(max-width:700px){main{padding:10px}}
 .printonly{display:none}
+#login{position:fixed;inset:0;background:linear-gradient(135deg,#0f6e56,#0b4a3a);display:none;align-items:center;justify-content:center;z-index:100;padding:16px}
+#login .box{background:#fff;border-radius:14px;padding:26px;width:min(400px,100%);box-shadow:0 10px 40px #0004}
+#login h2{margin:0 0 6px;font-size:19px}#login p{margin:6px 0 14px;color:var(--mut)}
+#login input{width:100%;font-size:26px;letter-spacing:10px;text-align:center;padding:10px}
+#login .err{color:var(--bad);min-height:20px;margin:8px 0;font-size:13px}
+#login button.b{width:100%;margin-top:8px;padding:10px}
 .flow{display:flex;gap:4px;flex-wrap:wrap}.flow .tag{font-weight:500}
 .impact{background:#f4f8f7;border:1px solid #cfe6df;border-radius:8px;padding:10px 12px;margin-top:12px;font-size:13px}
 .impact b{font-weight:600}.impact ul{margin:6px 0 0;padding-left:18px}
@@ -68,10 +74,11 @@ td.cell.ok{background:var(--ok-l)}td.cell.thieu{background:var(--bad-l)}td.cell.
 </style>
 </head>
 <body>
-<header><h1>Định biên & Phân công nhân sự – Khối Mầm non Việt Mỹ <small id="nh"></small></h1><small id="stamp"></small><button class="b s" data-do="refresh" title="Tải lại dữ liệu từ máy chủ" style="background:#ffffff22;color:#fff;border-color:#ffffff66">⟳ Làm mới</button><small id="who"></small></header>
+<header><h1>Định biên & Phân công nhân sự – Khối Mầm non Việt Mỹ <small id="nh"></small></h1><small id="stamp"></small><button class="b s" id="lo" data-do="logout" style="display:none;background:#ffffff22;color:#fff;border-color:#ffffff66">Đăng xuất</button><button class="b s" data-do="refresh" title="Tải lại dữ liệu từ máy chủ" style="background:#ffffff22;color:#fff;border-color:#ffffff66">⟳ Làm mới</button><small id="who"></small></header>
 <div class="printonly" id="ph" style="text-align:center"><b>HỆ THỐNG TRƯỜNG VIỆT MỸ – KHỐI MẦM NON</b><br><span id="ptitle"></span></div>
 <nav id="nav"></nav>
 <main id="main"><div class="loading">Đang tải…</div></main>
+<div id="login"></div>
 <div id="toast"></div>
 <div id="modal"></div>
 
@@ -83,11 +90,14 @@ const can=p=>S.boot.me.perms.indexOf(p)>=0;
 const ST={ok:'Đạt',thieu:'Thiếu',thua:'Thừa',vuot:'Vượt tỉ lệ',trong:'Chưa có sĩ số'};
 const tag=s=>`<span class="tag ${s}">${ST[s]||s}</span>`;
 
+const TK='vm_dinhbien_tok';
+const tokStore={get(){try{return localStorage.getItem(TK)||''}catch(e){return S.mem||''}},set(v){S.mem=v;try{v?localStorage.setItem(TK,v):localStorage.removeItem(TK)}catch(e){}}};
+S.token=tokStore.get();
 function call(action,payload){
   return new Promise((res,rej)=>google.script.run
-    .withSuccessHandler(r=>r&&r.ok?res(r.data):rej(new Error(r?r.error:'Lỗi không xác định')))
+    .withSuccessHandler(r=>{if(r&&r.ok)return res(r.data);if(r&&r.auth)showLogin();rej(new Error(r?r.error:'Lỗi không xác định'))})
     .withFailureHandler(e=>rej(new Error(e.message||e)))
-    .api(action,payload||{}));
+    .api(action,payload||{},S.token||''));
 }
 function toast(m,err){const t=$('#toast');t.textContent=m;t.className=err?'err':'';t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',err?6000:2500)}
 async function act(fn){try{return await fn()}catch(e){toast(e.message,true);throw e}}
@@ -100,7 +110,7 @@ function closeModal(){$('#modal').innerHTML=''}
 const val=id=>document.getElementById(id).value;
 
 /* ---------- khởi động ---------- */
-async function init(){
+async function startApp(){
   try{await load()}catch(e){$('#main').innerHTML=`<div class="card"><h3>Không thể truy cập</h3><p>${esc(e.message)}</p></div>`;return}
   $('#who').textContent=S.boot.me.name+' · '+S.boot.me.role;
   $('#nh').textContent='· NH '+(S.boot.cfg.params.NamHoc||'');
@@ -316,7 +326,9 @@ function renderConfig(){
   if(t==='ct')body=`<div class="hint">Sức chứa chuẩn của lớp = Tỉ lệ × (số GV + số bảo mẫu định biên). Bảng theo mục 2 của đề án.</div><table><thead><tr><th>Mã</th><th>Lứa tuổi</th><th>Tên lớp</th><th>Viết tắt</th><th>Tỉ lệ HS:GV</th><th>Số GV</th><th>Bảo mẫu</th><th>Tên theo Bộ GD&ĐT</th><th></th></tr></thead><tbody>${cfg.classTypes.map((r,i)=>`<tr>${['MaNhom','LuaTuoi','TenLop','VietTat','TiLe','SoGV','SoBM','TenBoGD'].map(k=>`<td>${inp('classTypes.'+i+'.'+k,r[k],/Ti|So/.test(k)?'70px':'')}</td>`).join('')}<td><button class="b s d" data-del="classTypes.${i}">✕</button></td></tr>`).join('')}</tbody></table><button class="b" data-add="classTypes">+ Thêm nhóm tuổi</button>`;
   if(t==='band')body=`<div class="hint">Khung tổng sĩ số (thực học + giữ chỗ) của cơ sở. Để trống "Đến" nếu không giới hạn trên.</div><table><thead><tr><th>Mã khung</th><th>Nhãn</th><th>Từ</th><th>Đến</th><th></th></tr></thead><tbody>${cfg.bands.map((r,i)=>`<tr>${['MaKhung','Nhan','Tu','Den'].map(k=>`<td>${inp('bands.'+i+'.'+k,r[k]===null?'':r[k])}</td>`).join('')}<td><button class="b s d" data-del="bands.${i}">✕</button></td></tr>`).join('')}</tbody></table><button class="b" data-add="bands">+ Thêm khung</button>`;
   if(t==='pos')body=`<div class="hint">Mỗi ô là một số (VD 2) hoặc khoảng (VD 1-2). Cột tương ứng khung sĩ số. Tên vị trí chính là danh mục "Vai trò định biên" đơn vị dùng khi phân công.</div><div class="tw"><table><thead><tr><th>Vị trí</th>${cfg.bands.map(b=>`<th>${esc(b.Nhan)}</th>`).join('')}<th></th></tr></thead><tbody>${cfg.positions.map((r,i)=>`<tr><td>${inp('positions.'+i+'.ViTri',r.ViTri)}</td>${cfg.bands.map(b=>`<td>${inp('positions.'+i+'.'+b.MaKhung,r[b.MaKhung]||'','80px')}</td>`).join('')}<td><button class="b s d" data-del="positions.${i}">✕</button></td></tr>`).join('')}</tbody></table></div><button class="b" data-add="positions">+ Thêm vị trí</button>`;
-  if(t==='par')body=`<table><thead><tr><th>Tham số</th><th>Giá trị</th><th>Mô tả</th></tr></thead><tbody><tr><td>Năm học</td><td>${inp('params.NamHoc',cfg.params.NamHoc||'')}</td><td class="muted">Hiển thị trên báo cáo</td></tr><tr><td>Chênh lệch đề xuất</td><td>${inp('params.ChenhLech',cfg.params.ChenhLech||2)}</td><td class="muted">Lớp đạt tỉ lệ định biên + N học sinh thì đủ điều kiện đề xuất bổ sung GV/bảo mẫu (mục 4 đề án)</td></tr></tbody></table>`;
+  if(t==='par')body=`<table><thead><tr><th>Tham số</th><th>Giá trị</th><th>Mô tả</th></tr></thead><tbody><tr><td>Năm học</td><td>${inp('params.NamHoc',cfg.params.NamHoc||'')}</td><td class="muted">Hiển thị trên báo cáo</td></tr><tr><td>Xác nhận đăng nhập bằng mã</td><td><select data-path="params.XacThucOTP"><option value="1" ${cfg.params.XacThucOTP!=='0'?'selected':''}>Bật</option><option value="0" ${cfg.params.XacThucOTP==='0'?'selected':''}>Tắt</option></select></td><td class="muted">Bật: mọi người dùng phải nhập mã 6 số gửi qua email khi vào hệ thống. Nếu cần tắt khẩn cấp, sửa ô GiaTri của XacThucOTP trong sheet CauHinh_ThamSo thành 0.</td></tr>
+  <tr><td>Thời hạn mỗi lần xác nhận (giờ)</td><td>${inp('params.PhienGio',cfg.params.PhienGio||8)}</td><td class="muted">1–72 giờ. Hết hạn sẽ yêu cầu nhập mã mới.</td></tr>
+  <tr><td>Chênh lệch đề xuất</td><td>${inp('params.ChenhLech',cfg.params.ChenhLech||2)}</td><td class="muted">Lớp đạt tỉ lệ định biên + N học sinh thì đủ điều kiện đề xuất bổ sung GV/bảo mẫu (mục 4 đề án)</td></tr></tbody></table>`;
   if(t==='cp')body=`<table><thead><tr><th>Mã cơ sở</th><th>Tên cơ sở</th><th>Hoạt động</th><th></th></tr></thead><tbody>${E.campuses.map((r,i)=>`<tr><td>${inp('campuses.'+i+'.MaCoSo',r.MaCoSo)}</td><td>${inp('campuses.'+i+'.TenCoSo',r.TenCoSo)}</td><td><input type="checkbox" data-path="campuses.${i}.KichHoat" ${r.KichHoat!==false?'checked':''}></td><td></td></tr>`).join('')}</tbody></table><button class="b" data-add="campuses">+ Thêm cơ sở</button>`;
   $('#main').innerHTML=`<div class="sub">${tabs.map(x=>`<button class="b ${x[0]===t?'on':''}" data-ctab="${x[0]}">${x[1]}</button>`).join('')}<span class="grow"></span><button class="b p" data-do="saveCfg">Lưu cấu hình</button></div><div class="card tw">${body}</div>`;
 }
@@ -357,6 +369,9 @@ function submitForm(){
   <div class="hint">Hồ sơ tự đính kèm <b>ảnh chụp phân công, sĩ số và kết luận định biên</b> của cơ sở tại thời điểm gửi. Khi được duyệt, ảnh chụp này được ghi vào Lịch sử phân công của kỳ.</div>
   <div class="row"><div><label>Cách duyệt</label><select id="s_che" style="width:auto"><option>Tuần tự</option><option>Đồng thời</option></select></div><div class="hint grow" style="margin-top:18px">Tuần tự: lần lượt từng người theo thứ tự bên dưới · Đồng thời: tất cả cùng duyệt, đủ mọi người đồng ý mới được duyệt.</div></div>
   <label>Người phê duyệt (chọn tên theo luồng)</label><div id="alist"></div>
+  <div class="impact" style="margin-top:14px"><label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px;margin:0"><input type="checkbox" id="s_mail" checked style="width:auto"> Gửi email thông báo cho người phê duyệt</label>
+   <label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px;margin:6px 0 0"><input type="checkbox" id="s_cc" style="width:auto"> Gửi bản sao (CC) cho tôi — ${esc(S.boot.me.email)}</label>
+   <div class="hint" style="margin:6px 0 0">Email hiển thị tên <b>${esc(S.boot.me.name)}</b>; người nhận bấm <b>Trả lời</b> sẽ gửi về <b>${esc(S.boot.me.email)}</b>. (Địa chỉ gửi đi là tài khoản của hệ thống do Google không cho gửi đi dưới địa chỉ người khác.)</div></div>
   <div class="row" style="margin-top:6px"><select id="apick" style="width:auto;min-width:260px"></select><button class="b" data-do="addAp">+ Thêm vào luồng</button></div>`;
 }
 function renderAList(){
@@ -370,7 +385,7 @@ async function openSubmit(){
   if(!cand.length)return toast('Chưa có ai được cấp quyền "Được chọn làm người phê duyệt". Nhờ Admin tick trong ma trận phân quyền.',true);
   S.sub={approvers:[],cand};
   modal('Gửi phê duyệt',submitForm(),async()=>{
-    const id=await call('approvalSubmit',{loai:val('s_loai'),campus:val('s_cs'),ky:val('s_ky'),tieuDe:val('s_title'),ghiChu:val('s_note'),cheDo:val('s_che'),approvers:S.sub.approvers});
+    const id=await call('approvalSubmit',{loai:val('s_loai'),campus:val('s_cs'),ky:val('s_ky'),tieuDe:val('s_title'),ghiChu:val('s_note'),cheDo:val('s_che'),guiMail:$('#s_mail').checked,ccToi:$('#s_cc').checked,approvers:S.sub.approvers});
     toast('Đã gửi hồ sơ '+id);S.apf='mine';await refresh()},{wide:true,okText:'Gửi phê duyệt'});
   renderAList();autoTitle();
 }
@@ -477,7 +492,7 @@ function renderPerm(){
 }
 
 /* ---------- Nhật ký ---------- */
-const AL={setup:'Khởi tạo hệ thống',seedDemo:'Nạp dữ liệu mẫu',staffSave:'Lưu nhân sự',staffImport:'Nhập nhân sự',staffDelete:'Xoá nhân sự',staffAssign:'Phân công vai trò/lớp',classSave:'Lưu lớp',classDelete:'Xoá lớp',configSave:'Lưu cấu hình',permSave:'Lưu phân quyền',historySnapshot:'Chốt kỳ phân công',approvalSubmit:'Gửi phê duyệt',approvalAct:'Phê duyệt / từ chối',approvalWithdraw:'Thu hồi hồ sơ',autoSnapshot:'Tự động chốt kỳ'};
+const AL={setup:'Khởi tạo hệ thống',seedDemo:'Nạp dữ liệu mẫu',staffSave:'Lưu nhân sự',staffImport:'Nhập nhân sự',staffDelete:'Xoá nhân sự',staffAssign:'Phân công vai trò/lớp',classSave:'Lưu lớp',classDelete:'Xoá lớp',configSave:'Lưu cấu hình',permSave:'Lưu phân quyền',historySnapshot:'Chốt kỳ phân công',approvalSubmit:'Gửi phê duyệt',approvalAct:'Phê duyệt / từ chối',approvalWithdraw:'Thu hồi hồ sơ',login:'Đăng nhập (mã xác nhận)',otpSend:'Gửi mã xác nhận',otpFail:'Nhập sai mã – khoá',revokeSessions:'Đăng xuất mọi phiên',autoSnapshot:'Tự động chốt kỳ'};
 VIEWS.audit=async()=>{
   const rows=await call('auditList');
   $('#main').innerHTML=`<div class="card tw"><table><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Chi tiết</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.ThoiGian)}</td><td>${esc(r.Email)}</td><td>${esc(AL[r.HanhDong]||r.HanhDong)}</td><td>${esc(r.ChiTiet)}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">Chưa có bản ghi nào.</td></tr>'}</tbody></table></div>`;
@@ -521,6 +536,7 @@ document.addEventListener('click',async e=>{
       const dup=S.hist.filter(r=>r.Ky===ky&&ids.indexOf(r.MaCoSo)>=0);
       if(dup.length&&!confirm('Kỳ '+ky+' đã được chốt cho '+dup.length+' cơ sở. Ghi đè bằng dữ liệu hiện tại?'))throw new Error('Đã huỷ');
       const n=await call('historySnapshot',{ky,campuses:ids,ghiChu:val('h_note')});toast('Đã chốt kỳ '+ky+' cho '+n+' cơ sở');S.hist=await call('historyList');renderHistory()},{okText:'Chốt kỳ'}),
+    logout:()=>{if(confirm('Đăng xuất? Lần sau vào cần nhập lại mã xác nhận.')){S.logging=false;S.pm=null;showLogin()}},
     refresh:async()=>{toast('Đang làm mới…');await refresh();toast('Đã làm mới')},
     addStaff:()=>modal('Thêm nhân sự',staffForm(),()=>act(saveStaffForm)),
     editStaff:()=>modal('Sửa nhân sự',staffForm(S.cache.staff.find(s=>s.MaNV===d.id)),()=>act(saveStaffForm)),
@@ -538,7 +554,7 @@ document.addEventListener('click',async e=>{
     editClass:()=>{S.ecid=d.id;modal('Sửa lớp (cập nhật sĩ số)',classForm(S.cache.classes.find(l=>l.MaLop===d.id)),()=>act(()=>saveClassForm(d.id)));loadPreview()},
     delClass:async()=>{if(confirm('Xoá lớp này và các phân công liên quan?')){await act(()=>call('classDelete',{maLop:d.id}));toast('Đã xoá');await refresh()}},
     saveCfg:async()=>{const E=S.cfgEdit,c=E.cfg;
-      const p={classTypes:c.classTypes,bands:c.bands.map(b=>({...b,Den:b.Den===''?null:b.Den})),positions:c.positions,campuses:E.campuses,params:[{Khoa:'NamHoc',GiaTri:c.params.NamHoc},{Khoa:'ChenhLech',GiaTri:c.params.ChenhLech}]};
+      const p={classTypes:c.classTypes,bands:c.bands.map(b=>({...b,Den:b.Den===''?null:b.Den})),positions:c.positions,campuses:E.campuses,params:[{Khoa:'NamHoc',GiaTri:c.params.NamHoc},{Khoa:'ChenhLech',GiaTri:c.params.ChenhLech},{Khoa:'XacThucOTP',GiaTri:c.params.XacThucOTP||'1'},{Khoa:'PhienGio',GiaTri:c.params.PhienGio||'8'}]};
       S.boot=Object.assign(S.boot,await act(()=>call('configSave',p)));toast('Đã lưu cấu hình');await refresh(true);go('config',false)},
     addRole:()=>{const n=val('nrole').trim();if(!n||S.pm.roleGrid[n])return toast('Tên vai trò trống hoặc đã tồn tại',true);S.pm.roleGrid[n]={};S.pm.roles.push(n);renderPerm()},
     addUser:()=>{S.pm.users.push({Email:'',HoTen:'',VaiTro:S.pm.roles[S.pm.roles.length-1],KichHoat:true,campuses:[]});S.permTab='user';renderPerm()},
@@ -570,7 +586,49 @@ document.addEventListener('change',async e=>{
   else if(d.u){const [i,k]=d.u.split('|'),u=S.pm.users[+i];u[k]=t.type==='checkbox'?t.checked:t.value;if(k==='VaiTro')renderPerm()}
   else if(d.uc){const [i,m]=d.uc.split('|'),u=S.pm.users[+i],a=u.campuses;const x=a.indexOf(m);if(t.checked&&x<0)a.push(m);if(!t.checked&&x>=0)a.splice(x,1)}
 });
-init();
+/* ---------- Đăng nhập bằng mã xác nhận ---------- */
+let LG={cd:0,timer:null};
+async function boot(){
+  let st;try{st=await call('authStatus')}catch(e){$('#main').innerHTML=`<div class="card warn">${esc(e.message)}</div>`;return}
+  S.otp=st.required;$('#lo').style.display=st.required?'':'none';
+  if(st.required&&!st.valid)return showLogin();
+  startApp();
+}
+async function showLogin(){
+  if(S.logging)return;S.logging=true;S.token='';tokStore.set('');clearInterval(LG.timer);
+  $('#login').style.display='flex';$('#main').innerHTML='';
+  let st={};try{st=await call('authStatus')}catch(e){}
+  S.otp=true;$('#lo').style.display='';
+  loginStep(1,st.masked||'',st.hours||8,'');
+}
+function loginStep(step,masked,hours,err,minutes){
+  const box=n=>$('#login').innerHTML=`<div class="box"><h2>🔐 Xác nhận đăng nhập</h2>${n}</div>`;
+  if(step===1)box(`<p>Hệ thống sẽ gửi <b>mã xác nhận 6 số</b> tới email <b>${esc(masked)}</b>. Mã có hiệu lực 5 phút; sau khi xác nhận bạn được dùng liên tục ${hours} giờ.</p><div class="err">${esc(err)}</div><button class="b p" id="lg_send">Gửi mã xác nhận</button>`);
+  else box(`<p>Đã gửi mã tới <b>${esc(masked)}</b> (hiệu lực ${minutes||5} phút). Kiểm tra cả thư mục Spam.</p><input id="lg_code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••"><div class="err">${esc(err)}</div><button class="b p" id="lg_ok">Xác nhận</button><button class="b" id="lg_re" disabled>Gửi lại mã</button>`);
+  const q=id=>document.getElementById(id);
+  if(step===1)q('lg_send').onclick=()=>sendCode(masked,hours);
+  else{
+    const c=q('lg_code');c.focus();c.oninput=()=>{c.value=c.value.replace(/\D/g,'');if(c.value.length===6)verifyCode(masked,hours)};
+    c.onkeydown=e=>{if(e.key==='Enter')verifyCode(masked,hours)};
+    q('lg_ok').onclick=()=>verifyCode(masked,hours);q('lg_re').onclick=()=>sendCode(masked,hours);
+    clearInterval(LG.timer);const tick=()=>{const b=q('lg_re');if(!b){clearInterval(LG.timer);return}
+      if(LG.cd>0){b.disabled=true;b.textContent='Gửi lại mã ('+LG.cd+'s)';LG.cd--}else{b.disabled=false;b.textContent='Gửi lại mã';clearInterval(LG.timer)}};
+    tick();LG.timer=setInterval(tick,1000);
+  }
+}
+async function sendCode(masked,hours){
+  const b=document.getElementById('lg_send')||document.getElementById('lg_re');if(b){b.disabled=true;b.textContent='Đang gửi…'}
+  try{const r=await call('authSend');LG.cd=r.cooldown;loginStep(2,r.masked,hours,'',r.minutes)}
+  catch(e){document.getElementById('lg_code')?loginStep(2,masked,hours,e.message):loginStep(1,masked,hours,e.message)}
+}
+async function verifyCode(masked,hours){
+  const c=document.getElementById('lg_code'),code=c?c.value:'';if(code.length!==6)return;
+  const ok=document.getElementById('lg_ok');ok.disabled=true;ok.textContent='Đang kiểm tra…';
+  try{const r=await call('authVerify',{code});S.token=r.token;tokStore.set(r.token);S.logging=false;
+    $('#login').style.display='none';$('#login').innerHTML='';boot()}
+  catch(e){loginStep(2,masked,hours,e.message);const n=document.getElementById('lg_code');if(n)n.focus()}
+}
+boot();
 </script>
 </body>
 </html>
