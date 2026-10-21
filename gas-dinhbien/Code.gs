@@ -218,7 +218,7 @@ function setup() {
   const addP = defParams.filter(d => !haveP.some(h => h.Khoa === d.Khoa));
   if (addP.length) put_(SH.PARAM, haveP.concat(addP));
   authSecret_();
-  if (empty(SH.GUIDE)) put_(SH.GUIDE, GUIDE_DEF);
+  if (empty(SH.GUIDE)) put_(SH.GUIDE, GUIDE_DEF); else migrateGuide_();
   log_(null, 'setup', 'Khởi tạo hệ thống');
   SpreadsheetApp.getActive().toast('Đã khởi tạo. Triển khai Web app rồi truy cập bằng đường link.', 'Định biên', 8);
 }
@@ -674,31 +674,32 @@ function evalCampus_(campus, staffAll, classesAll, assignsAll, cfg) {
     const members = (asgByClass[str_(l.MaLop)] || []).map(id => byId[id]).filter(isActive);
     const gv = members.filter(s => s.VaiTroDB === 'Giáo viên').length, bm = members.filter(s => s.VaiTroDB === 'Bảo mẫu').length;
     const students = num_(l.SiSo) + num_(l.GiuCho), adults = gv + bm, stdAdults = ct.SoGV + ct.SoBM;
-    /* Mục 4 đề án: chỉ đề xuất/tính THIẾU GV-bảo mẫu khi lớp đạt tỉ lệ định biên + N học sinh
-       (N = tham số ChenhLech, mặc định 2): sĩ số ≥ tỉ lệ × số người đang phụ trách + N.
-       Số người cần = ceil((sĩ số − N + 1) / tỉ lệ). Chưa đủ điều kiện thì không tính là thiếu. */
+    /* "Thiếu" GV/bảo mẫu của lớp khi MỘT TRONG HAI điều kiện:
+       (1) dưới mức tối thiểu của lớp (cơ cấu chuẩn: VD lớp K tối thiểu 2 người; nhà trẻ 2 GV + 1 bảo mẫu);
+       (2) đủ điều kiện mở rộng định biên (mục 4 đề án): sĩ số ≥ tỉ lệ × số người đang phụ trách + N (N = ChenhLech, mặc định 2).
+       Số người cần = max(tối thiểu, ⌈(sĩ số − N + 1) / tỉ lệ⌉). Vượt tỉ lệ nhưng chưa đủ N học sinh → chỉ "theo dõi", không tính thiếu. */
     const r = ct.TiLe, issues = [], notes = [];
     let status = 'ok', need = adults, short = { gv: 0, bm: 0, total: 0 }, eligible = false;
     if (students === 0) status = 'trong';
-    else if (r > 0) {
-      const demand = Math.ceil((students - extra + 1) / r);   // số người cần theo tỉ lệ
-      need = Math.max(adults, demand);
-      eligible = students >= r * adults + extra;
-      if (eligible) {
-        const t = demand - adults;
-        const g = Math.min(t, Math.max(0, ct.SoGV - gv)), b = Math.min(t - g, Math.max(0, ct.SoBM - bm));
-        short = { gv: g + (t - g - b), bm: b, total: t };
-        issues.push('Thiếu ' + [short.gv ? short.gv + ' giáo viên' : '', short.bm ? short.bm + ' bảo mẫu' : ''].filter(Boolean).join(' + ') + ' – đủ điều kiện bổ sung (sĩ số ' + students + ' ≥ ' + r + ' × ' + adults + ' + ' + extra + ')');
+    else {
+      const demand = r > 0 ? Math.ceil((students - extra + 1) / r) : 0;      // số người cần theo tỉ lệ
+      eligible = r > 0 && students >= r * adults + extra;                      // đủ điều kiện mở rộng
+      const g0 = Math.max(0, ct.SoGV - gv), b0 = Math.max(0, ct.SoBM - bm);   // thiếu so với tối thiểu theo vai trò
+      need = Math.max(stdAdults, demand, adults);
+      const total = Math.max(Math.max(stdAdults, demand) - adults, g0 + b0, 0);
+      if (total > 0) {
+        short = { gv: g0 + (total - g0 - b0), bm: b0, total };
+        const why = [];
+        if (g0 + b0 > 0) why.push(adults < stdAdults ? 'dưới mức tối thiểu ' + stdAdults + ' người/lớp (hiện ' + adults + ')' : 'chưa đủ cơ cấu chuẩn của lớp (' + ct.SoGV + ' giáo viên' + (ct.SoBM ? ' + ' + ct.SoBM + ' bảo mẫu' : '') + ')');
+        if (eligible) why.push('đủ điều kiện mở rộng: sĩ số ' + students + ' ≥ ' + r + ' × ' + adults + ' + ' + extra);
+        issues.push('Thiếu ' + [short.gv ? short.gv + ' giáo viên' : '', short.bm ? short.bm + ' bảo mẫu' : ''].filter(Boolean).join(' + ') + ' – ' + why.join('; '));
         status = 'thieu';
-      } else if (adults > 0 && students > r * adults) {
+      } else if (r > 0 && adults > 0 && students > r * adults) {
         issues.push('Vượt tỉ lệ ' + r + ':1 (hiện ' + (students / adults).toFixed(1) + ':1) nhưng chưa đủ điều kiện bổ sung (cần ≥ ' + (r * adults + extra) + ' học sinh)');
         status = 'vuot';
       }
       const keep = Math.max(stdAdults, demand);
       if (status !== 'thieu' && adults > keep) { issues.push('Thừa ' + (adults - keep) + ' người so với định biên của lớp'); if (status === 'ok') status = 'thua'; }
-      if (status === 'ok' || status === 'vuot') {
-        if (gv < ct.SoGV || bm < ct.SoBM) notes.push('Thấp hơn cơ cấu chuẩn (' + gv + '/' + ct.SoGV + ' GV' + (ct.SoBM ? ', ' + bm + '/' + ct.SoBM + ' bảo mẫu' : '') + ') nhưng tỉ lệ vẫn đảm bảo nên không tính là thiếu');
-      }
     }
     const cap = r * stdAdults;
     return {
@@ -896,7 +897,7 @@ const GUIDE_DEF = [
   { Id: 'g04', ThuTu: 4, Icon: '🧩', TieuDe: 'Phân vai trò và phân lớp cho nhân sự', DoiTuong: 'Hiệu trưởng/Quản lý cơ sở, Admin', Loai: 'section', NoiDung:
 'Mỗi nhân sự cần có **Vai trò định biên** thì mới được tính trong báo cáo.\n1. Vào [tab:staff|Nhân sự], tìm người cần phân.\n2. Ở cột **Vai trò định biên** chọn: Giáo viên, Bảo mẫu, Y tế, Cấp dưỡng, Bảo vệ…\n3. Với Giáo viên/Bảo mẫu, bấm **Phân lớp** và tick các lớp phụ trách.\n> Tick ô **Chưa phân vai trò** ở đầu bảng để tìm nhanh những người còn sót.\n> Giáo viên Tiếng Anh VN được tính ở cấp cơ sở, không cần phân lớp.' },
   { Id: 'g05', ThuTu: 5, Icon: '📊', TieuDe: 'Đọc báo cáo định biên', DoiTuong: R_ALL, Loai: 'section', NoiDung:
-'Có 2 nơi xem: [tab:dash|Tổng quan] (so sánh các cơ sở) và [tab:campus|Báo cáo cơ sở] (chi tiết từng cơ sở).\n## Ý nghĩa màu sắc\n- **Đạt** (xanh): đúng định biên.\n- **Thiếu** (đỏ): cần bổ sung người **và đã đủ điều kiện mở rộng định biên**.\n- **Thừa** (vàng): nhiều hơn định biên.\n- **Vượt tỉ lệ – theo dõi** (tím): lớp đông hơn tỉ lệ cho phép nhưng **chưa đủ điều kiện** để xin thêm người.\n## Khi nào mới tính là "Thiếu"?\n- **Giáo viên/Bảo mẫu của lớp**: chỉ khi sĩ số lớp ≥ tỉ lệ × số người đang phụ trách + 2 học sinh (Quy định mục 4). Ví dụ lớp K (10:1) có 2 giáo viên: đủ điều kiện khi từ **22 học sinh**.\n- **Nhân sự cơ sở** (Hiệu phó, Y tế, Cấp dưỡng…): theo khung tổng sĩ số của cơ sở (dưới 50, 50–59, 60–70, 71–150…).\n> Lớp ít học sinh mà chỉ có 1 giáo viên vẫn là **Đạt** nếu tỉ lệ còn đảm bảo; hệ thống chỉ ghi chú "thấp hơn cơ cấu chuẩn".' },
+'Có 2 nơi xem: [tab:dash|Tổng quan] (so sánh các cơ sở) và [tab:campus|Báo cáo cơ sở] (chi tiết từng cơ sở).\n## Ý nghĩa màu sắc\n- **Đạt** (xanh): đúng định biên.\n- **Thiếu** (đỏ): lớp có **ít hơn mức tối thiểu** hoặc **đã đủ điều kiện mở rộng định biên**.\n- **Thừa** (vàng): nhiều hơn định biên.\n- **Vượt tỉ lệ – theo dõi** (tím): lớp đông hơn tỉ lệ cho phép nhưng **chưa đủ điều kiện** để xin thêm người.\n## Khi nào mới tính là "Thiếu"?\n- **Giáo viên/Bảo mẫu của lớp** – thiếu khi một trong hai điều kiện:\n- (1) Có **ít hơn số người tối thiểu** của lớp (lớp K: tối thiểu 2 người; nhà trẻ: 2 giáo viên + 1 bảo mẫu).\n- (2) Đã **đủ điều kiện mở rộng**: sĩ số ≥ tỉ lệ × số người đang phụ trách + 2 học sinh (Quy định mục 4).\n- Ví dụ lớp K (10:1): chỉ có 1 người → **Thiếu**; 2 giáo viên và 21 học sinh → chưa thiếu (chỉ “Vượt tỉ lệ – theo dõi”); 2 giáo viên và từ **22 học sinh** → **Thiếu** (cần người thứ 3).\n- **Nhân sự cơ sở** (Hiệu phó, Y tế, Cấp dưỡng…): theo khung tổng sĩ số của cơ sở (dưới 50, 50–59, 60–70, 71–150…).\n> Lớp đã mở phải có đủ số người tối thiểu, dù chỉ có ít học sinh.' },
   { Id: 'g06', ThuTu: 6, Icon: '✉️', TieuDe: 'Gửi hồ sơ và phê duyệt', DoiTuong: 'Hiệu trưởng/Quản lý cơ sở, Chủ tịch HĐHT Mầm non, Nhân sự, Admin', Loai: 'section', NoiDung:
 '## Người gửi\n1. Vào [tab:approval|Phê duyệt] → **Gửi phê duyệt**.\n2. Chọn loại hồ sơ, cơ sở, kỳ và viết nội dung ngắn gọn.\n3. Chọn **người phê duyệt** theo thứ tự (dùng ↑ ↓ để sắp xếp).\n4. Chọn **Tuần tự** (lần lượt từng người) hoặc **Đồng thời** (cùng lúc).\n5. Bấm **Gửi** – hệ thống tự gửi email thông báo.\n## Người phê duyệt\n1. Hồ sơ chờ bạn hiện **số đỏ** trên tab Phê duyệt kèm email thông báo.\n2. Mở hồ sơ, xem số liệu đính kèm, nhập ý kiến rồi bấm **Phê duyệt** hoặc **Từ chối** (từ chối bắt buộc ghi lý do).\n> Hồ sơ lưu số liệu **đúng thời điểm gửi**; duyệt xong tự lưu vào Lịch sử.\n> Gửi nhầm? Mở hồ sơ → **Thu hồi** (khi chưa duyệt xong).' },
   { Id: 'g07', ThuTu: 7, Icon: '📌', TieuDe: 'Chốt kỳ và xem lại các tháng cũ', DoiTuong: 'Hiệu trưởng/Quản lý cơ sở, Nhân sự, Chủ tịch HĐHT Mầm non, Admin', Loai: 'section', NoiDung:
@@ -908,7 +909,7 @@ const GUIDE_DEF = [
   { Id: 'g10', ThuTu: 10, Icon: '🔑', TieuDe: 'Phân quyền người dùng', DoiTuong: 'Admin', Loai: 'section', NoiDung:
 '1. Vào [tab:perm|Phân quyền].\n2. **Quyền × Vai trò**: tick chức năng mỗi vai trò được dùng.\n3. **Người dùng × Cơ sở**: thêm email, chọn vai trò, tick các cơ sở được truy cập.\n4. Bấm **Lưu phân quyền**.\n> Muốn ai đó được chọn làm người phê duyệt: tick quyền **Được chọn làm người phê duyệt** cho vai trò của họ.' },
   { Id: 'f01', ThuTu: 11, Icon: '❓', TieuDe: 'Vì sao lớp báo "Vượt tỉ lệ" mà không báo "Thiếu"?', DoiTuong: R_ALL, Loai: 'faq', NoiDung:
-'Vì lớp mới vượt tỉ lệ một chút. Theo quy định, chỉ khi sĩ số đạt **tỉ lệ × số người phụ trách + 2 học sinh** mới đủ điều kiện xin thêm giáo viên/bảo mẫu. Lúc đó trạng thái sẽ chuyển sang **Thiếu**.' },
+'Vì lớp mới vượt tỉ lệ một chút. Theo quy định, chỉ khi sĩ số đạt **tỉ lệ × số người phụ trách + 2 học sinh** mới đủ điều kiện xin thêm giáo viên/bảo mẫu (VD lớp K có 2 giáo viên: từ 22 học sinh). Lúc đó trạng thái chuyển sang **Thiếu**. Lưu ý: lớp dưới số người tối thiểu thì luôn báo Thiếu.' },
   { Id: 'f02', ThuTu: 12, Icon: '❓', TieuDe: 'Sĩ số lớp thay đổi giữa tháng thì làm gì?', DoiTuong: R_ALL, Loai: 'faq', NoiDung:
 'Hiệu trưởng vào [tab:classes|Lớp học] → **Sửa** → nhập sĩ số mới (xem khung Tác động trước khi lưu). Báo cáo tự tính lại. Cuối tháng nhớ **Chốt kỳ**.' },
   { Id: 'f03', ThuTu: 13, Icon: '❓', TieuDe: 'Tôi không thấy tab hoặc cơ sở nào đó?', DoiTuong: R_ALL, Loai: 'faq', NoiDung:
@@ -927,6 +928,17 @@ function guideList_() {
   return rows.map(r => ({ Id: str_(r.Id), ThuTu: num_(r.ThuTu), Icon: str_(r.Icon), TieuDe: str_(r.TieuDe), DoiTuong: str_(r.DoiTuong) || R_ALL, Loai: r.Loai === 'faq' ? 'faq' : 'section', NoiDung: str_(r.NoiDung) }))
     .sort((a, b) => a.ThuTu - b.ThuTu);
 }
+/* Cập nhật 2 mục nói về quy tắc "Thiếu" nếu admin chưa sửa nội dung cũ (nhận biết bằng câu đặc trưng của bản cũ) */
+function migrateGuide_() {
+  const rows = read_(SH.GUIDE); let n = 0;
+  const out = rows.map(r => {
+    const def = GUIDE_DEF.find(d => d.Id === str_(r.Id)), old = str_(r.NoiDung);
+    if (def && (str_(r.Id) === 'g05' || str_(r.Id) === 'f01') && (old.indexOf('chỉ khi sĩ số lớp ≥ tỉ lệ') >= 0 || old.indexOf('Vì lớp mới vượt tỉ lệ một chút') >= 0) && old !== def.NoiDung) { n++; return Object.assign({}, r, { NoiDung: def.NoiDung }); }
+    return r;
+  });
+  if (n) put_(SH.GUIDE, out);
+}
+
 function guideSave_(c, p) {
   const items = p.items || [];
   if (!items.length) throw new Error('Cần ít nhất một mục hướng dẫn');

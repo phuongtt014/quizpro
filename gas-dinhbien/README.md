@@ -80,13 +80,15 @@ Mọi thông báo do **hệ thống tự gửi**, người dùng không phải c
 - Muốn một địa chỉ riêng như `dinhbien@tên-miền`: triển khai web app dưới một tài khoản dùng chung do IT cấp (tài khoản chủ web app chính là địa chỉ gửi).
 - Bốn tham số *Xác nhận bằng mã, Thời hạn phiên, Tên hiển thị, Ghi chú không trả lời* **chỉ Admin được đổi** (người có quyền "Cấu hình" khác không đổi được).
 
-## Quy tắc "Thiếu" (cập nhật) – chỉ tính khi đủ điều kiện mở rộng định biên
-Căn cứ mục 4 đề án (đề xuất GV/bảo mẫu: lớp đạt tỉ lệ định biên + 2 học sinh; nhân sự còn lại: cơ sở đạt định mức tổng sĩ số):
-- **Giáo viên/Bảo mẫu của lớp**: sĩ số (thực học + giữ chỗ) ≥ *tỉ lệ × số GV-bảo mẫu đang phụ trách + N* (N = tham số *Chênh lệch*, mặc định 2) → mới tính **Thiếu**; số cần thêm = ⌈(sĩ số − N + 1) / tỉ lệ⌉ − số hiện có (ưu tiên bổ sung theo cơ cấu chuẩn: GV, rồi bảo mẫu).
-- Lớp vượt tỉ lệ nhưng chưa đủ N học sinh → trạng thái **Vượt tỉ lệ (theo dõi)**, *không* tính là thiếu. Lớp có ít người hơn cơ cấu chuẩn mà tỉ lệ vẫn đảm bảo → **Đạt** kèm ghi chú.
-- Có nhiều người hơn mức cần (cơ cấu chuẩn hoặc theo tỉ lệ, lấy mức cao hơn) → **Thừa**.
-- Dòng "Giáo viên/Bảo mẫu (theo lớp)" ở cấp cơ sở = thực tế + tổng số thiếu của các lớp đủ điều kiện, nên chỉ lệch khi có lớp đủ điều kiện.
-- **Nhân sự cấp cơ sở** (Hiệu phó, Y tế, Cấp dưỡng…) vẫn theo khung tổng sĩ số của cơ sở. *Cách hiểu này do tôi suy ra từ văn bản; nếu Ban muốn điều kiện khác, chỉnh ở `evalCampus_` hoặc nhờ cập nhật.*
+## Quy tắc "Thiếu" (cập nhật theo yêu cầu Ban)
+Lớp được ghi nhận **Thiếu** GV/bảo mẫu khi **một trong hai** điều kiện:
+1. **Dưới mức tối thiểu** của lớp (cơ cấu chuẩn: lớp K, Pre-K.A, Pre-K.B tối thiểu 2 giáo viên; Pre-N, N: 2 giáo viên + 1 bảo mẫu). Ví dụ lớp K chỉ có 1 người → Thiếu 1.
+2. **Đủ điều kiện mở rộng định biên** (mục 4 đề án): sĩ số (thực học + giữ chỗ) ≥ *tỉ lệ × số người đang phụ trách + N* (N = tham số *Chênh lệch*, mặc định 2). Ví dụ lớp K (10:1) có 2 giáo viên: **21 học sinh chưa thiếu** (chỉ "Vượt tỉ lệ – theo dõi"); **từ 22 học sinh → Thiếu**, cần người thứ 3.
+- Số người cần = max(mức tối thiểu, ⌈(sĩ số − N + 1) / tỉ lệ⌉); số thiếu = số cần − số hiện có (bổ sung theo cơ cấu chuẩn, phần mở rộng thêm giáo viên).
+- Có nhiều hơn mức cần → **Thừa**. Lớp chưa có học sinh → "Chưa có sĩ số", không tính.
+- Dòng "Giáo viên/Bảo mẫu (theo lớp)" ở cấp cơ sở = thực tế + tổng số thiếu của các lớp.
+- **Nhân sự cấp cơ sở** (Hiệu phó, Y tế, Cấp dưỡng…) vẫn theo khung tổng sĩ số của cơ sở.
+- Chạy lại `setup` sau khi cập nhật để mục hướng dẫn về quy tắc này tự cập nhật (chỉ khi Admin chưa sửa nội dung mặc định).
 
 ## Tab Hướng dẫn
 - Tab đầu tiên 📖; lần đầu đăng nhập vào thẳng tab này. Luồng 6 bước trực quan (bước nào là việc của vai trò mình có viền xanh, bấm để mở đúng màn hình), mục hướng dẫn gập mở, hỏi–đáp, ô tìm kiếm, lọc theo vai trò.
