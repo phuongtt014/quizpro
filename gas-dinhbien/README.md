@@ -35,3 +35,10 @@ Căn cứ: *Quy định tên lớp học – Định biên nhân sự Khối M�
 - Mở app: 1 lệnh gọi `loadAll` lấy toàn bộ dữ liệu; chuyển tab hiển thị tức thì từ bộ nhớ trình duyệt, tự làm mới nền nếu dữ liệu cũ hơn 30 giây (nút **⟳ Làm mới** để tải ngay).
 - Máy chủ cache từng sheet (CacheService, 10 phút) và xoá cache khi ghi; đổi vai trò/phân lớp chỉ ghi đúng ô thay đổi.
 - **Lưu ý**: nếu sửa trực tiếp trong Google Sheet (không qua web app), dữ liệu có thể chậm tối đa 10 phút mới hiện lên; chạy lại `setup` hoặc chờ hết cache.
+
+## Lịch sử phân công theo kỳ (tab "Lịch sử phân công")
+- **Chốt kỳ**: lưu ảnh chụp của cơ sở theo tháng (YYYY-MM): nhân sự, vai trò định biên, lớp phụ trách, sĩ số và kết luận định biên. Chốt lại cùng kỳ sẽ ghi đè (có hỏi xác nhận).
+- **Xem lại / so sánh**: mở một kỳ cũ để xem đúng bảng phân công lúc đó; so sánh với *Hiện tại* hoặc kỳ khác để thấy ai đổi vai trò/lớp, ai mới vào, ai không còn. Xuất CSV được.
+- **Tự động**: chạy menu *Định biên › 3. Bật tự động chốt kỳ hằng tháng* — 1h sáng ngày 1 hệ thống chốt kỳ của tháng trước (không ghi đè kỳ đã chốt tay).
+- Quyền mới trong ma trận phân quyền: *Xem lịch sử phân công*, *Chốt kỳ phân công* (Hiệu trưởng chỉ chốt được cơ sở của mình).
+- **Nâng cấp từ bản cũ**: dán lại `Code.gs`, `Index.html`, `appsscript.json`, chạy lại `setup` một lần (tự sửa sheet Nhật ký bị thiếu tiêu đề, thêm 2 quyền mới mà không đổi các tick cũ), rồi triển khai phiên bản mới.

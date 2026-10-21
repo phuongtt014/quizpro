@@ -7,7 +7,7 @@
 const SH = {
   USERS: 'NguoiDung', ROLEPERM: 'PQ_VaiTro', USERCAMP: 'PQ_CoSo', CAMPUS: 'CoSo',
   STAFF: 'NhanSu', CLASS: 'Lop', ASSIGN: 'PhanCong',
-  CT: 'CauHinh_Lop', BAND: 'CauHinh_Khung', POS: 'CauHinh_CoSo', PARAM: 'CauHinh_ThamSo', AUDIT: 'NhatKy'
+  CT: 'CauHinh_Lop', BAND: 'CauHinh_Khung', POS: 'CauHinh_CoSo', PARAM: 'CauHinh_ThamSo', AUDIT: 'NhatKy', HIST: 'LichSu'
 };
 
 const PERMS = [
@@ -20,16 +20,18 @@ const PERMS = [
   { key: 'class.edit', label: 'Quản lý lớp & sĩ số' },
   { key: 'config.edit', label: 'Cấu hình định mức & cơ sở' },
   { key: 'admin.perm', label: 'Phân quyền & người dùng' },
-  { key: 'audit.view', label: 'Xem nhật ký' }
+  { key: 'audit.view', label: 'Xem nhật ký' },
+  { key: 'history.view', label: 'Xem lịch sử phân công' },
+  { key: 'history.snapshot', label: 'Chốt kỳ phân công' }
 ];
 
 const ROLE_ADMIN = 'Admin';
 const DEFAULT_ROLES = {
   'Admin': PERMS.map(p => p.key),
-  'Chủ tịch HĐHT Mầm non': ['dash.view', 'report.export', 'staff.view', 'class.view', 'config.edit', 'audit.view'],
-  'Nhân sự': ['dash.view', 'report.export', 'staff.view', 'staff.import', 'class.view', 'audit.view'],
-  'Hiệu trưởng/Quản lý cơ sở': ['dash.view', 'report.export', 'staff.view', 'staff.assign', 'class.view', 'class.edit'],
-  'Người xem': ['dash.view', 'staff.view', 'class.view']
+  'Chủ tịch HĐHT Mầm non': ['dash.view', 'report.export', 'staff.view', 'class.view', 'config.edit', 'audit.view', 'history.view'],
+  'Nhân sự': ['dash.view', 'report.export', 'staff.view', 'staff.import', 'class.view', 'audit.view', 'history.view', 'history.snapshot'],
+  'Hiệu trưởng/Quản lý cơ sở': ['dash.view', 'report.export', 'staff.view', 'staff.assign', 'class.view', 'class.edit', 'history.view', 'history.snapshot'],
+  'Người xem': ['dash.view', 'staff.view', 'class.view', 'history.view']
 };
 
 const CLASS_ROLES = ['Giáo viên', 'Bảo mẫu'];   // vai trò gắn theo lớp
@@ -45,9 +47,12 @@ const HEADERS = {
   CauHinh_Lop: ['MaNhom', 'LuaTuoi', 'TenLop', 'VietTat', 'TiLe', 'SoGV', 'SoBM', 'TenBoGD'],
   CauHinh_Khung: ['MaKhung', 'Nhan', 'Tu', 'Den'],
   CauHinh_ThamSo: ['Khoa', 'GiaTri', 'MoTa'],
-  NhatKy: ['ThoiGian', 'Email', 'HanhDong', 'ChiTiet']
+  NhatKy: ['ThoiGian', 'Email', 'HanhDong', 'ChiTiet'],
+  LichSu: ['Ky', 'MaCoSo', 'ChotLuc', 'NguoiChot', 'GhiChu', 'DuLieu']
 };
-const TEXT_COLS = { NhanSu: ['MaNV', 'MaCoSo', 'SoDT'], Lop: ['MaLop', 'MaCoSo', 'SoThuTu'], PhanCong: ['MaLop', 'MaNV'], PQ_CoSo: ['MaCoSo'], CoSo: ['MaCoSo'] };
+const TEXT_COLS = { NhanSu: ['MaNV', 'MaCoSo', 'SoDT'], Lop: ['MaLop', 'MaCoSo', 'SoThuTu'], PhanCong: ['MaLop', 'MaNV'], PQ_CoSo: ['MaCoSo'], CoSo: ['MaCoSo'], LichSu: ['Ky', 'MaCoSo', 'DuLieu'] };
+const NOCACHE = {};
+NOCACHE[SH.AUDIT] = 1; NOCACHE[SH.HIST] = 1;
 
 /* ===================== WEB APP ===================== */
 
@@ -61,14 +66,23 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('Định biên')
     .addItem('1. Khởi tạo hệ thống (chạy lần đầu)', 'setup')
     .addItem('2. Nạp dữ liệu mẫu để chạy thử', 'seedDemo')
+    .addItem('3. Bật tự động chốt kỳ hằng tháng', 'installMonthlyTrigger')
     .addToUi();
 }
 
 /* ===================== DB HELPERS ===================== */
 
 function ss_() { return SpreadsheetApp.getActive(); }
+function ensureHeaders_(name) {
+  const sh = sheet_(name), h = HEADERS[name];
+  if (sh.getLastRow() === 0) { sh.getRange(1, 1, 1, h.length).setValues([h]); sh.setFrozenRows(1); return; }
+  if (String(sh.getRange(1, 1).getValue()) !== h[0]) {   // sửa sheet cũ bị thiếu dòng tiêu đề
+    sh.insertRowBefore(1); sh.getRange(1, 1, 1, h.length).setValues([h]); sh.setFrozenRows(1); cacheDrop_(name);
+  }
+}
 function sheet_(n) {
-  const sh = ss_().getSheetByName(n);
+  let sh = ss_().getSheetByName(n);
+  if (!sh && HEADERS[n]) { sh = ss_().insertSheet(n); ensureHeaders_(n); }
   if (!sh) throw new Error('Chưa khởi tạo hệ thống: thiếu sheet "' + n + '". Hãy chạy setup() / menu Định biên.');
   return sh;
 }
@@ -95,12 +109,12 @@ function cachePut_(name, obj) {
 function cacheDrop_(name) { try { CacheService.getScriptCache().remove('m_' + name); } catch (e) {} }
 
 function read_(name) {
-  if (name !== SH.AUDIT) { const hit = cacheGet_(name); if (hit) return hit; }
+  if (!NOCACHE[name]) { const hit = cacheGet_(name); if (hit) return hit; }
   const v = sheet_(name).getDataRange().getValues();
   const h = v.shift();
   const out = [];
   v.forEach((r, idx) => { if (r.some(c => c !== '')) { const o = { _r: idx + 2 }; h.forEach((k, i) => o[k] = r[i]); out.push(o); } });
-  if (name !== SH.AUDIT) cachePut_(name, out);
+  if (!NOCACHE[name]) cachePut_(name, out);
   return out;
 }
 /* Ghi 1 ô theo số dòng (_r) – nhanh hơn ghi lại cả bảng */
@@ -129,6 +143,7 @@ function uid_(p) { return p + Utilities.getUuid().slice(0, 8); }
 
 function log_(c, action, detail) {
   const sh = sheet_(SH.AUDIT);
+  if (sh.getLastRow() === 0) ensureHeaders_(SH.AUDIT);
   sh.appendRow([Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd HH:mm:ss'), c ? c.email : 'system', action, String(detail || '').slice(0, 900)]);
 }
 
@@ -136,14 +151,14 @@ function log_(c, action, detail) {
 
 function setup() {
   const ss = ss_();
-  Object.keys(HEADERS).forEach(n => { if (!ss.getSheetByName(n)) ss.insertSheet(n); });
+  Object.keys(HEADERS).forEach(n => { if (!ss.getSheetByName(n)) ss.insertSheet(n); ensureHeaders_(n); });
   if (!ss.getSheetByName(SH.ROLEPERM)) ss.insertSheet(SH.ROLEPERM);
   if (!ss.getSheetByName(SH.POS)) ss.insertSheet(SH.POS);
 
   const empty = n => sheet_(n).getLastRow() < 2;
   const adminMail = (Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || '').toLowerCase();
 
-  if (empty(SH.ROLEPERM)) saveRoleGrid_(DEFAULT_ROLES);
+  if (empty(SH.ROLEPERM)) saveRoleGrid_(DEFAULT_ROLES); else migrateRolePerm_();
   if (empty(SH.USERS)) {
     put_(SH.USERS, [{ Email: adminMail, HoTen: 'Quản trị hệ thống', VaiTro: ROLE_ADMIN, KichHoat: true }]);
     put_(SH.USERCAMP, [{ Email: adminMail, MaCoSo: '*' }]);
@@ -186,6 +201,15 @@ function setup() {
   ]);
   log_(null, 'setup', 'Khởi tạo hệ thống');
   SpreadsheetApp.getActive().toast('Đã khởi tạo. Triển khai Web app rồi truy cập bằng đường link.', 'Định biên', 8);
+}
+
+/* Bản cập nhật có thêm quyền mới: bổ sung cột, giữ nguyên các tick cũ */
+function migrateRolePerm_() {
+  const rows = read_(SH.ROLEPERM), head = Object.keys(rows[0] || {});
+  if (PERMS.every(p => head.indexOf(p.key) >= 0)) return;
+  const grid = {};
+  rows.forEach(r => { grid[r.VaiTro] = {}; PERMS.forEach(p => grid[r.VaiTro][p.key] = head.indexOf(p.key) >= 0 ? bool_(r[p.key]) : (DEFAULT_ROLES[r.VaiTro] || []).indexOf(p.key) >= 0); });
+  saveRoleGrid_(grid);
 }
 
 function saveRoleGrid_(grid) {
@@ -274,7 +298,10 @@ const ACTIONS = {
   configSave: { perm: 'config.edit', write: true, fn: configSave_ },
   permGet: { perm: 'admin.perm', fn: permGet_ },
   permSave: { perm: 'admin.perm', write: true, fn: permSave_ },
-  auditList: { perm: 'audit.view', fn: auditList_ }
+  auditList: { perm: 'audit.view', fn: auditList_ },
+  historyList: { perm: 'history.view', fn: historyList_ },
+  historyGet: { perm: 'history.view', fn: historyGet_ },
+  historySnapshot: { perm: 'history.snapshot', write: true, fn: historySnapshot_ }
 };
 
 /* ===================== CONFIG ===================== */
@@ -607,5 +634,88 @@ function permSave_(c, p) {
 }
 
 function auditList_() {
-  return read_(SH.AUDIT).slice(-300).reverse();
+  ensureHeaders_(SH.AUDIT);
+  return read_(SH.AUDIT).slice(-300).reverse().map(r => ({ ThoiGian: str_(r.ThoiGian), Email: r.Email, HanhDong: r.HanhDong, ChiTiet: r.ChiTiet }));
+}
+
+/* ===================== LỊCH SỬ PHÂN CÔNG (chốt kỳ) ===================== */
+/* Mỗi kỳ (YYYY-MM) × cơ sở lưu một ảnh chụp: nhân sự – vai trò – lớp – sĩ số – kết luận định biên. */
+
+function snapOf_(campus, staffAll, classesAll, asgAll, cfg) {
+  const rep = evalCampus_(campus, staffAll, classesAll, asgAll, cfg);
+  rep.classes.forEach(l => delete l.members);
+  const cls = {}; classesAll.forEach(l => cls[str_(l.MaLop)] = l.TenLop);
+  const by = {}; asgAll.forEach(a => (by[str_(a.MaNV)] = by[str_(a.MaNV)] || []).push(cls[str_(a.MaLop)] || str_(a.MaLop)));
+  return {
+    MaCoSo: campus.MaCoSo, TenCoSo: campus.TenCoSo, namHoc: cfg.params.NamHoc,
+    staff: staffAll.filter(x => str_(x.MaCoSo) === campus.MaCoSo).map(x => ({ MaNV: str_(x.MaNV), HoTen: x.HoTen, ChucDanhHR: x.ChucDanhHR, TrangThai: x.TrangThai || 'Đang làm', VaiTroDB: x.VaiTroDB || '', lop: (by[str_(x.MaNV)] || []).sort() })),
+    report: rep
+  };
+}
+
+function takeSnapshots_(ky, campuses, who, note, overwrite) {
+  const cfg = loadCfg_(), staff = read_(SH.STAFF), classes = read_(SH.CLASS), asg = read_(SH.ASSIGN);
+  const rows = read_(SH.HIST), now = Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd HH:mm');
+  let n = 0;
+  campuses.forEach(cp => {
+    const i = rows.findIndex(r => str_(r.Ky) === ky && str_(r.MaCoSo) === cp.MaCoSo);
+    if (i >= 0 && !overwrite) return;
+    const json = JSON.stringify(snapOf_(cp, staff, classes, asg, cfg));
+    if (json.length > 49000) throw new Error('Dữ liệu cơ sở ' + cp.MaCoSo + ' quá lớn để lưu trong 1 ô (' + json.length + ' ký tự).');
+    const row = { Ky: ky, MaCoSo: cp.MaCoSo, ChotLuc: now, NguoiChot: who, GhiChu: note, DuLieu: json };
+    if (i >= 0) rows[i] = row; else rows.push(row);
+    n++;
+  });
+  put_(SH.HIST, rows);
+  return n;
+}
+
+function historySnapshot_(c, p) {
+  const ky = str_(p.ky);
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(ky)) throw new Error('Kỳ phải có dạng YYYY-MM, ví dụ 2026-11');
+  const ids = (p.campuses && p.campuses.length ? p.campuses : c.allowed).map(str_);
+  ids.forEach(id => needCampus_(c, id));
+  const n = takeSnapshots_(ky, c.campuses.filter(x => ids.indexOf(x.MaCoSo) >= 0), c.email, str_(p.ghiChu), true);
+  log_(c, 'historySnapshot', ky + ' · ' + ids.join(','));
+  return n;
+}
+
+function historyList_(c) {
+  return read_(SH.HIST).filter(r => c.allowed.indexOf(str_(r.MaCoSo)) >= 0).map(r => {
+    let d = {}; try { d = JSON.parse(r.DuLieu); } catch (e) {}
+    const rp = d.report || {};
+    return { Ky: str_(r.Ky), MaCoSo: str_(r.MaCoSo), TenCoSo: d.TenCoSo || r.MaCoSo, ChotLuc: str_(r.ChotLuc), NguoiChot: r.NguoiChot, GhiChu: r.GhiChu, total: rp.total, status: rp.status, nhanSu: (d.staff || []).filter(x => x.TrangThai !== STATUS_OFF).length };
+  }).sort((a, b) => a.Ky < b.Ky ? 1 : a.Ky > b.Ky ? -1 : a.TenCoSo > b.TenCoSo ? 1 : -1);
+}
+
+/* vs: '' | 'current' | 'YYYY-MM' → trả về {a: kỳ đang xem, b: kỳ so sánh} */
+function historyGet_(c, p) {
+  needCampus_(c, p.campus);
+  const rows = read_(SH.HIST);
+  const find = ky => {
+    const r = rows.find(x => str_(x.Ky) === str_(ky) && str_(x.MaCoSo) === str_(p.campus));
+    if (!r) throw new Error('Không có dữ liệu kỳ ' + ky + ' của cơ sở này');
+    const d = JSON.parse(r.DuLieu); d.Ky = str_(r.Ky); d.ChotLuc = str_(r.ChotLuc); d.NguoiChot = r.NguoiChot; d.GhiChu = r.GhiChu; return d;
+  };
+  const out = { a: find(p.ky), b: null };
+  if (p.vs === 'current') {
+    const cp = c.campuses.find(x => x.MaCoSo === str_(p.campus));
+    out.b = snapOf_(cp, read_(SH.STAFF), read_(SH.CLASS), read_(SH.ASSIGN), loadCfg_());
+    out.b.Ky = 'current'; out.b.ChotLuc = 'Hiện tại';
+  } else if (p.vs) out.b = find(p.vs);
+  return out;
+}
+
+/* Tự động chốt kỳ của tháng trước vào ngày 1 hằng tháng (không ghi đè kỳ đã chốt thủ công) */
+function autoSnapshot() {
+  const cur = Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'yyyy-MM').split('-').map(Number);   // [năm, tháng]
+  const ky = cur[1] === 1 ? (cur[0] - 1) + '-12' : cur[0] + '-' + ('0' + (cur[1] - 1)).slice(-2);
+  const camps = read_(SH.CAMPUS).filter(x => bool_(x.KichHoat)).map(x => ({ MaCoSo: str_(x.MaCoSo), TenCoSo: x.TenCoSo }));
+  const n = takeSnapshots_(ky, camps, 'Hệ thống (tự động)', 'Tự động chốt đầu tháng', false);
+  log_(null, 'autoSnapshot', ky + ': ' + n + ' cơ sở');
+}
+function installMonthlyTrigger() {
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'autoSnapshot').forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('autoSnapshot').timeBased().onMonthDay(1).atHour(1).create();
+  SpreadsheetApp.getActive().toast('Đã bật tự động chốt kỳ vào 1h sáng ngày 1 hằng tháng.', 'Định biên', 8);
 }
