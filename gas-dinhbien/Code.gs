@@ -7,7 +7,7 @@
 const SH = {
   USERS: 'NguoiDung', ROLEPERM: 'PQ_VaiTro', USERCAMP: 'PQ_CoSo', CAMPUS: 'CoSo',
   STAFF: 'NhanSu', CLASS: 'Lop', ASSIGN: 'PhanCong',
-  CT: 'CauHinh_Lop', BAND: 'CauHinh_Khung', POS: 'CauHinh_CoSo', PARAM: 'CauHinh_ThamSo', AUDIT: 'NhatKy', HIST: 'LichSu', PD: 'PheDuyet', PDDL: 'PheDuyet_DL'
+  CT: 'CauHinh_Lop', BAND: 'CauHinh_Khung', POS: 'CauHinh_CoSo', PARAM: 'CauHinh_ThamSo', AUDIT: 'NhatKy', HIST: 'LichSu', PD: 'PheDuyet', PDDL: 'PheDuyet_DL', GUIDE: 'HuongDan'
 };
 
 const PERMS = [
@@ -34,6 +34,7 @@ const PARAM_DEF = [
   { Khoa: 'ChenhLech', GiaTri: '2', MoTa: 'Lớp đạt tỉ lệ định biên + N học sinh thì đủ điều kiện đề xuất bổ sung GV/bảo mẫu' },
   { Khoa: 'XacThucOTP', GiaTri: '1', MoTa: '1 = bắt buộc nhập mã xác nhận gửi qua email khi vào hệ thống; 0 = tắt' },
   { Khoa: 'PhienGio', GiaTri: '8', MoTa: 'Số giờ một lần xác nhận có hiệu lực (1–72)' },
+  { Khoa: 'ChuKy', GiaTri: 'Người lập;Chủ tịch HĐHT Mầm non;Phó Tổng Giám đốc;Tổng Giám đốc', MoTa: 'Các chức danh ký ở cuối bản in (cách nhau bằng dấu ;)' },
   { Khoa: 'TenGui', GiaTri: SYS_NAME, MoTa: 'Tên hiển thị của email tự động (thay cho tên chủ web app)' },
   { Khoa: 'KhongTraLoi', GiaTri: '1', MoTa: '1 = email tự động ghi chú "không trả lời" và dùng địa chỉ no-reply nếu tài khoản hỗ trợ; 0 = cho phép trả lời' }
 ];
@@ -63,9 +64,10 @@ const HEADERS = {
   NhatKy: ['ThoiGian', 'Email', 'HanhDong', 'ChiTiet'],
   LichSu: ['Ky', 'MaCoSo', 'ChotLuc', 'NguoiChot', 'GhiChu', 'DuLieu'],
   PheDuyet: ['MaPD', 'Loai', 'Ky', 'MaCoSo', 'TieuDe', 'GhiChu', 'NguoiGui', 'TenNguoiGui', 'GuiLuc', 'CheDo', 'TrangThai', 'Luong', 'KetThucLuc'],
-  PheDuyet_DL: ['MaPD', 'DuLieu']
+  PheDuyet_DL: ['MaPD', 'DuLieu'],
+  HuongDan: ['Id', 'ThuTu', 'Icon', 'TieuDe', 'DoiTuong', 'Loai', 'NoiDung']
 };
-const TEXT_COLS = { NhanSu: ['MaNV', 'MaCoSo', 'SoDT'], Lop: ['MaLop', 'MaCoSo', 'SoThuTu'], PhanCong: ['MaLop', 'MaNV'], PQ_CoSo: ['MaCoSo'], CoSo: ['MaCoSo'], LichSu: ['Ky', 'MaCoSo', 'DuLieu'], PheDuyet: ['MaPD', 'Ky', 'MaCoSo'], PheDuyet_DL: ['MaPD', 'DuLieu'] };
+const TEXT_COLS = { NhanSu: ['MaNV', 'MaCoSo', 'SoDT'], Lop: ['MaLop', 'MaCoSo', 'SoThuTu'], PhanCong: ['MaLop', 'MaNV'], PQ_CoSo: ['MaCoSo'], CoSo: ['MaCoSo'], LichSu: ['Ky', 'MaCoSo', 'DuLieu'], PheDuyet: ['MaPD', 'Ky', 'MaCoSo'], PheDuyet_DL: ['MaPD', 'DuLieu'], HuongDan: ['Id', 'TieuDe', 'NoiDung'] };
 const NOCACHE = {};
 NOCACHE[SH.AUDIT] = 1; NOCACHE[SH.HIST] = 1; NOCACHE[SH.PDDL] = 1;
 
@@ -216,6 +218,7 @@ function setup() {
   const addP = defParams.filter(d => !haveP.some(h => h.Khoa === d.Khoa));
   if (addP.length) put_(SH.PARAM, haveP.concat(addP));
   authSecret_();
+  if (empty(SH.GUIDE)) put_(SH.GUIDE, GUIDE_DEF);
   log_(null, 'setup', 'Khởi tạo hệ thống');
   SpreadsheetApp.getActive().toast('Đã khởi tạo. Triển khai Web app rồi truy cập bằng đường link.', 'Định biên', 8);
 }
@@ -414,6 +417,8 @@ const ACTIONS = {
   historySnapshot: { perm: 'history.snapshot', write: true, fn: historySnapshot_ },
   classPreview: { perm: 'class.edit', fn: classPreview_ },
   mailTest: { perm: 'admin.perm', fn: mailTest_ },
+  guideSave: { perm: 'admin.perm', write: true, fn: guideSave_ },
+  guideReset: { perm: 'admin.perm', write: true, fn: guideReset_ },
   approvalList: { fn: (c) => pdList_(c) },
   approvalCandidates: { perm: 'approval.submit', fn: approverCandidates_ },
   approvalSubmit: { perm: 'approval.submit', write: true, fn: approvalSubmit_ },
@@ -455,6 +460,7 @@ function loadAll_(c) {
     report: has('dash.view') ? reportGet_(c, {}) : null,
     staff: has('staff.view') ? staffList_(c, {}) : [],
     classes: has('class.view') ? classList_(c, {}) : [],
+    guide: guideList_(),
     approvals: (has('approval.submit') || has('approval.approve') || has('approval.viewall')) ? pdList_(c) : []
   };
 }
@@ -482,6 +488,7 @@ function configSave_(c, p) {
       if ((d.Khoa === 'XacThucOTP' || d.Khoa === 'KhongTraLoi') && v !== '0' && v !== '1') throw new Error('Giá trị ' + d.Khoa + ' chỉ nhận 0 hoặc 1');
       if (d.Khoa === 'PhienGio') v = String(Math.min(72, Math.max(1, num_(v, 8))));
       if (d.Khoa === 'TenGui') v = (v || '').slice(0, 60) || SYS_NAME;
+      if (d.Khoa === 'ChuKy') v = (v || '').split(';').map(x => x.trim()).filter(Boolean).slice(0, 6).join(';') || d.GiaTri;
       return { Khoa: d.Khoa, GiaTri: v, MoTa: d.MoTa };
     });
     put_(SH.PARAM, out);
@@ -667,23 +674,37 @@ function evalCampus_(campus, staffAll, classesAll, assignsAll, cfg) {
     const members = (asgByClass[str_(l.MaLop)] || []).map(id => byId[id]).filter(isActive);
     const gv = members.filter(s => s.VaiTroDB === 'Giáo viên').length, bm = members.filter(s => s.VaiTroDB === 'Bảo mẫu').length;
     const students = num_(l.SiSo) + num_(l.GiuCho), adults = gv + bm, stdAdults = ct.SoGV + ct.SoBM;
-    const issues = [];
-    let status = 'ok';
+    /* Mục 4 đề án: chỉ đề xuất/tính THIẾU GV-bảo mẫu khi lớp đạt tỉ lệ định biên + N học sinh
+       (N = tham số ChenhLech, mặc định 2): sĩ số ≥ tỉ lệ × số người đang phụ trách + N.
+       Số người cần = ceil((sĩ số − N + 1) / tỉ lệ). Chưa đủ điều kiện thì không tính là thiếu. */
+    const r = ct.TiLe, issues = [], notes = [];
+    let status = 'ok', need = adults, short = { gv: 0, bm: 0, total: 0 }, eligible = false;
     if (students === 0) status = 'trong';
-    else {
-      if (gv < ct.SoGV) issues.push('Thiếu ' + (ct.SoGV - gv) + ' giáo viên');
-      if (bm < ct.SoBM) issues.push('Thiếu ' + (ct.SoBM - bm) + ' bảo mẫu');
-      const lack = issues.length > 0;
-      if (ct.TiLe && adults > 0 && students > ct.TiLe * adults) issues.push('Vượt tỉ lệ ' + ct.TiLe + ':1 (hiện ' + (students / adults).toFixed(1) + ':1)');
-      if (gv > ct.SoGV) issues.push('Thừa ' + (gv - ct.SoGV) + ' giáo viên so với định biên');
-      if (bm > ct.SoBM) issues.push('Thừa ' + (bm - ct.SoBM) + ' bảo mẫu so với định biên');
-      status = lack ? 'thieu' : issues.some(x => x.indexOf('Vượt') === 0) ? 'vuot' : issues.length ? 'thua' : 'ok';
+    else if (r > 0) {
+      const demand = Math.ceil((students - extra + 1) / r);   // số người cần theo tỉ lệ
+      need = Math.max(adults, demand);
+      eligible = students >= r * adults + extra;
+      if (eligible) {
+        const t = demand - adults;
+        const g = Math.min(t, Math.max(0, ct.SoGV - gv)), b = Math.min(t - g, Math.max(0, ct.SoBM - bm));
+        short = { gv: g + (t - g - b), bm: b, total: t };
+        issues.push('Thiếu ' + [short.gv ? short.gv + ' giáo viên' : '', short.bm ? short.bm + ' bảo mẫu' : ''].filter(Boolean).join(' + ') + ' – đủ điều kiện bổ sung (sĩ số ' + students + ' ≥ ' + r + ' × ' + adults + ' + ' + extra + ')');
+        status = 'thieu';
+      } else if (adults > 0 && students > r * adults) {
+        issues.push('Vượt tỉ lệ ' + r + ':1 (hiện ' + (students / adults).toFixed(1) + ':1) nhưng chưa đủ điều kiện bổ sung (cần ≥ ' + (r * adults + extra) + ' học sinh)');
+        status = 'vuot';
+      }
+      const keep = Math.max(stdAdults, demand);
+      if (status !== 'thieu' && adults > keep) { issues.push('Thừa ' + (adults - keep) + ' người so với định biên của lớp'); if (status === 'ok') status = 'thua'; }
+      if (status === 'ok' || status === 'vuot') {
+        if (gv < ct.SoGV || bm < ct.SoBM) notes.push('Thấp hơn cơ cấu chuẩn (' + gv + '/' + ct.SoGV + ' GV' + (ct.SoBM ? ', ' + bm + '/' + ct.SoBM + ' bảo mẫu' : '') + ') nhưng tỉ lệ vẫn đảm bảo nên không tính là thiếu');
+      }
     }
-    const cap = ct.TiLe * stdAdults;
+    const cap = r * stdAdults;
     return {
       MaLop: str_(l.MaLop), TenLop: l.TenLop, MaNhom: ct.MaNhom, LuaTuoi: ct.LuaTuoi, TenBoGD: ct.TenBoGD, siSo: num_(l.SiSo), giuCho: num_(l.GiuCho), students,
-      gv, bm, stdGV: ct.SoGV, stdBM: ct.SoBM, tiLe: ct.TiLe, capacity: cap, ratioActual: adults ? +(students / adults).toFixed(1) : null,
-      canPropose: students > 0 && cap > 0 && students >= cap + extra, status, issues,
+      gv, bm, stdGV: ct.SoGV, stdBM: ct.SoBM, tiLe: r, capacity: cap, ratioActual: adults ? +(students / adults).toFixed(1) : null,
+      need, short, eligible, canPropose: eligible, status, issues, notes,
       members: members.map(s => ({ HoTen: s.HoTen, VaiTro: s.VaiTroDB }))
     };
   });
@@ -697,9 +718,10 @@ function evalCampus_(campus, staffAll, classesAll, assignsAll, cfg) {
   });
   const open = classes.filter(l => l.students > 0);
   CLASS_ROLES.forEach(role => {
-    const need = open.reduce((a, l) => a + (role === 'Giáo viên' ? l.stdGV : l.stdBM), 0);
+    /* Dòng tổng hợp theo lớp: chỉ chênh lệch khi có lớp đủ điều kiện bổ sung (Σ số thiếu của các lớp đó) */
+    const lack = open.reduce((a, l) => a + (role === 'Giáo viên' ? l.short.gv : l.short.bm), 0);
     const actual = active.filter(s => s.VaiTroDB === role).length;
-    positions.push({ viTri: role + ' (theo lớp)', role, min: need, max: need, actual, status: statusOf_(actual, { min: need, max: need }), kind: 'class' });
+    positions.push({ viTri: role + ' (theo lớp)', role, min: actual + lack, max: actual + lack, actual, status: lack ? 'thieu' : 'ok', kind: 'class' });
   });
 
   const warnings = [];
@@ -844,7 +866,7 @@ function historyGet_(c, p) {
 
 function brief_(r, tenLop) {
   const cl = r.classes.find(l => l.TenLop === tenLop);
-  return { total: r.total, band: r.band, status: r.status, positions: r.positions.map(p => ({ viTri: p.viTri, min: p.min, max: p.max, actual: p.actual, status: p.status })), cls: cl ? { students: cl.students, gv: cl.gv, bm: cl.bm, stdGV: cl.stdGV, stdBM: cl.stdBM, tiLe: cl.tiLe, capacity: cl.capacity, status: cl.status, issues: cl.issues, canPropose: cl.canPropose } : null };
+  return { total: r.total, band: r.band, status: r.status, positions: r.positions.map(p => ({ viTri: p.viTri, min: p.min, max: p.max, actual: p.actual, status: p.status })), cls: cl ? { students: cl.students, gv: cl.gv, bm: cl.bm, stdGV: cl.stdGV, stdBM: cl.stdBM, tiLe: cl.tiLe, capacity: cl.capacity, status: cl.status, issues: cl.issues, notes: cl.notes, short: cl.short, canPropose: cl.canPropose } : null };
 }
 /* Tính thử (không ghi) cơ sở sẽ ra sao nếu lớp có sĩ số/giữ chỗ mới */
 function classPreview_(c, p) {
@@ -860,6 +882,65 @@ function classPreview_(c, p) {
   const b = evalCampus_(campus, staff, classes, asg, cfg), a = evalCampus_(campus, staff, after, asg, cfg);
   return { name, isNew: i < 0, before: brief_(b, i >= 0 ? classes[i].TenLop : name), after: brief_(a, name), extra: num_(cfg.params.ChenhLech, 2) };
 }
+
+/* ===================== HƯỚNG DẪN SỬ DỤNG (Admin chỉnh sửa được) ===================== */
+/* Cú pháp nội dung: "## " tiêu đề nhỏ · "1. " bước · "- " gạch đầu dòng · "> " mẹo · "!> " lưu ý · **đậm** · [tab:staff|Chữ hiển thị] nút mở tab */
+const R_ALL = 'Tất cả';
+const GUIDE_DEF = [
+  { Id: 'g01', ThuTu: 1, Icon: '🔐', TieuDe: 'Đăng nhập lần đầu', DoiTuong: R_ALL, Loai: 'section', NoiDung:
+'Hệ thống dùng tài khoản Google của tổ chức và **mã xác nhận 6 số** gửi về email của bạn.\n1. Mở đường link hệ thống do Admin cung cấp.\n2. Bấm **Gửi mã xác nhận**.\n3. Mở email "Mã xác nhận đăng nhập", nhập 6 số vào ô (mã có hiệu lực 5 phút).\n4. Đăng nhập xong, bạn được dùng liên tục khoảng 8 giờ.\n> Không thấy email? Kiểm tra thư mục Spam, chờ 60 giây rồi bấm **Gửi lại mã**.\n!> Nhập sai 5 lần sẽ bị khoá 15 phút. Nếu báo "chưa được cấp quyền", nhờ Admin thêm email của bạn vào hệ thống.' },
+  { Id: 'g02', ThuTu: 2, Icon: '👥', TieuDe: 'Nhập danh sách nhân sự', DoiTuong: 'Nhân sự, Admin', Loai: 'section', NoiDung:
+'Làm một lần đầu năm, sau đó chỉ cập nhật khi có người vào/nghỉ.\n1. Vào tab [tab:staff|Nhân sự].\n2. Bấm **Nhập từ Excel**.\n3. Trong Excel/Google Sheet, chọn các cột theo thứ tự: **Mã NV · Họ tên · Cơ sở · Chức danh · Trạng thái** rồi Copy.\n4. Dán vào ô và bấm **Nhập**. Mã NV đã có sẽ được cập nhật, không bị trùng.\n> Người nghỉ việc: đổi Trạng thái thành **Nghỉ việc** để không tính vào định biên (không cần xoá).' },
+  { Id: 'g03', ThuTu: 3, Icon: '🏫', TieuDe: 'Tạo lớp và cập nhật sĩ số', DoiTuong: 'Hiệu trưởng/Quản lý cơ sở, Admin', Loai: 'section', NoiDung:
+'1. Vào tab [tab:classes|Lớp học] → **+ Thêm lớp**.\n2. Chọn **nhóm tuổi** (hệ thống tự đặt tên: Pre-N1, N1, Pre-K.A1, Pre-K.B1, K1…).\n3. Nhập **Sĩ số thực học** và **Đã đăng ký giữ chỗ**. Tổng hai số này là sĩ số dùng để tính định biên.\n4. Xem khung **Tác động** bên dưới (xem trước hệ quả: đổi khung định biên không? lớp có đủ điều kiện bổ sung giáo viên không?) rồi bấm **Lưu**.\n## Khi sĩ số thay đổi\n- Bấm **Sửa** ở lớp đó và nhập số mới; mọi báo cáo tự tính lại ngay.\n- Cuối tháng nên [tab:history|Chốt kỳ] để lưu lại số liệu.' },
+  { Id: 'g04', ThuTu: 4, Icon: '🧩', TieuDe: 'Phân vai trò và phân lớp cho nhân sự', DoiTuong: 'Hiệu trưởng/Quản lý cơ sở, Admin', Loai: 'section', NoiDung:
+'Mỗi nhân sự cần có **Vai trò định biên** thì mới được tính trong báo cáo.\n1. Vào [tab:staff|Nhân sự], tìm người cần phân.\n2. Ở cột **Vai trò định biên** chọn: Giáo viên, Bảo mẫu, Y tế, Cấp dưỡng, Bảo vệ…\n3. Với Giáo viên/Bảo mẫu, bấm **Phân lớp** và tick các lớp phụ trách.\n> Tick ô **Chưa phân vai trò** ở đầu bảng để tìm nhanh những người còn sót.\n> Giáo viên Tiếng Anh VN được tính ở cấp cơ sở, không cần phân lớp.' },
+  { Id: 'g05', ThuTu: 5, Icon: '📊', TieuDe: 'Đọc báo cáo định biên', DoiTuong: R_ALL, Loai: 'section', NoiDung:
+'Có 2 nơi xem: [tab:dash|Tổng quan] (so sánh các cơ sở) và [tab:campus|Báo cáo cơ sở] (chi tiết từng cơ sở).\n## Ý nghĩa màu sắc\n- **Đạt** (xanh): đúng định biên.\n- **Thiếu** (đỏ): cần bổ sung người **và đã đủ điều kiện mở rộng định biên**.\n- **Thừa** (vàng): nhiều hơn định biên.\n- **Vượt tỉ lệ – theo dõi** (tím): lớp đông hơn tỉ lệ cho phép nhưng **chưa đủ điều kiện** để xin thêm người.\n## Khi nào mới tính là "Thiếu"?\n- **Giáo viên/Bảo mẫu của lớp**: chỉ khi sĩ số lớp ≥ tỉ lệ × số người đang phụ trách + 2 học sinh (Quy định mục 4). Ví dụ lớp K (10:1) có 2 giáo viên: đủ điều kiện khi từ **22 học sinh**.\n- **Nhân sự cơ sở** (Hiệu phó, Y tế, Cấp dưỡng…): theo khung tổng sĩ số của cơ sở (dưới 50, 50–59, 60–70, 71–150…).\n> Lớp ít học sinh mà chỉ có 1 giáo viên vẫn là **Đạt** nếu tỉ lệ còn đảm bảo; hệ thống chỉ ghi chú "thấp hơn cơ cấu chuẩn".' },
+  { Id: 'g06', ThuTu: 6, Icon: '✉️', TieuDe: 'Gửi hồ sơ và phê duyệt', DoiTuong: 'Hiệu trưởng/Quản lý cơ sở, Chủ tịch HĐHT Mầm non, Nhân sự, Admin', Loai: 'section', NoiDung:
+'## Người gửi\n1. Vào [tab:approval|Phê duyệt] → **Gửi phê duyệt**.\n2. Chọn loại hồ sơ, cơ sở, kỳ và viết nội dung ngắn gọn.\n3. Chọn **người phê duyệt** theo thứ tự (dùng ↑ ↓ để sắp xếp).\n4. Chọn **Tuần tự** (lần lượt từng người) hoặc **Đồng thời** (cùng lúc).\n5. Bấm **Gửi** – hệ thống tự gửi email thông báo.\n## Người phê duyệt\n1. Hồ sơ chờ bạn hiện **số đỏ** trên tab Phê duyệt kèm email thông báo.\n2. Mở hồ sơ, xem số liệu đính kèm, nhập ý kiến rồi bấm **Phê duyệt** hoặc **Từ chối** (từ chối bắt buộc ghi lý do).\n> Hồ sơ lưu số liệu **đúng thời điểm gửi**; duyệt xong tự lưu vào Lịch sử.\n> Gửi nhầm? Mở hồ sơ → **Thu hồi** (khi chưa duyệt xong).' },
+  { Id: 'g07', ThuTu: 7, Icon: '📌', TieuDe: 'Chốt kỳ và xem lại các tháng cũ', DoiTuong: 'Hiệu trưởng/Quản lý cơ sở, Nhân sự, Chủ tịch HĐHT Mầm non, Admin', Loai: 'section', NoiDung:
+'Mỗi lần phân công lại, "chụp ảnh" lại để sau này xem được bảng phân công của từng tháng.\n1. Vào [tab:history|Lịch sử phân công] → **Chốt kỳ phân công**, chọn tháng và cơ sở.\n2. Xem lại: bấm **Xem**. Muốn biết ai đổi lớp/vai trò: bấm **So với hiện tại**.\n> Nếu Admin đã bật, hệ thống tự chốt tháng trước vào ngày 1 hằng tháng.' },
+  { Id: 'g08', ThuTu: 8, Icon: '🖨️', TieuDe: 'In và xuất Excel', DoiTuong: R_ALL, Loai: 'section', NoiDung:
+'- **⬇ Excel**: tải file .xlsx nhiều sheet.\n- **🖨 In**: in khổ A4 ngang, tự ẩn menu và nút bấm.\n- Tick ô **Kèm phần ký** cạnh nút In khi cần chữ ký trực tiếp của Ban Tổng giám đốc (mặc định: Người lập, Chủ tịch HĐHT Mầm non, Phó Tổng Giám đốc, Tổng Giám đốc).\n> Chọn "Lưu dưới dạng PDF" trong hộp thoại in nếu muốn gửi file thay vì in giấy.' },
+  { Id: 'g09', ThuTu: 9, Icon: '⚙️', TieuDe: 'Cấu hình định mức', DoiTuong: 'Chủ tịch HĐHT Mầm non, Admin', Loai: 'section', NoiDung:
+'Vào [tab:config|Cấu hình] để chỉnh: tỉ lệ HS:GV theo lứa tuổi, khung sĩ số, định biên từng vị trí theo khung, số học sinh chênh lệch (+N), danh sách cơ sở, dòng ký ở bản in.\n!> Thay đổi áp dụng ngay cho mọi báo cáo. Hãy đối chiếu với văn bản quy định trước khi lưu.' },
+  { Id: 'g10', ThuTu: 10, Icon: '🔑', TieuDe: 'Phân quyền người dùng', DoiTuong: 'Admin', Loai: 'section', NoiDung:
+'1. Vào [tab:perm|Phân quyền].\n2. **Quyền × Vai trò**: tick chức năng mỗi vai trò được dùng.\n3. **Người dùng × Cơ sở**: thêm email, chọn vai trò, tick các cơ sở được truy cập.\n4. Bấm **Lưu phân quyền**.\n> Muốn ai đó được chọn làm người phê duyệt: tick quyền **Được chọn làm người phê duyệt** cho vai trò của họ.' },
+  { Id: 'f01', ThuTu: 11, Icon: '❓', TieuDe: 'Vì sao lớp báo "Vượt tỉ lệ" mà không báo "Thiếu"?', DoiTuong: R_ALL, Loai: 'faq', NoiDung:
+'Vì lớp mới vượt tỉ lệ một chút. Theo quy định, chỉ khi sĩ số đạt **tỉ lệ × số người phụ trách + 2 học sinh** mới đủ điều kiện xin thêm giáo viên/bảo mẫu. Lúc đó trạng thái sẽ chuyển sang **Thiếu**.' },
+  { Id: 'f02', ThuTu: 12, Icon: '❓', TieuDe: 'Sĩ số lớp thay đổi giữa tháng thì làm gì?', DoiTuong: R_ALL, Loai: 'faq', NoiDung:
+'Hiệu trưởng vào [tab:classes|Lớp học] → **Sửa** → nhập sĩ số mới (xem khung Tác động trước khi lưu). Báo cáo tự tính lại. Cuối tháng nhớ **Chốt kỳ**.' },
+  { Id: 'f03', ThuTu: 13, Icon: '❓', TieuDe: 'Tôi không thấy tab hoặc cơ sở nào đó?', DoiTuong: R_ALL, Loai: 'faq', NoiDung:
+'Mỗi người chỉ thấy chức năng và cơ sở được Admin cấp quyền. Cần thêm quyền, hãy nhờ Admin chỉnh trong tab Phân quyền.' },
+  { Id: 'f04', ThuTu: 14, Icon: '❓', TieuDe: 'Số liệu có vẻ cũ hoặc chưa cập nhật?', DoiTuong: R_ALL, Loai: 'faq', NoiDung:
+'Bấm nút **⟳ Làm mới** ở góc trên. Nếu ai đó sửa trực tiếp trong Google Sheet (không qua web), có thể chậm tối đa 10 phút.' },
+  { Id: 'f05', ThuTu: 15, Icon: '❓', TieuDe: 'Không nhận được mã xác nhận đăng nhập?', DoiTuong: R_ALL, Loai: 'faq', NoiDung:
+'Kiểm tra thư mục Spam, chờ 60 giây rồi bấm **Gửi lại mã**. Vẫn không có: báo Admin kiểm tra email của bạn đã được thêm đúng chưa.' },
+  { Id: 'f06', ThuTu: 16, Icon: '❓', TieuDe: 'Nhập nhầm vai trò hoặc lớp cho nhân sự?', DoiTuong: R_ALL, Loai: 'faq', NoiDung:
+'Mở tab [tab:staff|Nhân sự] và chọn lại – áp dụng ngay. Mọi thay đổi đều được ghi vào Nhật ký.' }
+];
+
+function guideList_() {
+  const rows = read_(SH.GUIDE);
+  if (!rows.length) return GUIDE_DEF;
+  return rows.map(r => ({ Id: str_(r.Id), ThuTu: num_(r.ThuTu), Icon: str_(r.Icon), TieuDe: str_(r.TieuDe), DoiTuong: str_(r.DoiTuong) || R_ALL, Loai: r.Loai === 'faq' ? 'faq' : 'section', NoiDung: str_(r.NoiDung) }))
+    .sort((a, b) => a.ThuTu - b.ThuTu);
+}
+function guideSave_(c, p) {
+  const items = p.items || [];
+  if (!items.length) throw new Error('Cần ít nhất một mục hướng dẫn');
+  if (items.length > 60) throw new Error('Tối đa 60 mục');
+  const out = items.map((x, i) => {
+    if (!str_(x.TieuDe)) throw new Error('Mục #' + (i + 1) + ' chưa có tiêu đề');
+    if (str_(x.NoiDung).length > 8000) throw new Error('Mục "' + x.TieuDe + '" quá dài (tối đa 8000 ký tự)');
+    return { Id: str_(x.Id) || uid_('g'), ThuTu: i + 1, Icon: str_(x.Icon).slice(0, 4), TieuDe: str_(x.TieuDe).slice(0, 150), DoiTuong: str_(x.DoiTuong) || R_ALL, Loai: x.Loai === 'faq' ? 'faq' : 'section', NoiDung: String(x.NoiDung || '') };
+  });
+  put_(SH.GUIDE, out);
+  log_(c, 'guideSave', out.length + ' mục');
+  return guideList_();
+}
+function guideReset_(c) { put_(SH.GUIDE, GUIDE_DEF); log_(c, 'guideReset', 'Khôi phục hướng dẫn mặc định'); return guideList_(); }
 
 /* ===================== GỬI & PHÊ DUYỆT ===================== */
 /* Người gửi chọn danh sách người duyệt (tuần tự hoặc đồng thời). Hồ sơ đính kèm ảnh chụp phân công/định biên tại thời điểm gửi.
