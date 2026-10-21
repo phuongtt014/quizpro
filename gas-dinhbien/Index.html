@@ -48,7 +48,7 @@ td.cell.ok{background:var(--ok-l)}td.cell.thieu{background:var(--bad-l)}td.cell.
 </style>
 </head>
 <body>
-<header><h1>Định biên & Phân công nhân sự – Khối Mầm non Việt Mỹ <small id="nh"></small></h1><small id="who"></small></header>
+<header><h1>Định biên & Phân công nhân sự – Khối Mầm non Việt Mỹ <small id="nh"></small></h1><small id="stamp"></small><button class="b s" data-do="refresh" title="Tải lại dữ liệu từ máy chủ" style="background:#ffffff22;color:#fff;border-color:#ffffff66">⟳ Làm mới</button><small id="who"></small></header>
 <nav id="nav"></nav>
 <main id="main"><div class="loading">Đang tải…</div></main>
 <div id="toast"></div>
@@ -80,7 +80,7 @@ const val=id=>document.getElementById(id).value;
 
 /* ---------- khởi động ---------- */
 async function init(){
-  try{S.boot=await call('bootstrap')}catch(e){$('#main').innerHTML=`<div class="card"><h3>Không thể truy cập</h3><p>${esc(e.message)}</p></div>`;return}
+  try{await load()}catch(e){$('#main').innerHTML=`<div class="card"><h3>Không thể truy cập</h3><p>${esc(e.message)}</p></div>`;return}
   $('#who').textContent=S.boot.me.name+' · '+S.boot.me.role;
   $('#nh').textContent='· NH '+(S.boot.cfg.params.NamHoc||'');
   S.campus=S.boot.campuses.length===1?S.boot.campuses[0].MaCoSo:'';
@@ -89,10 +89,24 @@ async function init(){
   if(!tabs.length){$('#main').innerHTML='<div class="card">Tài khoản chưa được cấp chức năng nào.</div>';return}
   go(tabs[0][0]);
 }
-async function go(tab){
+const DATA_TABS=['dash','campus','staff','classes'];
+async function load(){
+  const d=await call('loadAll');
+  S.boot=d.boot;S.cache.report=d.report;S.cache.staff=d.staff;S.cache.classes=d.classes;S.t=Date.now();
+  const el=$('#stamp');if(el)el.textContent='Cập nhật '+new Date().toTimeString().slice(0,5)+' ';
+}
+/* silent=true: nền, không làm gián đoạn thao tác đang dở; false: tải xong vẽ lại ngay */
+async function refresh(silent){
+  try{await load()}catch(e){if(!silent)toast(e.message,true);return}
+  if(DATA_TABS.indexOf(S.tab)<0)return;
+  if(silent&&($('#modal').innerHTML||/INPUT|SELECT|TEXTAREA/.test((document.activeElement||{}).tagName||'')))return;
+  go(S.tab,false);
+}
+async function go(tab,fetchIfStale=true){
   S.tab=tab;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
-  $('#main').innerHTML='<div class="loading">Đang tải…</div>';
+  if(tab==='perm'&&!S.pm||tab==='audit')$('#main').innerHTML='<div class="loading">Đang tải…</div>';
   try{await VIEWS[tab]()}catch(e){$('#main').innerHTML=`<div class="card warn">${esc(e.message)}</div>`}
+  if(fetchIfStale&&DATA_TABS.indexOf(tab)>=0&&Date.now()-S.t>30000)refresh(true);
 }
 const campusSel=(id,all=true)=>`<select id="${id}">${all?'<option value="">— Tất cả cơ sở —</option>':''}${S.boot.campuses.map(c=>`<option value="${esc(c.MaCoSo)}" ${S.campus===c.MaCoSo?'selected':''}>${esc(c.TenCoSo)}</option>`).join('')}</select>`;
 const campName=id=>(S.boot.allCampuses.find(c=>c.MaCoSo===id)||{}).TenCoSo||id;
@@ -100,7 +114,7 @@ const campName=id=>(S.boot.allCampuses.find(c=>c.MaCoSo===id)||{}).TenCoSo||id;
 /* ---------- Tổng quan ---------- */
 const VIEWS={};
 VIEWS.dash=async()=>{
-  const r=S.cache.report=await call('report');
+  const r=S.cache.report;
   const s=r.summary,po=r.positionOrder;
   const cellOf=p=>`<td class="cell ${p.status}">${p.actual}<small>${p.min===p.max?p.min:p.min+'–'+p.max}</small></td>`;
   $('#main').innerHTML=`
@@ -125,7 +139,7 @@ VIEWS.dash=async()=>{
 /* ---------- Báo cáo cơ sở ---------- */
 VIEWS.campus=async()=>{
   if(!S.campus&&S.boot.campuses.length)S.campus=S.boot.campuses[0].MaCoSo;
-  const r=await call('report',{campus:S.campus});const c=r.campuses[0];
+  const c=S.cache.report.campuses.find(x=>x.MaCoSo===S.campus);
   const head=`<div class="row">${campusSel('csel',false)}<span class="grow"></span></div>`;
   if(!c){$('#main').innerHTML=head+'<div class="card">Chưa có dữ liệu.</div>';bindSel();return}
   $('#main').innerHTML=head+`
@@ -147,8 +161,6 @@ function bindSel(){const e=$('#csel');if(e)e.onchange=()=>{S.campus=e.value;go(S
 
 /* ---------- Nhân sự ---------- */
 VIEWS.staff=async()=>{
-  const [staff,classes]=await Promise.all([call('staffList',{}),can('class.view')?call('classList',{}):[]]);
-  S.cache.staff=staff;S.cache.classes=classes;
   renderStaff();
 };
 function renderStaff(){
@@ -159,8 +171,8 @@ function renderStaff(){
   $('#main').innerHTML=`<div class="row">${campusSel('csel')}<input id="q" placeholder="Tìm tên / mã NV / chức danh" value="${esc(S.q||'')}" class="grow">
    <label><input type="checkbox" id="nr" ${f.only?'checked':''}> Chưa phân vai trò</label>
    ${edit?'<button class="b" data-do="addStaff">+ Thêm</button><button class="b p" data-do="importStaff">Nhập từ Excel</button>':''}</div>
-   <div class="card"><div class="muted" style="margin-bottom:8px">${rows.length} nhân sự</div><div class="tw"><table><thead><tr><th>Mã NV</th><th>Họ tên</th><th>Cơ sở</th><th>Chức danh (HR)</th><th>Trạng thái</th><th>Vai trò định biên</th><th>Lớp phụ trách</th><th></th></tr></thead><tbody>
-   ${rows.map(s=>`<tr><td>${esc(s.MaNV)}</td><td>${esc(s.HoTen)}</td><td>${esc(campName(s.MaCoSo))}</td><td>${esc(s.ChucDanhHR)}</td><td>${s.TrangThai===  'Nghỉ việc'?'<span class="tag trong">Nghỉ việc</span>':esc(s.TrangThai)}</td>
+   <div class="card"><div class="muted" style="margin-bottom:8px">${rows.length} nhân sự${rows.length>200?' – hiển thị 200 đầu, hãy lọc/tìm kiếm để thu hẹp':''}</div><div class="tw"><table><thead><tr><th>Mã NV</th><th>Họ tên</th><th>Cơ sở</th><th>Chức danh (HR)</th><th>Trạng thái</th><th>Vai trò định biên</th><th>Lớp phụ trách</th><th></th></tr></thead><tbody>
+   ${rows.slice(0,200).map(s=>`<tr><td>${esc(s.MaNV)}</td><td>${esc(s.HoTen)}</td><td>${esc(campName(s.MaCoSo))}</td><td>${esc(s.ChucDanhHR)}</td><td>${s.TrangThai===  'Nghỉ việc'?'<span class="tag trong">Nghỉ việc</span>':esc(s.TrangThai)}</td>
    <td>${assign?`<select data-role="${esc(s.MaNV)}"><option value="">— chưa phân —</option>${S.boot.roleOptions.map(o=>`<option ${o===s.VaiTroDB?'selected':''}>${esc(o)}</option>`).join('')}</select>`:(esc(s.VaiTroDB)||'<span class="muted">—</span>')}</td>
    <td>${s.lop.map(id=>`<span class="chip">${esc(cn(id))}</span>`).join('')}${assign&&S.boot.classRoles.indexOf(s.VaiTroDB)>=0?` <button class="b s" data-do="assignClass" data-id="${esc(s.MaNV)}">Phân lớp</button>`:''}</td>
    <td style="white-space:nowrap">${edit?`<button class="b s" data-do="editStaff" data-id="${esc(s.MaNV)}">Sửa</button> <button class="b s d" data-do="delStaff" data-id="${esc(s.MaNV)}">Xoá</button>`:''}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">Không có dữ liệu.</td></tr>'}
@@ -180,7 +192,7 @@ function staffForm(s){
 }
 async function saveStaffForm(){
   await call('staffSave',{row:{MaNV:val('f_id'),HoTen:val('f_name'),MaCoSo:val('f_cs'),ChucDanhHR:val('f_title'),TrangThai:val('f_st'),GhiChu:val('f_note')}});
-  toast('Đã lưu');go('staff');
+  toast('Đã lưu');await refresh();
 }
 function parsePaste(text){
   const lines=text.split(/\r?\n/).filter(l=>l.trim());if(!lines.length)return[];
@@ -195,7 +207,6 @@ function parsePaste(text){
 
 /* ---------- Lớp học ---------- */
 VIEWS.classes=async()=>{
-  S.cache.classes=await call('classList',{});
   const ed=can('class.edit');
   const rows=S.cache.classes.filter(l=>!S.campus||l.MaCoSo===S.campus);
   const gvOf=(l,r)=>l.members.filter(m=>m.VaiTro===r).map(m=>`<span class="chip">${esc(m.HoTen)}</span>`).join('');
@@ -217,7 +228,7 @@ function classForm(l){
 
 /* ---------- Cấu hình ---------- */
 VIEWS.config=async()=>{
-  S.boot=await call('bootstrap');S.cfgEdit=JSON.parse(JSON.stringify({cfg:S.boot.cfg,campuses:S.boot.allCampuses}));
+  S.cfgEdit=JSON.parse(JSON.stringify({cfg:S.boot.cfg,campuses:S.boot.allCampuses}));
   renderConfig();
 };
 function renderConfig(){
@@ -240,7 +251,7 @@ function setPath(path,v){
 function getList(name){return name==='campuses'?S.cfgEdit.campuses:S.cfgEdit.cfg[name]}
 
 /* ---------- Phân quyền ---------- */
-VIEWS.perm=async()=>{S.pm=await call('permGet');renderPerm()};
+VIEWS.perm=async()=>{if(!S.pm)S.pm=await call('permGet');renderPerm()};
 function renderPerm(){
   const d=S.pm,t=S.permTab||'role';
   const roleOpts=r=>d.roles.map(x=>`<option ${x===r?'selected':''}>${esc(x)}</option>`).join('');
@@ -280,24 +291,25 @@ document.addEventListener('click',async e=>{
   if(d.delu){S.pm.users.splice(+d.delu,1);return renderPerm()}
   const A={
     csv:exportCsv,
+    refresh:async()=>{toast('Đang làm mới…');await refresh();toast('Đã làm mới')},
     addStaff:()=>modal('Thêm nhân sự',staffForm(),()=>act(saveStaffForm)),
     editStaff:()=>modal('Sửa nhân sự',staffForm(S.cache.staff.find(s=>s.MaNV===d.id)),()=>act(saveStaffForm)),
-    delStaff:async()=>{if(confirm('Xoá nhân sự '+d.id+'? (cũng xoá phân công lớp)')){await act(()=>call('staffDelete',{maNV:d.id}));toast('Đã xoá');go('staff')}},
+    delStaff:async()=>{if(confirm('Xoá nhân sự '+d.id+'? (cũng xoá phân công lớp)')){await act(()=>call('staffDelete',{maNV:d.id}));toast('Đã xoá');await refresh()}},
     importStaff:()=>modal('Nhập nhân sự từ Excel',`<div class="hint">Dán dữ liệu copy từ Excel/Google Sheets. Thứ tự cột: <b>Mã NV · Họ tên · Cơ sở (mã hoặc tên) · Chức danh · Trạng thái</b> (có thể có dòng tiêu đề). Mã NV đã có sẽ được cập nhật; vai trò định biên đã phân được giữ nguyên. NV mới được gợi ý vai trò từ chức danh, đơn vị điều chỉnh sau.</div><textarea id="paste" rows="10" placeholder="VA011239&#9;Thạch Vàng&#9;CS01&#9;Giáo viên&#9;Đang làm"></textarea>`,async()=>{
       const rows=parsePaste(val('paste'));if(!rows.length)throw new Error('Chưa có dữ liệu');
       const r=await call('staffImport',{rows});
       if(r.errors.length)alert('Thêm '+r.added+', cập nhật '+r.updated+'.\nLỗi ('+r.errors.length+'):\n'+r.errors.slice(0,20).join('\n'));else toast('Thêm '+r.added+', cập nhật '+r.updated);
-      go('staff')},{okText:'Nhập',wide:true}),
+      await refresh()},{okText:'Nhập',wide:true}),
     assignClass:()=>{
       const s=S.cache.staff.find(x=>x.MaNV===d.id),ls=S.cache.classes.filter(l=>l.MaCoSo===s.MaCoSo);
       modal('Phân lớp – '+esc(s.HoTen),ls.length?ls.map(l=>`<label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px"><input type="checkbox" style="width:auto" class="lc" value="${esc(l.MaLop)}" ${s.lop.indexOf(l.MaLop)>=0?'checked':''}> ${esc(l.TenLop)} <span class="muted">(${l.SiSo+l.GiuCho} HS)</span></label>`).join(''):'<p class="muted">Cơ sở chưa có lớp. Hãy tạo lớp trước.</p>',ls.length?()=>act(async()=>{
-        await call('staffAssign',{maNV:s.MaNV,vaiTro:s.VaiTroDB,lop:[...document.querySelectorAll('.lc:checked')].map(x=>x.value)});toast('Đã lưu phân lớp');go('staff')}):null)},
+        await call('staffAssign',{maNV:s.MaNV,vaiTro:s.VaiTroDB,lop:[...document.querySelectorAll('.lc:checked')].map(x=>x.value)});toast('Đã lưu phân lớp');await refresh()}):null)},
     addClass:()=>modal('Thêm lớp',classForm(),()=>act(saveClassForm)),
     editClass:()=>modal('Sửa lớp',classForm(S.cache.classes.find(l=>l.MaLop===d.id)),()=>act(()=>saveClassForm(d.id))),
-    delClass:async()=>{if(confirm('Xoá lớp này và các phân công liên quan?')){await act(()=>call('classDelete',{maLop:d.id}));toast('Đã xoá');go('classes')}},
+    delClass:async()=>{if(confirm('Xoá lớp này và các phân công liên quan?')){await act(()=>call('classDelete',{maLop:d.id}));toast('Đã xoá');await refresh()}},
     saveCfg:async()=>{const E=S.cfgEdit,c=E.cfg;
       const p={classTypes:c.classTypes,bands:c.bands.map(b=>({...b,Den:b.Den===''?null:b.Den})),positions:c.positions,campuses:E.campuses,params:[{Khoa:'NamHoc',GiaTri:c.params.NamHoc},{Khoa:'ChenhLech',GiaTri:c.params.ChenhLech}]};
-      S.boot=Object.assign(S.boot,await act(()=>call('configSave',p)));toast('Đã lưu cấu hình');go('config')},
+      S.boot=Object.assign(S.boot,await act(()=>call('configSave',p)));toast('Đã lưu cấu hình');await refresh(true);go('config',false)},
     addRole:()=>{const n=val('nrole').trim();if(!n||S.pm.roleGrid[n])return toast('Tên vai trò trống hoặc đã tồn tại',true);S.pm.roleGrid[n]={};S.pm.roles.push(n);renderPerm()},
     addUser:()=>{S.pm.users.push({Email:'',HoTen:'',VaiTro:S.pm.roles[S.pm.roles.length-1],KichHoat:true,campuses:[]});S.permTab='user';renderPerm()},
     savePerm:async()=>{const d=await act(()=>call('permSave',{roleGrid:S.pm.roleGrid,users:S.pm.users}));S.pm=d;toast('Đã lưu phân quyền');renderPerm()}
@@ -306,13 +318,16 @@ document.addEventListener('click',async e=>{
 });
 async function saveClassForm(id){
   await call('classSave',{row:{MaLop:id||'',MaCoSo:val('c_cs'),MaNhom:val('c_ng'),SoThuTu:val('c_stt'),SiSo:val('c_si'),GiuCho:val('c_gc'),GhiChu:val('c_note')}});
-  toast('Đã lưu');go('classes');
+  toast('Đã lưu');await refresh();
 }
 document.addEventListener('change',async e=>{
   const t=e.target,d=t.dataset;
   if(d.role!==undefined){
-    const s=S.cache.staff.find(x=>x.MaNV===d.role);
-    try{await call('staffAssign',{maNV:s.MaNV,vaiTro:t.value,lop:S.boot.classRoles.indexOf(t.value)>=0?s.lop:[]});s.VaiTroDB=t.value;if(S.boot.classRoles.indexOf(t.value)<0)s.lop=[];toast('Đã cập nhật vai trò');renderStaff()}catch(er){toast(er.message,true);renderStaff()}
+    const s=S.cache.staff.find(x=>x.MaNV===d.role),prev={r:s.VaiTroDB,l:s.lop};
+    const isCls=S.boot.classRoles.indexOf(t.value)>=0;
+    s.VaiTroDB=t.value;if(!isCls)s.lop=[];renderStaff();          // cập nhật giao diện ngay
+    try{await call('staffAssign',{maNV:s.MaNV,vaiTro:t.value,lop:s.lop});toast('Đã cập nhật vai trò');refresh(true)}
+    catch(er){s.VaiTroDB=prev.r;s.lop=prev.l;toast(er.message,true);renderStaff()}
   }else if(d.path!==undefined)setPath(d.path,t.type==='checkbox'?t.checked:t.value);
   else if(d.rp){const [r,k]=d.rp.split('|');S.pm.roleGrid[r][k]=t.checked}
   else if(d.u){const [i,k]=d.u.split('|'),u=S.pm.users[+i];u[k]=t.type==='checkbox'?t.checked:t.value;if(k==='VaiTro')renderPerm()}

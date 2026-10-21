@@ -30,3 +30,8 @@ Căn cứ: *Quy định tên lớp học – Định biên nhân sự Khối M�
 2. Bảng định biên cơ sở được đọc từ OCR; hãy đối chiếu lại *Cấu hình › Định biên cơ sở* với bản gốc (đặc biệt hàng Trợ lý / Trợ lý kiêm nhiệm).
 3. "Tỉ lệ 4:1 – 2 GV + 1 bảo mẫu" được hiểu là tỉ lệ tính trên **tổng số người chăm sóc** trong lớp (Pre-N tối đa 12 trẻ, N 15, Pre-K.A 12, Pre-K.B 16, K 20).
 4. "Giáo viên Tiếng Anh VN" được tính ở cấp cơ sở (không gắn lớp).
+
+## Hiệu năng
+- Mở app: 1 lệnh gọi `loadAll` lấy toàn bộ dữ liệu; chuyển tab hiển thị tức thì từ bộ nhớ trình duyệt, tự làm mới nền nếu dữ liệu cũ hơn 30 giây (nút **⟳ Làm mới** để tải ngay).
+- Máy chủ cache từng sheet (CacheService, 10 phút) và xoá cache khi ghi; đổi vai trò/phân lớp chỉ ghi đúng ô thay đổi.
+- **Lưu ý**: nếu sửa trực tiếp trong Google Sheet (không qua web app), dữ liệu có thể chậm tối đa 10 phút mới hiện lên; chạy lại `setup` hoặc chờ hết cache.

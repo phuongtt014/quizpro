@@ -72,10 +72,42 @@ function sheet_(n) {
   if (!sh) throw new Error('Chưa khởi tạo hệ thống: thiếu sheet "' + n + '". Hãy chạy setup() / menu Định biên.');
   return sh;
 }
+/* Cache theo sheet (CacheService, chia mảnh ≤30k ký tự); xoá khi ghi. Nhật ký không cache. */
+const CACHE_TTL = 600, CHUNK = 30000;
+function cacheGet_(name) {
+  try {
+    const c = CacheService.getScriptCache(), n = Number(c.get('m_' + name));
+    if (!n) return null;
+    const keys = []; for (let i = 0; i < n; i++) keys.push('d_' + name + '_' + i);
+    const got = c.getAll(keys); let s = '';
+    for (let i = 0; i < n; i++) { if (got[keys[i]] == null) return null; s += got[keys[i]]; }
+    return JSON.parse(s);
+  } catch (e) { return null; }
+}
+function cachePut_(name, obj) {
+  try {
+    const s = JSON.stringify(obj), m = {}; let n = 0;
+    for (let i = 0; i < s.length || n === 0; i += CHUNK) m['d_' + name + '_' + (n++)] = s.slice(i, i + CHUNK);
+    m['m_' + name] = String(n);
+    CacheService.getScriptCache().putAll(m, CACHE_TTL);
+  } catch (e) { /* quá lớn / lỗi cache: bỏ qua, vẫn đọc trực tiếp */ }
+}
+function cacheDrop_(name) { try { CacheService.getScriptCache().remove('m_' + name); } catch (e) {} }
+
 function read_(name) {
+  if (name !== SH.AUDIT) { const hit = cacheGet_(name); if (hit) return hit; }
   const v = sheet_(name).getDataRange().getValues();
   const h = v.shift();
-  return v.filter(r => r.some(c => c !== '')).map(r => { const o = {}; h.forEach((k, i) => o[k] = r[i]); return o; });
+  const out = [];
+  v.forEach((r, idx) => { if (r.some(c => c !== '')) { const o = { _r: idx + 2 }; h.forEach((k, i) => o[k] = r[i]); out.push(o); } });
+  if (name !== SH.AUDIT) cachePut_(name, out);
+  return out;
+}
+/* Ghi 1 ô theo số dòng (_r) – nhanh hơn ghi lại cả bảng */
+function setCell_(name, row, header, value) {
+  const sh = sheet_(name), col = HEADERS[name].indexOf(header) + 1;
+  sh.getRange(row, col).setValue(value);
+  cacheDrop_(name);
 }
 function writeAll_(name, headers, rows, textCols) {
   const sh = sheet_(name);
@@ -86,6 +118,7 @@ function writeAll_(name, headers, rows, textCols) {
   rng.setNumberFormats(data.map(() => fmt));
   rng.setValues(data);
   sh.setFrozenRows(1);
+  cacheDrop_(name);
 }
 function textColsOf_(name) { return TEXT_COLS[name] || []; }
 function put_(name, rows, headers) { writeAll_(name, headers || HEADERS[name], rows, textColsOf_(name)); }
@@ -228,6 +261,7 @@ function api(action, payload) {
 
 const ACTIONS = {
   bootstrap: { fn: bootstrap_ },
+  loadAll: { fn: loadAll_ },
   report: { perm: 'dash.view', fn: reportGet_ },
   staffList: { perm: 'staff.view', fn: staffList_ },
   staffSave: { perm: 'staff.import', write: true, fn: staffSave_ },
@@ -264,6 +298,17 @@ function bootstrap_(c) {
     campuses: c.campuses,
     allCampuses: read_(SH.CAMPUS).map(x => ({ MaCoSo: str_(x.MaCoSo), TenCoSo: x.TenCoSo, KichHoat: bool_(x.KichHoat) })),
     cfg, classRoles: CLASS_ROLES, roleOptions: CLASS_ROLES.concat(positionNames_(cfg)), perms: PERMS
+  };
+}
+
+/* Một lần gọi trả về mọi dữ liệu cần cho các tab (client lưu cache, chuyển tab không gọi server). */
+function loadAll_(c) {
+  const has = k => c.perms.indexOf(k) >= 0;
+  return {
+    boot: bootstrap_(c),
+    report: has('dash.view') ? reportGet_(c, {}) : null,
+    staff: has('staff.view') ? staffList_(c, {}) : [],
+    classes: has('class.view') ? classList_(c, {}) : []
   };
 }
 
@@ -368,24 +413,24 @@ function staffDelete_(c, p) {
 }
 
 function staffAssign_(c, p) {
-  const all = read_(SH.STAFF), i = all.findIndex(x => str_(x.MaNV) === str_(p.maNV));
-  if (i < 0) throw new Error('Không tìm thấy nhân viên');
-  needCampus_(c, all[i].MaCoSo);
+  const all = read_(SH.STAFF), s = all.find(x => str_(x.MaNV) === str_(p.maNV));
+  if (!s) throw new Error('Không tìm thấy nhân viên');
+  needCampus_(c, s.MaCoSo);
   const cfg = loadCfg_(), valid = CLASS_ROLES.concat(positionNames_(cfg));
   const role = str_(p.vaiTro);
   if (role && valid.indexOf(role) < 0) throw new Error('Vai trò không hợp lệ: ' + role);
-  all[i].VaiTroDB = role;
   let lop = Array.isArray(p.lop) ? p.lop.map(str_) : null;
   if (CLASS_ROLES.indexOf(role) < 0) lop = [];
-  const asg = read_(SH.ASSIGN);
   if (lop !== null) {
     const classes = read_(SH.CLASS);
-    lop.forEach(id => { const cl = classes.find(x => str_(x.MaLop) === id); if (!cl || str_(cl.MaCoSo) !== str_(all[i].MaCoSo)) throw new Error('Lớp ' + id + ' không thuộc cơ sở của nhân viên'); });
-    const rest = asg.filter(a => str_(a.MaNV) !== str_(p.maNV));
-    lop.forEach(id => rest.push({ MaLop: id, MaNV: str_(p.maNV) }));
-    put_(SH.ASSIGN, rest);
+    lop.forEach(id => { const cl = classes.find(x => str_(x.MaLop) === id); if (!cl || str_(cl.MaCoSo) !== str_(s.MaCoSo)) throw new Error('Lớp ' + id + ' không thuộc cơ sở của nhân viên'); });
+    const asg = read_(SH.ASSIGN), keep = asg.filter(a => str_(a.MaNV) !== str_(p.maNV));
+    if (lop.length || keep.length !== asg.length) {
+      lop.forEach(id => keep.push({ MaLop: id, MaNV: str_(p.maNV) }));
+      put_(SH.ASSIGN, keep);
+    }
   }
-  put_(SH.STAFF, all);
+  if (str_(s.VaiTroDB) !== role) setCell_(SH.STAFF, s._r, 'VaiTroDB', role);
   log_(c, 'staffAssign', p.maNV + ' → ' + role + (lop ? ' [' + lop.join(',') + ']' : ''));
   return true;
 }
