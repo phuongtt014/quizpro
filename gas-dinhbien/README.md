@@ -94,5 +94,11 @@ Lớp được ghi nhận **Thiếu** GV/bảo mẫu khi **một trong hai** đi
 - Tab đầu tiên 📖; lần đầu đăng nhập vào thẳng tab này. Luồng 6 bước trực quan (bước nào là việc của vai trò mình có viền xanh, bấm để mở đúng màn hình), mục hướng dẫn gập mở, hỏi–đáp, ô tìm kiếm, lọc theo vai trò.
 - **Admin** có nút **✏ Chỉnh sửa hướng dẫn**: sửa tiêu đề/biểu tượng/nội dung, chọn vai trò được xem, thêm–xoá–sắp xếp mục, xem trước tức thì, **Khôi phục mặc định**. Nội dung lưu ở sheet `HuongDan`. Cú pháp: `## tiêu đề nhỏ`, `1. bước`, `- gạch đầu dòng`, `> mẹo`, `!> lưu ý`, `**đậm**`, `[tab:staff|Nhân sự]` (nút mở tab).
 
-## Phần ký khi in
-Cạnh nút **🖨 In** (Tổng quan, Báo cáo cơ sở, Lịch sử, Phiếu phê duyệt) có ô **Kèm phần ký**: tick thì cuối bản in có khối ký trực tiếp (mặc định: Người lập – Chủ tịch HĐHT Mầm non – Phó Tổng Giám đốc – Tổng Giám đốc, kèm dòng "TP. Hồ Chí Minh, ngày … tháng … năm …"). Đổi chức danh ở *Cấu hình › Tham số › Chức danh ký ở cuối bản in*.
+## Phần ký khi in – chỉ Ban Tổng giám đốc
+- Cạnh nút **🖨 In** (Tổng quan, Báo cáo cơ sở, Lịch sử, Phiếu phê duyệt): tick **Kèm phần ký BTGĐ** thì cuối bản in có khối ký chỉ gồm các thành viên Ban Tổng giám đốc (chức danh in hoa, dòng "Ký, ghi rõ họ tên", chỗ trống để ký, họ tên in sẵn bên dưới) và dòng "TP. Hồ Chí Minh, ngày … tháng … năm …" để điền tay.
+- Bấm **▾ Người ký** để chọn những ai cần ký cho lần in đó.
+- **Cấu hình › Ban TGĐ ký in** (quyền *Cấu hình*): khai báo danh sách (chức danh + họ tên, tối đa 10 người), tick **Mặc định ký** cho người được chọn sẵn; thêm/xoá/đổi tên tuỳ ý khi thay đổi nhân sự lãnh đạo. Mặc định tạo sẵn Phó Tổng Giám đốc và Tổng Giám đốc (chưa có họ tên – hãy nhập).
+- Dữ liệu lưu ở sheet `BanTGD`.
+
+## Tab Nhân sự – thứ tự sắp xếp
+Trong từng cơ sở: **Hiệu trưởng → Hiệu phó → giáo viên/bảo mẫu theo lớp** (Pre-N → N → Pre-K.A → Pre-K.B → K, rồi số lớp; trong lớp giáo viên trước bảo mẫu) → giáo viên/bảo mẫu chưa phân lớp → **nhân sự không phân lớp** (theo thứ tự vị trí trong Cấu hình: Tư vấn, Y tế, Cấp dưỡng, Bảo vệ…, người chưa phân vai trò cuối nhóm) → **nhân sự đã nghỉ việc**. Mỗi nhóm có dòng tiêu đề; file Excel xuất ra cùng thứ tự và có cột "Nhóm".

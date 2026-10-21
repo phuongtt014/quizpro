@@ -47,6 +47,10 @@ td.cell.ok{background:var(--ok-l)}td.cell.thieu{background:var(--bad-l)}td.cell.
 .loading{padding:40px;text-align:center;color:var(--mut)}
 @media(max-width:700px){main{padding:10px}}
 .printonly{display:none}
+.psign{display:inline-block;position:relative;margin-right:6px;font-size:12px;vertical-align:middle}.psign summary{cursor:pointer;display:inline;color:var(--pri)}
+.psign .pop{position:absolute;z-index:30;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 12px;box-shadow:0 6px 20px #0002;min-width:260px;right:0;white-space:nowrap;text-align:left}
+.psign .pop label{display:flex;gap:6px;align-items:center;margin:4px 0;color:var(--ink)}
+.grp td{background:#eef4f2;font-weight:600;color:var(--pri);font-size:12px;padding:5px 9px}
 .gflow{display:flex;gap:6px;flex-wrap:wrap;align-items:stretch;margin:8px 0 4px}
 .gstep{flex:1;min-width:140px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;position:relative;text-align:left;font:inherit}
 .gstep:hover{border-color:var(--pri)}.gstep.me{border-color:var(--pri);background:var(--pri-l)}
@@ -183,12 +187,18 @@ function xlsx(file,sheets){
   sheets.forEach(s=>{const ws=XLSX.utils.aoa_to_sheet(s.rows);ws['!cols']=colW(s.rows);XLSX.utils.book_append_sheet(wb,ws,s.name.slice(0,31))});
   XLSX.writeFile(wb,file+'.xlsx');
 }
-const printCtl=(act,label)=>`<label class="noprint" style="font-size:12px;margin-right:4px;white-space:nowrap"><input type="checkbox" data-sign ${S.sign?'checked':''} style="width:auto"> Kèm phần ký</label><button class="b" data-do="${act}">${label||'🖨 In'}</button>`;
+const signers=()=>S.boot.cfg.signers||[];
+const signSel=()=>{const ids=signers().map(x=>x.Id);if(!S.signSel)S.signSel=signers().filter(x=>x.MacDinh).map(x=>x.Id);return S.signSel.filter(id=>ids.indexOf(id)>=0)};
+const printCtl=(act,label)=>{const sg=signers(),sel=signSel();
+  return `<label class="noprint" style="font-size:12px;margin-right:4px;white-space:nowrap"><input type="checkbox" data-sign ${S.sign?'checked':''} style="width:auto"> Kèm phần ký BTGĐ</label>`+
+  (sg.length?`<details class="noprint psign"><summary>▾ Người ký (${sel.length})</summary><div class="pop">${sg.map(x=>`<label><input type="checkbox" data-signer="${esc(x.Id)}" ${sel.indexOf(x.Id)>=0?'checked':''} style="width:auto"> <span><b>${esc(x.ChucDanh)}</b>${x.HoTen?' – '+esc(x.HoTen):''}</span></label>`).join('')}</div></details>`:'')+
+  `<button class="b" data-do="${act}">${label||'🖨 In'}</button>`};
+/* Khối ký cuối bản in: chỉ Ban Tổng giám đốc (người được chọn), họ tên lấy từ Cấu hình */
 function signHtml(){
-  const ts=String(S.boot.cfg.params.ChuKy||'').split(';').map(x=>x.trim()).filter(Boolean);
-  if(!ts.length)return '';
+  const sg=signers().filter(x=>signSel().indexOf(x.Id)>=0);
+  if(!sg.length)return '';
   return `<div style="margin-top:26px;break-inside:avoid"><div style="text-align:right;font-style:italic">TP. Hồ Chí Minh, ngày ……… tháng ……… năm 20……</div>
-  <table style="width:100%;border:0;text-align:center;margin-top:8px"><tr>${ts.map((t,i)=>`<td style="width:${(100/ts.length).toFixed(1)}%;vertical-align:top"><b>${esc(t.toUpperCase())}</b><div style="font-style:italic;font-size:11px">(Ký, ghi rõ họ tên)</div><div style="height:90px"></div>${i===0?esc(S.boot.me.name):''}</td>`).join('')}</tr></table></div>`;
+  <table style="width:100%;border:0;text-align:center;margin-top:8px"><tr>${sg.map(x=>`<td style="width:${(100/sg.length).toFixed(1)}%;vertical-align:top"><b>${esc(x.ChucDanh.toUpperCase())}</b><div style="font-style:italic;font-size:11px">(Ký, ghi rõ họ tên)</div><div style="height:90px"></div>${x.HoTen?'<b>'+esc(x.HoTen)+'</b>':''}</td>`).join('')}</tr></table></div>`;
 }
 function printNow(title){
   $('#signblk').innerHTML=S.sign?signHtml():'';
@@ -323,16 +333,43 @@ function filteredStaff(){
   const f={cs:S.campus,q:(S.q||'').toLowerCase(),only:S.onlyNoRole};
   return S.cache.staff.filter(s=>(!f.cs||s.MaCoSo===f.cs)&&(!f.q||(s.HoTen+s.MaNV+s.ChucDanhHR).toLowerCase().indexOf(f.q)>=0)&&(!f.only||(!s.VaiTroDB&&s.TrangThai!=='Nghỉ việc')));
 }
+/* Thứ tự: Hiệu trưởng → Hiệu phó → GV/Bảo mẫu theo lớp (Pre-N → N → Pre-K.A → Pre-K.B → K, rồi số lớp) → GV/BM chưa phân lớp
+   → nhân sự không phân lớp (theo thứ tự vị trí trong Cấu hình) → nhân sự đã nghỉ việc. Trong cùng cơ sở. */
+function staffMeta(){
+  const ord={};(S.boot.cfg.classTypes||[]).forEach((t,i)=>ord[t.MaNhom]=i);
+  const cm={};(S.cache.classes||[]).forEach(l=>cm[l.MaLop]={rank:(ord[l.MaNhom]!==undefined?ord[l.MaNhom]:90)*1000+(parseInt(l.SoThuTu,10)||0),name:l.TenLop});
+  const pi={};(S.boot.cfg.positions||[]).forEach((p,i)=>pi[p.ViTri]=i);
+  const ci={};S.boot.campuses.forEach((c,i)=>ci[c.MaCoSo]=i);
+  return {cm,pi,ci};
+}
+function staffRank(s,M){
+  if(s.TrangThai==='Nghỉ việc')return {g:4,sub:0,role:0,label:'Đã nghỉ việc'};
+  if(s.VaiTroDB==='Hiệu trưởng')return {g:0,sub:0,role:0,label:'Hiệu trưởng'};
+  if(s.VaiTroDB==='Hiệu phó')return {g:1,sub:0,role:0,label:'Hiệu phó'};
+  if(S.boot.classRoles.indexOf(s.VaiTroDB)>=0){
+    const ls=(s.lop||[]).map(id=>M.cm[id]).filter(Boolean).sort((a,b)=>a.rank-b.rank),role=s.VaiTroDB==='Giáo viên'?0:1;
+    return ls.length?{g:2,sub:ls[0].rank,role,label:'Lớp '+ls[0].name}:{g:2,sub:99999,role,label:'Giáo viên / Bảo mẫu chưa phân lớp'};
+  }
+  return {g:3,sub:s.VaiTroDB?(M.pi[s.VaiTroDB]!==undefined?M.pi[s.VaiTroDB]:500):900,role:0,label:'Nhân sự không phân lớp'};
+}
+function sortedStaff(rows){
+  const M=staffMeta();
+  return rows.map(s=>({s,k:staffRank(s,M),c:M.ci[s.MaCoSo]===undefined?99:M.ci[s.MaCoSo]}))
+    .sort((a,b)=>a.c-b.c||a.k.g-b.k.g||a.k.sub-b.k.sub||a.k.role-b.k.role||String(a.s.HoTen).localeCompare(String(b.s.HoTen),'vi'));
+}
 function renderStaff(){
   const f={only:S.onlyNoRole};
   let rows=filteredStaff();
+  const sorted=sortedStaff(rows),multi=!S.campus&&S.boot.campuses.length>1;
+  const glabel=(k,s)=>(multi?campName(s.MaCoSo)+' · ':'')+k.label;
+  const hdr=(k,s,ix,arr)=>{const lab=glabel(k,s),pv=ix?glabel(arr[ix-1].k,arr[ix-1].s):null;return lab!==pv?`<tr class="grp"><td colspan="8">${esc(lab)}</td></tr>`:''};
   const cn=id=>{const l=S.cache.classes.find(x=>x.MaLop===id);return l?l.TenLop:id};
   const assign=can('staff.assign'),edit=can('staff.import');
   $('#main').innerHTML=`<div class="row">${campusSel('csel')}<input id="q" placeholder="Tìm tên / mã NV / chức danh" value="${esc(S.q||'')}" class="grow">
    <label><input type="checkbox" id="nr" ${f.only?'checked':''}> Chưa phân vai trò</label>
    <button class="b" data-do="xstaff">⬇ Excel</button>${edit?'<button class="b" data-do="addStaff">+ Thêm</button><button class="b p" data-do="importStaff">Nhập từ Excel</button>':''}</div>
    <div class="card"><div class="muted" style="margin-bottom:8px">${rows.length} nhân sự${rows.length>200?' – hiển thị 200 đầu, hãy lọc/tìm kiếm để thu hẹp':''}</div><div class="tw"><table><thead><tr><th>Mã NV</th><th>Họ tên</th><th>Cơ sở</th><th>Chức danh (HR)</th><th>Trạng thái</th><th>Vai trò định biên</th><th>Lớp phụ trách</th><th></th></tr></thead><tbody>
-   ${rows.slice(0,200).map(s=>`<tr><td>${esc(s.MaNV)}</td><td>${esc(s.HoTen)}</td><td>${esc(campName(s.MaCoSo))}</td><td>${esc(s.ChucDanhHR)}</td><td>${s.TrangThai===  'Nghỉ việc'?'<span class="tag trong">Nghỉ việc</span>':esc(s.TrangThai)}</td>
+   ${sorted.slice(0,200).map(({s,k},ix,arr)=>`${hdr(k,s,ix,arr)}<tr><td>${esc(s.MaNV)}</td><td>${esc(s.HoTen)}</td><td>${esc(campName(s.MaCoSo))}</td><td>${esc(s.ChucDanhHR)}</td><td>${s.TrangThai===  'Nghỉ việc'?'<span class="tag trong">Nghỉ việc</span>':esc(s.TrangThai)}</td>
    <td>${assign?`<select data-role="${esc(s.MaNV)}"><option value="">— chưa phân —</option>${S.boot.roleOptions.map(o=>`<option ${o===s.VaiTroDB?'selected':''}>${esc(o)}</option>`).join('')}</select>`:(esc(s.VaiTroDB)||'<span class="muted">—</span>')}</td>
    <td>${s.lop.map(id=>`<span class="chip">${esc(cn(id))}</span>`).join('')}${assign&&S.boot.classRoles.indexOf(s.VaiTroDB)>=0?` <button class="b s" data-do="assignClass" data-id="${esc(s.MaNV)}">Phân lớp</button>`:''}</td>
    <td style="white-space:nowrap">${edit?`<button class="b s" data-do="editStaff" data-id="${esc(s.MaNV)}">Sửa</button> <button class="b s d" data-do="delStaff" data-id="${esc(s.MaNV)}">Xoá</button>`:''}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">Không có dữ liệu.</td></tr>'}
@@ -406,7 +443,7 @@ VIEWS.config=async()=>{
 };
 function renderConfig(){
   const t=S.cfgTab||'ct',E=S.cfgEdit,cfg=E.cfg;
-  const tabs=[['ct','Lớp & tỉ lệ HS:GV'],['band','Khung sĩ số'],['pos','Định biên cơ sở'],['par','Tham số'],['cp','Cơ sở']];
+  const tabs=[['ct','Lớp & tỉ lệ HS:GV'],['band','Khung sĩ số'],['pos','Định biên cơ sở'],['sg','Ban TGĐ ký in'],['par','Tham số'],['cp','Cơ sở']];
   const inp=(path,v,w)=>`<input data-path="${path}" value="${esc(v)}" style="width:${w||'100%'}">`;
   let body='';
   if(t==='ct')body=`<div class="hint">Sức chứa chuẩn của lớp = Tỉ lệ × (số GV + số bảo mẫu định biên). Bảng theo mục 2 của đề án.</div><table><thead><tr><th>Mã</th><th>Lứa tuổi</th><th>Tên lớp</th><th>Viết tắt</th><th>Tỉ lệ HS:GV</th><th>Số GV</th><th>Bảo mẫu</th><th>Tên theo Bộ GD&ĐT</th><th></th></tr></thead><tbody>${cfg.classTypes.map((r,i)=>`<tr>${['MaNhom','LuaTuoi','TenLop','VietTat','TiLe','SoGV','SoBM','TenBoGD'].map(k=>`<td>${inp('classTypes.'+i+'.'+k,r[k],/Ti|So/.test(k)?'70px':'')}</td>`).join('')}<td><button class="b s d" data-del="classTypes.${i}">✕</button></td></tr>`).join('')}</tbody></table><button class="b" data-add="classTypes">+ Thêm nhóm tuổi</button>`;
@@ -415,11 +452,11 @@ function renderConfig(){
   const admin=can('admin.perm');
   if(t==='par')body=`<table><thead><tr><th>Tham số</th><th>Giá trị</th><th>Mô tả</th></tr></thead><tbody><tr><td>Năm học</td><td>${inp('params.NamHoc',cfg.params.NamHoc||'')}</td><td class="muted">Hiển thị trên báo cáo</td></tr><tr><td>Xác nhận đăng nhập bằng mã</td><td><select data-path="params.XacThucOTP"><option value="1" ${cfg.params.XacThucOTP!=='0'?'selected':''}>Bật</option><option value="0" ${cfg.params.XacThucOTP==='0'?'selected':''}>Tắt</option></select></td><td class="muted">Bật: mọi người dùng phải nhập mã 6 số gửi qua email khi vào hệ thống. Nếu cần tắt khẩn cấp, sửa ô GiaTri của XacThucOTP trong sheet CauHinh_ThamSo thành 0.</td></tr>
   <tr><td>Thời hạn mỗi lần xác nhận (giờ)</td><td>${inp('params.PhienGio',cfg.params.PhienGio||8)}</td><td class="muted">1–72 giờ. Hết hạn sẽ yêu cầu nhập mã mới.</td></tr>
-  <tr><td>Chức danh ký ở cuối bản in</td><td>${inp('params.ChuKy',cfg.params.ChuKy||'')}</td><td class="muted">Cách nhau bằng dấu ; (tối đa 6). Chỉ hiện khi tick "Kèm phần ký" lúc in.</td></tr>
   <tr><td>Tên hiển thị của email tự động</td><td>${admin?inp('params.TenGui',cfg.params.TenGui||'Hệ thống Định biên Khối Mầm non'):esc(cfg.params.TenGui||'')}</td><td class="muted">Người nhận chỉ thấy tên này thay cho tên chủ web app.</td></tr>
   <tr><td>Ghi chú "email tự động – không trả lời"</td><td>${admin?`<select data-path="params.KhongTraLoi"><option value="1" ${cfg.params.KhongTraLoi!=='0'?'selected':''}>Bật</option><option value="0" ${cfg.params.KhongTraLoi==='0'?'selected':''}>Tắt (cho phép trả lời)</option></select>`:(cfg.params.KhongTraLoi==='0'?'Tắt':'Bật')}</td><td class="muted">Bật: thêm dòng ghi chú cuối thư và dùng địa chỉ no-reply nếu Google Workspace hỗ trợ.</td></tr>
   ${admin?'<tr><td></td><td><button class="b" data-do="mailTest">✉ Gửi email thử cho tôi</button></td><td class="muted">Xem đúng cách người nhận thấy tên/địa chỉ người gửi.</td></tr>':''}
   <tr><td>Chênh lệch đề xuất</td><td>${inp('params.ChenhLech',cfg.params.ChenhLech||2)}</td><td class="muted">Lớp đạt tỉ lệ định biên + N học sinh thì đủ điều kiện đề xuất bổ sung GV/bảo mẫu (mục 4 đề án)</td></tr></tbody></table>`;
+  if(t==='sg')body=`<div class="hint">Danh sách thành viên <b>Ban Tổng giám đốc</b> ký trực tiếp ở cuối bản in (khi tick "Kèm phần ký BTGĐ"). Mỗi người một dòng: chức danh + họ tên. "Mặc định ký" = được chọn sẵn khi in; lúc in vẫn bỏ chọn/chọn thêm được ở mục <b>▾ Người ký</b>.</div><table><thead><tr><th>Chức danh</th><th>Họ và tên</th><th class="c">Mặc định ký</th><th></th></tr></thead><tbody>${(cfg.signers||[]).map((r,i)=>`<tr><td>${inp('signers.'+i+'.ChucDanh',r.ChucDanh)}</td><td>${inp('signers.'+i+'.HoTen',r.HoTen)}</td><td class="c"><input type="checkbox" data-path="signers.${i}.MacDinh" ${r.MacDinh!==false?'checked':''}></td><td style="white-space:nowrap"><button class="b s" data-del="signers.${i}">✕</button></td></tr>`).join('')||'<tr><td colspan="4" class="muted">Chưa có ai. Bấm "+ Thêm người ký".</td></tr>'}</tbody></table><button class="b" data-add="signers">+ Thêm người ký</button>`;
   if(t==='cp')body=`<table><thead><tr><th>Mã cơ sở</th><th>Tên cơ sở</th><th>Hoạt động</th><th></th></tr></thead><tbody>${E.campuses.map((r,i)=>`<tr><td>${inp('campuses.'+i+'.MaCoSo',r.MaCoSo)}</td><td>${inp('campuses.'+i+'.TenCoSo',r.TenCoSo)}</td><td><input type="checkbox" data-path="campuses.${i}.KichHoat" ${r.KichHoat!==false?'checked':''}></td><td></td></tr>`).join('')}</tbody></table><button class="b" data-add="campuses">+ Thêm cơ sở</button>`;
   $('#main').innerHTML=`<div class="sub">${tabs.map(x=>`<button class="b ${x[0]===t?'on':''}" data-ctab="${x[0]}">${x[1]}</button>`).join('')}<span class="grow"></span><button class="b p" data-do="saveCfg">Lưu cấu hình</button></div><div class="card tw">${body}</div>`;
 }
@@ -597,7 +634,7 @@ document.addEventListener('click',async e=>{
   if(d.ctab){S.cfgTab=d.ctab;return renderConfig()}
   if(d.ptab){S.permTab=d.ptab;return renderPerm()}
   if(d.add){const n=d.add,l=getList(n),B=S.cfgEdit.cfg.bands;
-    l.push(n==='classTypes'?{MaNhom:'',LuaTuoi:'',TenLop:'',VietTat:'',TiLe:0,SoGV:2,SoBM:0,TenBoGD:''}:n==='bands'?{MaKhung:'B'+(l.length+1),Nhan:'',Tu:0,Den:null}:n==='positions'?{ViTri:''}:{MaCoSo:'',TenCoSo:'',KichHoat:true});
+    l.push(n==='signers'?{Id:'',ChucDanh:'',HoTen:'',MacDinh:true}:n==='classTypes'?{MaNhom:'',LuaTuoi:'',TenLop:'',VietTat:'',TiLe:0,SoGV:2,SoBM:0,TenBoGD:''}:n==='bands'?{MaKhung:'B'+(l.length+1),Nhan:'',Tu:0,Den:null}:n==='positions'?{ViTri:''}:{MaCoSo:'',TenCoSo:'',KichHoat:true});
     return renderConfig()}
   if(d.del){const [n,i]=d.del.split('.');getList(n).splice(+i,1);return renderConfig()}
   if(d.delu){S.pm.users.splice(+d.delu,1);return renderPerm()}
@@ -616,7 +653,7 @@ document.addEventListener('click',async e=>{
     pdash:()=>printNow('Báo cáo đối chiếu định biên theo cơ sở'),
     xcampus:()=>{const c=S.cache.report.campuses.find(x=>x.MaCoSo===S.campus);if(c)xlsx('dinh-bien-'+c.MaCoSo+'-'+today(),reportSheets([c],S.cache.report.positionOrder))},
     pcampus:()=>{const c=S.cache.report.campuses.find(x=>x.MaCoSo===S.campus);printNow('Báo cáo định biên – '+(c?c.TenCoSo:''))},
-    xstaff:()=>xlsx('nhan-su-'+today(),[{name:'Nhân sự',rows:[['Mã NV','Họ tên','Cơ sở','Chức danh HR','Trạng thái','Vai trò định biên','Lớp phụ trách']].concat(filteredStaff().map(s=>[s.MaNV,s.HoTen,campName(s.MaCoSo),s.ChucDanhHR,s.TrangThai,s.VaiTroDB,s.lop.map(id=>{const l=S.cache.classes.find(x=>x.MaLop===id);return l?l.TenLop:id}).join('; ')]))}]),
+    xstaff:()=>xlsx('nhan-su-'+today(),[{name:'Nhân sự',rows:[['Mã NV','Họ tên','Cơ sở','Chức danh HR','Trạng thái','Vai trò định biên','Lớp phụ trách','Nhóm']].concat(sortedStaff(filteredStaff()).map(({s,k})=>[s.MaNV,s.HoTen,campName(s.MaCoSo),s.ChucDanhHR,s.TrangThai,s.VaiTroDB,s.lop.map(id=>{const l=S.cache.classes.find(x=>x.MaLop===id);return l?l.TenLop:id}).join('; '),k.label]))}]),
     hxlsx:()=>{const{a,b}=S.hv;xlsx('phan-cong-'+a.Ky+'-'+a.MaCoSo,snapSheets(a,b,S.hv.diff))},
     hprint:()=>printNow('Phân công & định biên '+S.hv.a.TenCoSo+' · kỳ '+S.hv.a.Ky),
     newPD:openSubmit,openPD:()=>openPD(d.id),
@@ -654,7 +691,7 @@ document.addEventListener('click',async e=>{
     editClass:()=>{S.ecid=d.id;modal('Sửa lớp (cập nhật sĩ số)',classForm(S.cache.classes.find(l=>l.MaLop===d.id)),()=>act(()=>saveClassForm(d.id)));loadPreview()},
     delClass:async()=>{if(confirm('Xoá lớp này và các phân công liên quan?')){await act(()=>call('classDelete',{maLop:d.id}));toast('Đã xoá');await refresh()}},
     saveCfg:async()=>{const E=S.cfgEdit,c=E.cfg;
-      const p={classTypes:c.classTypes,bands:c.bands.map(b=>({...b,Den:b.Den===''?null:b.Den})),positions:c.positions,campuses:E.campuses,params:[{Khoa:'NamHoc',GiaTri:c.params.NamHoc},{Khoa:'ChenhLech',GiaTri:c.params.ChenhLech},{Khoa:'XacThucOTP',GiaTri:c.params.XacThucOTP||'1'},{Khoa:'PhienGio',GiaTri:c.params.PhienGio||'8'},{Khoa:'TenGui',GiaTri:c.params.TenGui||''},{Khoa:'ChuKy',GiaTri:c.params.ChuKy||''},{Khoa:'KhongTraLoi',GiaTri:c.params.KhongTraLoi||'1'}]};
+      const p={classTypes:c.classTypes,bands:c.bands.map(b=>({...b,Den:b.Den===''?null:b.Den})),positions:c.positions,campuses:E.campuses,signers:(c.signers||[]).map(x=>({Id:x.Id||'',ChucDanh:x.ChucDanh,HoTen:x.HoTen,MacDinh:x.MacDinh!==false})),params:[{Khoa:'NamHoc',GiaTri:c.params.NamHoc},{Khoa:'ChenhLech',GiaTri:c.params.ChenhLech},{Khoa:'XacThucOTP',GiaTri:c.params.XacThucOTP||'1'},{Khoa:'PhienGio',GiaTri:c.params.PhienGio||'8'},{Khoa:'TenGui',GiaTri:c.params.TenGui||''},{Khoa:'KhongTraLoi',GiaTri:c.params.KhongTraLoi||'1'}]};
       S.boot=Object.assign(S.boot,await act(()=>call('configSave',p)));toast('Đã lưu cấu hình');await refresh(true);go('config',false)},
     addRole:()=>{const n=val('nrole').trim();if(!n||S.pm.roleGrid[n])return toast('Tên vai trò trống hoặc đã tồn tại',true);S.pm.roleGrid[n]={};S.pm.roles.push(n);renderPerm()},
     addUser:()=>{S.pm.users.push({Email:'',HoTen:'',VaiTro:S.pm.roles[S.pm.roles.length-1],KichHoat:true,campuses:[]});S.permTab='user';renderPerm()},
@@ -673,6 +710,9 @@ document.addEventListener('input',e=>{
   else if(e.target.id==='s_title')e.target.dataset.auto='0';
 });
 document.addEventListener('change',async e=>{
+  if(e.target.dataset&&e.target.dataset.signer!==undefined){
+    const id=e.target.dataset.signer,a=signSel().slice(),k=a.indexOf(id);if(e.target.checked&&k<0)a.push(id);if(!e.target.checked&&k>=0)a.splice(k,1);S.signSel=a;
+    const sm=e.target.closest('details').querySelector('summary');sm.textContent='▾ Người ký ('+a.length+')';return}
   if(e.target.dataset&&e.target.dataset.sign!==undefined){S.sign=e.target.checked;document.querySelectorAll('[data-sign]').forEach(x=>x.checked=S.sign);return}
   if(/^c_(cs|ng)$/.test(e.target.id))loadPreview();
   if(/^s_(cs|ky|loai)$/.test(e.target.id))autoTitle();

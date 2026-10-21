@@ -7,7 +7,7 @@
 const SH = {
   USERS: 'NguoiDung', ROLEPERM: 'PQ_VaiTro', USERCAMP: 'PQ_CoSo', CAMPUS: 'CoSo',
   STAFF: 'NhanSu', CLASS: 'Lop', ASSIGN: 'PhanCong',
-  CT: 'CauHinh_Lop', BAND: 'CauHinh_Khung', POS: 'CauHinh_CoSo', PARAM: 'CauHinh_ThamSo', AUDIT: 'NhatKy', HIST: 'LichSu', PD: 'PheDuyet', PDDL: 'PheDuyet_DL', GUIDE: 'HuongDan'
+  CT: 'CauHinh_Lop', BAND: 'CauHinh_Khung', POS: 'CauHinh_CoSo', PARAM: 'CauHinh_ThamSo', AUDIT: 'NhatKy', HIST: 'LichSu', PD: 'PheDuyet', PDDL: 'PheDuyet_DL', GUIDE: 'HuongDan', SIGN: 'BanTGD'
 };
 
 const PERMS = [
@@ -34,7 +34,6 @@ const PARAM_DEF = [
   { Khoa: 'ChenhLech', GiaTri: '2', MoTa: 'Lớp đạt tỉ lệ định biên + N học sinh thì đủ điều kiện đề xuất bổ sung GV/bảo mẫu' },
   { Khoa: 'XacThucOTP', GiaTri: '1', MoTa: '1 = bắt buộc nhập mã xác nhận gửi qua email khi vào hệ thống; 0 = tắt' },
   { Khoa: 'PhienGio', GiaTri: '8', MoTa: 'Số giờ một lần xác nhận có hiệu lực (1–72)' },
-  { Khoa: 'ChuKy', GiaTri: 'Người lập;Chủ tịch HĐHT Mầm non;Phó Tổng Giám đốc;Tổng Giám đốc', MoTa: 'Các chức danh ký ở cuối bản in (cách nhau bằng dấu ;)' },
   { Khoa: 'TenGui', GiaTri: SYS_NAME, MoTa: 'Tên hiển thị của email tự động (thay cho tên chủ web app)' },
   { Khoa: 'KhongTraLoi', GiaTri: '1', MoTa: '1 = email tự động ghi chú "không trả lời" và dùng địa chỉ no-reply nếu tài khoản hỗ trợ; 0 = cho phép trả lời' }
 ];
@@ -65,9 +64,10 @@ const HEADERS = {
   LichSu: ['Ky', 'MaCoSo', 'ChotLuc', 'NguoiChot', 'GhiChu', 'DuLieu'],
   PheDuyet: ['MaPD', 'Loai', 'Ky', 'MaCoSo', 'TieuDe', 'GhiChu', 'NguoiGui', 'TenNguoiGui', 'GuiLuc', 'CheDo', 'TrangThai', 'Luong', 'KetThucLuc'],
   PheDuyet_DL: ['MaPD', 'DuLieu'],
-  HuongDan: ['Id', 'ThuTu', 'Icon', 'TieuDe', 'DoiTuong', 'Loai', 'NoiDung']
+  HuongDan: ['Id', 'ThuTu', 'Icon', 'TieuDe', 'DoiTuong', 'Loai', 'NoiDung'],
+  BanTGD: ['Id', 'ThuTu', 'ChucDanh', 'HoTen', 'MacDinh']
 };
-const TEXT_COLS = { NhanSu: ['MaNV', 'MaCoSo', 'SoDT'], Lop: ['MaLop', 'MaCoSo', 'SoThuTu'], PhanCong: ['MaLop', 'MaNV'], PQ_CoSo: ['MaCoSo'], CoSo: ['MaCoSo'], LichSu: ['Ky', 'MaCoSo', 'DuLieu'], PheDuyet: ['MaPD', 'Ky', 'MaCoSo'], PheDuyet_DL: ['MaPD', 'DuLieu'], HuongDan: ['Id', 'TieuDe', 'NoiDung'] };
+const TEXT_COLS = { NhanSu: ['MaNV', 'MaCoSo', 'SoDT'], Lop: ['MaLop', 'MaCoSo', 'SoThuTu'], PhanCong: ['MaLop', 'MaNV'], PQ_CoSo: ['MaCoSo'], CoSo: ['MaCoSo'], LichSu: ['Ky', 'MaCoSo', 'DuLieu'], PheDuyet: ['MaPD', 'Ky', 'MaCoSo'], PheDuyet_DL: ['MaPD', 'DuLieu'], HuongDan: ['Id', 'TieuDe', 'NoiDung'], BanTGD: ['Id', 'ChucDanh', 'HoTen'] };
 const NOCACHE = {};
 NOCACHE[SH.AUDIT] = 1; NOCACHE[SH.HIST] = 1; NOCACHE[SH.PDDL] = 1;
 
@@ -219,6 +219,7 @@ function setup() {
   if (addP.length) put_(SH.PARAM, haveP.concat(addP));
   authSecret_();
   if (empty(SH.GUIDE)) put_(SH.GUIDE, GUIDE_DEF); else migrateGuide_();
+  if (empty(SH.SIGN)) put_(SH.SIGN, SIGN_DEF);
   log_(null, 'setup', 'Khởi tạo hệ thống');
   SpreadsheetApp.getActive().toast('Đã khởi tạo. Triển khai Web app rồi truy cập bằng đường link.', 'Định biên', 8);
 }
@@ -429,12 +430,23 @@ const ACTIONS = {
 
 /* ===================== CONFIG ===================== */
 
+/* Ban Tổng giám đốc ký ở cuối bản in: danh sách (chức danh + họ tên) cấu hình được; MacDinh = mặc định được chọn ký */
+const SIGN_DEF = [
+  { Id: 's1', ThuTu: 1, ChucDanh: 'Phó Tổng Giám đốc', HoTen: '', MacDinh: true },
+  { Id: 's2', ThuTu: 2, ChucDanh: 'Tổng Giám đốc', HoTen: '', MacDinh: true }
+];
+function signersList_() {
+  const rows = read_(SH.SIGN);
+  if (!rows.length) return SIGN_DEF;
+  return rows.map(r => ({ Id: str_(r.Id), ThuTu: num_(r.ThuTu), ChucDanh: str_(r.ChucDanh), HoTen: str_(r.HoTen), MacDinh: bool_(r.MacDinh) })).sort((a, b) => a.ThuTu - b.ThuTu);
+}
+
 function loadCfg_() {
   const params = {};
   read_(SH.PARAM).forEach(r => params[r.Khoa] = str_(r.GiaTri));
   const bands = read_(SH.BAND).map(r => ({ MaKhung: str_(r.MaKhung), Nhan: r.Nhan, Tu: num_(r.Tu), Den: r.Den === '' ? null : num_(r.Den) }));
   return {
-    params, bands,
+    params, bands, signers: signersList_(),
     classTypes: read_(SH.CT).map(r => ({ MaNhom: str_(r.MaNhom), LuaTuoi: r.LuaTuoi, TenLop: r.TenLop, VietTat: str_(r.VietTat), TiLe: num_(r.TiLe), SoGV: num_(r.SoGV), SoBM: num_(r.SoBM), TenBoGD: r.TenBoGD })),
     positions: read_(SH.POS).map(r => { const o = { ViTri: str_(r.ViTri) }; bands.forEach(b => o[b.MaKhung] = str_(r[b.MaKhung])); return o; })
   };
@@ -488,10 +500,14 @@ function configSave_(c, p) {
       if ((d.Khoa === 'XacThucOTP' || d.Khoa === 'KhongTraLoi') && v !== '0' && v !== '1') throw new Error('Giá trị ' + d.Khoa + ' chỉ nhận 0 hoặc 1');
       if (d.Khoa === 'PhienGio') v = String(Math.min(72, Math.max(1, num_(v, 8))));
       if (d.Khoa === 'TenGui') v = (v || '').slice(0, 60) || SYS_NAME;
-      if (d.Khoa === 'ChuKy') v = (v || '').split(';').map(x => x.trim()).filter(Boolean).slice(0, 6).join(';') || d.GiaTri;
       return { Khoa: d.Khoa, GiaTri: v, MoTa: d.MoTa };
     });
     put_(SH.PARAM, out);
+  }
+  if (p.signers) {
+    if (p.signers.length > 10) throw new Error('Tối đa 10 người ký');
+    p.signers.forEach((x, i) => { if (!str_(x.ChucDanh)) throw new Error('Người ký #' + (i + 1) + ' chưa có chức danh'); });
+    put_(SH.SIGN, p.signers.map((x, i) => ({ Id: str_(x.Id) || uid_('s'), ThuTu: i + 1, ChucDanh: str_(x.ChucDanh).slice(0, 80), HoTen: str_(x.HoTen).slice(0, 80), MacDinh: x.MacDinh !== false })));
   }
   if (p.campuses) {
     const seen = {};
@@ -903,9 +919,9 @@ const GUIDE_DEF = [
   { Id: 'g07', ThuTu: 7, Icon: '📌', TieuDe: 'Chốt kỳ và xem lại các tháng cũ', DoiTuong: 'Hiệu trưởng/Quản lý cơ sở, Nhân sự, Chủ tịch HĐHT Mầm non, Admin', Loai: 'section', NoiDung:
 'Mỗi lần phân công lại, "chụp ảnh" lại để sau này xem được bảng phân công của từng tháng.\n1. Vào [tab:history|Lịch sử phân công] → **Chốt kỳ phân công**, chọn tháng và cơ sở.\n2. Xem lại: bấm **Xem**. Muốn biết ai đổi lớp/vai trò: bấm **So với hiện tại**.\n> Nếu Admin đã bật, hệ thống tự chốt tháng trước vào ngày 1 hằng tháng.' },
   { Id: 'g08', ThuTu: 8, Icon: '🖨️', TieuDe: 'In và xuất Excel', DoiTuong: R_ALL, Loai: 'section', NoiDung:
-'- **⬇ Excel**: tải file .xlsx nhiều sheet.\n- **🖨 In**: in khổ A4 ngang, tự ẩn menu và nút bấm.\n- Tick ô **Kèm phần ký** cạnh nút In khi cần chữ ký trực tiếp của Ban Tổng giám đốc (mặc định: Người lập, Chủ tịch HĐHT Mầm non, Phó Tổng Giám đốc, Tổng Giám đốc).\n> Chọn "Lưu dưới dạng PDF" trong hộp thoại in nếu muốn gửi file thay vì in giấy.' },
+'- **⬇ Excel**: tải file .xlsx nhiều sheet.\n- **🖨 In**: in khổ A4 ngang, tự ẩn menu và nút bấm.\n- Tick ô **Kèm phần ký BTGĐ** cạnh nút In khi cần chữ ký trực tiếp của Ban Tổng giám đốc; bấm **▾ Người ký** để chọn những thành viên cần ký (danh sách do Admin/Chủ tịch cài trong Cấu hình).\n> Chọn "Lưu dưới dạng PDF" trong hộp thoại in nếu muốn gửi file thay vì in giấy.' },
   { Id: 'g09', ThuTu: 9, Icon: '⚙️', TieuDe: 'Cấu hình định mức', DoiTuong: 'Chủ tịch HĐHT Mầm non, Admin', Loai: 'section', NoiDung:
-'Vào [tab:config|Cấu hình] để chỉnh: tỉ lệ HS:GV theo lứa tuổi, khung sĩ số, định biên từng vị trí theo khung, số học sinh chênh lệch (+N), danh sách cơ sở, dòng ký ở bản in.\n!> Thay đổi áp dụng ngay cho mọi báo cáo. Hãy đối chiếu với văn bản quy định trước khi lưu.' },
+'Vào [tab:config|Cấu hình] để chỉnh: tỉ lệ HS:GV theo lứa tuổi, khung sĩ số, định biên từng vị trí theo khung, số học sinh chênh lệch (+N), danh sách cơ sở, danh sách Ban Tổng giám đốc ký ở bản in.\n!> Thay đổi áp dụng ngay cho mọi báo cáo. Hãy đối chiếu với văn bản quy định trước khi lưu.' },
   { Id: 'g10', ThuTu: 10, Icon: '🔑', TieuDe: 'Phân quyền người dùng', DoiTuong: 'Admin', Loai: 'section', NoiDung:
 '1. Vào [tab:perm|Phân quyền].\n2. **Quyền × Vai trò**: tick chức năng mỗi vai trò được dùng.\n3. **Người dùng × Cơ sở**: thêm email, chọn vai trò, tick các cơ sở được truy cập.\n4. Bấm **Lưu phân quyền**.\n> Muốn ai đó được chọn làm người phê duyệt: tick quyền **Được chọn làm người phê duyệt** cho vai trò của họ.' },
   { Id: 'f01', ThuTu: 11, Icon: '❓', TieuDe: 'Vì sao lớp báo "Vượt tỉ lệ" mà không báo "Thiếu"?', DoiTuong: R_ALL, Loai: 'faq', NoiDung:
@@ -933,7 +949,8 @@ function migrateGuide_() {
   const rows = read_(SH.GUIDE); let n = 0;
   const out = rows.map(r => {
     const def = GUIDE_DEF.find(d => d.Id === str_(r.Id)), old = str_(r.NoiDung);
-    if (def && (str_(r.Id) === 'g05' || str_(r.Id) === 'f01') && (old.indexOf('chỉ khi sĩ số lớp ≥ tỉ lệ') >= 0 || old.indexOf('Vì lớp mới vượt tỉ lệ một chút') >= 0) && old !== def.NoiDung) { n++; return Object.assign({}, r, { NoiDung: def.NoiDung }); }
+    const marks = { g05: ['chỉ khi sĩ số lớp ≥ tỉ lệ'], f01: ['Vì lớp mới vượt tỉ lệ một chút'], g08: ['Người lập, Chủ tịch HĐHT'], g09: ['dòng ký ở bản in'] }[str_(r.Id)];
+    if (def && marks && marks.some(m => old.indexOf(m) >= 0) && old !== def.NoiDung) { n++; return Object.assign({}, r, { NoiDung: def.NoiDung }); }
     return r;
   });
   if (n) put_(SH.GUIDE, out);
