@@ -1339,23 +1339,6 @@ function tomTatKy_(kqRows, ttRows, cdSet, ten) {
   return s;
 }
 
-function apiTongQuan() {
-  const user = getUser_();
-  const kys = listKy_().slice(0, 12);
-  const kq = loadKQAll_().rows.filter(function (r) { return canSee_(user, r); });
-  const tt = load_(T.TT).rows.filter(function (r) { return canSee_(user, r); });
-  const khoanRows = load_(T.KHOAN).rows;
-  const cdSet = congDoanCodes_(khoanRows);
-  const ten = khoanTen_(khoanRows);
-  return kys.map(function (k) {
-    const rows = kq.filter(function (r) { return r.ky === k.ky; });
-    const s = tomTatKy_(rows, tt.filter(function (r) { return r.ky === k.ky; }), cdSet, ten);
-    s.ky = k.ky; s.trangThai = k.trangThai; s.daTinh = !!k.ngayTinh; s.ngayTinh = k.ngayTinh;
-    delete s.items;
-    return s;
-  });
-}
-
 /** Dữ liệu cho biểu đồ dashboard ở Tổng quan: biến động nhân sự/quỹ lương theo tháng, thâm niên, theo mã PL */
 function apiDashboard(tuKy, denKy, phongBan) {
   const user = getUser_();

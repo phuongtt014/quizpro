@@ -6,7 +6,8 @@ const S = {
   user: null, info: {}, kys: [], khoan: [], mapl: [], phongBan: [], lists: {}, today: '',
   view: 'tongquan', nvKy: null, nvData: null, ttKy: null, ttData: null,
   rpTab: 'chitiet', rpKy: null, rpTuKy: null, rpDenKy: null, rpData: null, setTab: 'info', pq: [], impTab: 'paste', zf: {},
-  dashTuKy: null, dashDenKy: null, dashPB: '', dashData: null
+  dashTuKy: null, dashDenKy: null, dashPB: '', dashData: null,
+  cache: {} // bộ nhớ đệm hiển thị tức thì khi chuyển tab (xem swrFetch)
 };
 const $ = (id) => document.getElementById(id);
 const V = () => $('view');
@@ -180,6 +181,49 @@ async function run(fn, ...args) {
   catch (e) { toast((e && e.message) || String(e), 'err'); throw e; }
   finally { busy(false); }
 }
+// Giống run(), nhưng không hiện overlay bận/toast lỗi – dùng để tải lại ngầm phía sau dữ liệu cũ đang hiển thị
+// (xem swrFetch). Lỗi (vd. mất kết nối) chỉ im lặng bỏ qua vì màn hình vẫn còn dữ liệu cũ để xem.
+async function runBg(fn, ...args) {
+  try { return await api(fn, ...args); } catch (e) { console.error(fn, e); return undefined; }
+}
+/**
+ * Tải dữ liệu cho 1 màn hình/tab theo kiểu "hiện ngay, cập nhật sau" (stale-while-revalidate):
+ * nếu đã có dữ liệu cũ của đúng khóa (key) này trong S.cache, gọi onData(dữ liệu cũ) NGAY để hiển thị
+ * tức thì – không phải chờ mạng – rồi mới âm thầm tải lại ở hậu trường (không hiện overlay bận) và gọi lại
+ * onData(dữ liệu mới) khi xong, để màn hình luôn phản ánh đúng dữ liệu mới nhất trên Sheet.
+ * Nếu CHƯA có dữ liệu cũ (lần đầu mở khóa này), gọi onLoading() rồi tải kiểu chặn (có overlay bận) như cũ.
+ * key nên gồm cả các tham số ảnh hưởng tới dữ liệu (kỳ, khoảng ngày, bộ lọc phía server…).
+ */
+async function swrFetch(key, fetchArgs, onData, onLoading) {
+  const hit = S.cache[key];
+  if (hit !== undefined) {
+    onData(hit, true);
+    const fresh = await runBg(...fetchArgs);
+    if (fresh !== undefined) { S.cache[key] = fresh; onData(fresh, false); }
+    return hit;
+  }
+  if (onLoading) onLoading();
+  const d = await run(...fetchArgs);
+  S.cache[key] = d;
+  onData(d, false);
+  return d;
+}
+// Xoá cache của mọi dữ liệu gắn với 1 kỳ cụ thể (Nhân viên, Truy thu, các bảng Báo cáo theo kỳ) sau khi
+// có thao tác làm thay đổi dữ liệu kỳ đó (Tính/Chốt/Mở lại/Tạo/Xóa kỳ, lưu/xóa NV, lưu/xóa truy thu…) –
+// để lần tải tiếp theo lấy đúng dữ liệu mới ngay, không hiện thoáng qua dữ liệu cũ rồi mới cập nhật.
+// Các bảng theo khoảng ngày (Tổng hợp, Theo nhân sự, Tổng quan) luôn bị xoá hết vì khó biết khoảng nào
+// chứa kỳ này – chi phí giữ cache sai còn tốn hơn việc tải lại 1 lần.
+function invalidateKyCache(ky) {
+  ['nv:', 'tt:', 'baocaochi:', 'cd:', 'biendong:'].forEach((p) => { delete S.cache[p + ky]; });
+  Object.keys(S.cache).forEach((k) => { if (k.startsWith('dash:') || k.startsWith('tonghop:') || k.startsWith('nhansu:')) delete S.cache[k]; });
+}
+// Nhân viên có thể sửa ở hồ sơ gốc ('') hoặc ở 1 kỳ cụ thể, và khi sửa ở kỳ mới nhất thì hồ sơ gốc cũng
+// được cập nhật theo (xem apiSaveNV) – nên xoá cache của cả 3 nơi này để chắc chắn đồng bộ.
+function invalidateNVCache() {
+  invalidateKyCache(S.nvData ? S.nvData.ky : '');
+  invalidateKyCache('');
+  if (S.kys.length) invalidateKyCache(S.kys[0].ky);
+}
 function act(fn) { return fn().catch(() => {}); }
 function toast(msg, type) {
   const d = document.createElement('div');
@@ -237,7 +281,7 @@ function go(v) {
   closeModal();
   ({ tongquan: vTongQuan, ky: vKy, nhanvien: vNhanVien, truythu: vTruyThu, baocao: vBaoCao, thietlap: vThietLap, nhatky: vNhatKy }[v])();
 }
-async function refreshKys() { S.kys = await api('apiListKy'); }
+async function refreshKys() { S.kys = await api('apiListKy'); S.cache['ky-list'] = S.kys; }
 // Các danh mục (Khoản trích đóng, Mã phân loại, Tỉ lệ Công đoàn, Phòng ban, Thông tin chung) chỉ tải lúc mở trang.
 // Nếu vừa sửa tay trên Google Sheet, bấm nút này để nạp lại mà không cần tải lại cả trang.
 async function refreshDanhMuc() {
@@ -253,13 +297,10 @@ async function refreshDanhMuc() {
 // =====================================================================
 // TỔNG QUAN
 // =====================================================================
-async function vTongQuan() {
-  V().innerHTML = '<h2>Tổng quan</h2><div class="card muted">Đang tải…</div>';
-  let list;
-  try { list = await run('apiTongQuan'); } catch (e) { return; }
-  const last = list[0];
+function vTongQuan() {
+  // Không cần gọi server để biết đã có kỳ nào chưa – S.kys đã có sẵn từ lúc mở trang (apiBootstrap).
   let h = '<h2>Tổng quan</h2>';
-  if (!last) {
+  if (!S.kys.length) {
     h += `<div class="alert info"><b>Chưa có kỳ BHXH nào.</b> Các bước bắt đầu:
       <ol class="steps"><li>Kiểm tra <b>Thiết lập</b>: Thông tin chung, Khoản trích đóng, Mã phân loại, Phòng ban.</li>
       <li>Nhập danh sách nhân viên vào <b>Nhân viên → Hồ sơ gốc</b> (hoặc dán trực tiếp vào tab "Danh sách nhân viên" trên Google Sheet).</li>
@@ -267,19 +308,20 @@ async function vTongQuan() {
     V().innerHTML = h;
     return;
   }
-  h += `<div id="dashArea"></div>`;
-  V().innerHTML = h;
+  V().innerHTML = h + '<div id="dashArea"></div>';
   if (!S.dashTuKy) S.dashTuKy = S.kys[S.kys.length - 1].ky;
   if (!S.dashDenKy) S.dashDenKy = S.kys[0].ky;
   loadDashboard();
 }
 async function loadDashboard() {
   const area = $('dashArea'); if (!area) return;
-  area.innerHTML = '<div class="card muted">Đang tải biểu đồ…</div>';
-  let d;
-  try { d = await run('apiDashboard', S.dashTuKy, S.dashDenKy, S.dashPB); } catch (e) { area.innerHTML = ''; return; }
-  S.dashData = d; S.dashTuKy = d.tuKy; S.dashDenKy = d.denKy;
-  renderDashboard();
+  const key = 'dash:' + S.dashTuKy + '|' + S.dashDenKy + '|' + (S.dashPB || '');
+  try {
+    await swrFetch(key, ['apiDashboard', S.dashTuKy, S.dashDenKy, S.dashPB], (d) => {
+      S.dashData = d; S.dashTuKy = d.tuKy; S.dashDenKy = d.denKy;
+      renderDashboard();
+    }, () => { area.innerHTML = '<div class="card muted">Đang tải biểu đồ…</div>'; });
+  } catch (e) { area.innerHTML = ''; }
 }
 function renderDashboard() {
   const d = S.dashData; const area = $('dashArea'); if (!d || !area) return;
@@ -314,7 +356,12 @@ function renderDashboard() {
 // KỲ BHXH
 // =====================================================================
 async function vKy() {
-  try { busy(true); await refreshKys(); } catch (e) { toast(e.message, 'err'); } finally { busy(false); }
+  try {
+    await swrFetch('ky-list', ['apiListKy'], (d) => { S.kys = d; renderKy(); },
+      () => { V().innerHTML = '<h2>Kỳ BHXH</h2><div class="card muted">Đang tải…</div>'; });
+  } catch (e) { toast(e.message, 'err'); }
+}
+function renderKy() {
   const def = S.kys.length ? nextMonth(S.kys[0].ky) : S.today;
   let h = '<h2>Kỳ BHXH</h2>';
   if (isRole('Admin')) {
@@ -353,8 +400,9 @@ function taoKy() {
   if (!confirm('Tạo kỳ ' + fmtM(ky) + '?')) return;
   act(async () => {
     const r = await run('apiTaoKy', ky);
+    invalidateKyCache(r.ky);
     toast(`Đã tạo kỳ ${fmtM(r.ky)}: ${r.soNV} NV (nguồn: ${r.nguon}${r.themTuHoSo ? ', thêm ' + r.themTuHoSo + ' NV từ hồ sơ gốc' : ''}).`, 'ok');
-    vKy();
+    await refreshKys(); vKy();
   });
 }
 function ketQuaTinh(r, title) {
@@ -369,19 +417,19 @@ function ketQuaTinh(r, title) {
      <button class="btn pri" onclick="S.rpKy='${r.ky}';S.rpTab='chitiet';go('baocao')">Xem bảng tính</button>`);
 }
 function tinhKy(ky) {
-  act(async () => { const r = await run('apiTinhKy', ky); await refreshKys(); vKy(); ketQuaTinh(r, 'Kết quả tính kỳ ' + fmtM(ky)); });
+  act(async () => { const r = await run('apiTinhKy', ky); invalidateKyCache(ky); await refreshKys(); vKy(); ketQuaTinh(r, 'Kết quả tính kỳ ' + fmtM(ky)); });
 }
 function chotKy(ky) {
   if (!confirm(`Chốt kỳ ${fmtM(ky)}?\n\nApp sẽ tính lại lần cuối rồi KHÓA kỳ. Sau khi chốt không thể sửa; phát sinh cho tháng này phải nhập Truy thu/Thoái thu ở kỳ sau.`)) return;
-  act(async () => { const r = await run('apiChotKy', ky); await refreshKys(); vKy(); ketQuaTinh(r, 'Đã chốt kỳ ' + fmtM(ky)); });
+  act(async () => { const r = await run('apiChotKy', ky); invalidateKyCache(ky); await refreshKys(); vKy(); ketQuaTinh(r, 'Đã chốt kỳ ' + fmtM(ky)); });
 }
 function moLaiKy(ky) {
   if (!confirm(`Mở lại kỳ ${fmtM(ky)}?\n\nKỳ sẽ chuyển về "Đang mở", có thể sửa dữ liệu và bấm Tính lại. Chỉ dùng khi cần điều chỉnh gấp cho kỳ đã chốt.`)) return;
-  act(async () => { await run('apiMoLaiKy', ky); await refreshKys(); vKy(); toast(`Đã mở lại kỳ ${fmtM(ky)}. Có thể sửa dữ liệu và bấm Tính lại.`, 'ok'); });
+  act(async () => { await run('apiMoLaiKy', ky); invalidateKyCache(ky); await refreshKys(); vKy(); toast(`Đã mở lại kỳ ${fmtM(ky)}. Có thể sửa dữ liệu và bấm Tính lại.`, 'ok'); });
 }
 function xoaKy(ky) {
   if (!confirm(`XÓA HẲN kỳ ${fmtM(ky)}?\n\nSẽ xóa toàn bộ dữ liệu NV, kết quả tính và các dòng Truy thu ghi nhận trong kỳ này. KHÔNG THỂ HOÀN TÁC. Chỉ xóa được kỳ mới nhất.`)) return;
-  act(async () => { await run('apiXoaKy', ky); await refreshKys(); vKy(); toast(`Đã xóa kỳ ${fmtM(ky)}.`, 'ok'); });
+  act(async () => { await run('apiXoaKy', ky); invalidateKyCache(ky); await refreshKys(); vKy(); toast(`Đã xóa kỳ ${fmtM(ky)}.`, 'ok'); });
 }
 
 // =====================================================================
@@ -417,7 +465,12 @@ async function vNhanVien() {
   loadNV();
 }
 async function loadNV() {
-  try { S.nvData = await run('apiNhanVien', S.nvKy); } catch (e) { $('nvTbl').innerHTML = ''; return; }
+  try {
+    await swrFetch('nv:' + S.nvKy, ['apiNhanVien', S.nvKy], (d) => { S.nvData = d; afterNVLoaded(); },
+      () => { $('nvTbl').className = 'card muted'; $('nvTbl').innerHTML = 'Đang tải…'; });
+  } catch (e) { $('nvTbl').innerHTML = ''; }
+}
+function afterNVLoaded() {
   const d = S.nvData;
   $('nvAdd').innerHTML = d.editable ? '<button class="btn pri" onclick="nvForm(null)">＋ Thêm nhân viên</button>' : '';
   $('nvImportBtn').innerHTML = d.editable ? '<button class="btn sm pri" onclick="nvImportForm()">⬆ Nhập từ file</button>' : '';
@@ -486,14 +539,14 @@ async function nvImportSubmit() {
     act(async () => {
       const b64 = await readFileB64(f);
       const r = await run('apiImportNV', S.nvData.ky, mode, b64, f.name, onlyEmpty);
-      closeModal(); nvImportResult(r); loadNV();
+      invalidateNVCache(); closeModal(); nvImportResult(r); loadNV();
     });
   } else {
     const text = $('impPaste').value;
     if (!text.trim()) return toast('Chưa dán dữ liệu.', 'err');
     act(async () => {
       const r = await run('apiImportNVText', S.nvData.ky, mode, text, onlyEmpty);
-      closeModal(); nvImportResult(r); loadNV();
+      invalidateNVCache(); closeModal(); nvImportResult(r); loadNV();
     });
   }
 }
@@ -619,6 +672,7 @@ function ycSubmit(maNV) {
   if (!o.lyDo || !o.lyDo.trim()) return toast('Vui lòng ghi lý do.', 'err');
   act(async () => {
     await run('apiYeuCauMoKhoa', maNV, o.lyDo);
+    delete S.cache.ycml; invalidateNVCache();
     closeModal();
     toast('Đã gửi yêu cầu mở khóa, chờ Admin duyệt.', 'ok');
     loadNV();
@@ -632,12 +686,12 @@ function nvSum() {
 function nvSave(isNew) {
   const o = formData('nvF1');
   ['luongChinh', 'pcKN', 'pcCV', 'pcDH', 'pcKhac'].forEach((k) => { o[k] = Number(String(o[k] || '').replace(/[^\d-]/g, '')) || 0; });
-  act(async () => { await run('apiSaveNV', S.nvData.ky, o, isNew); closeModal(); toast('Đã lưu nhân viên ' + o.maNV, 'ok'); loadNV(); });
+  act(async () => { await run('apiSaveNV', S.nvData.ky, o, isNew); invalidateNVCache(); closeModal(); toast('Đã lưu nhân viên ' + o.maNV, 'ok'); loadNV(); });
 }
 function nvDel(maNV) {
   const where = S.nvData.ky ? 'khỏi kỳ ' + fmtM(S.nvData.ky) : 'khỏi hồ sơ gốc';
   if (!confirm(`Xóa NV ${maNV} ${where}?\n\nLưu ý: NV nghỉ việc nên nhập "Tháng dừng đóng" thay vì xóa, để báo cáo biến động ghi nhận giảm.`)) return;
-  act(async () => { await run('apiDeleteNV', S.nvData.ky, maNV); toast('Đã xóa.', 'ok'); loadNV(); });
+  act(async () => { await run('apiDeleteNV', S.nvData.ky, maNV); invalidateNVCache(); toast('Đã xóa.', 'ok'); loadNV(); });
 }
 
 // =====================================================================
@@ -657,7 +711,12 @@ async function vTruyThu() {
   loadTT();
 }
 async function loadTT() {
-  try { S.ttData = await run('apiTruyThu', S.ttKy); } catch (e) { $('ttTbl').innerHTML = ''; return; }
+  try {
+    await swrFetch('tt:' + S.ttKy, ['apiTruyThu', S.ttKy], (d) => { S.ttData = d; renderTT(); },
+      () => { $('ttTbl').className = 'card muted'; $('ttTbl').innerHTML = 'Đang tải…'; });
+  } catch (e) { $('ttTbl').innerHTML = ''; }
+}
+function renderTT() {
   const d = S.ttData;
   $('ttAdd').innerHTML = d.editable ? '<button class="btn pri" onclick="ttForm(null)">＋ Thêm dòng</button>' : kyBadge(d.trangThai);
   const sum = (f) => d.rows.reduce((s, r) => s + (Number(f(r)) || 0), 0);
@@ -721,6 +780,7 @@ function ttSave() {
   ['luongCu', 'luongMoi'].forEach((k) => { o[k] = Number(String(o[k] || '').replace(/[^\d-]/g, '')) || 0; });
   act(async () => {
     const r = await run('apiSaveTruyThu', S.ttData.ky, o);
+    invalidateKyCache(S.ttData.ky);
     closeModal();
     toast(`Đã lưu: BHXH NLĐ ${fmt(r.bhxhNLD)}, BHXH DN ${fmt(r.bhxhDN)}, Đoàn phí ${fmt(r.dpcd)}, Kinh phí ${fmt(r.kpcd)}`, 'ok');
     loadTT();
@@ -728,7 +788,7 @@ function ttSave() {
 }
 function ttDel(id) {
   if (!confirm('Xóa dòng truy thu/thoái thu này?')) return;
-  act(async () => { await run('apiDeleteTruyThu', S.ttData.ky, id); toast('Đã xóa.', 'ok'); loadTT(); });
+  act(async () => { await run('apiDeleteTruyThu', S.ttData.ky, id); invalidateKyCache(S.ttData.ky); toast('Đã xóa.', 'ok'); loadTT(); });
 }
 
 // =====================================================================
@@ -772,9 +832,10 @@ function rpRefilter() {
   else if (S.rpTab === 'tonghop') renderTongHop();
 }
 async function rpCongDoan() {
-  $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>';
-  try { S.rpCD = await run('apiCongDoanChiTiet', S.rpKy); } catch (e) { $('rpBody').innerHTML = ''; return; }
-  renderCongDoan();
+  try {
+    await swrFetch('cd:' + S.rpKy, ['apiCongDoanChiTiet', S.rpKy], (d) => { S.rpCD = d; renderCongDoan(); },
+      () => { $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>'; });
+  } catch (e) { $('rpBody').innerHTML = ''; }
 }
 function renderCongDoan() {
   const d = S.rpCD; if (!d) return;
@@ -875,9 +936,10 @@ function renderCongDoan() {
   $('rpBody').innerHTML = h;
 }
 async function rpChiTiet() {
-  $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>';
-  try { S.rpData = await run('apiBaoCaoChiTiet', S.rpKy); } catch (e) { $('rpBody').innerHTML = ''; return; }
-  renderChiTiet();
+  try {
+    await swrFetch('baocaochi:' + S.rpKy, ['apiBaoCaoChiTiet', S.rpKy], (d) => { S.rpData = d; renderChiTiet(); },
+      () => { $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>'; });
+  } catch (e) { $('rpBody').innerHTML = ''; }
 }
 function renderChiTiet() {
   const d = S.rpData; if (!d) return;
@@ -966,9 +1028,10 @@ function renderChiTiet() {
   $('rpBody').innerHTML = h;
 }
 async function rpChiPhi() {
-  $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>';
-  try { S.rpData = await run('apiBaoCaoChiTiet', S.rpKy); } catch (e) { $('rpBody').innerHTML = ''; return; }
-  renderChiPhi();
+  try {
+    await swrFetch('baocaochi:' + S.rpKy, ['apiBaoCaoChiTiet', S.rpKy], (d) => { S.rpData = d; renderChiPhi(); },
+      () => { $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>'; });
+  } catch (e) { $('rpBody').innerHTML = ''; }
 }
 function renderChiPhi() {
   const d = S.rpData; if (!d) return;
@@ -1074,11 +1137,10 @@ function renderChiPhi() {
   $('rpBody').innerHTML = h;
 }
 async function rpBienDong() {
-  $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>';
-  let d;
-  try { d = await run('apiBienDong', S.rpKy); } catch (e) { $('rpBody').innerHTML = ''; return; }
-  S.rpBDData = d;
-  renderBienDong();
+  try {
+    await swrFetch('biendong:' + S.rpKy, ['apiBienDong', S.rpKy], (d) => { S.rpBDData = d; renderBienDong(); },
+      () => { $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>'; });
+  } catch (e) { $('rpBody').innerHTML = ''; }
 }
 function renderBienDong() {
   const d = S.rpBDData; if (!d) return;
@@ -1108,13 +1170,15 @@ function renderBienDong() {
   $('rpBody').innerHTML = h;
 }
 async function rpTongHop() {
-  $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>';
-  let d;
-  try { d = await run('apiTongHop', S.rpTuKy, S.rpDenKy); } catch (e) { $('rpBody').innerHTML = ''; return; }
-  S.rpTHData = d; S.rpTuKy = d.tuKy; S.rpDenKy = d.denKy;
-  const tk = $('rpTuKy'), dk = $('rpDenKy');
-  if (tk) tk.value = d.tuKy; if (dk) dk.value = d.denKy;
-  renderTongHop();
+  const key = 'tonghop:' + S.rpTuKy + '|' + S.rpDenKy;
+  try {
+    await swrFetch(key, ['apiTongHop', S.rpTuKy, S.rpDenKy], (d) => {
+      S.rpTHData = d; S.rpTuKy = d.tuKy; S.rpDenKy = d.denKy;
+      const tk = $('rpTuKy'), dk = $('rpDenKy');
+      if (tk) tk.value = d.tuKy; if (dk) dk.value = d.denKy;
+      renderTongHop();
+    }, () => { $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>'; });
+  } catch (e) { $('rpBody').innerHTML = ''; }
 }
 function renderTongHop() {
   const d = S.rpTHData; if (!d) return;
@@ -1199,13 +1263,15 @@ function renderTongHop() {
   $('rpBody').innerHTML = h;
 }
 async function rpNhanSu() {
-  $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>';
-  let d;
-  try { d = await run('apiLichSuNhanSu', S.rpTuKy, S.rpDenKy); } catch (e) { $('rpBody').innerHTML = ''; return; }
-  S.rpNSData = d; S.rpTuKy = d.tuKy; S.rpDenKy = d.denKy;
-  const tk = $('rpTuKy'), dk = $('rpDenKy');
-  if (tk) tk.value = d.tuKy; if (dk) dk.value = d.denKy;
-  renderNhanSu();
+  const key = 'nhansu:' + S.rpTuKy + '|' + S.rpDenKy;
+  try {
+    await swrFetch(key, ['apiLichSuNhanSu', S.rpTuKy, S.rpDenKy], (d) => {
+      S.rpNSData = d; S.rpTuKy = d.tuKy; S.rpDenKy = d.denKy;
+      const tk = $('rpTuKy'), dk = $('rpDenKy');
+      if (tk) tk.value = d.tuKy; if (dk) dk.value = d.denKy;
+      renderNhanSu();
+    }, () => { $('rpBody').innerHTML = '<div class="card muted">Đang tải…</div>'; });
+  } catch (e) { $('rpBody').innerHTML = ''; }
 }
 function renderNhanSu() {
   const d = S.rpNSData; if (!d) return;
@@ -1262,11 +1328,10 @@ function vThietLap() {
   ({ info: setInfo, pb: setPB, khoan: setKhoan, mapl: setMaPL, tlcd: setTLCD, ycml: setYCML, pq: setPQ }[S.setTab])();
 }
 async function setYCML() {
-  $('setBody').innerHTML = '<div class="card muted">Đang tải…</div>';
-  let rows;
-  try { rows = await run('apiListYeuCauMoKhoa'); } catch (e) { return; }
-  S.ycml = rows;
-  renderYCML();
+  try {
+    await swrFetch('ycml', ['apiListYeuCauMoKhoa'], (rows) => { S.ycml = rows; renderYCML(); },
+      () => { $('setBody').innerHTML = '<div class="card muted">Đang tải…</div>'; });
+  } catch (e) { /* đã báo lỗi qua toast trong run() */ }
 }
 function renderYCML() {
   const admin = isRole('Admin');
@@ -1287,11 +1352,19 @@ function renderYCML() {
     </tbody></table></div></div>`;
 }
 function ycDuyet(id, duyet) {
-  act(async () => { await run('apiDuyetYeuCauMoKhoa', id, duyet); toast(duyet ? 'Đã duyệt mở khóa.' : 'Đã từ chối.', 'ok'); setYCML(); });
+  act(async () => {
+    await run('apiDuyetYeuCauMoKhoa', id, duyet);
+    delete S.cache.ycml; invalidateNVCache();
+    toast(duyet ? 'Đã duyệt mở khóa.' : 'Đã từ chối.', 'ok'); setYCML();
+  });
 }
 function ycKhoaLai(maNV) {
   if (!confirm('Khóa lại hồ sơ NV ' + maNV + '?')) return;
-  act(async () => { await run('apiKhoaLaiNV', maNV); toast('Đã khóa lại.', 'ok'); setYCML(); });
+  act(async () => {
+    await run('apiKhoaLaiNV', maNV);
+    delete S.cache.ycml; invalidateNVCache();
+    toast('Đã khóa lại.', 'ok'); setYCML();
+  });
 }
 function setTLCD() {
   const admin = isRole('Admin');
@@ -1474,9 +1547,10 @@ function maplDel(ma) {
   act(async () => { S.mapl = await run('apiDeleteMaPL', ma); toast('Đã xóa.', 'ok'); setMaPL(); });
 }
 async function setPQ() {
-  $('setBody').innerHTML = '<div class="card muted">Đang tải…</div>';
-  try { S.pq = await run('apiPhanQuyen'); } catch (e) { return; }
-  renderPQ();
+  try {
+    await swrFetch('pq', ['apiPhanQuyen'], (d) => { S.pq = d; renderPQ(); },
+      () => { $('setBody').innerHTML = '<div class="card muted">Đang tải…</div>'; });
+  } catch (e) { /* đã báo lỗi qua toast trong run() */ }
 }
 function renderPQ() {
   $('setBody').innerHTML = `<div class="card"><div class="row between" style="margin-bottom:10px"><div class="small muted">
@@ -1500,20 +1574,23 @@ function pqForm(email) {
     `<button class="btn" onclick="closeModal()">Hủy</button><button class="btn pri" onclick="pqSave()">Lưu</button>`);
 }
 function pqSave() {
-  act(async () => { S.pq = await run('apiSavePQ', formData('pqF')); closeModal(); toast('Đã lưu phân quyền.', 'ok'); renderPQ(); });
+  act(async () => { S.pq = await run('apiSavePQ', formData('pqF')); S.cache.pq = S.pq; closeModal(); toast('Đã lưu phân quyền.', 'ok'); renderPQ(); });
 }
 function pqDel(email) {
   if (!confirm('Xóa quyền của ' + email + '?')) return;
-  act(async () => { S.pq = await run('apiDeletePQ', email); toast('Đã xóa.', 'ok'); renderPQ(); });
+  act(async () => { S.pq = await run('apiDeletePQ', email); S.cache.pq = S.pq; toast('Đã xóa.', 'ok'); renderPQ(); });
 }
 
 // =====================================================================
 // NHẬT KÝ
 // =====================================================================
 async function vNhatKy() {
-  V().innerHTML = '<h2>Nhật ký thao tác</h2><div class="card muted">Đang tải…</div>';
-  let rows;
-  try { rows = await run('apiNhatKy'); } catch (e) { return; }
+  try {
+    await swrFetch('nhatky', ['apiNhatKy'], (rows) => { renderNhatKy(rows); },
+      () => { V().innerHTML = '<h2>Nhật ký thao tác</h2><div class="card muted">Đang tải…</div>'; });
+  } catch (e) { /* đã báo lỗi qua toast trong run() */ }
+}
+function renderNhatKy(rows) {
   V().innerHTML = `<h2>Nhật ký thao tác</h2><div class="card"><p class="small muted">500 thao tác gần nhất.</p><div class="tbl-wrap"><table>
     <thead><tr><th>Thời gian</th><th>Người thực hiện</th><th>Hành động</th><th>Chi tiết</th></tr></thead><tbody>
     ${rows.map((r) => `<tr><td class="small">${esc(r.thoiGian)}</td><td class="small">${esc(r.email)}</td><td>${esc(r.hanhDong)}</td>

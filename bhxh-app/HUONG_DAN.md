@@ -226,6 +226,12 @@ Bảng **Truy thu – Thoái thu** có thêm cột **Chênh lệch** (= Lương 
 
 Hồ sơ nhân viên có thêm trường **Giới tính** (dropdown, nằm ngay sau Ngày sinh trong form Nhân viên), chỉ nhận **Nam / Nữ / Khác**, có thể để trống. Trường này được kiểm tra theo đúng danh mục như các dropdown khác (xem mục 6) và có trong file mẫu nhập/xuất cùng sheet "Danh mục". Tab **Nhân viên** có thêm bộ lọc theo **Giới tính** và theo **Tham gia công đoàn** (xem mục 6). Với các công ty đã cài trước đó, vào Google Sheet → menu **BHXH → 1. Khởi tạo / cập nhật cấu trúc** một lần để Sheet tự thêm cột **"Giới tính"** vào các tab *Danh sách nhân viên* và *Dữ liệu kỳ* (các cột hiện có không bị ảnh hưởng).
 
+## 9g. Chuyển tab nhanh hơn (bộ nhớ đệm phía trình duyệt)
+
+Mỗi lần chuyển qua một tab (Tổng quan, Kỳ BHXH, Nhân viên, Truy thu, các tab trong Báo cáo, Yêu cầu mở khóa, Phân quyền…), ứng dụng nhớ lại dữ liệu đã tải lần gần nhất **ngay trên trình duyệt** (mất khi tải lại trang F5). Lần đầu mở một tab vẫn tải như trước (có thể mất vài giây vì phải gọi lên Google); nhưng nếu quay lại tab đó mà chưa tải lại trang, màn hình hiện dữ liệu cũ **ngay lập tức** (không phải chờ), rồi mới âm thầm tải lại ở phía sau để cập nhật đúng dữ liệu mới nhất – nếu có gì thay đổi (vd. bạn vừa sửa tay trên Google Sheet) thì bảng sẽ tự cập nhật lại sau một chút, không cần bấm gì thêm. Màn hình **Tổng quan** còn bớt hẳn 1 lượt tải dữ liệu không cần thiết mỗi lần mở.
+
+Sau khi Lưu/Xóa/Nhập file ở Nhân viên, Lưu/Xóa ở Truy thu, hay Tạo/Tính/Chốt/Mở lại/Xóa ở Kỳ BHXH, ứng dụng tự xóa phần nhớ tạm liên quan để lần xem tiếp theo luôn đúng dữ liệu mới nhất, không hiện nhầm số liệu cũ.
+
 ## 10. Lưu ý
 
 - **Sửa tay trên Google Sheet:** Nhân viên, Kỳ BHXH, Truy thu, và mọi tính toán/báo cáo luôn đọc dữ liệu **mới nhất** từ Sheet mỗi lần bạn mở màn hình đó hoặc bấm Tính — sửa tay xong là có tác dụng ngay. Riêng 5 danh mục **Khoản trích đóng, Mã phân loại, Tỉ lệ Công đoàn, Phòng ban, Thông tin chung** chỉ được tải **một lần lúc mở trang** để dùng cho dropdown; sửa tay trên Sheet sẽ không hiện ngay trên các màn hình đó. Bấm nút **"🔄 Làm mới dữ liệu"** ở góc trên (hoặc tải lại trang F5) để nạp lại.
