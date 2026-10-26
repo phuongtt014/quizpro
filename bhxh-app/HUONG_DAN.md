@@ -238,7 +238,9 @@ Sau khi Lưu/Xóa/Nhập file ở Nhân viên, Lưu/Xóa ở Truy thu, hay Tạo
 
 **Chỉ đọc đúng 1 kỳ cần xem, không đọc lại toàn bộ lịch sử:** tab "Dữ liệu kỳ" cộng dồn dữ liệu của **tất cả các kỳ** từ trước tới nay trên cùng 1 sheet. Trước đây mỗi lần mở tab Nhân viên theo 1 kỳ, hoặc Lưu hồ sơ NV ở 1 kỳ, ứng dụng đọc **toàn bộ** sheet này (gồm cả dữ liệu những kỳ khác không liên quan) rồi mới lọc ra đúng kỳ cần – công ty dùng app càng lâu (càng nhiều kỳ cộng dồn) thì việc mở/Lưu ở tab Nhân viên càng chậm dần, dù chỉ đang xem/sửa 1 kỳ. Nay ứng dụng đọc trước cột "Kỳ" (nhẹ) để xác định đúng các dòng cần, rồi chỉ đọc đầy đủ đúng các dòng của kỳ đang xem – không phụ thuộc số kỳ đã tích lũy trước đó, và vẫn đúng dữ liệu kể cả khi có sửa tay làm xáo trộn thứ tự các dòng trên Sheet.
 
-**Ghi chú cho người kiểm tra (F12 → tab Console của trình duyệt):** mỗi lệnh gọi lên Google đều được in ra thời gian chạy thực tế, ví dụ `[BHXH] apiSaveNV: 1850 ms`, để biết chính xác đang chậm ở đâu nếu vẫn thấy lâu.
+**Nhớ lại "dòng nào thuộc kỳ nào" để khỏi phải dò lại mỗi lần:** bước đọc riêng cột "Kỳ" nói trên vẫn phải quét qua toàn bộ chiều dài cột đó mỗi lần – để khỏi phải quét lại liên tục, kết quả (dòng nào thuộc kỳ nào) được nhớ tạm lại trong tối đa 30 phút. Chỉ khi có nhân viên được **thêm vào hoặc xóa khỏi** T.DLKY (ở bất kỳ kỳ nào) thì phần nhớ tạm này mới bị bỏ và quét lại cho đúng; còn **chỉ sửa thông tin** một nhân viên đã có (trường hợp phổ biến nhất khi "mở nhân viên lên để thay đổi thông tin") thì không cần quét lại – nhờ vậy càng sửa thông tin nhiều lần liên tiếp thì các lần sau càng nhanh dần, không phụ thuộc đã tích lũy bao nhiêu kỳ.
+
+**Ghi chú cho người kiểm tra (F12 → tab Console của trình duyệt):** mỗi lệnh gọi lên Google đều được in ra thời gian chạy thực tế, ví dụ `[BHXH] apiSaveNV: 1850 ms`, kèm theo 1 dòng chi tiết từng bước phía server (ví dụ bước nào tốn bao nhiêu ms: đọc dữ liệu, kiểm tra khóa, ghi dữ liệu…) để biết chính xác đang chậm ở bước nào nếu vẫn thấy lâu.
 
 ## 10. Lưu ý
 

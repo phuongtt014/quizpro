@@ -178,9 +178,13 @@ function busy(on) { busyCount += on ? 1 : -1; $('busy').classList.toggle('on', b
 async function run(fn, ...args) {
   busy(true);
   const t0 = performance.now();
-  try { return await api(fn, ...args); }
+  try {
+    const r = await api(fn, ...args);
+    if (r && r.__t) console.log('[BHXH] ' + fn + ' – chi tiết từng bước phía server (ms):', r.__t);
+    return r;
+  }
   catch (e) { toast((e && e.message) || String(e), 'err'); throw e; }
-  finally { busy(false); console.log('[BHXH] ' + fn + ': ' + Math.round(performance.now() - t0) + ' ms'); }
+  finally { busy(false); console.log('[BHXH] ' + fn + ': ' + Math.round(performance.now() - t0) + ' ms (tổng cả round-trip)'); }
 }
 // Giống run(), nhưng không hiện overlay bận/toast lỗi – dùng để tải lại ngầm phía sau dữ liệu cũ đang hiển thị
 // (xem swrFetch). Lỗi (vd. mất kết nối) chỉ im lặng bỏ qua vì màn hình vẫn còn dữ liệu cũ để xem.

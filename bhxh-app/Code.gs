@@ -513,18 +513,61 @@ function load_(t) {
  * các dòng của 1 kỳ luôn liền nhau trên Sheet – đúng cả khi dữ liệu bị xáo trộn do sửa tay), rồi chỉ đọc
  * đầy đủ các dòng đó, ghép các dòng liền kề thành từng đoạn để giảm số lượt gọi getRange.
  */
+/**
+ * Số phiên bản dữ liệu T.DLKY – chỉ tăng khi có dòng được THÊM/XÓA (append_/deleteRows_), KHÔNG tăng khi
+ * chỉ sửa nội dung 1 dòng đã có (update_) vì sửa nội dung không làm đổi vị trí dòng nào. Dùng để biết
+ * chắc chắn khi nào "dòng nào thuộc kỳ nào" (xem getDlkyKyIndex_) vẫn còn đúng, không cần đọc lại.
+ */
+function dlkyVersion_() {
+  try { return PropertiesService.getScriptProperties().getProperty('dlkyVer') || '0'; } catch (e) { return '0'; }
+}
+function bumpDlkyVersion_() {
+  try {
+    const p = PropertiesService.getScriptProperties();
+    p.setProperty('dlkyVer', String((Number(p.getProperty('dlkyVer')) || 0) + 1));
+  } catch (e) { /* bỏ qua lỗi PropertiesService, chỉ mất tác dụng cache, không ảnh hưởng dữ liệu */ }
+}
+/**
+ * Dòng nào (chỉ số 0-based) trong T.DLKY thuộc về kỳ `ky` – đọc riêng cột "Kỳ" (nhẹ, 1 cột) rồi nhớ lại
+ * trong CacheService (tối đa 30 phút) để các lần gọi tiếp theo không phải quét lại toàn bộ cột này, vốn
+ * ngày càng dài ra khi công ty dùng app lâu (DLKY cộng dồn mọi kỳ từ trước tới nay). Cache được coi là
+ * còn dùng được chỉ khi cả số phiên bản (dlkyVersion_) và tổng số dòng hiện tại đều khớp với lúc lưu –
+ * tức là chưa có dòng nào bị thêm/xóa ở bất kỳ đâu trong T.DLKY kể từ lúc đó (chỉ sửa nội dung 1 dòng đã
+ * có, như Lưu thông tin 1 nhân viên, KHÔNG làm mất cache).
+ */
+function getDlkyKyIndex_(sh, header, n, ky) {
+  const kyColIdx = header.indexOf('Kỳ');
+  if (kyColIdx < 0) return null; // phòng hờ thiếu cột Kỳ, để gọi nơi khác tự xử lý
+  const ver = dlkyVersion_();
+  const cacheKey = 'dlkyidx_' + ky;
+  let cache = null;
+  try { cache = CacheService.getScriptCache(); } catch (e) { cache = null; }
+  if (cache) {
+    try {
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.ver === ver && parsed.n === n) return parsed.idx;
+      }
+    } catch (e) { /* bỏ qua lỗi đọc cache, tính lại như bình thường */ }
+  }
+  const kyVals = sh.getRange(2, kyColIdx + 1, n, 1).getValues();
+  const matchIdx = [];
+  kyVals.forEach(function (v, i) { if (normMonth_(v[0]) === ky) matchIdx.push(i); });
+  if (cache) {
+    try { cache.put(cacheKey, JSON.stringify({ ver: ver, n: n, idx: matchIdx }), 1800); } catch (e) { /* bỏ qua lỗi ghi cache */ }
+  }
+  return matchIdx;
+}
 function loadDLKYForKy_(ky) {
   const t = T.DLKY;
   const sh = getSheet_(t);
   const header = headerOf_(sh);
   const lr = sh.getLastRow();
   if (lr < 2 || !header.length) return [];
-  const kyColIdx = header.indexOf('Kỳ');
   const n = lr - 1;
-  if (kyColIdx < 0) return load_(t).rows.filter(function (r) { return r.ky === ky; }); // phòng hờ thiếu cột Kỳ
-  const kyVals = sh.getRange(2, kyColIdx + 1, n, 1).getValues();
-  const matchIdx = [];
-  kyVals.forEach(function (v, i) { if (normMonth_(v[0]) === ky) matchIdx.push(i); });
+  const matchIdx = getDlkyKyIndex_(sh, header, n, ky);
+  if (matchIdx === null) return load_(t).rows.filter(function (r) { return r.ky === ky; }); // phòng hờ thiếu cột Kỳ
   if (!matchIdx.length) return [];
   const runs = [];
   let runStart = matchIdx[0], runLen = 1;
@@ -600,6 +643,7 @@ function append_(t, objs) {
   ensureRows_(sh, start + rows.length - 1);
   formatRange_(t, sh, header, start, rows.length);
   sh.getRange(start, 1, rows.length, header.length).setValues(rows);
+  if (t === T.DLKY) bumpDlkyVersion_(); // thêm dòng -> "dòng nào thuộc kỳ nào" đã nhớ trước đó không còn đúng nữa
 }
 function update_(t, rowNum, o) {
   const sh = getSheet_(t);
@@ -608,10 +652,13 @@ function update_(t, rowNum, o) {
   const ex = rg.getValues()[0];
   formatRange_(t, sh, header, rowNum, 1);
   rg.setValues([buildRow_(t, header, o, ex)]);
+  // Chỉ sửa NỘI DUNG 1 dòng đã có (không thêm/xóa dòng) -> vị trí "dòng nào thuộc kỳ nào" không đổi,
+  // không cần tăng dlkyVersion_ (giữ cache tra cứu kỳ vẫn dùng được, kể cả khi Lưu/sửa thông tin NV).
 }
 function deleteRows_(t, rowNums) {
   const sh = getSheet_(t);
   rowNums.slice().sort(function (a, b) { return b - a; }).forEach(function (r) { sh.deleteRow(r); });
+  if (t === T.DLKY && rowNums.length) bumpDlkyVersion_();
 }
 function strip_(o) { const c = Object.assign({}, o); delete c._row; return c; }
 
@@ -1123,7 +1170,9 @@ function nvKhoaMsg_(nv) {
 }
 
 function apiNhanVien(ky) {
+  const t0 = Date.now();
   const user = getUser_();
+  const t1 = Date.now();
   ky = normMonth_(ky);
   let rows, trangThai = '', editable;
   if (ky) {
@@ -1135,15 +1184,21 @@ function apiNhanVien(ky) {
     rows = load_(T.NV).rows;
     editable = true;
   }
+  const t2 = Date.now();
   editable = editable && user.role !== ROLE.XEM;
   const ycmlMap = ycmlLatestMap_(); // đọc tab Yêu cầu mở khóa NV đúng 1 lần cho cả danh sách, không lặp lại theo từng NV
+  const t3 = Date.now();
   rows = rows.filter(function (r) { return canSee_(user, r); }).map(function (r) {
     r.luongDong = luongDong_(r);
     r.khoa = nvDaKhoa_(r, ky);
     r.moKhoa = r.khoa && !!(ycmlMap[r.maNV] && ycmlMap[r.maNV].trangThai === YCML_DUYET);
     return r;
   });
-  return { ky: ky, trangThai: trangThai, editable: editable, rows: rows };
+  const t4 = Date.now();
+  // __t: thời gian (ms) từng bước, chỉ để chẩn đoán tốc độ – App.html tự in ra Console (F12) nếu có,
+  // không ảnh hưởng gì tới dữ liệu hay giao diện.
+  return { ky: ky, trangThai: trangThai, editable: editable, rows: rows,
+    __t: { xacThucNguoiDung: t1 - t0, docDuLieuNV: t2 - t1, docYeuCauMoKhoa: t3 - t2, xuLy: t4 - t3, tong: t4 - t0 } };
 }
 
 // ---------------------------------------------------------------------
@@ -1198,26 +1253,32 @@ function apiKhoaLaiNV(maNV) {
 }
 
 function apiSaveNV(ky, o, isNew) {
+  const t0 = Date.now();
   const user = getUser_();
   requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
   ky = normMonth_(ky);
   o = cleanNV_(o, user);
+  const t1 = Date.now();
   return withLock_(function () {
+    const t2 = Date.now();
     const kys = listKy_();
     const latest = kys.length ? kys[0].ky : '';
     // Đọc tab Danh sách nhân viên đúng 1 lần (nếu cần) và dùng lại, thay vì load_(T.NV) 2 lần riêng biệt
     // cho việc kiểm tra khóa và việc tìm dòng để cập nhật hồ sơ gốc.
     const needNV = !isNew || !ky || ky >= latest;
     const nvRows = needNV ? load_(T.NV).rows : null;
+    const t3 = Date.now();
     if (!isNew) {
       const hoSo = nvRows.find(function (r) { return r.maNV === o.maNV; });
       if (hoSo && !nvCoTheSua_(hoSo, ky, user)) throw new Error(nvKhoaMsg_(hoSo));
     }
+    const t4 = Date.now();
     if (ky) {
       requireOpen_(ky);
       const ex = loadDLKYForKy_(ky).find(function (r) { return r.maNV === o.maNV; });
       saveOne_(T.DLKY, ex, Object.assign({ ky: ky }, o), isNew, user);
     }
+    const t5 = Date.now();
     // Cập nhật hồ sơ gốc nếu sửa ở kỳ mới nhất hoặc sửa trực tiếp hồ sơ gốc
     if (!ky || ky >= latest) {
       const ex2 = nvRows.find(function (r) { return r.maNV === o.maNV; });
@@ -1225,8 +1286,14 @@ function apiSaveNV(ky, o, isNew) {
       else if (ex2) update_(T.NV, ex2._row, o);
       else append_(T.NV, [o]);
     }
+    const t6 = Date.now();
     log_(user, isNew ? 'Thêm NV' : 'Sửa NV', (ky ? 'Kỳ ' + monthDisp_(ky) : 'Hồ sơ gốc') + ' – ' + o.maNV + ' ' + o.hoTen);
-    return true;
+    const t7 = Date.now();
+    // __t: thời gian (ms) từng bước, chỉ để chẩn đoán tốc độ – App.html tự in ra Console (F12) nếu có.
+    return { ok: true, __t: {
+      xacThucVaChuan: t1 - t0, chiLock: t2 - t1, docDanhSachNV: t3 - t2, kiemTraKhoa: t4 - t3,
+      luuTheoKy: t5 - t4, luuHoSoGoc: t6 - t5, ghiNhatKy: t7 - t6, tong: t7 - t0
+    } };
   });
 }
 function saveOne_(t, ex, o, isNew, user) {
