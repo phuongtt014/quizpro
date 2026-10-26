@@ -512,10 +512,36 @@ function buildRow_(t, header, o, existing) {
   });
   return row;
 }
+/** 'A', 'B', …, 'Z', 'AA', … cho số thứ tự cột (1-based) */
+function colLetter_(col) {
+  let s = '';
+  while (col > 0) {
+    const m = (col - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    col = Math.floor((col - 1) / 26);
+  }
+  return s;
+}
+/**
+ * Đặt định dạng số liệu cho các cột của bảng t, dòng start..start+n-1. Chỉ có 4 định dạng khác nhau
+ * (xem fmtOf_) nên nhóm các cột theo đúng định dạng rồi đặt 1 lần bằng getRangeList thay vì gọi
+ * getRange().setNumberFormat() riêng cho TỪNG cột – mỗi lệnh gọi Spreadsheet đều tốn thời gian round-trip,
+ * bảng nhiều cột (như Nhân viên/Dữ liệu kỳ) trước đây tốn hàng chục lệnh gọi chỉ để lưu 1 dòng.
+ */
 function formatRange_(t, sh, header, start, n) {
+  const groups = {};
   t.cols.forEach(function (c) {
     const i = header.indexOf(c[1]);
-    if (i >= 0) sh.getRange(start, i + 1, n, 1).setNumberFormat(fmtOf_(c[2]));
+    if (i < 0) return;
+    const fmt = fmtOf_(c[2]);
+    (groups[fmt] = groups[fmt] || []).push(i + 1);
+  });
+  Object.keys(groups).forEach(function (fmt) {
+    const a1s = groups[fmt].map(function (col) {
+      const L = colLetter_(col);
+      return L + start + ':' + L + (start + n - 1);
+    });
+    sh.getRangeList(a1s).setNumberFormat(fmt);
   });
 }
 function ensureRows_(sh, need) {
