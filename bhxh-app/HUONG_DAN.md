@@ -236,6 +236,10 @@ Sau khi Lưu/Xóa/Nhập file ở Nhân viên, Lưu/Xóa ở Truy thu, hay Tạo
 
 **Sửa tiếp lỗi làm chậm riêng ở tab Nhân viên:** mỗi lần mở/làm mới danh sách Nhân viên (kể cả ngay sau khi Lưu), ứng dụng cần kiểm tra từng nhân viên đã nghỉ việc xem có đang được mở khóa hay không (mục 9d) – trước đây việc này đọc lại toàn bộ tab "Yêu cầu mở khóa NV" **riêng cho từng nhân viên đã khóa một**, nên công ty có nhiều nhân viên đã nghỉ việc càng lâu càng chậm (có bao nhiêu NV đã khóa thì đọc lại tab đó bấy nhiêu lần). Nay chỉ đọc tab này **đúng 1 lần** cho cả danh sách rồi tra cứu trong bộ nhớ, bất kể danh sách có bao nhiêu nhân viên đã nghỉ việc.
 
+**Chỉ đọc đúng 1 kỳ cần xem, không đọc lại toàn bộ lịch sử:** tab "Dữ liệu kỳ" cộng dồn dữ liệu của **tất cả các kỳ** từ trước tới nay trên cùng 1 sheet. Trước đây mỗi lần mở tab Nhân viên theo 1 kỳ, hoặc Lưu hồ sơ NV ở 1 kỳ, ứng dụng đọc **toàn bộ** sheet này (gồm cả dữ liệu những kỳ khác không liên quan) rồi mới lọc ra đúng kỳ cần – công ty dùng app càng lâu (càng nhiều kỳ cộng dồn) thì việc mở/Lưu ở tab Nhân viên càng chậm dần, dù chỉ đang xem/sửa 1 kỳ. Nay ứng dụng đọc trước cột "Kỳ" (nhẹ) để xác định đúng các dòng cần, rồi chỉ đọc đầy đủ đúng các dòng của kỳ đang xem – không phụ thuộc số kỳ đã tích lũy trước đó, và vẫn đúng dữ liệu kể cả khi có sửa tay làm xáo trộn thứ tự các dòng trên Sheet.
+
+**Ghi chú cho người kiểm tra (F12 → tab Console của trình duyệt):** mỗi lệnh gọi lên Google đều được in ra thời gian chạy thực tế, ví dụ `[BHXH] apiSaveNV: 1850 ms`, để biết chính xác đang chậm ở đâu nếu vẫn thấy lâu.
+
 ## 10. Lưu ý
 
 - **Sửa tay trên Google Sheet:** Nhân viên, Kỳ BHXH, Truy thu, và mọi tính toán/báo cáo luôn đọc dữ liệu **mới nhất** từ Sheet mỗi lần bạn mở màn hình đó hoặc bấm Tính — sửa tay xong là có tác dụng ngay. Riêng 5 danh mục **Khoản trích đóng, Mã phân loại, Tỉ lệ Công đoàn, Phòng ban, Thông tin chung** chỉ được tải **một lần lúc mở trang** để dùng cho dropdown; sửa tay trên Sheet sẽ không hiện ngay trên các màn hình đó. Bấm nút **"🔄 Làm mới dữ liệu"** ở góc trên (hoặc tải lại trang F5) để nạp lại.

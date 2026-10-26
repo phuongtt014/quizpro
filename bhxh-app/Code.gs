@@ -504,6 +504,49 @@ function load_(t) {
   });
   return { sh: sh, header: header, rows: rows };
 }
+/**
+ * Đọc dữ liệu kỳ (T.DLKY) CHỈ của 1 kỳ cụ thể, không đọc toàn bộ lịch sử các kỳ khác – dùng cho 2 đường
+ * dẫn "nóng" nhất (mở tab Nhân viên theo kỳ, Lưu hồ sơ NV theo kỳ) để tránh phải tải lại toàn bộ dữ liệu
+ * nhiều tháng/năm cộng dồn mỗi lần chỉ cần xem/sửa 1 kỳ – công ty dùng lâu, dữ liệu T.DLKY cộng dồn
+ * nhiều kỳ thì load_(T.DLKY) đọc toàn bộ sẽ ngày càng chậm dù chỉ cần đúng 1 kỳ.
+ * Cách làm: đọc riêng cột "Kỳ" trước (nhẹ, 1 cột), xác định đúng các dòng thuộc kỳ cần (không giả định
+ * các dòng của 1 kỳ luôn liền nhau trên Sheet – đúng cả khi dữ liệu bị xáo trộn do sửa tay), rồi chỉ đọc
+ * đầy đủ các dòng đó, ghép các dòng liền kề thành từng đoạn để giảm số lượt gọi getRange.
+ */
+function loadDLKYForKy_(ky) {
+  const t = T.DLKY;
+  const sh = getSheet_(t);
+  const header = headerOf_(sh);
+  const lr = sh.getLastRow();
+  if (lr < 2 || !header.length) return [];
+  const kyColIdx = header.indexOf('Kỳ');
+  const n = lr - 1;
+  if (kyColIdx < 0) return load_(t).rows.filter(function (r) { return r.ky === ky; }); // phòng hờ thiếu cột Kỳ
+  const kyVals = sh.getRange(2, kyColIdx + 1, n, 1).getValues();
+  const matchIdx = [];
+  kyVals.forEach(function (v, i) { if (normMonth_(v[0]) === ky) matchIdx.push(i); });
+  if (!matchIdx.length) return [];
+  const runs = [];
+  let runStart = matchIdx[0], runLen = 1;
+  for (let i = 1; i < matchIdx.length; i++) {
+    if (matchIdx[i] === matchIdx[i - 1] + 1) { runLen++; } else { runs.push([runStart, runLen]); runStart = matchIdx[i]; runLen = 1; }
+  }
+  runs.push([runStart, runLen]);
+  const idx = {};
+  t.cols.forEach(function (c) { idx[c[0]] = header.indexOf(c[1]); });
+  const rows = [];
+  runs.forEach(function (run) {
+    const startRow = 2 + run[0], len = run[1];
+    const values = sh.getRange(startRow, 1, len, header.length).getValues();
+    values.forEach(function (v, i) {
+      if (v.every(function (x) { return x === '' || x === null; })) return;
+      const o = { _row: startRow + i };
+      t.cols.forEach(function (c) { o[c[0]] = idx[c[0]] >= 0 ? fromCell_(c[2], v[idx[c[0]]]) : ((c[2] === 'num' || c[2] === 'pct') ? 0 : ''); });
+      rows.push(o);
+    });
+  });
+  return rows;
+}
 function buildRow_(t, header, o, existing) {
   const row = existing ? existing.slice() : header.map(function () { return ''; });
   t.cols.forEach(function (c) {
@@ -1086,7 +1129,7 @@ function apiNhanVien(ky) {
   if (ky) {
     const k = getKy_(ky);
     trangThai = k.trangThai;
-    rows = load_(T.DLKY).rows.filter(function (r) { return r.ky === ky; });
+    rows = loadDLKYForKy_(ky);
     editable = k.trangThai !== KY_CHOT;
   } else {
     rows = load_(T.NV).rows;
@@ -1172,8 +1215,7 @@ function apiSaveNV(ky, o, isNew) {
     }
     if (ky) {
       requireOpen_(ky);
-      const dl = load_(T.DLKY);
-      const ex = dl.rows.find(function (r) { return r.ky === ky && r.maNV === o.maNV; });
+      const ex = loadDLKYForKy_(ky).find(function (r) { return r.maNV === o.maNV; });
       saveOne_(T.DLKY, ex, Object.assign({ ky: ky }, o), isNew, user);
     }
     // Cập nhật hồ sơ gốc nếu sửa ở kỳ mới nhất hoặc sửa trực tiếp hồ sơ gốc
