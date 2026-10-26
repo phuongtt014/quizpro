@@ -234,6 +234,8 @@ Sau khi Lưu/Xóa/Nhập file ở Nhân viên, Lưu/Xóa ở Truy thu, hay Tạo
 
 **Lưu một dòng (ví dụ sửa hồ sơ nhân viên) cũng nhanh hơn:** mỗi lần ghi 1 dòng xuống Google Sheet, trước đây ứng dụng đặt lại định dạng số liệu riêng cho **từng cột một** (hồ sơ nhân viên có hơn 20 cột → hơn 20 lệnh gọi liên tiếp lên Google chỉ để định dạng, trước khi ghi giá trị), nay được gộp lại thành vài lệnh gọi theo từng nhóm định dạng giống nhau (chữ/tháng, ngày, số tiền…) – giảm mạnh số lượt gọi lên Google cho mọi thao tác Lưu ở tất cả các tab (Nhân viên, Truy thu, Thiết lập…), không chỉ riêng tab Nhân viên.
 
+**Sửa tiếp lỗi làm chậm riêng ở tab Nhân viên:** mỗi lần mở/làm mới danh sách Nhân viên (kể cả ngay sau khi Lưu), ứng dụng cần kiểm tra từng nhân viên đã nghỉ việc xem có đang được mở khóa hay không (mục 9d) – trước đây việc này đọc lại toàn bộ tab "Yêu cầu mở khóa NV" **riêng cho từng nhân viên đã khóa một**, nên công ty có nhiều nhân viên đã nghỉ việc càng lâu càng chậm (có bao nhiêu NV đã khóa thì đọc lại tab đó bấy nhiêu lần). Nay chỉ đọc tab này **đúng 1 lần** cho cả danh sách rồi tra cứu trong bộ nhớ, bất kể danh sách có bao nhiêu nhân viên đã nghỉ việc.
+
 ## 10. Lưu ý
 
 - **Sửa tay trên Google Sheet:** Nhân viên, Kỳ BHXH, Truy thu, và mọi tính toán/báo cáo luôn đọc dữ liệu **mới nhất** từ Sheet mỗi lần bạn mở màn hình đó hoặc bấm Tính — sửa tay xong là có tác dụng ngay. Riêng 5 danh mục **Khoản trích đóng, Mã phân loại, Tỉ lệ Công đoàn, Phòng ban, Thông tin chung** chỉ được tải **một lần lúc mở trang** để dùng cho dropdown; sửa tay trên Sheet sẽ không hiện ngay trên các màn hình đó. Bấm nút **"🔄 Làm mới dữ liệu"** ở góc trên (hoặc tải lại trang F5) để nạp lại.

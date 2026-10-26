@@ -1051,6 +1051,24 @@ function nvDangMoKhoa_(maNV) {
   const rows = ycmlRowsCuaNV_(maNV);
   return !!(rows.length && rows[0].trangThai === YCML_DUYET);
 }
+/**
+ * {maNV -> yêu cầu mở khóa gần nhất} cho TOÀN BỘ NV, đọc tab "Yêu cầu mở khóa NV" đúng 1 lần – dùng khi
+ * cần biết trạng thái mở khóa của nhiều NV cùng lúc (vd. liệt kê cả danh sách ở apiNhanVien), để tránh
+ * gọi ycmlRowsCuaNV_/nvDangMoKhoa_ lặp lại cho từng NV (mỗi lần gọi là 1 lần đọc lại cả Sheet từ đầu).
+ */
+function ycmlLatestMap_() {
+  const groups = {};
+  load_(T.YCML).rows.forEach(function (r) {
+    if (!r.maNV) return;
+    (groups[r.maNV] = groups[r.maNV] || []).push(r);
+  });
+  const m = {};
+  Object.keys(groups).forEach(function (maNV) {
+    groups[maNV].sort(function (a, b) { return a.thoiGianYC < b.thoiGianYC ? 1 : -1; });
+    m[maNV] = groups[maNV][0];
+  });
+  return m;
+}
 function nvCoTheSua_(nv, ky, user) {
   if (user.role !== ROLE.NHAP) return true;
   if (!nvDaKhoa_(nv, ky)) return true;
@@ -1075,10 +1093,11 @@ function apiNhanVien(ky) {
     editable = true;
   }
   editable = editable && user.role !== ROLE.XEM;
+  const ycmlMap = ycmlLatestMap_(); // đọc tab Yêu cầu mở khóa NV đúng 1 lần cho cả danh sách, không lặp lại theo từng NV
   rows = rows.filter(function (r) { return canSee_(user, r); }).map(function (r) {
     r.luongDong = luongDong_(r);
     r.khoa = nvDaKhoa_(r, ky);
-    r.moKhoa = r.khoa && nvDangMoKhoa_(r.maNV);
+    r.moKhoa = r.khoa && !!(ycmlMap[r.maNV] && ycmlMap[r.maNV].trangThai === YCML_DUYET);
     return r;
   });
   return { ky: ky, trangThai: trangThai, editable: editable, rows: rows };
@@ -1143,8 +1162,12 @@ function apiSaveNV(ky, o, isNew) {
   return withLock_(function () {
     const kys = listKy_();
     const latest = kys.length ? kys[0].ky : '';
+    // Đọc tab Danh sách nhân viên đúng 1 lần (nếu cần) và dùng lại, thay vì load_(T.NV) 2 lần riêng biệt
+    // cho việc kiểm tra khóa và việc tìm dòng để cập nhật hồ sơ gốc.
+    const needNV = !isNew || !ky || ky >= latest;
+    const nvRows = needNV ? load_(T.NV).rows : null;
     if (!isNew) {
-      const hoSo = load_(T.NV).rows.find(function (r) { return r.maNV === o.maNV; });
+      const hoSo = nvRows.find(function (r) { return r.maNV === o.maNV; });
       if (hoSo && !nvCoTheSua_(hoSo, ky, user)) throw new Error(nvKhoaMsg_(hoSo));
     }
     if (ky) {
@@ -1155,7 +1178,7 @@ function apiSaveNV(ky, o, isNew) {
     }
     // Cập nhật hồ sơ gốc nếu sửa ở kỳ mới nhất hoặc sửa trực tiếp hồ sơ gốc
     if (!ky || ky >= latest) {
-      const ex2 = load_(T.NV).rows.find(function (r) { return r.maNV === o.maNV; });
+      const ex2 = nvRows.find(function (r) { return r.maNV === o.maNV; });
       if (!ky) saveOne_(T.NV, ex2, o, isNew, user);
       else if (ex2) update_(T.NV, ex2._row, o);
       else append_(T.NV, [o]);
