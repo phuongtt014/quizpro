@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --bg:#f6f7f9; --card:#fff; --text:#1c2430; --muted:#5b6675; --line:#dde2e8; --brand:#8a1538; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#14181d; --card:#1d232b; --text:#e8ebef; --muted:#9aa5b3; --line:#2b333d; --brand:#e0587c; } }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; display:grid; place-items:center; min-height:100vh; padding:16px; box-sizing:border-box; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:28px; max-width:460px; }
+    h1 { font-size:20px; margin:0 0 8px; color:var(--brand); }
+    p { color:var(--muted); line-height:1.5; margin:6px 0; }
+    code { background:var(--bg); padding:2px 6px; border-radius:4px; color:var(--text); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Chưa được cấp quyền</h1>
+    <p>Tài khoản <code><?= email || '(không xác định)' ?></code> chưa được khai báo trong hệ thống hoặc đang bị khóa.</p>
+    <p>Vui lòng liên hệ quản trị viên (Phòng Nhân sự) để được cấp quyền. Nếu bạn đang đăng nhập nhiều tài khoản Google, hãy dùng tài khoản <code>@vaschools.edu.vn</code>.</p>
+  </div>
+</body>
+</html>

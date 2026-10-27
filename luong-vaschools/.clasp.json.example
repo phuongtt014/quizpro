@@ -1,0 +1,9 @@
+{
+  "scriptId": "DÁN_SCRIPT_ID_VÀO_ĐÂY",
+  "rootDir": "src",
+  "filePushOrder": [
+    "src/Util.gs", "src/Csv.gs", "src/Strict.gs", "src/Schema.gs", "src/Db.gs", "src/Validate.gs",
+    "src/Auth.gs", "src/Audit.gs", "src/Notify.gs", "src/Policy.gs", "src/Staff.gs", "src/Seed.gs",
+    "src/Setup.gs", "src/Api.gs"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "luong-vaschools",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Web app Google Apps Script số hóa Đề án lương khối Phổ thông (VASchools)",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  }
+}
