@@ -230,7 +230,10 @@ test('Đề án: nhân bản, sửa bản nháp, ban hành tự đóng bản cũ
   assert.deepStrictEqual(d, ['DA01-2026:Ban hành:2026-03-01>2027-08-31', 'DA02-2027:Ban hành:2027-09-01>']);
   assert.strictEqual(j(e.run('Policy.effective("2027-08-31").ma')), 'DA01-2026');
   assert.strictEqual(j(e.run('Policy.effective("2027-09-01").ma')), 'DA02-2027');
-  assert.strictEqual(e.api('save', { table: 'DEAN_THAMSO', ctx: { de_an_ma: 'DA02-2027' }, row: { chi_nhanh_ma: 'HN', lcb: '1', ltb: '1' } }).code, 'LOCKED');
+  const thamsoId = j(e.run('Db.find("DEAN_THAMSO",function(x){return x.de_an_ma==="DA02-2027"&&x.chi_nhanh_ma==="HN";}).id'));
+  assert.strictEqual(e.api('save', { table: 'DEAN_THAMSO', ctx: { de_an_ma: 'DA02-2027' }, id: thamsoId, row: { chi_nhanh_ma: 'HN', lcb: '1', ltb: '1' } }).code, 'LOCKED');
+  assert.strictEqual(e.api('remove', { table: 'DEAN_THAMSO', ctx: { de_an_ma: 'DA02-2027' }, id: thamsoId }).code, 'LOCKED');
+  assert.strictEqual(e.api('save', { table: 'DEAN_NGACH', ctx: { de_an_ma: 'DA02-2027' }, row: { ngach_ma: 'GV1', hs_chuc_danh: '9' } }).code, 'LOCKED');
   assert.strictEqual(e.api('remove', { table: 'DEAN', id: j(e.run('Db.all("DEAN")[1].id')) }).code, 'LOCKED');
   // thông báo trong ứng dụng + email
   assert.ok(e.api('notify.list').data.items.some(n => /ban hành/.test(n.title)));

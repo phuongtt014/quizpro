@@ -28,6 +28,14 @@ Bạn chỉ cần **4 tệp** trong thư mục `dist/`: `Code.gs`, `Index.html`,
 3. **Triển khai** → sao chép **URL ứng dụng web** → mở bằng trình duyệt.
 4. Vào **Thiết lập → Cấu hình chung → `app_url`** → dán URL đó vào (để email thông báo có liên kết).
 
+## Nâng cấp lên bản có Khai báo / Quyết toán / Phiếu duyệt (dành cho hệ thống đã cài)
+1. Dán lại **cả 4 tệp** trong `dist/` (`Code.gs`, `Index.html`, `Denied.html`, `appsscript.json`) đè lên bản cũ, bấm 💾.
+2. Chọn hàm **`setupEnsureSheets`** → **Chạy**. Hàm tự thêm các sheet/cột mới, thêm vai trò *Giáo vụ / Người đề xuất*, thêm các quyền mới
+   cho vai trò mặc định và nạp quy trình duyệt mặc định. **Không xóa và không ghi đè dữ liệu hay quyền bạn đã chỉnh.** Chạy lại nhiều lần vẫn an toàn.
+3. **Triển khai → Quản lý triển khai → ✏ → Phiên bản mới → Triển khai** (URL không đổi).
+4. Gán vai trò: người nhập khai báo → **Giáo vụ / Người đề xuất** (phạm vi *Trường*), Hiệu trưởng → **Hiệu trưởng** (phạm vi *Trường*),
+   Nhân sự → **Giám đốc Nhân sự**, Tổng giám đốc → **Tổng Giám đốc** (*Toàn hệ thống*). Xem/sửa chuỗi duyệt ở **Hệ thống → Quy trình duyệt**.
+
 ## Khi có bản cập nhật mã
 Dán lại `Code.gs` / `Index.html` mới → **Triển khai → Quản lý triển khai → ✏ Sửa → Phiên bản mới → Triển khai** (URL không đổi). Nếu bản mới có thêm bảng/cột, chạy thêm hàm **`setupEnsureSheets`** (không mất dữ liệu).
 

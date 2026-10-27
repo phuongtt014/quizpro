@@ -3,7 +3,7 @@
 Số hóa Đề án lương khối Phổ thông (HP.ĐA.01, hiệu lực 01/03/2026) để dùng nhiều năm:
 lịch sử ngạch bậc, phiên bản đề án, phân quyền theo phạm vi, nhập dữ liệu nghiêm ngặt.
 
-**Trạng thái:** GĐ1 (nền tảng) + GĐ2 (nhân sự) hoàn tất. GĐ3 (quy trình duyệt nhiều bậc), GĐ4 (tính phụ trội/thu nhập mới), GĐ5 (hè, mô phỏng, báo cáo) làm tiếp.
+**Trạng thái:** GĐ1 (nền tảng), GĐ2 (nhân sự), GĐ3 (quy trình duyệt nhiều bậc), GĐ4 (khai báo, quyết toán phụ trội, thu nhập mới) hoàn tất. GĐ5 (chế độ hè, mô phỏng, báo cáo/xuất Excel) làm tiếp.
 
 ## Cài đặt
 
@@ -34,6 +34,24 @@ Thêm quản trị khác: sửa email trong `setupAddAdmin` rồi chạy.
 - **Thông báo:** trong ứng dụng (🔔) và email (bật/tắt bằng cấu hình `email_bat`). Lỗi gửi email được ghi nhật ký, không chặn thao tác.
 - **Nhật ký:** mọi thay đổi được ghi (người, thời điểm, trước/sau).
 
+## Quy trình duyệt, khai báo, quyết toán
+
+- **Quy trình cấu hình bằng dữ liệu** (*Hệ thống → Quy trình duyệt*): mỗi loại phiếu (Khai báo, Đề xuất ngạch, Quyết toán kỳ, Khác) có các bước
+  *Đề xuất/Xét duyệt/Phê duyệt*, mỗi bước gắn một vai trò và phạm vi (cùng trường / cùng chi nhánh / toàn hệ thống).
+  Dòng có **Trường để trống = quy trình mặc định**; thêm dòng có mã trường để **ghi đè riêng cho trường đó**.
+  Mặc định cài sẵn: Hiệu trưởng (cùng trường) → Nhân sự (toàn hệ thống) → Tổng Giám đốc.
+  Phiếu đã gửi giữ nguyên quy trình lúc gửi dù cấu hình đổi sau đó. Bước phải đánh số liên tục 1, 2, 3…
+- **Quy tắc:** không tự duyệt phiếu của mình; không nhảy bậc; *Trả lại* và *Duyệt thay* (quản trị) bắt buộc ghi lý do; hỗ trợ **ủy quyền** có thời hạn
+  (*Hệ thống → Ủy quyền*). Thông báo trong ứng dụng và email cho người tới lượt duyệt, người tạo phiếu khi được duyệt/trả lại.
+- **Khai báo:** nhập số tiết thực dạy/trách nhiệm/định mức theo kỳ → *Gửi duyệt* → khi duyệt xong dòng thành "Đã duyệt". Chỉ dòng đã duyệt mới được tính.
+- **Quyết toán:** *Tính toán* (tạm tính, tính lại được) → *Gửi duyệt chốt* → khi duyệt xong thành "Đã chốt", không bị ghi đè.
+  Mỗi kết quả lưu kèm mã phiên bản đề án đã dùng. Công thức đúng PRD/đề án (quy đổi tiết, ưu tiên lấp giỏ trách nhiệm, KPI tiết dạy, thâm niên,
+  vượt khung, hỗ trợ hạng trường, kiêm nhiệm, trần theo thâm niên, bảo vệ lương).
+- **Quy ước tính toán:** dùng đề án hiệu lực **vào ngày cuối kỳ**; ngạch, kiêm nhiệm, thâm niên tại ngày cuối kỳ; thu nhập hiện tại tại ngày đầu kỳ.
+  Định mức tự động (24/20 tiết/tuần × số tuần) chỉ áp dụng cho "GV Tiểu học nhiều môn" / "GV còn lại" khi không có dòng Định mức khai báo.
+  Chi nhánh mở sau khi đề án ban hành: được **thêm mới** LCB/LTB vào đề án đã ban hành (không sửa/xóa).
+- **Chưa có trong GĐ4:** hỗ trợ đặc thù do Giám đốc chi nhánh quyết định; tiết quy đổi theo "buổi" (QD09) phải tự quy ra Tiết/Tuần khi khai báo.
+
 ## Cấu trúc mã
 
 | Tệp | Vai trò |
@@ -43,13 +61,15 @@ Thêm quản trị khác: sửa email trong `setupAddAdmin` rồi chạy.
 | `Strict.gs`, `Csv.gs`, `Validate.gs` | Đọc CSV và kiểm tra nghiêm ngặt |
 | `Auth.gs`, `Audit.gs`, `Notify.gs` | Xác thực/phân quyền, nhật ký, thông báo |
 | `Policy.gs`, `Staff.gs` | Đề án có phiên bản; thâm niên (số năm tròn), ngạch hiện tại |
+| `Engine.gs`, `Calc.gs` | Công thức tính (thuần, có kiểm thử) và điều phối tính cho một kỳ |
+| `Workflow.gs` | Phiếu, quy trình duyệt nhiều bậc, ủy quyền |
 | `Seed.gs`, `Setup.gs` | Dữ liệu đề án 2026 và cài đặt |
 | `Api.gs` + `Index/App/Style.html` | Web app |
 
 ## Kiểm thử
 
 ```bash
-npm test                      # 20 kiểm thử logic trên bản giả lập Apps Script
+npm test                      # 33 kiểm thử logic trên bản giả lập Apps Script
 node tests/ui-smoke.js ./ảnh  # chạy giao diện thật trên Chromium (cần playwright)
 ```
 

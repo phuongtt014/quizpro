@@ -60,17 +60,46 @@ var Seed = (function () {
     ['HDHT_CHAIR', 'Chủ tịch HĐHT khối Phổ thông', 'Soạn thảo đề án, xem nhân sự và thu nhập'],
     ['HR_STAFF', 'Chuyên viên Nhân sự', 'Nhập và cập nhật hồ sơ nhân sự'],
     ['PRINCIPAL', 'Hiệu trưởng', 'Xem/sửa nhân sự thuộc trường mình (gán phạm vi Trường)'],
-    ['EMPLOYEE', 'Nhân sự', 'Chỉ xem hồ sơ và thu nhập của chính mình (gán phạm vi Cá nhân)']
+    ['EMPLOYEE', 'Nhân sự', 'Chỉ xem hồ sơ và thu nhập của chính mình (gán phạm vi Cá nhân)'],
+    ['PROPOSER', 'Giáo vụ / Người đề xuất', 'Nhập khai báo, tạo và gửi phiếu đề xuất cho trường mình (gán phạm vi Trường)']
   ];
 
+  /** Các quyền đã tồn tại ở bản đầu tiên: dùng để biết quyền nào là "mới" khi nâng cấp hệ thống đã cài. */
+  var ORIGINAL_PERMS = ['setup.view', 'setup.edit', 'policy.view', 'policy.edit', 'policy.publish', 'staff.view', 'staff.edit',
+    'staff.import', 'salary.view', 'salary.edit', 'user.manage', 'role.manage', 'audit.view'];
+
   var ROLE_PERMS = {
-    HR_DIRECTOR: ['setup.view', 'setup.edit', 'policy.view', 'policy.edit', 'staff.view', 'staff.edit', 'staff.import', 'salary.view', 'salary.edit', 'audit.view'],
-    CEO: ['setup.view', 'policy.view', 'policy.publish', 'staff.view', 'salary.view', 'audit.view'],
-    HDHT_CHAIR: ['setup.view', 'policy.view', 'policy.edit', 'staff.view', 'salary.view'],
-    HR_STAFF: ['setup.view', 'policy.view', 'staff.view', 'staff.edit', 'staff.import'],
-    PRINCIPAL: ['setup.view', 'policy.view', 'staff.view', 'staff.edit', 'salary.view'],
-    EMPLOYEE: ['staff.view', 'salary.view']
+    HR_DIRECTOR: ['setup.view', 'setup.edit', 'policy.view', 'policy.edit', 'staff.view', 'staff.edit', 'staff.import', 'salary.view', 'salary.edit', 'audit.view',
+      'declare.view', 'declare.edit', 'phieu.create', 'phieu.view', 'workflow.manage', 'calc.run', 'calc.view'],
+    CEO: ['setup.view', 'policy.view', 'policy.publish', 'staff.view', 'salary.view', 'audit.view', 'declare.view', 'phieu.view', 'calc.view'],
+    HDHT_CHAIR: ['setup.view', 'policy.view', 'policy.edit', 'staff.view', 'salary.view', 'declare.view', 'phieu.view', 'calc.view'],
+    HR_STAFF: ['setup.view', 'policy.view', 'staff.view', 'staff.edit', 'staff.import', 'declare.view', 'declare.edit', 'phieu.create', 'phieu.view', 'calc.run', 'calc.view'],
+    PRINCIPAL: ['setup.view', 'policy.view', 'staff.view', 'staff.edit', 'salary.view', 'declare.view', 'declare.edit', 'phieu.create', 'phieu.view', 'calc.view'],
+    PROPOSER: ['setup.view', 'policy.view', 'staff.view', 'declare.view', 'declare.edit', 'phieu.create', 'phieu.view', 'calc.view'],
+    EMPLOYEE: ['staff.view', 'salary.view', 'declare.view', 'calc.view']
   };
+
+  var VUOT_KHUNG = { GV3: 1, PHT: 1, HT: 1 };
+  var HANG_TRUONG = { HT: 'Hiệu trưởng', PHT: 'Phó hiệu trưởng' };
+
+  /** Quy trình mặc định (câu mẫu: Giáo vụ đề xuất -> Hiệu trưởng -> Nhân sự -> Tổng giám đốc). Sửa được trong Hệ thống → Quy trình duyệt. */
+  function defaultSteps() {
+    var rows = [];
+    LOAI_PHIEU.forEach(function (l) {
+      [[1, 'Hiệu trưởng xét duyệt', 'Xét duyệt', 'PRINCIPAL', 'Cùng trường'],
+        [2, 'Nhân sự xét duyệt', 'Xét duyệt', 'HR_DIRECTOR', 'Toàn hệ thống'],
+        [3, 'Tổng Giám đốc phê duyệt', 'Phê duyệt', 'CEO', 'Toàn hệ thống']].forEach(function (x) {
+        rows.push({ loai_phieu: l, truong_ma: '', thu_tu: x[0], ten_buoc: x[1], hanh_dong: x[2], vai_tro: x[3], pham_vi: x[4], han_ngay: '' });
+      });
+    });
+    return rows;
+  }
+
+  function setSetting(k, v) {
+    var cur = Db.find('SETTINGS', function (x) { return x.khoa === k; });
+    if (cur) Db.updateMany('SETTINGS', [{ id: cur.id, patch: { gia_tri: v } }], 'system');
+    else Db.insertMany('SETTINGS', [{ khoa: k, gia_tri: v }], 'system');
+  }
 
   function seedTable(table, rows, actor) {
     if (Db.all(table).length) return 0;
@@ -101,7 +130,8 @@ var Seed = (function () {
           var d = function (o) { o.de_an_ma = DE_AN; return o; };
           Db.insertMany('DEAN_THAMSO', [d({ chi_nhanh_ma: 'HCM', lcb: 6000000, ltb: 100000 })], 'system');
           Db.insertMany('DEAN_NGACH', NGACH.map(function (g) {
-            return d({ ngach_ma: g[0], hs_chuc_danh: g[3], hs_kpi: g[4], hs_tiet: g[5], nhom_tham_nien: g[6] });
+            return d({ ngach_ma: g[0], hs_chuc_danh: g[3], hs_kpi: g[4], hs_tiet: g[5], nhom_tham_nien: g[6],
+              vuot_khung: VUOT_KHUNG[g[0]] ? 'Có' : 'Không', ho_tro_hang_truong: HANG_TRUONG[g[0]] || '' });
           }), 'system');
           Db.insertMany('DEAN_HANGTRUONG', [
             d({ hang: 3, hs_hieu_truong: 0, hs_pho_hieu_truong: 0 }),
@@ -130,7 +160,51 @@ var Seed = (function () {
           }
           n.admin = mail;
         }
+        if (!Db.find('SETTINGS', function (x) { return x.khoa === 'perms_da_nap'; })) setSetting('perms_da_nap', PERMS.map(function (x) { return x.k; }).join(','));
         Audit.log(null, 'KHOI_TAO', '', '', n);
+      });
+      n.nang_cap = Seed.upgrade();
+      return n;
+    },
+
+    /**
+     * Nâng cấp hệ thống đã cài khi mã nguồn có thêm quyền/vai trò/quy trình mặc định. Không xóa, không ghi đè
+     * tùy chỉnh của bạn: chỉ thêm quyền MỚI cho vai trò mặc định, thêm vai trò mặc định còn thiếu, nạp quy trình
+     * mặc định nếu bảng đang trống, và đặt cờ vượt khung/hạng trường cho đề án 2026.
+     */
+    upgrade: function () {
+      var n = {};
+      Db.tx(function () {
+        var roleHave = {};
+        Db.all('ROLES').forEach(function (r) { roleHave[r.ma] = true; });
+        var newRoles = ROLES.filter(function (r) { return !roleHave[r[0]]; });
+        if (newRoles.length) Db.insertMany('ROLES', newRoles.map(function (r) { return { ma: r[0], ten: r[1], mo_ta: r[2], he_thong: 'Có' }; }), 'system');
+        n.vaiTroMoi = newRoles.map(function (r) { return r[0]; });
+
+        var st = Db.find('SETTINGS', function (x) { return x.khoa === 'perms_da_nap'; });
+        var known = st && st.gia_tri ? st.gia_tri.split(',') : ORIGINAL_PERMS;
+        var have = {};
+        Db.all('ROLE_PERMS').forEach(function (rp) { have[rp.role_ma + '|' + rp.quyen] = true; });
+        var brandNew = {};
+        n.vaiTroMoi.forEach(function (r) { brandNew[r] = true; });
+        var add = [];
+        Object.keys(ROLE_PERMS).forEach(function (role) {
+          ROLE_PERMS[role].forEach(function (perm) {
+            if ((brandNew[role] || known.indexOf(perm) < 0) && !have[role + '|' + perm]) add.push({ role_ma: role, quyen: perm });
+          });
+        });
+        Db.insertMany('ROLE_PERMS', add, 'system');
+        n.quyenMoi = add.length;
+        setSetting('perms_da_nap', PERMS.map(function (x) { return x.k; }).join(','));
+
+        n.quyTrinh = Db.all('WORKFLOW_STEP').length ? 0 : seedTable('WORKFLOW_STEP', defaultSteps());
+
+        var ups = Db.filter('DEAN_NGACH', function (r) { return r.de_an_ma === DE_AN && r.vuot_khung === '' ; }).map(function (r) {
+          return { id: r.id, patch: { vuot_khung: VUOT_KHUNG[r.ngach_ma] ? 'Có' : 'Không', ho_tro_hang_truong: r.ho_tro_hang_truong || HANG_TRUONG[r.ngach_ma] || '' } };
+        });
+        Db.updateMany('DEAN_NGACH', ups, 'system');
+        n.capNhatNgach = ups.length;
+        if (add.length || n.quyTrinh || ups.length || newRoles.length) Audit.log(null, 'NANG_CAP', '', '', n);
       });
       return n;
     }

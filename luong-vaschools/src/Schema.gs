@@ -28,8 +28,17 @@ var PERMS = [
   { k: 'salary.edit', l: 'Sửa/nhập thu nhập nền' },
   { k: 'user.manage', l: 'Quản lý người dùng & gán vai trò' },
   { k: 'role.manage', l: 'Quản lý vai trò & quyền' },
-  { k: 'audit.view', l: 'Xem nhật ký hệ thống' }
+  { k: 'audit.view', l: 'Xem nhật ký hệ thống' },
+  { k: 'declare.view', l: 'Xem khai báo giảng dạy/trách nhiệm' },
+  { k: 'declare.edit', l: 'Nhập khai báo giảng dạy/trách nhiệm' },
+  { k: 'phieu.create', l: 'Tạo và gửi phiếu đề xuất/duyệt' },
+  { k: 'phieu.view', l: 'Xem mọi phiếu trong phạm vi' },
+  { k: 'workflow.manage', l: 'Cấu hình quy trình duyệt & ủy quyền' },
+  { k: 'calc.run', l: 'Chạy quyết toán phụ trội & thu nhập mới' },
+  { k: 'calc.view', l: 'Xem kết quả quyết toán & thu nhập mới' }
 ];
+
+var LOAI_PHIEU = ['Khai báo', 'Đề xuất ngạch', 'Quyết toán kỳ', 'Khác'];
 
 /** Tham số số học của đề án (khóa cố định, giá trị theo từng phiên bản đề án). */
 var PARAMS = [
@@ -144,14 +153,17 @@ var SCHEMA = (function () {
       col_('ten', 'Tên ngạch', 'text', { req: true }),
       col_('nhom', 'Nhóm', 'enum', { values: ['Giáo viên', 'Quản lý', 'Nhân viên', 'HĐHT', 'Khác'], req: true }),
       col_('trang_thai', 'Trạng thái', 'enum', { values: ['Hoạt động', 'Ngừng'], def: 'Hoạt động' })
-    ]
+    ],
+    // Hệ số lấy từ đề án đang hiệu lực (xem/sửa ở mục Đề án), chỉ để tra cứu tại đây.
+    computed: [{ k: 'hs_chuc_danh', l: 'HS chức danh' }, { k: 'hs_kpi', l: 'HS KPI' }, { k: 'hs_tiet', l: 'HS tiết' },
+      { k: 'nhom_tham_nien', l: 'Thâm niên' }, { k: 'vuot_khung', l: 'Vượt khung' }, { k: 'de_an_ap_dung', l: 'Theo đề án' }]
   };
 
   S.SETTINGS = {
     label: 'Cấu hình chung', group: 'setup', key: ['khoa'], lockKey: true,
     perm: { r: 'setup.view', w: 'setup.edit' },
     cols: [
-      col_('khoa', 'Khóa', 'enum', { values: ['email_bat', 'app_url', 'ten_he_thong'], req: true }),
+      col_('khoa', 'Khóa', 'enum', { values: ['email_bat', 'app_url', 'ten_he_thong', 'perms_da_nap'], req: true }),
       col_('gia_tri', 'Giá trị', 'text')
     ]
   };
@@ -192,7 +204,9 @@ var SCHEMA = (function () {
       col_('hs_chuc_danh', 'HS Chức danh', 'num', { min: 0 }),
       col_('hs_kpi', 'HS KPI', 'num', { min: 0 }),
       col_('hs_tiet', 'HS Tiết', 'num', { min: 0 }),
-      col_('nhom_tham_nien', 'Nhóm thâm niên', 'enum', { values: ['TN2', 'TN3', 'TN4'] })
+      col_('nhom_tham_nien', 'Nhóm thâm niên', 'enum', { values: ['TN2', 'TN3', 'TN4'] }),
+      col_('vuot_khung', 'Hỗ trợ vượt khung', 'enum', { values: YN, def: 'Không' }),
+      col_('ho_tro_hang_truong', 'Hỗ trợ hạng trường', 'enum', { values: ['Hiệu trưởng', 'Phó hiệu trưởng'] })
     ]
   };
 
@@ -365,6 +379,119 @@ var SCHEMA = (function () {
     perm: { r: 'audit.view', w: 'audit.view' },
     cols: [col_('email', 'Người nhận', 'text'), col_('tieu_de', 'Tiêu đề', 'text'), col_('noi_dung', 'Nội dung', 'longtext'),
       col_('link', 'Liên kết', 'text'), col_('loai', 'Loại', 'text'), col_('da_doc', 'Đã đọc', 'enum', { values: YN, def: 'Không' })]
+  };
+
+  /* ---------- KHAI BÁO, QUYẾT TOÁN, THU NHẬP MỚI ---------- */
+  S.KHAI_BAO = {
+    label: 'Khai báo giảng dạy & trách nhiệm', group: 'declare', scope: 'staff',
+    key: ['ky_ma', 'ma_nv', 'loai', 'noi_dung', 'tu_ngay'], perm: { r: 'declare.view', w: 'declare.edit', i: 'declare.edit' },
+    cols: [
+      col_('ky_ma', 'Kỳ', 'ref', { ref: 'KY_LUONG.ma', req: true }),
+      col_('ma_nv', 'Mã nhân sự', 'ref', { ref: 'NHAN_SU.ma_nv', req: true }),
+      col_('loai', 'Loại', 'enum', { values: ['Thực dạy', 'Trách nhiệm', 'Định mức'], req: true }),
+      col_('noi_dung', 'Nội dung (môn/lớp/chức trách)', 'text', { req: true }),
+      col_('so_luong', 'Số lượng', 'num', { req: true, min: 0 }),
+      col_('don_vi', 'Đơn vị', 'enum', { values: ['Tiết/Tuần', 'Tiết/Tháng', 'Tiết/Ngày'], req: true }),
+      col_('dac_thu', 'Môn đặc thù (1 tiết = 1,5)', 'enum', { values: YN, def: 'Không' }),
+      col_('tu_ngay', 'Từ ngày', 'date', { req: true }),
+      col_('den_ngay', 'Đến ngày', 'date', { req: true }),
+      col_('trang_thai', 'Trạng thái', 'enum', { values: ['Nháp', 'Chờ duyệt', 'Đã duyệt'], def: 'Nháp', ro: true }),
+      col_('phieu_ma', 'Phiếu', 'text', { ro: true })
+    ],
+    guard: function (r) { return r.trang_thai !== 'Nháp' ? 'Dòng khai báo đang ' + r.trang_thai.toLowerCase() + ' nên không sửa/xóa được. Nếu phiếu bị trả lại, dòng sẽ mở lại.' : null; },
+    check: function (r) {
+      if (r.den_ngay < r.tu_ngay) return 'Đến ngày phải ≥ Từ ngày';
+      if (r.dac_thu === 'Có' && r.loai !== 'Thực dạy') return 'Chỉ môn Thực dạy mới đánh dấu đặc thù';
+      var ky = Db.find('KY_LUONG', function (k) { return k.ma === r.ky_ma; });
+      if (ky && (r.tu_ngay < ky.tu_ngay || r.den_ngay > ky.den_ngay)) {
+        return 'Thời gian khai báo phải nằm trong kỳ ' + ky.ma + ' (' + Util.displayDate(ky.tu_ngay) + ' – ' + Util.displayDate(ky.den_ngay) + ')';
+      }
+      return null;
+    }
+  };
+
+  var resultCols = function () {
+    return [col_('ky_ma', 'Kỳ', 'ref', { ref: 'KY_LUONG.ma', req: true }), col_('ma_nv', 'Mã nhân sự', 'ref', { ref: 'NHAN_SU.ma_nv', req: true }),
+      col_('de_an_ma', 'Đề án', 'text')];
+  };
+  var tail = function () {
+    return [col_('ghi_chu', 'Ghi chú', 'text'),
+      col_('trang_thai', 'Trạng thái', 'enum', { values: ['Tạm tính', 'Chờ chốt', 'Đã chốt'], def: 'Tạm tính', ro: true }),
+      col_('phieu_ma', 'Phiếu', 'text', { ro: true })];
+  };
+
+  S.QUYET_TOAN = {
+    label: 'Quyết toán phụ trội', group: 'calc', scope: 'staff', readonly: true, key: ['ky_ma', 'ma_nv'],
+    perm: { r: 'calc.view', w: 'calc.run' },
+    cols: resultCols().concat([
+      col_('thuc_day', 'Thực dạy (tiết)', 'num'), col_('trach_nhiem', 'Trách nhiệm (tiết)', 'num'), col_('dinh_muc', 'Định mức (tiết)', 'num'),
+      col_('tong_pt', 'Tổng phụ trội', 'num'), col_('pt_trach_nhiem', 'PT trách nhiệm', 'num'), col_('pt_giang_day', 'PT giảng dạy', 'num'),
+      col_('hs_tiet', 'HS tiết', 'num'), col_('ltb', 'LTB', 'money'), col_('tien_pt', 'Tiền phụ trội', 'money')
+    ]).concat(tail())
+  };
+
+  S.THU_NHAP_MOI = {
+    label: 'Thu nhập mới', group: 'calc', scope: 'staff', readonly: true, key: ['ky_ma', 'ma_nv'],
+    perm: { r: 'calc.view', w: 'calc.run' },
+    cols: resultCols().concat([
+      col_('ngach_ma', 'Ngạch', 'text'), col_('tham_nien', 'Thâm niên (năm)', 'int'),
+      col_('hs_cd', 'HS chức danh', 'num'), col_('hs_tn', 'HS thâm niên', 'num'), col_('hs_vk', 'HS vượt khung', 'num'),
+      col_('hs_bgh', 'HS hạng trường', 'num'), col_('hs_kn', 'HS kiêm nhiệm', 'num'), col_('hs_kpi', 'HS KPI', 'num'),
+      col_('luong_chuc_danh', 'Lương chức danh', 'money'), col_('ho_tro', 'Các khoản hỗ trợ', 'money'),
+      col_('luong_kpi', 'Lương KPI', 'money'), col_('pa_moi', 'Phương án mới', 'money'),
+      col_('thu_nhap_hien_tai', 'Thu nhập hiện tại', 'money'), col_('ty_le_tran', 'Trần tăng', 'pct'),
+      col_('max_income', 'Mức tối đa', 'money'), col_('chinh_thuc', 'Mức chính thức', 'money')
+    ]).concat(tail())
+  };
+
+  /* ---------- QUY TRÌNH DUYỆT ---------- */
+  S.WORKFLOW_STEP = {
+    label: 'Quy trình duyệt', group: 'admin', key: ['loai_phieu', 'truong_ma', 'thu_tu'],
+    perm: { r: 'workflow.manage', w: 'workflow.manage' },
+    cols: [
+      col_('loai_phieu', 'Loại phiếu', 'enum', { values: LOAI_PHIEU, req: true }),
+      col_('truong_ma', 'Trường (trống = mặc định)', 'ref', { ref: 'TRUONG.ma' }),
+      col_('thu_tu', 'Bước số', 'int', { req: true, min: 1, max: 20 }),
+      col_('ten_buoc', 'Tên bước', 'text', { req: true }),
+      col_('hanh_dong', 'Hành động', 'enum', { values: ['Đề xuất', 'Xét duyệt', 'Phê duyệt'], req: true }),
+      col_('vai_tro', 'Vai trò xử lý', 'ref', { ref: 'ROLES.ma', req: true }),
+      col_('pham_vi', 'Phạm vi người duyệt', 'enum', { values: ['Cùng trường', 'Cùng chi nhánh', 'Toàn hệ thống'], def: 'Cùng trường' }),
+      col_('han_ngay', 'Hạn xử lý (ngày)', 'int', { min: 0 })
+    ]
+  };
+
+  S.UY_QUYEN = {
+    label: 'Ủy quyền duyệt', group: 'admin', key: ['tu_email', 'den_email', 'loai_phieu', 'hieu_luc_tu'],
+    perm: { r: 'workflow.manage', w: 'workflow.manage' },
+    cols: [
+      col_('tu_email', 'Người ủy quyền', 'ref', { ref: 'USERS.email', req: true }),
+      col_('den_email', 'Người được ủy quyền', 'ref', { ref: 'USERS.email', req: true }),
+      col_('loai_phieu', 'Loại phiếu (trống = tất cả)', 'enum', { values: LOAI_PHIEU }),
+      col_('hieu_luc_tu', 'Từ ngày', 'date', { req: true }),
+      col_('hieu_luc_den', 'Đến ngày', 'date', { req: true }),
+      col_('ly_do', 'Lý do', 'text')
+    ],
+    check: function (r) {
+      if (r.tu_email === r.den_email) return 'Không thể tự ủy quyền cho chính mình';
+      return r.hieu_luc_den < r.hieu_luc_tu ? 'Đến ngày phải ≥ Từ ngày' : null;
+    }
+  };
+
+  S.PHIEU = {
+    label: 'Phiếu', group: 'workflow', key: [], internal: true, perm: { r: 'phieu.view', w: 'phieu.create' },
+    cols: [
+      col_('ma_phieu', 'Mã phiếu'), col_('loai_phieu', 'Loại', 'enum', { values: LOAI_PHIEU }), col_('tieu_de', 'Tiêu đề'),
+      col_('chi_nhanh_ma', 'Chi nhánh'), col_('truong_ma', 'Trường'), col_('ky_ma', 'Kỳ'), col_('nguoi_tao', 'Người tạo'),
+      col_('trang_thai', 'Trạng thái', 'enum', { values: ['Đang duyệt', 'Đã duyệt', 'Trả lại', 'Đã hủy'] }),
+      col_('buoc_hien_tai', 'Bước hiện tại', 'int'), col_('so_buoc', 'Số bước', 'int'),
+      col_('quy_trinh', 'Quy trình', 'longtext'), col_('noi_dung', 'Nội dung', 'longtext')
+    ]
+  };
+
+  S.PHIEU_LOG = {
+    label: 'Lịch sử phiếu', group: 'workflow', key: [], internal: true, perm: { r: 'phieu.view', w: 'phieu.create' },
+    cols: [col_('ma_phieu', 'Mã phiếu'), col_('buoc', 'Bước', 'int'), col_('hanh_dong', 'Hành động'), col_('email', 'Người thực hiện'),
+      col_('ghi_chu', 'Ghi chú', 'longtext'), col_('ts', 'Thời điểm')]
   };
 
   return S;

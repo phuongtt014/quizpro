@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const SRC = path.join(__dirname, 'src'), DIST = path.join(__dirname, 'dist');
-const ORDER = ['Util', 'Csv', 'Strict', 'Schema', 'Db', 'Validate', 'Auth', 'Audit', 'Notify', 'Policy', 'Staff', 'Seed', 'Setup', 'Api'];
+const ORDER = ['Util', 'Csv', 'Strict', 'Schema', 'Db', 'Validate', 'Auth', 'Audit', 'Notify', 'Policy', 'Staff', 'Engine', 'Calc', 'Workflow', 'Seed', 'Setup', 'Api'];
 const read = (f) => fs.readFileSync(path.join(SRC, f), 'utf8');
 
 fs.mkdirSync(DIST, { recursive: true });

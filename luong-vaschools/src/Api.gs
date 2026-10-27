@@ -45,6 +45,23 @@ var Api = (function () {
     if (d.trang_thai !== 'Nháp') throw new AppError('LOCKED', 'Đề án đã ban hành nên không thể sửa. Hãy nhân bản thành phiên bản mới rồi chỉnh sửa.');
   }
 
+  /**
+   * Bản Nháp sửa tự do. Bản đã Ban hành khóa hoàn toàn, TRỪ việc thêm mới LCB/LTB cho chi nhánh chưa có
+   * (chi nhánh mở sau khi ban hành): chỉ thêm, không sửa/xóa nên không làm đổi kết quả cũ.
+   */
+  function dean(ma) {
+    var d = ma && Db.find('DEAN', function (x) { return x.ma === ma; });
+    if (!d) throw new AppError('NOT_FOUND', 'Không tìm thấy đề án');
+    return d;
+  }
+  function assertDeanWritable(table, ma, appendOnly) {
+    var d = dean(ma);
+    if (d.trang_thai === 'Nháp') return;
+    if (appendOnly && table === 'DEAN_THAMSO' && d.trang_thai === 'Ban hành') return;
+    throw new AppError('LOCKED', 'Đề án đã ban hành nên không thể sửa. Hãy nhân bản thành phiên bản mới rồi chỉnh sửa.' +
+      (table === 'DEAN_THAMSO' ? ' (Riêng LCB/LTB của chi nhánh mới thì được thêm mới.)' : ''));
+  }
+
   function stripRow(T, r, forUpdate) {
     var o = {};
     T.cols.forEach(function (c) {
@@ -105,12 +122,77 @@ var Api = (function () {
 
   function resolveWriteCtx(T, p) {
     var ctx = p.ctx || {};
-    if (T.ctx) assertDraft(ctx[T.ctx]);
+    if (T.ctx) assertDeanWritable(p.table, ctx[T.ctx], !p.id);
     return ctx;
   }
 
   function validationError(res, headline) {
     return new AppError('VALIDATION', headline || (res.errors[0].msg + (res.errors.length > 1 ? ' (và ' + (res.errors.length - 1) + ' lỗi khác)' : '')), res.errors);
+  }
+
+  function stepOf(p) { return Workflow.parse(p.quy_trinh, [])[p.buoc_hien_tai - 1] || null; }
+
+  function phieuRow(p, user) {
+    var st = stepOf(p), au = user ? Workflow.authority(user, p) : { ok: false };
+    return { id: p.id, ma: p.ma_phieu, loai: p.loai_phieu, tieu_de: p.tieu_de, truong: p.truong_ma, ky: p.ky_ma, nguoi_tao: p.nguoi_tao,
+      trang_thai: p.trang_thai, buoc: p.buoc_hien_tai, so_buoc: p.so_buoc, buoc_ten: p.trang_thai === 'Đang duyệt' && st ? st.ten_buoc : '',
+      at: p.created_at, can_act: !!au.ok };
+  }
+
+  function canSee(user, p) {
+    if (user.isAdmin || p.nguoi_tao === user.email) return true;
+    if (Auth.canRow(user, 'phieu.view', { cn: p.chi_nhanh_ma, tr: p.truong_ma })) return true;
+    return Workflow.parse(p.quy_trinh, []).some(function (st) {
+      var a = Workflow.approvers(st, p);
+      return a.direct.indexOf(user.email) >= 0 || a.delegated.some(function (d) { return d.email === user.email; });
+    });
+  }
+
+  function staffName() {
+    var m = {};
+    Db.all('NHAN_SU').forEach(function (s) { m[s.ma_nv] = s.ho_ten; });
+    return m;
+  }
+
+  function phieuItems(p) {
+    var names = staffName(), rows = [], head = [];
+    if (p.loai_phieu === 'Khai báo') {
+      head = ['Mã NV', 'Họ tên', 'Loại', 'Nội dung', 'Số lượng', 'Thời gian'];
+      rows = Db.filter('KHAI_BAO', function (r) { return r.phieu_ma === p.ma_phieu; }).map(function (r) {
+        return [r.ma_nv, names[r.ma_nv] || '', r.loai, r.noi_dung, r.so_luong + ' ' + r.don_vi + (r.dac_thu === 'Có' ? ' (đặc thù)' : ''), Util.displayDate(r.tu_ngay) + ' – ' + Util.displayDate(r.den_ngay)];
+      });
+    } else if (p.loai_phieu === 'Quyết toán kỳ') {
+      head = ['Mã NV', 'Họ tên', 'Thu nhập hiện tại', 'Mức chính thức', 'Ghi chú'];
+      var money = function (v) { return v === '' ? '' : Number(v).toLocaleString('vi-VN'); };
+      rows = Db.filter('THU_NHAP_MOI', function (r) { return r.phieu_ma === p.ma_phieu; }).map(function (r) {
+        return [r.ma_nv, names[r.ma_nv] || '', money(r.thu_nhap_hien_tai), money(r.chinh_thuc), r.ghi_chu];
+      });
+    } else if (p.loai_phieu === 'Đề xuất ngạch') {
+      var d = Workflow.parse(p.noi_dung, {}).row || {};
+      head = ['Mã NV', 'Họ tên', 'Ngạch đề xuất', 'Hiệu lực từ', 'Số quyết định', 'Lý do'];
+      rows = [[d.ma_nv, names[d.ma_nv] || '', d.ngach_ma, d.hieu_luc_tu, d.so_quyet_dinh || '', d.ly_do || '']];
+    } else {
+      head = ['Nội dung'];
+      rows = [[Workflow.parse(p.noi_dung, {}).noi_dung || '']];
+    }
+    return { head: head, rows: rows.slice(0, 500), total: rows.length };
+  }
+
+  function pendingFor(user) {
+    return Db.filter('PHIEU', function (p) { return p.trang_thai === 'Đang duyệt'; })
+      .filter(function (p) { var a = Workflow.authority(user, p); return a.ok && a.mode !== 'admin'; });
+  }
+
+  function findKy(ma, needOpen) {
+    var ky = Db.find('KY_LUONG', function (k) { return k.ma === ma; });
+    if (!ky) throw new AppError('NOT_FOUND', 'Không tìm thấy kỳ ' + ma);
+    if (needOpen && ky.trang_thai !== 'Mở') throw new AppError('LOCKED', 'Kỳ ' + ma + ' đã chốt');
+    return ky;
+  }
+  function findTruong(ma) {
+    var t = Db.find('TRUONG', function (x) { return x.ma === ma; });
+    if (!t) throw new AppError('NOT_FOUND', 'Chọn trường hợp lệ');
+    return t;
   }
 
   var handlers = {
@@ -135,6 +217,7 @@ var Api = (function () {
       var staffVisible = Auth.can(user, 'staff.view');
       return {
         checklist: checklist,
+        pending: pendingFor(user).length,
         dean: dean ? { ma: dean.ma, so_hieu: dean.so_hieu, tu: dean.hieu_luc_tu } : null,
         counts: {
           chi_nhanh: cnt('CHI_NHANH', function (r) { return r.trang_thai === 'Hoạt động'; }),
@@ -170,9 +253,14 @@ var Api = (function () {
       var total = rows.length, page = Math.max(0, p.page || 0);
       rows = rows.slice(page * PAGE, page * PAGE + PAGE);
       if (p.table === 'NHAN_SU') rows = Staff.decorate(rows);
-      var locked = false;
-      if (T.ctx) { var d = Db.find('DEAN', function (x) { return x.ma === ctx[T.ctx]; }); locked = !d || d.trang_thai !== 'Nháp'; }
-      return { rows: rows.map(function (r) { return pickClient(T, r); }), total: total, page: page, pageSize: PAGE, locked: locked };
+      if (p.table === 'NGACH_DM') rows = Policy.decorateNgach(rows);
+      var locked = false, appendOnly = false;
+      if (T.ctx) {
+        var d = Db.find('DEAN', function (x) { return x.ma === ctx[T.ctx]; });
+        locked = !d || d.trang_thai !== 'Nháp';
+        appendOnly = locked && !!d && p.table === 'DEAN_THAMSO' && d.trang_thai === 'Ban hành';
+      }
+      return { rows: rows.map(function (r) { return pickClient(T, r); }), total: total, page: page, pageSize: PAGE, locked: locked, appendOnly: appendOnly };
     },
 
     save: function (p, user) {
@@ -188,6 +276,7 @@ var Api = (function () {
           var sf = Auth.scopeFn(p.table);
           if (sf && !Auth.canRow(user, T.perm.w, sf(old))) throw new AppError('FORBIDDEN', 'Bản ghi nằm ngoài phạm vi dữ liệu của bạn');
         }
+        if (old && T.guard) { var gm = T.guard(old); if (gm) throw new AppError('LOCKED', gm); }
         var res = Validate.rows(p.table, [{ n: 1, vals: p.row || {} }], ctx,
           { mode: 'insert', selfId: p.id, user: user, autoClose: !!p.autoClose && !p.id });
         if (!res.ok) throw validationError(res);
@@ -220,11 +309,12 @@ var Api = (function () {
       Auth.require(user, T.perm.w);
       Db.tx(function () {
         var ctx = p.ctx || {};
-        if (T.ctx) assertDraft(ctx[T.ctx]);
+        if (T.ctx) assertDeanWritable(p.table, ctx[T.ctx], false);
         var row = Db.get(p.table, p.id);
         if (!row || (T.ctx && row[T.ctx] !== ctx[T.ctx])) throw new AppError('NOT_FOUND', 'Không tìm thấy bản ghi');
         var sf = Auth.scopeFn(p.table);
         if (sf && !Auth.canRow(user, T.perm.w, sf(row))) throw new AppError('FORBIDDEN', 'Bản ghi nằm ngoài phạm vi dữ liệu của bạn');
+        if (T.guard) { var gm = T.guard(row); if (gm) throw new AppError('LOCKED', gm); }
 
         if (p.table === 'DEAN') {
           if (row.trang_thai !== 'Nháp') throw new AppError('LOCKED', 'Chỉ xóa được đề án ở trạng thái Nháp');
@@ -251,7 +341,11 @@ var Api = (function () {
       if (T.ctx && !(p.ctx && p.ctx[T.ctx])) throw new AppError('BAD_REQUEST', 'Thiếu ngữ cảnh đề án');
       var res = Validate.importText(p.table, p.text, p.ctx || {}, { mode: p.mode || 'insert', user: user });
       return { ok: res.ok, errors: res.errors.slice(0, 500), total: res.total || 0, inserts: res.inserts || 0, updates: res.updates || 0,
-        truncated: !!res.truncated, locked: T.ctx ? (function () { var d = Db.find('DEAN', function (x) { return x.ma === p.ctx[T.ctx]; }); return !d || d.trang_thai !== 'Nháp'; })() : false };
+        truncated: !!res.truncated, locked: T.ctx ? (function () {
+          var d = Db.find('DEAN', function (x) { return x.ma === p.ctx[T.ctx]; });
+          if (!d) return true;
+          return d.trang_thai !== 'Nháp' && !(p.table === 'DEAN_THAMSO' && d.trang_thai === 'Ban hành' && (p.mode || 'insert') === 'insert');
+        })() : false };
     },
 
     importCommit: function (p, user) {
@@ -259,7 +353,7 @@ var Api = (function () {
       Auth.require(user, T.perm.i || T.perm.w);
       var res, ins = 0, upd = 0;
       Db.tx(function () {
-        if (T.ctx) assertDraft((p.ctx || {})[T.ctx]);
+        if (T.ctx) assertDeanWritable(p.table, (p.ctx || {})[T.ctx], (p.mode || 'insert') === 'insert');
         res = Validate.importText(p.table, p.text, p.ctx || {}, { mode: p.mode || 'insert', user: user });
         if (!res.ok) return;
         var inserts = [], updates = [];
@@ -324,6 +418,117 @@ var Api = (function () {
     'notify.read': function (p, user) {
       Notify.markRead(user.email, p.ids || null);
       return { unread: Notify.unread(user.email) };
+    },
+
+    'khaibao.submit': function (p, user) {
+      Auth.require(user, 'phieu.create');
+      var out;
+      Db.tx(function () {
+        var ky = findKy(p.ky_ma, true), tr = findTruong(p.truong_ma), staff = {};
+        Db.all('NHAN_SU').forEach(function (s) { if (s.truong_ma === tr.ma) staff[s.ma_nv] = s; });
+        var lines = Db.filter('KHAI_BAO', function (r) {
+          var s = staff[r.ma_nv];
+          return r.ky_ma === ky.ma && r.trang_thai === 'Nháp' && s && Auth.canRow(user, 'declare.edit', { cn: s.chi_nhanh_ma, tr: s.truong_ma, nv: s.ma_nv });
+        });
+        if (!lines.length) throw new AppError('EMPTY', 'Không có dòng khai báo nào ở trạng thái Nháp của trường này trong kỳ ' + ky.ma);
+        var ph = Workflow.create(user, { loai: 'Khai báo', tieu_de: 'Khai báo giảng dạy ' + ky.ma + ' · ' + tr.ten + ' (' + lines.length + ' dòng)',
+          truong_ma: tr.ma, chi_nhanh_ma: tr.chi_nhanh_ma, ky_ma: ky.ma, payload: { lines: lines.length } });
+        Db.updateMany('KHAI_BAO', lines.map(function (l) { return { id: l.id, patch: { trang_thai: 'Chờ duyệt', phieu_ma: ph.ma_phieu } }; }), user.email);
+        out = { ma_phieu: ph.ma_phieu, lines: lines.length };
+      });
+      return out;
+    },
+
+    'ngach.propose': function (p, user) {
+      Auth.require(user, 'phieu.create');
+      var out;
+      Db.tx(function () {
+        var s = Db.find('NHAN_SU', function (x) { return x.ma_nv === p.ma_nv; });
+        if (!s) throw new AppError('NOT_FOUND', 'Không tìm thấy nhân sự ' + p.ma_nv);
+        if (!Auth.canRow(user, 'staff.view', { cn: s.chi_nhanh_ma, tr: s.truong_ma, nv: s.ma_nv })) throw new AppError('FORBIDDEN', 'Nhân sự nằm ngoài phạm vi của bạn');
+        var vals = { ma_nv: p.ma_nv, ngach_ma: p.ngach_ma || '', hieu_luc_tu: p.hieu_luc_tu || '', hieu_luc_den: '', so_quyet_dinh: p.so_quyet_dinh || '', ly_do: p.ly_do || '' };
+        var res = Validate.rows('QUA_TRINH_NGACH', [{ n: 1, vals: vals }], {}, { mode: 'insert', autoClose: true });
+        if (!res.ok) throw validationError(res);
+        var ng = Db.find('NGACH_DM', function (n) { return n.ma === vals.ngach_ma; });
+        var ph = Workflow.create(user, { loai: 'Đề xuất ngạch', tieu_de: 'Đề xuất ngạch ' + ng.ten + ' cho ' + s.ho_ten + ' (' + s.ma_nv + ')',
+          truong_ma: s.truong_ma, chi_nhanh_ma: s.chi_nhanh_ma, payload: { row: vals } });
+        out = { ma_phieu: ph.ma_phieu };
+      });
+      return out;
+    },
+
+    'phieu.other': function (p, user) {
+      Auth.require(user, 'phieu.create');
+      if (!p.tieu_de || !p.noi_dung) throw new AppError('BAD_REQUEST', 'Nhập tiêu đề và nội dung');
+      var out;
+      Db.tx(function () {
+        var tr = p.truong_ma ? findTruong(p.truong_ma) : null;
+        var ph = Workflow.create(user, { loai: 'Khác', tieu_de: p.tieu_de, truong_ma: tr ? tr.ma : '', chi_nhanh_ma: tr ? tr.chi_nhanh_ma : '', payload: { noi_dung: p.noi_dung } });
+        out = { ma_phieu: ph.ma_phieu };
+      });
+      return out;
+    },
+
+    'calc.run': function (p, user) {
+      Auth.require(user, 'calc.run');
+      var out;
+      Db.tx(function () { out = Calc.run(user, p.ky_ma, p.truong_ma || ''); });
+      return out;
+    },
+
+    'quyettoan.submit': function (p, user) {
+      Auth.require(user, 'phieu.create');
+      var out;
+      Db.tx(function () {
+        var ky = findKy(p.ky_ma, true), tr = findTruong(p.truong_ma), staff = {};
+        Db.all('NHAN_SU').forEach(function (s) { if (s.truong_ma === tr.ma) staff[s.ma_nv] = s; });
+        var mine = function (r) {
+          var s = staff[r.ma_nv];
+          return r.ky_ma === ky.ma && r.trang_thai === 'Tạm tính' && s && Auth.canRow(user, 'calc.run', { cn: s.chi_nhanh_ma, tr: s.truong_ma, nv: s.ma_nv });
+        };
+        var inc = Db.filter('THU_NHAP_MOI', mine), qt = Db.filter('QUYET_TOAN', mine);
+        if (!inc.length) throw new AppError('EMPTY', 'Chưa có kết quả tạm tính của trường này. Hãy bấm "Tính toán" trước.');
+        var ph = Workflow.create(user, { loai: 'Quyết toán kỳ', tieu_de: 'Quyết toán & thu nhập mới ' + ky.ma + ' · ' + tr.ten + ' (' + inc.length + ' nhân sự)',
+          truong_ma: tr.ma, chi_nhanh_ma: tr.chi_nhanh_ma, ky_ma: ky.ma, payload: { nhan_su: inc.length } });
+        var patch = function (r) { return { id: r.id, patch: { trang_thai: 'Chờ chốt', phieu_ma: ph.ma_phieu } }; };
+        Db.updateMany('THU_NHAP_MOI', inc.map(patch), user.email);
+        Db.updateMany('QUYET_TOAN', qt.map(patch), user.email);
+        out = { ma_phieu: ph.ma_phieu, nhan_su: inc.length };
+      });
+      return out;
+    },
+
+    'phieu.list': function (p, user) {
+      var rows = Db.all('PHIEU'), tab = p.tab || 'cho_toi';
+      if (tab === 'cho_toi') rows = pendingFor(user);
+      else if (tab === 'cua_toi') rows = rows.filter(function (x) { return x.nguoi_tao === user.email; });
+      else {
+        Auth.require(user, 'phieu.view');
+        rows = rows.filter(function (x) { return Auth.canRow(user, 'phieu.view', { cn: x.chi_nhanh_ma, tr: x.truong_ma }); });
+      }
+      rows = rows.slice().reverse().slice(0, 300);
+      return { rows: rows.map(function (x) { return phieuRow(x, user); }) };
+    },
+
+    'phieu.get': function (p, user) {
+      var ph = Db.get('PHIEU', p.id);
+      if (!ph || !canSee(user, ph)) throw new AppError('NOT_FOUND', 'Không tìm thấy phiếu hoặc bạn không có quyền xem');
+      var au = Workflow.authority(user, ph), chain = Workflow.parse(ph.quy_trinh, []);
+      var logs = Db.filter('PHIEU_LOG', function (l) { return l.ma_phieu === ph.ma_phieu; })
+        .map(function (l) { return { buoc: l.buoc, hanh_dong: l.hanh_dong, email: l.email, ghi_chu: l.ghi_chu, ts: l.ts }; });
+      return { phieu: phieuRow(ph, user), steps: chain, log: logs, items: phieuItems(ph),
+        can_act: !!au.ok, act_mode: au.ok ? au.mode : '', can_cancel: ph.trang_thai === 'Đang duyệt' && (ph.nguoi_tao === user.email || user.isAdmin) };
+    },
+
+    'phieu.act': function (p, user) {
+      var out;
+      Db.tx(function () { out = phieuRow(Workflow.act(user, p.id, p.action, p.note || ''), user); });
+      return out;
+    },
+
+    'phieu.cancel': function (p, user) {
+      Db.tx(function () { Workflow.cancel(user, p.id); });
+      return {};
     }
   };
 

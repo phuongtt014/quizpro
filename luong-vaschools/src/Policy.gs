@@ -17,6 +17,22 @@ var Policy = {
     return list[0] || null;
   },
 
+  /** Gắn hệ số/thâm niên của đề án đang hiệu lực vào danh mục ngạch (chỉ để tra cứu). */
+  decorateNgach: function (rows) {
+    var d = Policy.effective(Util.todayIso()), b = d ? Policy.bundle(d.ma) : null;
+    return rows.map(function (r) {
+      var o = {}, g = b ? b.ngach[r.ma] : null;
+      Object.keys(r).forEach(function (k) { o[k] = r[k]; });
+      o.hs_chuc_danh = g ? g.hs_chuc_danh : '';
+      o.hs_kpi = g ? g.hs_kpi : '';
+      o.hs_tiet = g ? g.hs_tiet : '';
+      o.nhom_tham_nien = g ? g.nhom_tham_nien : '';
+      o.vuot_khung = g ? g.vuot_khung : '';
+      o.de_an_ap_dung = d ? (g ? d.so_hieu : d.so_hieu + ' (chưa có hệ số)') : 'Chưa có đề án hiệu lực';
+      return o;
+    });
+  },
+
   /** Gói tham số của một phiên bản, dạng dễ tra cứu cho bộ tính lương (GĐ4). */
   bundle: function (ma) {
     var of = function (t) { return Db.filter(t, function (r) { return r.de_an_ma === ma; }); };

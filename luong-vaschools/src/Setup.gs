@@ -22,10 +22,11 @@ function setupInstall() {
   return id;
 }
 
-/** Chạy lại sau khi cập nhật mã nguồn có thêm bảng/cột mới (không xóa dữ liệu). */
+/** Chạy lại sau khi cập nhật mã nguồn có thêm bảng/cột/quyền mới (thêm sheet/cột, nâng cấp dữ liệu mặc định; không xóa dữ liệu). */
 function setupEnsureSheets() {
   setupAssertOwner_();
-  Logger.log(JSON.stringify(Db.ensureSheets()));
+  Logger.log('Sheet: ' + JSON.stringify(Db.ensureSheets()));
+  Logger.log('Nâng cấp: ' + JSON.stringify(Seed.upgrade()));
 }
 
 /** Cấp quyền quản trị cho một tài khoản khác (chạy trong trình soạn thảo, sửa email rồi bấm Run). */
