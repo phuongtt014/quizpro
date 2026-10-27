@@ -8,7 +8,7 @@ lịch sử ngạch bậc, phiên bản đề án, phân quyền theo phạm vi,
 ## Cài đặt
 
 1. Tạo dự án Apps Script (script.google.com) bằng tài khoản `@vaschools.edu.vn` của chủ hệ thống.
-2. Đưa mã trong `src/` vào dự án: dùng `clasp` (sao chép `.clasp.json.example` thành `.clasp.json`, điền `scriptId`, rồi `clasp push`)
+2. Cách nhanh nhất: làm theo `HUONG_DAN_CAI_DAT.md` (dán 4 tệp trong `dist/`). Tùy chọn dùng `clasp`: sao chép `.clasp.json.example` thành `.clasp.json`, điền `scriptId`, rồi `clasp push`.
    hoặc tạo từng tệp thủ công cùng tên (`.gs` là Script, `.html` là HTML, và `appsscript.json`).
    Nếu tạo thủ công, bật *Project Settings → Show "appsscript.json"* rồi dán nội dung.
 3. Chạy hàm **`setupInstall`** (cấp quyền khi được hỏi). Hàm tạo Google Sheet CSDL `LUONG-VASCHOOLS-DB`, các sheet, nạp đề án HP.ĐA.01,

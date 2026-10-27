@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hệ thống Lương VASchools</title>
+  <style>
+  :root {
+    --bg:#f6f7f9; --card:#ffffff; --text:#1c2430; --muted:#5b6675; --line:#dde2e8; --head:#eef1f5;
+    --brand:#8a1538; --brand-ink:#ffffff; --ok:#1a7f45; --warn:#9a6700; --bad:#c62828; --bad-bg:#fdecec; --ok-bg:#e8f6ee; --warn-bg:#fff6e0;
+    --focus:#2563eb; --shadow:0 1px 2px rgba(16,24,40,.06), 0 4px 16px rgba(16,24,40,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14181d; --card:#1d232b; --text:#e8ebef; --muted:#9aa5b3; --line:#2b333d; --head:#252d37;
+      --brand:#e0587c; --brand-ink:#14181d; --ok:#59c38a; --warn:#e8b24a; --bad:#ff7a7a; --bad-bg:#3a1f22; --ok-bg:#1c3326; --warn-bg:#3a2f16;
+      --focus:#7aa7ff; --shadow:none; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  .boot { padding:48px; text-align:center; color:var(--muted); }
+  header.top { background:var(--card); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:20; }
+  .top-in { display:flex; align-items:center; gap:12px; padding:8px 16px; flex-wrap:wrap; }
+  .brand { font-weight:700; color:var(--brand); letter-spacing:.2px; }
+  nav { display:flex; gap:2px; flex-wrap:wrap; flex:1; }
+  nav a { padding:7px 12px; border-radius:8px; color:var(--text); text-decoration:none; cursor:pointer; }
+  nav a:hover { background:var(--head); }
+  nav a.on { background:var(--brand); color:var(--brand-ink); }
+  .who { color:var(--muted); font-size:13px; }
+  main { padding:16px; max-width:1280px; margin:0 auto; }
+  h2 { margin:4px 0 12px; font-size:20px; }
+  h3 { margin:0 0 8px; font-size:15px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; box-shadow:var(--shadow); margin-bottom:16px; }
+  .tabs { display:flex; gap:4px; flex-wrap:wrap; border-bottom:1px solid var(--line); margin-bottom:12px; }
+  .tabs button { background:none; border:0; padding:8px 12px; cursor:pointer; color:var(--muted); border-bottom:2px solid transparent; font:inherit; }
+  .tabs button.on { color:var(--brand); border-bottom-color:var(--brand); font-weight:600; }
+  .bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+  .bar .sp { flex:1; }
+  button.btn, .btn { font:inherit; padding:7px 12px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--text); cursor:pointer; }
+  .btn:hover { background:var(--head); }
+  .btn.pri { background:var(--brand); border-color:var(--brand); color:var(--brand-ink); }
+  .btn.pri:hover { filter:brightness(1.08); }
+  .btn.dng { color:var(--bad); }
+  .btn.sm { padding:3px 8px; font-size:12px; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  input, select, textarea { font:inherit; color:var(--text); background:var(--card); border:1px solid var(--line); border-radius:8px; padding:7px 9px; width:100%; }
+  input:focus, select:focus, textarea:focus, button:focus-visible, nav a:focus-visible { outline:2px solid var(--focus); outline-offset:1px; }
+  .bar input[type=search] { width:240px; max-width:100%; }
+  .tw { overflow:auto; border:1px solid var(--line); border-radius:10px; max-height:62vh; }
+  table { border-collapse:collapse; width:100%; }
+  th, td { padding:7px 10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; white-space:nowrap; }
+  td.wrap { white-space:normal; min-width:200px; }
+  th { background:var(--head); position:sticky; top:0; font-weight:600; font-size:12px; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  tr:last-child td { border-bottom:0; }
+  .muted { color:var(--muted); }
+  .badge { display:inline-block; padding:1px 8px; border-radius:99px; font-size:12px; background:var(--head); }
+  .badge.ok { background:var(--ok-bg); color:var(--ok); } .badge.warn { background:var(--warn-bg); color:var(--warn); } .badge.bad { background:var(--bad-bg); color:var(--bad); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+  .stat { font-size:28px; font-weight:700; } .stat small { display:block; font-size:12px; color:var(--muted); font-weight:400; }
+  .check li { list-style:none; padding:4px 0; } .check { padding:0; margin:0; }
+  .check a { color:var(--text); cursor:pointer; }
+  .overlay { position:fixed; inset:0; background:rgba(10,14,20,.5); display:grid; place-items:center; z-index:50; padding:12px; }
+  .modal { background:var(--card); border-radius:14px; width:min(760px,100%); max-height:92vh; overflow:auto; padding:18px; border:1px solid var(--line); }
+  .modal.wide { width:min(1040px,100%); }
+  .modal h3 { font-size:17px; }
+  .form { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px 14px; }
+  .form label { display:block; font-size:12px; color:var(--muted); margin-bottom:3px; }
+  .form .full { grid-column:1/-1; }
+  .req::after { content:" *"; color:var(--bad); }
+  .alert { padding:9px 12px; border-radius:8px; margin:8px 0; }
+  .alert.bad { background:var(--bad-bg); color:var(--bad); } .alert.ok { background:var(--ok-bg); color:var(--ok); } .alert.warn { background:var(--warn-bg); color:var(--warn); }
+  .row-end { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; flex-wrap:wrap; }
+  textarea.paste { min-height:150px; font:12px/1.4 ui-monospace,Menlo,Consolas,monospace; white-space:pre; }
+  .vis { font-family:ui-monospace,Menlo,Consolas,monospace; background:var(--head); padding:1px 5px; border-radius:4px; }
+  .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--text); color:var(--bg); padding:9px 16px; border-radius:99px; z-index:90; max-width:90vw; }
+  .bell { position:relative; background:none; border:1px solid var(--line); border-radius:8px; padding:6px 10px; cursor:pointer; color:var(--text); font:inherit; }
+  .bell .dot { position:absolute; top:-6px; right:-6px; background:var(--bad); color:#fff; border-radius:99px; font-size:11px; padding:0 6px; }
+  .drop { position:absolute; right:16px; top:52px; width:min(380px,calc(100vw - 32px)); background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); z-index:40; max-height:70vh; overflow:auto; }
+  .drop .it { padding:10px 12px; border-bottom:1px solid var(--line); cursor:pointer; } .drop .it.un { background:var(--head); } .drop .it b { display:block; }
+  .matrix td, .matrix th { text-align:center; } .matrix td:first-child, .matrix th:first-child { text-align:left; }
+  @media (max-width:640px) { main { padding:10px; } .bar input[type=search] { width:100%; } }
+</style>
+
+</head>
+<body>
+  <div id="app"><div class="boot">Đang tải…</div></div>
+  <div id="toast" class="toast" hidden></div>
+  <script>
+(function () {
+  'use strict';
+
+  var S = { schema: null, me: null, main: null, nav: null, bellBox: null };
+
+  /* ---------- tiện ích DOM ---------- */
+  function el(tag, a, kids) {
+    var n = document.createElement(tag), val;
+    Object.keys(a || {}).forEach(function (k) {
+      var v = a[k];
+      if (v === null || v === undefined || v === false) return;
+      if (k === 'class') n.className = v;
+      else if (k === 'text') n.textContent = v;
+      else if (k === 'value') val = v;
+      else if (k.slice(0, 2) === 'on') n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v === true ? '' : v);
+    });
+    (kids || []).forEach(function (c) {
+      if (c === null || c === undefined || c === false) return;
+      n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    });
+    if (val !== undefined) n.value = val;
+    return n;
+  }
+  function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); return n; }
+
+  var toastTimer;
+  function toast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, 3200);
+  }
+
+  function api(name, payload) {
+    return new Promise(function (resolve, reject) {
+      google.script.run
+        .withSuccessHandler(function (r) { if (r && r.ok) resolve(r.data); else reject(r || { error: 'Lỗi không xác định' }); })
+        .withFailureHandler(function (e) { reject({ error: e && e.message ? e.message : String(e) }); })
+        .apiCall(name, payload || {});
+    });
+  }
+
+  function openModal(wide) {
+    var ov = el('div', { class: 'overlay' }), m = el('div', { class: 'modal' + (wide ? ' wide' : ''), role: 'dialog', 'aria-modal': 'true' });
+    ov.appendChild(m);
+    document.body.appendChild(ov);
+    function close() { ov.remove(); document.removeEventListener('keydown', onKey); }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    document.addEventListener('keydown', onKey);
+    ov.addEventListener('mousedown', function (e) { if (e.target === ov) close(); });
+    return { m: m, close: close };
+  }
+
+  function errBox(e) {
+    var box = el('div', { class: 'alert bad' }, [el('b', { text: e.error || 'Có lỗi xảy ra' })]);
+    if (e.details && e.details.length) {
+      var ul = el('ul', { style: 'margin:6px 0 0;padding-left:18px' });
+      e.details.slice(0, 20).forEach(function (d) {
+        var text = typeof d === 'string' ? d : ((d.label ? d.label + ': ' : '') + d.msg);
+        ul.appendChild(el('li', { text: text }));
+      });
+      box.appendChild(ul);
+    }
+    return box;
+  }
+  function showErr(e) { toast(e.error || 'Có lỗi xảy ra'); }
+
+  /* ---------- định dạng ---------- */
+  function dmy(iso) { if (!iso) return ''; var p = String(iso).split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : iso; }
+  function fmtCell(c, v) {
+    if (v === '' || v === null || v === undefined) return '';
+    switch (c.t) {
+      case 'date': return dmy(v);
+      case 'money': return Number(v).toLocaleString('vi-VN');
+      case 'pct': return (Math.round(Number(v) * 10000) / 100).toString().replace('.', ',') + '%';
+      case 'num': return String(v).replace('.', ',');
+      default: return String(v);
+    }
+  }
+  function toRaw(c, v) {
+    if (v === '' || v === null || v === undefined) return '';
+    switch (c.t) {
+      case 'date': return dmy(v);
+      case 'pct': return (Math.round(Number(v) * 10000) / 100).toString().replace('.', ',') + '%';
+      case 'num': return String(v).replace('.', ',');
+      case 'money': case 'int': return String(v);
+      default: return String(v);
+    }
+  }
+  function tt(table) { return S.schema.tables[table]; }
+  /** Cột tham chiếu hiển thị "mã – tên" nếu danh mục đủ nhỏ để tải sẵn. */
+  function refLabel(c, v) {
+    var list = S.schema.refs[c.ref];
+    if (!list) return v;
+    for (var i = 0; i < list.length; i++) if (list[i].v === String(v)) return list[i].l && list[i].l !== list[i].v ? v + ' – ' + list[i].l : v;
+    return v;
+  }
+  /** Làm mới danh mục chọn (khóa ngoại) sau khi dữ liệu thay đổi, để form luôn thấy mục mới. */
+  function refreshSchema() { return api('schema').then(function (sc) { S.schema = sc; }).catch(function () { /* giữ bản cũ */ }); }
+
+  /* ---------- form thêm/sửa ---------- */
+  function openForm(table, opts, row, onDone) {
+    var T = tt(table), md = openModal(), inputs = {}, fixed = opts.fixed || {};
+    var form = el('div', { class: 'form' });
+    T.cols.forEach(function (c) {
+      if (c.k === T.ctx || c.ro) return;
+      var input, list = c.t === 'ref' ? S.schema.refs[c.ref] : null;
+      var cur = row ? toRaw(c, row[c.k]) : (fixed[c.k] !== undefined ? fixed[c.k] : (c.def !== undefined ? toRaw(c, c.def) : ''));
+      if (c.t === 'enum') {
+        input = el('select', null, (c.req && c.def === undefined ? [] : [el('option', { value: '', text: '— chọn —' })]).concat(
+          c.values.map(function (v) { return el('option', { value: v, text: v }); })));
+      } else if (list) {
+        input = el('select', null, [el('option', { value: '', text: '— chọn —' })].concat(
+          list.map(function (o) { return el('option', { value: o.v, text: o.l && o.l !== o.v ? o.v + ' – ' + o.l : o.v }); })));
+      } else if (c.t === 'longtext') input = el('textarea', { rows: 3 });
+      else {
+        var ph = c.t === 'date' ? 'dd/MM/yyyy' : (c.t === 'pct' ? 'vd 5%' : (c.hint || ''));
+        input = el('input', { type: 'text', autocomplete: 'off', placeholder: ph });
+      }
+      input.value = cur;
+      if (fixed[c.k] !== undefined) input.disabled = true;
+      if (row && T.key.indexOf(c.k) >= 0 && c.k !== 'hieu_luc_tu' && tableLocksKey(table)) input.disabled = true;
+      inputs[c.k] = input;
+      form.appendChild(el('div', { class: c.t === 'longtext' ? 'full' : '' }, [
+        el('label', { class: c.req && c.def === undefined ? 'req' : '', text: c.l }), input
+      ]));
+    });
+    var autoClose = null, errHost = el('div');
+    if (T.temporal && !row) {
+      autoClose = el('input', { type: 'checkbox', checked: true, style: 'width:auto' });
+      form.appendChild(el('div', { class: 'full' }, [el('label', null, [autoClose, ' Tự động kết thúc bản ghi đang còn hiệu lực ngay trước ngày bắt đầu mới'])]));
+    }
+    var save = el('button', { class: 'btn pri', text: 'Lưu', onclick: function () {
+      var vals = {};
+      Object.keys(inputs).forEach(function (k) { vals[k] = inputs[k].value; });
+      Object.keys(fixed).forEach(function (k) { vals[k] = fixed[k]; });
+      save.disabled = true;
+      api('save', { table: table, id: row ? row.id : null, row: vals, ctx: opts.ctx, autoClose: autoClose ? autoClose.checked : false })
+        .then(function () { md.close(); toast('Đã lưu'); onDone(); })
+        .catch(function (e) { clear(errHost).appendChild(errBox(e)); save.disabled = false; });
+    } });
+    md.m.appendChild(el('h3', { text: (row ? 'Sửa: ' : 'Thêm: ') + T.label }));
+    md.m.appendChild(form);
+    md.m.appendChild(errHost);
+    md.m.appendChild(el('div', { class: 'row-end' }, [el('button', { class: 'btn', text: 'Hủy', onclick: md.close }), save]));
+  }
+  var LOCK_KEY = { CHI_NHANH: 1, TRUONG: 1, NAM_HOC: 1, KY_LUONG: 1, NGACH_DM: 1, SETTINGS: 1, DEAN: 1, NHAN_SU: 1, USERS: 1, ROLES: 1 };
+  function tableLocksKey(t) { return !!LOCK_KEY[t]; }
+
+  /* ---------- nhập CSV nghiêm ngặt ---------- */
+  function openImport(table, opts, onDone) {
+    var T = tt(table), md = openModal(true), checked = null;
+    var ta = el('textarea', { class: 'paste', placeholder: 'Dán dữ liệu từ Excel/Google Sheets vào đây (dòng đầu là tiêu đề cột)…', spellcheck: 'false' });
+    var mode = el('select', null, [
+      el('option', { value: 'insert', text: 'Chỉ thêm mới (báo lỗi nếu đã tồn tại)' }),
+      el('option', { value: 'upsert', text: 'Thêm mới hoặc cập nhật theo khóa' })]);
+    var out = el('div'), commit = el('button', { class: 'btn pri', text: 'Nhập vào hệ thống', disabled: true });
+    var check = el('button', { class: 'btn', text: 'Kiểm tra dữ liệu' });
+
+    var specBody = el('tbody');
+    T.spec.forEach(function (s) {
+      specBody.appendChild(el('tr', null, [el('td', { text: s.label }), el('td', { text: s.type }), el('td', { text: s.req ? 'Bắt buộc' : '' }),
+        el('td', { class: 'wrap', text: Array.isArray(s.values) ? s.values.join(' | ') : s.values })]));
+    });
+    var header = T.spec.map(function (s) { return s.label; });
+    var spec = el('details', null, [el('summary', { text: 'Xem các cột của mẫu' }),
+      el('div', { class: 'tw', style: 'max-height:240px;margin-top:8px' }, [el('table', null, [
+        el('thead', null, [el('tr', null, ['Cột', 'Kiểu', '', 'Giá trị hợp lệ'].map(function (h) { return el('th', { text: h }); }))]), specBody])])]);
+
+    function invalidate() { checked = null; commit.disabled = true; }
+    ta.addEventListener('input', invalidate);
+    mode.addEventListener('change', invalidate);
+
+    check.addEventListener('click', function () {
+      var text = ta.value; check.disabled = true; clear(out).appendChild(el('div', { class: 'muted', text: 'Đang kiểm tra…' }));
+      api('importCheck', { table: table, text: text, mode: mode.value, ctx: opts.ctx }).then(function (r) {
+        check.disabled = false; clear(out);
+        if (r.locked) { out.appendChild(el('div', { class: 'alert bad', text: 'Đề án đã ban hành, không nhập được.' })); return; }
+        if (r.ok) {
+          checked = text; commit.disabled = false;
+          out.appendChild(el('div', { class: 'alert ok', text: 'Hợp lệ: ' + r.total + ' dòng (' + r.inserts + ' thêm mới, ' + r.updates + ' cập nhật). Bấm "Nhập vào hệ thống" để ghi.' }));
+          return;
+        }
+        out.appendChild(el('div', { class: 'alert bad', text: 'Có ' + r.errors.length + (r.truncated ? '+' : '') + ' lỗi. Chưa có dòng nào được nhập. Hãy sửa dữ liệu nguồn rồi dán lại.' }));
+        var body = el('tbody');
+        r.errors.slice(0, 300).forEach(function (e) {
+          body.appendChild(el('tr', null, [el('td', { text: e.n ? String(e.n) : '' }), el('td', { text: e.label }),
+            el('td', null, [e.value !== '' ? el('span', { class: 'vis', text: e.value }) : null]), el('td', { class: 'wrap', text: e.msg })]));
+        });
+        out.appendChild(el('div', { class: 'tw' }, [el('table', null, [
+          el('thead', null, [el('tr', null, ['Dòng', 'Cột', 'Giá trị (· = khoảng trắng)', 'Lỗi'].map(function (h) { return el('th', { text: h }); }))]), body])]));
+      }).catch(function (e) { check.disabled = false; clear(out).appendChild(errBox(e)); });
+    });
+
+    commit.addEventListener('click', function () {
+      if (checked === null) return;
+      commit.disabled = true;
+      api('importCommit', { table: table, text: checked, mode: mode.value, ctx: opts.ctx }).then(function (r) {
+        md.close(); toast('Đã nhập: ' + r.inserted + ' thêm mới, ' + r.updated + ' cập nhật'); onDone();
+      }).catch(function (e) { clear(out).appendChild(errBox(e)); });
+    });
+
+    md.m.appendChild(el('h3', { text: 'Nhập CSV: ' + T.label }));
+    md.m.appendChild(el('p', { class: 'muted', text: 'Hệ thống không tự sửa dữ liệu. Khoảng trắng thừa, ký tự ẩn, sai danh mục hoặc sai định dạng đều bị báo lỗi và toàn bộ lần nhập bị từ chối.' }));
+    md.m.appendChild(spec);
+    md.m.appendChild(el('div', { class: 'bar', style: 'margin-top:10px' }, [mode,
+      el('button', { class: 'btn', text: 'Chèn tiêu đề mẫu', onclick: function () { ta.value = header.join('\t') + '\n' + ta.value; invalidate(); } })]));
+    md.m.appendChild(ta);
+    md.m.appendChild(out);
+    md.m.appendChild(el('div', { class: 'row-end' }, [el('button', { class: 'btn', text: 'Đóng', onclick: md.close }), check, commit]));
+  }
+
+  /* ---------- bảng dữ liệu dùng chung ---------- */
+  function TableView(host, table, opts) {
+    opts = opts || {};
+    var T = tt(table);
+    if (!T) { host.appendChild(el('div', { class: 'alert warn', text: 'Bạn không có quyền xem mục này.' })); return; }
+    var st = { q: '', page: 0, rows: [], total: 0, locked: false, loading: true }, box = el('div');
+    host.appendChild(box);
+
+    function load() {
+      st.loading = true; render();
+      api('list', { table: table, ctx: opts.ctx, q: st.q, page: st.page, filter: opts.filter }).then(function (d) {
+        st.rows = d.rows; st.total = d.total; st.locked = d.locked; st.size = d.pageSize; st.loading = false; render();
+      }).catch(function (e) { st.loading = false; clear(box).appendChild(errBox(e)); });
+    }
+
+    function afterWrite() { refreshSchema().then(load); }
+
+    function render() {
+      clear(box);
+      var canW = T.canWrite && !st.locked, canI = T.canImport && !st.locked;
+      var search = el('input', { type: 'search', placeholder: 'Tìm kiếm…', value: st.q, 'aria-label': 'Tìm kiếm' });
+      search.addEventListener('keydown', function (e) { if (e.key === 'Enter') { st.q = search.value; st.page = 0; load(); } });
+      box.appendChild(el('div', { class: 'bar' }, [search,
+        el('button', { class: 'btn', text: 'Tìm', onclick: function () { st.q = search.value; st.page = 0; load(); } }),
+        el('span', { class: 'muted', text: st.loading ? 'Đang tải…' : st.total + ' bản ghi' }), el('span', { class: 'sp' }),
+        st.locked ? el('span', { class: 'badge warn', text: 'Đã ban hành - chỉ xem' }) : null,
+        canI ? el('button', { class: 'btn', text: 'Nhập CSV', onclick: function () { openImport(table, opts, afterWrite); } }) : null,
+        canW ? el('button', { class: 'btn pri', text: '+ Thêm', onclick: function () { openForm(table, opts, null, afterWrite); } }) : null]));
+
+      var cols = T.cols.filter(function (c) { return c.k !== T.ctx; });
+      var head = el('tr', null, cols.map(function (c) { return el('th', { text: c.l }); })
+        .concat((T.computed || []).map(function (c) { return el('th', { text: c.l }); })).concat([el('th', { text: '' })]));
+      var body = el('tbody');
+      st.rows.forEach(function (r) {
+        var tr = el('tr');
+        cols.forEach(function (c) {
+          var v = c.t === 'ref' && r[c.k] !== '' && c.k !== T.ctx ? refLabel(c, r[c.k]) : fmtCell(c, r[c.k]);
+          tr.appendChild(el('td', { class: (c.t === 'money' || c.t === 'num' || c.t === 'int' || c.t === 'pct' ? 'num ' : '') + (c.t === 'longtext' ? 'wrap' : ''), text: v }));
+        });
+        (T.computed || []).forEach(function (c) { tr.appendChild(el('td', { text: r[c.k] === undefined ? '' : String(r[c.k]) })); });
+        var acts = el('td');
+        (opts.rowActions ? opts.rowActions(r, st) : []).forEach(function (a) {
+          acts.appendChild(el('button', { class: 'btn sm ' + (a.cls || ''), text: a.label, onclick: function () { a.fn(r, load); } }));
+          acts.appendChild(document.createTextNode(' '));
+        });
+        if (canW) {
+          acts.appendChild(el('button', { class: 'btn sm', text: 'Sửa', onclick: function () { openForm(table, opts, r, afterWrite); } }));
+          acts.appendChild(document.createTextNode(' '));
+          acts.appendChild(el('button', { class: 'btn sm dng', text: 'Xóa', onclick: function () {
+            if (!confirm('Xóa bản ghi này?')) return;
+            api('remove', { table: table, id: r.id, ctx: opts.ctx }).then(function () { toast('Đã xóa'); afterWrite(); }).catch(function (e) { alert(e.error); });
+          } }));
+        }
+        tr.appendChild(acts);
+        body.appendChild(tr);
+      });
+      if (!st.rows.length && !st.loading) body.appendChild(el('tr', null, [el('td', { class: 'muted', colspan: cols.length + (T.computed || []).length + 1, text: 'Chưa có dữ liệu.' })]));
+      box.appendChild(el('div', { class: 'tw' }, [el('table', null, [el('thead', null, [head]), body])]));
+
+      if (st.total > (st.size || 300)) {
+        var pages = Math.ceil(st.total / st.size);
+        box.appendChild(el('div', { class: 'bar', style: 'margin-top:8px' }, [
+          el('button', { class: 'btn sm', text: '‹ Trước', disabled: st.page === 0, onclick: function () { st.page--; load(); } }),
+          el('span', { class: 'muted', text: 'Trang ' + (st.page + 1) + '/' + pages }),
+          el('button', { class: 'btn sm', text: 'Sau ›', disabled: st.page >= pages - 1, onclick: function () { st.page++; load(); } })]));
+      }
+    }
+    load();
+  }
+
+  function Tabs(host, items, activeKey, onChange) {
+    var bar = el('div', { class: 'tabs', role: 'tablist' }), body = el('div');
+    host.appendChild(bar); host.appendChild(body);
+    function select(key) {
+      Array.prototype.forEach.call(bar.children, function (b) { b.className = b.getAttribute('data-k') === key ? 'on' : ''; });
+      clear(body);
+      var it = items.filter(function (i) { return i.key === key; })[0] || items[0];
+      it.render(body);
+      if (onChange) onChange(it.key);
+    }
+    items.forEach(function (i) { bar.appendChild(el('button', { 'data-k': i.key, role: 'tab', text: i.label, onclick: function () { select(i.key); } })); });
+    select(activeKey && items.some(function (i) { return i.key === activeKey; }) ? activeKey : items[0].key);
+  }
+
+  function tableTabs(host, tables, sub, base, ctx) {
+    var items = tables.filter(function (t) { return tt(t) && !tt(t).hidden; }).map(function (t) {
+      return { key: t, label: tt(t).label, render: function (b) { TableView(b, t, { ctx: ctx }); } };
+    });
+    if (!items.length) { host.appendChild(el('div', { class: 'alert warn', text: 'Bạn không có quyền xem mục này.' })); return; }
+    Tabs(host, items, sub, function (k) { history.replaceState(null, '', '#' + base + '/' + k); });
+  }
+
+  /* ---------- các trang ---------- */
+  function pageDash(host) {
+    host.appendChild(el('h2', { text: 'Tổng quan' }));
+    var box = el('div'); host.appendChild(box);
+    api('dashboard').then(function (d) {
+      var stats = el('div', { class: 'grid' });
+      [['Chi nhánh hoạt động', d.counts.chi_nhanh], ['Trường hoạt động', d.counts.truong], ['Nhân sự đang làm việc', d.counts.nhan_su]].forEach(function (s) {
+        if (s[1] === null) return;
+        stats.appendChild(el('div', { class: 'card' }, [el('div', { class: 'stat' }, [String(s[1]), el('small', { text: s[0] })])]));
+      });
+      stats.appendChild(el('div', { class: 'card' }, [el('div', { class: 'stat' }, [d.dean ? d.dean.so_hieu : '—',
+        el('small', { text: d.dean ? 'Đề án hiệu lực từ ' + dmy(d.dean.tu) : 'Chưa có đề án đang hiệu lực' })])]));
+      box.appendChild(stats);
+      var ul = el('ul', { class: 'check' });
+      d.checklist.forEach(function (c) {
+        ul.appendChild(el('li', null, [el('span', { class: 'badge ' + (c.ok ? 'ok' : 'warn'), text: c.ok ? '✓' : '!' }), ' ',
+          el('a', { text: c.text, onclick: function () { location.hash = '#' + c.route; } })]));
+      });
+      box.appendChild(el('div', { class: 'card' }, [el('h3', { text: 'Các bước thiết lập' }), ul]));
+    }).catch(function (e) { box.appendChild(errBox(e)); });
+  }
+
+  function pageSetup(host, sub) {
+    host.appendChild(el('h2', { text: 'Thiết lập' }));
+    host.appendChild(el('p', { class: 'muted', text: 'Dùng "Nhập CSV" để dán nhanh danh sách chi nhánh, trường, năm học… trực tiếp từ Excel/Google Sheets.' }));
+    tableTabs(host, ['CHI_NHANH', 'TRUONG', 'NAM_HOC', 'KY_LUONG', 'TRUONG_HANG', 'NGACH_DM', 'SETTINGS'], sub, 'setup');
+  }
+
+  function pageStaff(host, sub) {
+    host.appendChild(el('h2', { text: 'Nhân sự' }));
+    tableTabs(host, ['NHAN_SU', 'QUA_TRINH_NGACH', 'QUA_TRINH_KIEMNHIEM', 'THU_NHAP_NEN'], sub, 'staff');
+  }
+
+  function openClone(src, onDone) {
+    var md = openModal(), f = {}, errHost = el('div');
+    var form = el('div', { class: 'form' });
+    [['ma', 'Mã phiên bản mới (vd DA02-2027)'], ['so_hieu', 'Số hiệu văn bản'], ['ten', 'Tên đề án'], ['hieu_luc_tu', 'Hiệu lực từ (dd/MM/yyyy)']].forEach(function (x) {
+      f[x[0]] = el('input', { type: 'text', autocomplete: 'off' });
+      form.appendChild(el('div', null, [el('label', { class: 'req', text: x[1] }), f[x[0]]]));
+    });
+    var go = el('button', { class: 'btn pri', text: 'Nhân bản', onclick: function () {
+      var p = { src: src.ma };
+      Object.keys(f).forEach(function (k) { p[k] = f[k].value; });
+      go.disabled = true;
+      api('dean.clone', p).then(function (r) { md.close(); toast('Đã tạo bản nháp ' + r.ma + ' (' + r.copied + ' dòng tham số)'); onDone(r.ma); })
+        .catch(function (e) { clear(errHost).appendChild(errBox(e)); go.disabled = false; });
+    } });
+    md.m.appendChild(el('h3', { text: 'Nhân bản từ ' + src.ma }));
+    md.m.appendChild(el('p', { class: 'muted', text: 'Tạo bản Nháp chứa toàn bộ bảng tham số của phiên bản nguồn để bạn chỉnh sửa. Phiên bản cũ giữ nguyên.' }));
+    md.m.appendChild(form); md.m.appendChild(errHost);
+    md.m.appendChild(el('div', { class: 'row-end' }, [el('button', { class: 'btn', text: 'Hủy', onclick: md.close }), go]));
+  }
+
+  function showCheck(ma) {
+    api('dean.check', { ma: ma }).then(function (r) {
+      var md = openModal();
+      md.m.appendChild(el('h3', { text: 'Kiểm tra đề án ' + ma }));
+      if (!r.issues.length) md.m.appendChild(el('div', { class: 'alert ok', text: 'Đủ điều kiện ban hành.' }));
+      else {
+        md.m.appendChild(el('div', { class: 'alert warn', text: 'Cần xử lý ' + r.issues.length + ' vấn đề trước khi ban hành:' }));
+        md.m.appendChild(el('ul', null, r.issues.map(function (i) { return el('li', { text: i }); })));
+      }
+      md.m.appendChild(el('div', { class: 'row-end' }, [el('button', { class: 'btn', text: 'Đóng', onclick: md.close })]));
+    }).catch(showErr);
+  }
+
+  function publish(ma, done) {
+    if (!confirm('Ban hành phiên bản ' + ma + '? Sau khi ban hành sẽ không sửa được, và hiệu lực phiên bản trước sẽ tự kết thúc.')) return;
+    api('dean.publish', { ma: ma }).then(function () { toast('Đã ban hành ' + ma); done(); })
+      .catch(function (e) {
+        var md = openModal(); md.m.appendChild(el('h3', { text: 'Chưa ban hành được' })); md.m.appendChild(errBox(e));
+        md.m.appendChild(el('div', { class: 'row-end' }, [el('button', { class: 'btn', text: 'Đóng', onclick: md.close })]));
+      });
+  }
+
+  function pageDean(host, sub) {
+    var T = tt('DEAN');
+    host.appendChild(el('h2', { text: 'Đề án lương (phiên bản)' }));
+    if (!T) { host.appendChild(el('div', { class: 'alert warn', text: 'Bạn không có quyền xem mục này.' })); return; }
+    if (sub) return deanDetail(host, sub);
+    host.appendChild(el('p', { class: 'muted', text: 'Mỗi lần thay đổi LCB, hệ số, ngạch bậc… hãy nhân bản phiên bản hiện hành thành bản Nháp, chỉnh sửa rồi ban hành. Các kỳ lương cũ vẫn gắn với phiên bản cũ.' }));
+    var box = el('div'); host.appendChild(box);
+    TableView(box, 'DEAN', { rowActions: function (r) {
+      var a = [{ label: 'Mở', fn: function () { location.hash = '#dean/' + r.ma; } }];
+      if (S.me.perms.indexOf('policy.edit') >= 0) a.push({ label: 'Nhân bản', fn: function (row, reload) { openClone(row, function (ma) { location.hash = '#dean/' + ma; }); } });
+      if (r.trang_thai === 'Nháp' && S.me.perms.indexOf('policy.publish') >= 0) a.push({ label: 'Ban hành', cls: 'pri', fn: function (row, reload) { publish(row.ma, reload); } });
+      return a;
+    } });
+  }
+
+  function deanDetail(host, ma) {
+    var head = el('div', { class: 'bar' }), body = el('div');
+    host.appendChild(head); host.appendChild(body);
+    api('list', { table: 'DEAN', filter: { ma: ma } }).then(function (d) {
+      var r = d.rows[0];
+      if (!r) { head.appendChild(el('div', { class: 'alert bad', text: 'Không tìm thấy đề án ' + ma })); return; }
+      var cls = r.trang_thai === 'Ban hành' ? 'ok' : (r.trang_thai === 'Nháp' ? 'warn' : '');
+      head.appendChild(el('button', { class: 'btn', text: '‹ Danh sách', onclick: function () { location.hash = '#dean'; } }));
+      head.appendChild(el('b', { text: r.ma + ' · ' + r.so_hieu }));
+      head.appendChild(el('span', { class: 'badge ' + cls, text: r.trang_thai }));
+      head.appendChild(el('span', { class: 'muted', text: 'Hiệu lực ' + dmy(r.hieu_luc_tu) + ' → ' + (r.hieu_luc_den ? dmy(r.hieu_luc_den) : 'nay') }));
+      head.appendChild(el('span', { class: 'sp' }));
+      head.appendChild(el('button', { class: 'btn', text: 'Kiểm tra sẵn sàng', onclick: function () { showCheck(ma); } }));
+      if (r.trang_thai === 'Nháp' && S.me.perms.indexOf('policy.publish') >= 0)
+        head.appendChild(el('button', { class: 'btn pri', text: 'Ban hành', onclick: function () { publish(ma, function () { route(); }); } }));
+      var ctx = { de_an_ma: ma };
+      var items = [['DEAN_THAMSO', 'LCB / LTB'], ['DEAN_NGACH', 'Ngạch - bậc'], ['DEAN_HANGTRUONG', 'Hạng trường'], ['DEAN_QUYDOI', 'Quy đổi trách nhiệm'],
+        ['DEAN_TRAN', 'Trần tăng thu nhập'], ['DEAN_PARAM', 'Tham số khác']];
+      Tabs(body, items.map(function (i) { return { key: i[0], label: i[1], render: function (b) { TableView(b, i[0], { ctx: ctx }); } }; }));
+    }).catch(function (e) { head.appendChild(errBox(e)); });
+  }
+
+  function rolesMatrix(host) {
+    var box = el('div'); host.appendChild(box);
+    api('roles.matrix').then(function (m) {
+      var inputs = {};
+      var thead = el('tr', null, [el('th', { text: 'Quyền' })].concat(m.roles.map(function (r) { return el('th', { title: r.ten, text: r.ma }); })));
+      var body = el('tbody');
+      m.perms.forEach(function (p) {
+        var tr = el('tr', null, [el('td', { class: 'wrap', text: p.l })]);
+        m.roles.forEach(function (r) {
+          var cb = el('input', { type: 'checkbox', style: 'width:auto', 'aria-label': r.ma + ' ' + p.k });
+          cb.checked = r.ma === 'ADMIN' || !!(m.grid[r.ma] && m.grid[r.ma][p.k]);
+          if (r.ma === 'ADMIN') cb.disabled = true;
+          inputs[r.ma + '|' + p.k] = cb;
+          tr.appendChild(el('td', null, [cb]));
+        });
+        body.appendChild(tr);
+      });
+      var saves = el('tr', null, [el('td', { text: '' })].concat(m.roles.map(function (r) {
+        return el('td', null, [r.ma === 'ADMIN' ? null : el('button', { class: 'btn sm', text: 'Lưu', onclick: function () {
+          var perms = m.perms.filter(function (p) { return inputs[r.ma + '|' + p.k].checked; }).map(function (p) { return p.k; });
+          api('roles.save', { role: r.ma, perms: perms }).then(function () { toast('Đã lưu quyền vai trò ' + r.ma); }).catch(showErr);
+        } })]);
+      })));
+      body.appendChild(saves);
+      box.appendChild(el('p', { class: 'muted', text: 'Tích chọn các chức năng mỗi vai trò được làm, rồi bấm Lưu ở cột tương ứng. Phạm vi dữ liệu (toàn hệ thống / chi nhánh / trường / cá nhân) được chọn khi gán vai trò cho người dùng.' }));
+      box.appendChild(el('div', { class: 'tw' }, [el('table', { class: 'matrix' }, [el('thead', null, [thead]), body])]));
+    }).catch(function (e) { box.appendChild(errBox(e)); });
+  }
+
+  function pageAdmin(host, sub) {
+    host.appendChild(el('h2', { text: 'Hệ thống' }));
+    var items = [];
+    [['USERS', 'Người dùng'], ['USER_ROLES', 'Gán vai trò'], ['ROLES', 'Vai trò']].forEach(function (x) {
+      if (tt(x[0])) items.push({ key: x[0], label: x[1], render: function (b) { TableView(b, x[0]); } });
+    });
+    if (tt('ROLE_PERMS')) items.push({ key: 'MATRIX', label: 'Ma trận quyền', render: rolesMatrix });
+    if (tt('AUDIT_LOG')) items.push({ key: 'AUDIT_LOG', label: 'Nhật ký', render: function (b) { TableView(b, 'AUDIT_LOG'); } });
+    if (!items.length) { host.appendChild(el('div', { class: 'alert warn', text: 'Bạn không có quyền xem mục này.' })); return; }
+    Tabs(host, items, sub, function (k) { history.replaceState(null, '', '#admin/' + k); });
+  }
+
+  /* ---------- thông báo ---------- */
+  function refreshBell(btn) {
+    api('notify.list').then(function (d) {
+      clear(btn).appendChild(document.createTextNode('🔔'));
+      if (d.unread) btn.appendChild(el('span', { class: 'dot', text: String(d.unread) }));
+    }).catch(function () { /* im lặng */ });
+  }
+  function toggleBell(btn) {
+    if (S.bellBox) { S.bellBox.remove(); S.bellBox = null; return; }
+    api('notify.list').then(function (d) {
+      var box = el('div', { class: 'drop' });
+      box.appendChild(el('div', { class: 'bar', style: 'padding:8px 12px;margin:0' }, [el('b', { text: 'Thông báo' }), el('span', { class: 'sp' }),
+        el('button', { class: 'btn sm', text: 'Đánh dấu đã đọc', onclick: function () { api('notify.read', {}).then(function () { toggleBell(btn); toggleBell(btn); refreshBell(btn); }); } })]));
+      if (!d.items.length) box.appendChild(el('div', { class: 'it muted', text: 'Chưa có thông báo.' }));
+      d.items.forEach(function (n) {
+        box.appendChild(el('div', { class: 'it' + (n.read ? '' : ' un'), onclick: function () {
+          api('notify.read', { ids: [n.id] }).then(function () { refreshBell(btn); });
+          if (n.link) location.hash = '#' + n.link;
+          if (S.bellBox) { S.bellBox.remove(); S.bellBox = null; }
+        } }, [el('b', { text: n.title }), el('span', { class: 'muted', text: n.body }), el('div', { class: 'muted', style: 'font-size:11px', text: n.at.replace('T', ' ') })]));
+      });
+      document.body.appendChild(box); S.bellBox = box;
+    }).catch(showErr);
+  }
+
+  /* ---------- khung & định tuyến ---------- */
+  var PAGES = [
+    { id: 'dash', label: 'Tổng quan', show: function () { return true; }, render: pageDash },
+    { id: 'setup', label: 'Thiết lập', show: function () { return !!tt('CHI_NHANH'); }, render: pageSetup },
+    { id: 'dean', label: 'Đề án', show: function () { return !!tt('DEAN'); }, render: pageDean },
+    { id: 'staff', label: 'Nhân sự', show: function () { return !!tt('NHAN_SU') || !!tt('THU_NHAP_NEN'); }, render: pageStaff },
+    { id: 'admin', label: 'Hệ thống', show: function () { return !!tt('USERS') || !!tt('AUDIT_LOG'); }, render: pageAdmin }
+  ];
+
+  function route() {
+    if (S.bellBox) { S.bellBox.remove(); S.bellBox = null; }
+    var parts = location.hash.replace(/^#/, '').split('/'), id = parts[0] || 'dash', sub = parts.slice(1).join('/') || '';
+    var page = PAGES.filter(function (p) { return p.id === id && p.show(); })[0] || PAGES[0];
+    Array.prototype.forEach.call(S.nav.children, function (a) { a.className = a.getAttribute('data-p') === page.id ? 'on' : ''; });
+    clear(S.main);
+    page.render(S.main, sub);
+  }
+
+  function start() {
+    Promise.all([api('me'), api('schema')]).then(function (r) {
+      S.me = r[0]; S.schema = r[1];
+      var app = clear(document.getElementById('app'));
+      S.nav = el('nav');
+      PAGES.forEach(function (p) {
+        if (p.show()) S.nav.appendChild(el('a', { 'data-p': p.id, tabindex: '0', text: p.label, onclick: function () { location.hash = '#' + p.id; } }));
+      });
+      var bell = el('button', { class: 'bell', 'aria-label': 'Thông báo', text: '🔔', onclick: function () { toggleBell(bell); } });
+      app.appendChild(el('header', { class: 'top' }, [el('div', { class: 'top-in' }, [
+        el('span', { class: 'brand', text: 'VAS · Hệ thống Lương' }), S.nav, bell,
+        el('span', { class: 'who', text: S.me.name + (S.me.isAdmin ? ' (Quản trị)' : '') })])]));
+      S.main = el('main');
+      app.appendChild(S.main);
+      refreshBell(bell);
+      setInterval(function () { refreshBell(bell); }, 90000);
+      window.addEventListener('hashchange', route);
+      route();
+    }).catch(function (e) {
+      if (e instanceof Error) console.error(e);
+      clear(document.getElementById('app')).appendChild(el('div', { class: 'boot' }, [errBox(e instanceof Error ? { error: 'Lỗi giao diện: ' + e.message } : e)]));
+    });
+  }
+
+  start();
+})();
+</script>
+
+</body>
+</html>
