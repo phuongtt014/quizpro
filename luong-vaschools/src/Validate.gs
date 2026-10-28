@@ -128,6 +128,8 @@ var Validate = (function () {
       });
     });
 
+    if (T.checkSet) T.checkSet(out.filter(function (r) { return !r.__bad; }), existing, updatedIds, function (n, f, v, m) { push(n, f, v, m); });
+
     var closes = [];
     if (T.temporal) {
       var good = out.filter(function (r) { return !r.__bad; }), against = existing;

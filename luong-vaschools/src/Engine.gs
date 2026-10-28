@@ -55,16 +55,26 @@ var Engine = (function () {
     };
   }
 
-  /** Tỷ lệ trần theo năm áp dụng và thâm niên; null nếu đề án không có dòng phù hợp. */
-  function capRate(tran, nam, tenure) {
-    var years = tran.map(function (r) { return r.nam; }).filter(function (y) { return y <= nam; });
-    if (!years.length) return null;
-    var y = Math.max.apply(null, years), rate = null;
-    tran.forEach(function (r) {
-      if (r.nam === y && tenure >= r.tn_tu && (r.tn_den === '' || r.tn_den === null || tenure < r.tn_den)) rate = r.ty_le;
-    });
-    return rate;
+  /**
+   * Tỷ lệ trần theo năm áp dụng, thâm niên và trường. Trường có trần riêng (dòng có truong_ma) thì dùng trần riêng của năm gần nhất không quá năm xét;
+   * khoảng thâm niên nào trần riêng không phủ thì dùng trần chung (truong_ma trống). Trả { rate, own } (rate = null nếu không có).
+   */
+  function capRateInfo(tran, nam, tenure, truongMa) {
+    function pick(rows) {
+      var years = rows.map(function (r) { return r.nam; }).filter(function (y) { return y <= nam; });
+      if (!years.length) return null;
+      var y = Math.max.apply(null, years), rate = null;
+      rows.forEach(function (r) {
+        if (r.nam === y && tenure >= r.tn_tu && (r.tn_den === '' || r.tn_den === null || tenure < r.tn_den)) rate = r.ty_le;
+      });
+      return rate;
+    }
+    var own = truongMa ? tran.filter(function (r) { return r.truong_ma === truongMa; }) : [];
+    var rate = own.length ? pick(own) : null;
+    if (rate !== null) return { rate: rate, own: true };
+    return { rate: pick(tran.filter(function (r) { return !r.truong_ma; })), own: false };
   }
+  function capRate(tran, nam, tenure, truongMa) { return capRateInfo(tran, nam, tenure, truongMa).rate; }
 
   /**
    * input: { doiTuong, ngach (dòng DEAN_NGACH), tenure, holdYears, kiemNhiem: [{ hs_kpi, ti_le }],
@@ -104,9 +114,10 @@ var Engine = (function () {
     if (cur === null || cur === undefined) {
       notes.push('Chưa có thu nhập hiện tại: không áp trần/bảo vệ lương');
     } else {
-      tran = capRate(input.tran, input.namXet, input.tenure);
+      var info = capRateInfo(input.tran, input.namXet, input.tenure, input.truongMa);
+      tran = info.rate;
       if (tran === null) notes.push('Đề án chưa có trần cho năm ' + input.namXet + ': không áp trần');
-      else { max = cur * (1 + tran); if (pa > max) { official = max; notes.push('Bị khống chế bởi trần ' + round(tran * 100, 2) + '%'); } }
+      else { max = cur * (1 + tran); if (pa > max) { official = max; notes.push('Bị khống chế bởi trần ' + round(tran * 100, 2) + '%' + (info.own ? ' (trần riêng của trường)' : '')); } }
       if (official < cur) { official = cur; notes.push('Hỗ trợ giữ mức thu nhập'); }
     }
     return {
@@ -122,5 +133,14 @@ var Engine = (function () {
     };
   }
 
-  return { daysInclusive: daysInclusive, tietOf: tietOf, allocate: allocate, settle: settle, income: income, capRate: capRate };
+  /** Lương hè: thu nhập ngày × x + tỷ lệ(60%) × thu nhập ngày × y; thu nhập ngày = thu nhập tháng / số ngày chia (24). Đăng ký nghỉ (x = y = 0) thì không hưởng. */
+  function summer(input) {
+    var p = input.param, chia = num(p.he_ngay_chia) || 24, ty = num(p.he_ty_le_khong_phan_cong);
+    var x = num(input.x), y = num(input.y), ngay = input.thuNhapThang / chia;
+    var tienX = ngay * x, tienY = ngay * ty * y;
+    return { thu_nhap_thang: Math.round(input.thuNhapThang), thu_nhap_ngay: Math.round(ngay), tien_x: Math.round(tienX), tien_y: Math.round(tienY),
+      tong_he: Math.round(tienX + tienY), ghi_chu: x + y === 0 ? 'Đăng ký nghỉ hè: không hưởng lương' : '' };
+  }
+
+  return { summer: summer, daysInclusive: daysInclusive, tietOf: tietOf, allocate: allocate, settle: settle, income: income, capRate: capRate, capRateInfo: capRateInfo };
 })();

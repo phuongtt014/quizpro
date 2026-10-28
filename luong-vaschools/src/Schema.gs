@@ -115,10 +115,10 @@ var SCHEMA = (function () {
     label: 'Kỳ tính (học kỳ / đợt điều chỉnh thu nhập)', group: 'setup', key: ['ma'], lockKey: true,
     perm: { r: 'setup.view', w: 'setup.edit' },
     cols: [
-      col_('ma', 'Mã kỳ', 'text', { req: true, pattern: '^\\d{4}-\\d{4}-(HK[12]|DC[1-9])$', hint: 'học kỳ: 2026-2027-HK1; đợt điều chỉnh: 2025-2026-DC1' }),
+      col_('ma', 'Mã kỳ', 'text', { req: true, pattern: '^\\d{4}-\\d{4}-(HK[12]|DC[1-9]|HE)$', hint: 'học kỳ: 2026-2027-HK1; đợt điều chỉnh: 2025-2026-DC1; hè: 2025-2026-HE' }),
       col_('nam_hoc_ma', 'Năm học', 'ref', { ref: 'NAM_HOC.ma', req: true }),
-      col_('hoc_ky', 'Học kỳ', 'enum', { values: ['HK1', 'HK2', 'DC1', 'DC2', 'DC3', 'DC4', 'DC5', 'DC6', 'DC7', 'DC8', 'DC9'], req: true }),
-      col_('loai', 'Loại', 'enum', { values: ['Học kỳ', 'Điều chỉnh'], def: 'Học kỳ' }),
+      col_('hoc_ky', 'Học kỳ', 'enum', { values: ['HK1', 'HK2', 'DC1', 'DC2', 'DC3', 'DC4', 'DC5', 'DC6', 'DC7', 'DC8', 'DC9', 'HE'], req: true }),
+      col_('loai', 'Loại', 'enum', { values: ['Học kỳ', 'Điều chỉnh', 'Hè'], def: 'Học kỳ' }),
       col_('tu_ngay', 'Từ ngày', 'date', { req: true, hint: 'đợt điều chỉnh: ngày hiệu lực' }),
       col_('den_ngay', 'Đến ngày', 'date', { req: true, hint: 'đợt điều chỉnh: bằng ngày hiệu lực' }),
       col_('so_tuan', 'Số tuần quy định', 'int', { min: 0, max: 30, def: 0, hint: 'bắt buộc ≥ 1 với học kỳ' }),
@@ -128,15 +128,15 @@ var SCHEMA = (function () {
     ],
     check: function (r) {
       if (r.ma !== r.nam_hoc_ma + '-' + r.hoc_ky) return 'Mã kỳ phải = Năm học + "-" + Học kỳ/Đợt (vd ' + r.nam_hoc_ma + '-' + r.hoc_ky + ')';
-      var dc = r.hoc_ky.indexOf('DC') === 0;
-      if (dc && r.loai !== 'Điều chỉnh') return 'Mã đợt DC… thì Loại phải là "Điều chỉnh"';
-      if (!dc && r.loai !== 'Học kỳ') return 'Học kỳ HK1/HK2 thì Loại phải là "Học kỳ"';
-      if (dc) {
+      var kind = r.hoc_ky === 'HE' ? 'Hè' : (r.hoc_ky.indexOf('DC') === 0 ? 'Điều chỉnh' : 'Học kỳ');
+      if (r.loai !== kind) return 'Mã ' + r.hoc_ky + ' thì Loại phải là "' + kind + '"';
+      if (kind === 'Điều chỉnh') {
         if (r.den_ngay < r.tu_ngay) return 'Đến ngày phải ≥ Từ ngày';
         if (r.ky_phu_troi === r.ma) return 'Kỳ phụ trội không thể là chính đợt này';
         return null;
       }
-      if (r.ky_phu_troi) return 'Chỉ đợt điều chỉnh mới chọn "Lấy phụ trội từ kỳ"';
+      if (r.ky_phu_troi) return 'Chỉ đợt điều chỉnh mới chọn "Kỳ lấy phụ trội"';
+      if (kind === 'Hè') return r.den_ngay <= r.tu_ngay ? 'Đến ngày phải sau Từ ngày (kỳ hè thường 01/06 – 31/07)' : null;
       if (r.so_tuan < 1) return 'Học kỳ cần nhập Số tuần quy định (≥ 1)';
       return r.den_ngay <= r.tu_ngay ? 'Đến ngày phải sau Từ ngày' : null;
     }
@@ -245,15 +245,34 @@ var SCHEMA = (function () {
   };
 
   S.DEAN_TRAN = {
-    label: 'Trần tăng thu nhập theo thâm niên', group: 'policy', ctx: 'de_an_ma', key: ['de_an_ma', 'nam', 'tn_tu'], perm: deanPerm,
+    label: 'Trần tăng thu nhập (chung và riêng từng trường)', group: 'policy', ctx: 'de_an_ma', key: ['de_an_ma', 'truong_ma', 'nam', 'tn_tu'], perm: deanPerm,
     cols: [
       deanCtx(),
+      col_('truong_ma', 'Trường', 'ref', { ref: 'TRUONG.ma', hint: 'để trống = áp dụng chung cho mọi trường chưa có trần riêng' }),
       col_('nam', 'Năm áp dụng', 'int', { req: true, min: 2000, max: 2100 }),
       col_('tn_tu', 'Thâm niên từ (năm)', 'int', { req: true, min: 0 }),
       col_('tn_den', 'Đến dưới (năm)', 'int', { min: 1, hint: 'để trống = không giới hạn' }),
       col_('ty_le', 'Tỷ lệ tăng tối đa', 'pct', { req: true, min: 0 })
     ],
-    check: function (r) { return r.tn_den !== '' && r.tn_den <= r.tn_tu ? '"Đến dưới" phải lớn hơn "Thâm niên từ"' : null; }
+    check: function (r) { return r.tn_den !== '' && r.tn_den <= r.tn_tu ? '"Đến dưới" phải lớn hơn "Thâm niên từ"' : null; },
+    // Các khoảng thâm niên của cùng (trường, năm) không được chồng nhau (tính cả dòng đã có và dòng trong file).
+    checkSet: function (rows, existing, updated, push) {
+      var groups = {}, key = function (r) { return r.truong_ma + '|' + r.nam; };
+      existing.forEach(function (r) { if (!updated[r.id]) (groups[key(r)] = groups[key(r)] || []).push({ r: r, own: false }); });
+      rows.forEach(function (r) { (groups[key(r)] = groups[key(r)] || []).push({ r: r, own: true }); });
+      var end = function (r) { return r.tn_den === '' || r.tn_den === null ? Infinity : r.tn_den; };
+      var span = function (r) { return '[' + r.tn_tu + ', ' + (r.tn_den === '' ? '∞' : r.tn_den) + ')'; };
+      Object.keys(groups).forEach(function (g) {
+        var l = groups[g].sort(function (a, b) { return a.r.tn_tu - b.r.tn_tu; });
+        for (var i = 0; i < l.length; i++) for (var j = i + 1; j < l.length; j++) {
+          if (l[j].r.tn_tu >= end(l[i].r)) break;
+          [[l[i], l[j]], [l[j], l[i]]].forEach(function (p) {
+            if (p[0].own) push(p[0].r.__n, 'tn_tu', p[0].r.tn_tu, 'Khoảng thâm niên ' + span(p[0].r) + ' chồng với ' + (p[1].own ? 'dòng ' + p[1].r.__n + ' trong file' : 'dòng đã có') + ' ' + span(p[1].r) +
+              (p[0].r.truong_ma ? ' (trường ' + p[0].r.truong_ma + ', năm ' + p[0].r.nam + ')' : ' (trần chung, năm ' + p[0].r.nam + ')'));
+          });
+        }
+      });
+    }
   };
 
   S.DEAN_PARAM = {
@@ -457,6 +476,43 @@ var SCHEMA = (function () {
       col_('max_income', 'Mức tối đa', 'money'), col_('chinh_thuc', 'Mức chính thức', 'money'), col_('chenh_lech', 'Chênh lệch so với hiện tại', 'money'),
       col_('luong_nen', 'Lương làm mốc cho đợt sau', 'money'), col_('chi_phi_thang', 'Chi phí/tháng (lương + phụ trội BQ)', 'money'),
       col_('tien_pt', 'Tiền phụ trội cả kỳ', 'money')
+    ]).concat(tail())
+  };
+
+
+  /* ---------- LƯƠNG HÈ (đề án VI.2) ---------- */
+  S.HE_KHAI_BAO = {
+    label: 'Khai báo ngày làm việc trong hè', group: 'declare', scope: 'staff', key: ['ky_ma', 'ma_nv'],
+    perm: { r: 'declare.view', w: 'declare.edit', i: 'declare.edit' },
+    cols: [
+      col_('ky_ma', 'Kỳ hè', 'ref', { ref: 'KY_LUONG.ma', req: true }),
+      col_('ma_nv', 'Mã nhân sự', 'ref', { ref: 'NHAN_SU.ma_nv', req: true }),
+      col_('so_ngay_lam', 'Số ngày vào trường theo kế hoạch (x)', 'num', { req: true, min: 0 }),
+      col_('so_ngay_san_sang', 'Số ngày không vào trường nhưng sẵn sàng (y)', 'num', { req: true, min: 0 }),
+      col_('ghi_chu', 'Ghi chú', 'text'),
+      col_('trang_thai', 'Trạng thái', 'enum', { values: ['Nháp', 'Chờ duyệt', 'Đã duyệt'], def: 'Nháp', ro: true }),
+      col_('phieu_ma', 'Phiếu', 'text', { ro: true })
+    ],
+    guard: function (r) { return r.trang_thai !== 'Nháp' ? 'Dòng khai báo đang ' + r.trang_thai.toLowerCase() + ' nên không sửa/xóa được.' : null; },
+    check: function (r) {
+      var ky = Db.find('KY_LUONG', function (k) { return k.ma === r.ky_ma; });
+      if (ky && ky.loai !== 'Hè') return 'Kỳ ' + ky.ma + ' không phải kỳ hè';
+      if (ky) {
+        var days = Engine.daysInclusive(ky.tu_ngay, ky.den_ngay);
+        if (r.so_ngay_lam + r.so_ngay_san_sang > days) return 'x + y (' + (r.so_ngay_lam + r.so_ngay_san_sang) + ') vượt số ngày của kỳ hè (' + days + ')';
+      }
+      return null;
+    }
+  };
+
+  S.HE_THU_NHAP = {
+    label: 'Lương hè từng người', group: 'calc', scope: 'staff', readonly: true, key: ['ky_ma', 'ma_nv'],
+    perm: { r: 'calc.view', w: 'calc.run' },
+    cols: resultCols().concat([
+      col_('ngach_ma', 'Ngạch'), col_('ngach_ten', 'Tên ngạch'),
+      col_('so_ngay_lam', 'Ngày làm theo kế hoạch (x)', 'num'), col_('so_ngay_san_sang', 'Ngày sẵn sàng (y)', 'num'),
+      col_('thu_nhap_thang', 'Thu nhập tháng', 'money'), col_('thu_nhap_ngay', 'Thu nhập ngày', 'money'),
+      col_('tien_x', 'Tiền x', 'money'), col_('tien_y', 'Tiền y (60%)', 'money'), col_('tong_he', 'Lương hè', 'money')
     ]).concat(tail())
   };
 

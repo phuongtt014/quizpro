@@ -54,12 +54,13 @@ var Api = (function () {
     if (!d) throw new AppError('NOT_FOUND', 'Không tìm thấy đề án');
     return d;
   }
+  var APPEND_ONLY = { DEAN_THAMSO: 'LCB/LTB của chi nhánh mới', DEAN_TRAN: 'trần của năm/trường mới' };
   function assertDeanWritable(table, ma, appendOnly) {
     var d = dean(ma);
     if (d.trang_thai === 'Nháp') return;
-    if (appendOnly && table === 'DEAN_THAMSO' && d.trang_thai === 'Ban hành') return;
+    if (appendOnly && APPEND_ONLY[table] && d.trang_thai === 'Ban hành') return;
     throw new AppError('LOCKED', 'Đề án đã ban hành nên không thể sửa. Hãy nhân bản thành phiên bản mới rồi chỉnh sửa.' +
-      (table === 'DEAN_THAMSO' ? ' (Riêng LCB/LTB của chi nhánh mới thì được thêm mới.)' : ''));
+      (APPEND_ONLY[table] ? ' (Riêng ' + APPEND_ONLY[table] + ' thì được thêm mới.)' : ''));
   }
 
   function stripRow(T, r, forUpdate) {
@@ -163,13 +164,17 @@ var Api = (function () {
       head = ['Mã NV', 'Họ tên', 'Loại', 'Nội dung', 'Số lượng', 'Thời gian'];
       rows = Db.filter('KHAI_BAO', function (r) { return r.phieu_ma === p.ma_phieu; }).map(function (r) {
         return [r.ma_nv, names[r.ma_nv] || '', r.loai, r.noi_dung, r.so_luong + ' ' + r.don_vi + (r.dac_thu === 'Có' ? ' (đặc thù)' : ''), Util.displayDate(r.tu_ngay) + ' – ' + Util.displayDate(r.den_ngay)];
-      });
+      }).concat(Db.filter('HE_KHAI_BAO', function (r) { return r.phieu_ma === p.ma_phieu; }).map(function (r) {
+        return [r.ma_nv, names[r.ma_nv] || '', 'Lương hè', 'Ngày vào trường (x) / ngày sẵn sàng (y)', r.so_ngay_lam + ' / ' + r.so_ngay_san_sang, r.ky_ma];
+      }));
     } else if (p.loai_phieu === 'Quyết toán kỳ') {
       head = ['Mã NV', 'Họ tên', 'Thu nhập hiện tại', 'Mức chính thức', 'Ghi chú'];
       var money = function (v) { return v === '' ? '' : Number(v).toLocaleString('vi-VN'); };
       rows = Db.filter('THU_NHAP_MOI', function (r) { return r.phieu_ma === p.ma_phieu; }).map(function (r) {
         return [r.ma_nv, names[r.ma_nv] || '', money(r.thu_nhap_hien_tai), money(r.chinh_thuc), r.ghi_chu];
-      });
+      }).concat(Db.filter('HE_THU_NHAP', function (r) { return r.phieu_ma === p.ma_phieu; }).map(function (r) {
+        return [r.ma_nv, names[r.ma_nv] || '', money(r.thu_nhap_thang), money(r.tong_he) + ' (lương hè)', r.ghi_chu];
+      }));
     } else if (p.loai_phieu === 'Đề xuất ngạch') {
       var d = Workflow.parse(p.noi_dung, {}).row || {};
       head = ['Mã NV', 'Họ tên', 'Ngạch đề xuất', 'Hiệu lực từ', 'Số quyết định', 'Lý do'];
@@ -261,7 +266,7 @@ var Api = (function () {
       if (T.ctx) {
         var d = Db.find('DEAN', function (x) { return x.ma === ctx[T.ctx]; });
         locked = !d || d.trang_thai !== 'Nháp';
-        appendOnly = locked && !!d && p.table === 'DEAN_THAMSO' && d.trang_thai === 'Ban hành';
+        appendOnly = locked && !!d && !!APPEND_ONLY[p.table] && d.trang_thai === 'Ban hành';
       }
       return { rows: rows.map(function (r) { return pickClient(T, r); }), total: total, page: page, pageSize: PAGE, locked: locked, appendOnly: appendOnly };
     },
@@ -347,7 +352,7 @@ var Api = (function () {
         truncated: !!res.truncated, locked: T.ctx ? (function () {
           var d = Db.find('DEAN', function (x) { return x.ma === p.ctx[T.ctx]; });
           if (!d) return true;
-          return d.trang_thai !== 'Nháp' && !(p.table === 'DEAN_THAMSO' && d.trang_thai === 'Ban hành' && (p.mode || 'insert') === 'insert');
+          return d.trang_thai !== 'Nháp' && !(APPEND_ONLY[p.table] && d.trang_thai === 'Ban hành' && (p.mode || 'insert') === 'insert');
         })() : false };
     },
 
@@ -371,6 +376,33 @@ var Api = (function () {
       });
       if (!res.ok) throw new AppError('VALIDATION', 'Dữ liệu không hợp lệ - không có dòng nào được nhập.', res.errors.slice(0, 500));
       return { inserted: ins, updated: upd };
+    },
+
+    /** Sao chép toàn bộ trần (chung và riêng từng trường) của một năm sang năm mới để chỉnh tiếp; bỏ qua dòng đã có. */
+    'tran.copy': function (p, user) {
+      Auth.require(user, 'policy.edit');
+      var out;
+      Db.tx(function () {
+        assertDeanWritable('DEAN_TRAN', p.de_an_ma, true);
+        var from = parseInt(p.from_nam, 10), to = parseInt(p.to_nam, 10);
+        if (!(from > 0) || !(to > 0) || from === to) throw new AppError('BAD_REQUEST', 'Nhập năm nguồn và năm đích khác nhau');
+        var src = Db.filter('DEAN_TRAN', function (r) { return r.de_an_ma === p.de_an_ma && r.nam === from; });
+        if (!src.length) throw new AppError('EMPTY', 'Năm ' + from + ' chưa có dòng trần nào để sao chép');
+        var raws = src.map(function (r, i) {
+          return { n: i + 1, vals: { truong_ma: r.truong_ma, nam: String(to), tn_tu: String(r.tn_tu), tn_den: r.tn_den === '' ? '' : String(r.tn_den),
+            ty_le: String(Math.round(r.ty_le * 10000) / 100).replace('.', ',') + '%' } };
+        });
+        var have = {};
+        Db.filter('DEAN_TRAN', function (r) { return r.de_an_ma === p.de_an_ma && r.nam === to; }).forEach(function (r) { have[r.truong_ma + '|' + r.tn_tu] = true; });
+        raws = raws.filter(function (x) { return !have[x.vals.truong_ma + '|' + x.vals.tn_tu]; });
+        if (!raws.length) throw new AppError('EMPTY', 'Năm ' + to + ' đã có đủ các dòng này');
+        var res = Validate.rows('DEAN_TRAN', raws, { de_an_ma: p.de_an_ma }, { mode: 'insert' });
+        if (!res.ok) throw validationError(res);
+        Db.insertMany('DEAN_TRAN', res.rows.map(function (r) { return stripRow(SCHEMA.DEAN_TRAN, r); }), user.email);
+        Audit.log(user, 'SAO_CHEP_TRAN', 'DEAN_TRAN', p.de_an_ma, { tu_nam: from, den_nam: to, so_dong: res.rows.length });
+        out = { copied: res.rows.length };
+      });
+      return out;
     },
 
     'dean.check': function (p, user) {
@@ -429,14 +461,16 @@ var Api = (function () {
       Db.tx(function () {
         var ky = findKy(p.ky_ma, true), tr = findTruong(p.truong_ma), staff = {};
         Db.all('NHAN_SU').forEach(function (s) { if (s.truong_ma === tr.ma) staff[s.ma_nv] = s; });
-        var lines = Db.filter('KHAI_BAO', function (r) {
+        if (ky.loai === 'Điều chỉnh') throw new AppError('BAD_REQUEST', 'Đợt điều chỉnh không có khai báo giảng dạy');
+        var tbl = ky.loai === 'Hè' ? 'HE_KHAI_BAO' : 'KHAI_BAO';
+        var lines = Db.filter(tbl, function (r) {
           var s = staff[r.ma_nv];
           return r.ky_ma === ky.ma && r.trang_thai === 'Nháp' && s && Auth.canRow(user, 'declare.edit', { cn: s.chi_nhanh_ma, tr: s.truong_ma, nv: s.ma_nv });
         });
         if (!lines.length) throw new AppError('EMPTY', 'Không có dòng khai báo nào ở trạng thái Nháp của trường này trong kỳ ' + ky.ma);
-        var ph = Workflow.create(user, { loai: 'Khai báo', tieu_de: 'Khai báo giảng dạy ' + ky.ma + ' · ' + tr.ten + ' (' + lines.length + ' dòng)',
+        var ph = Workflow.create(user, { loai: 'Khai báo', tieu_de: (ky.loai === 'Hè' ? 'Khai báo ngày làm việc hè ' : 'Khai báo giảng dạy ') + ky.ma + ' · ' + tr.ten + ' (' + lines.length + ' dòng)',
           truong_ma: tr.ma, chi_nhanh_ma: tr.chi_nhanh_ma, ky_ma: ky.ma, payload: { lines: lines.length } });
-        Db.updateMany('KHAI_BAO', lines.map(function (l) { return { id: l.id, patch: { trang_thai: 'Chờ duyệt', phieu_ma: ph.ma_phieu } }; }), user.email);
+        Db.updateMany(tbl, lines.map(function (l) { return { id: l.id, patch: { trang_thai: 'Chờ duyệt', phieu_ma: ph.ma_phieu } }; }), user.email);
         out = { ma_phieu: ph.ma_phieu, lines: lines.length };
       });
       return out;
@@ -479,6 +513,11 @@ var Api = (function () {
       return out;
     },
 
+    'calc.simulate': function (p, user) {
+      Auth.require(user, 'calc.run');
+      return Calc.simulate(user, p.ky_ma, p.truong_ma || '', p.kich_ban || {}, p.group, p.gom);
+    },
+
     tonghop: function (p, user) {
       Auth.require(user, 'calc.view');
       return Report.summary(user, p.ky_ma, p.group);
@@ -504,15 +543,16 @@ var Api = (function () {
           var s = staff[r.ma_nv];
           return r.ky_ma === ky.ma && r.trang_thai === 'Tạm tính' && s && Auth.canRow(user, 'calc.run', { cn: s.chi_nhanh_ma, tr: s.truong_ma, nv: s.ma_nv });
         };
-        var inc = Db.filter('THU_NHAP_MOI', mine), qt = Db.filter('QUYET_TOAN', mine);
+        var isHe = ky.loai === 'Hè';
+        var inc = Db.filter(isHe ? 'HE_THU_NHAP' : 'THU_NHAP_MOI', mine), qt = isHe ? [] : Db.filter('QUYET_TOAN', mine);
         if (!inc.length) throw new AppError('EMPTY', 'Chưa có kết quả tạm tính của trường này. Hãy bấm "Tính toán" trước.');
         if (inc.concat(qt).some(function (r) { return r.nguon === 'Gồm dòng chưa duyệt'; })) {
           throw new AppError('UNAPPROVED', 'Kết quả đang gồm dòng khai báo CHƯA duyệt (chế độ tính thử). Hãy duyệt hết khai báo rồi bấm "Tính toán" với chế độ "Chỉ dòng đã duyệt" trước khi gửi chốt.');
         }
-        var ph = Workflow.create(user, { loai: 'Quyết toán kỳ', tieu_de: 'Quyết toán & thu nhập mới ' + ky.ma + ' · ' + tr.ten + ' (' + inc.length + ' nhân sự)',
+        var ph = Workflow.create(user, { loai: 'Quyết toán kỳ', tieu_de: (isHe ? 'Lương hè ' : 'Quyết toán & thu nhập mới ') + ky.ma + ' · ' + tr.ten + ' (' + inc.length + ' nhân sự)',
           truong_ma: tr.ma, chi_nhanh_ma: tr.chi_nhanh_ma, ky_ma: ky.ma, payload: { nhan_su: inc.length } });
         var patch = function (r) { return { id: r.id, patch: { trang_thai: 'Chờ chốt', phieu_ma: ph.ma_phieu } }; };
-        Db.updateMany('THU_NHAP_MOI', inc.map(patch), user.email);
+        Db.updateMany(isHe ? 'HE_THU_NHAP' : 'THU_NHAP_MOI', inc.map(patch), user.email);
         Db.updateMany('QUYET_TOAN', qt.map(patch), user.email);
         out = { ma_phieu: ph.ma_phieu, nhan_su: inc.length };
       });
