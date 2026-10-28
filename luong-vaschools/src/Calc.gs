@@ -43,7 +43,7 @@ var Calc = (function () {
       rows.forEach(function (h) {
         if (h.hieu_luc_tu < date && (!h.hieu_luc_den || h.hieu_luc_den >= date)) ups.push({ id: h.id, patch: { hieu_luc_den: Util.addDays(date, -1) } });
       });
-      ins.push({ ma_nv: r.ma_nv, thu_nhap: luong, hieu_luc_tu: date, hieu_luc_den: later ? Util.addDays(later, -1) : '',
+      ins.push({ ma_nv: r.ma_nv, thu_nhap: luong, ho_tro_gvcn: 0, ho_tro_khac: 0, hieu_luc_tu: date, hieu_luc_den: later ? Util.addDays(later, -1) : '',
         ghi_chu: 'Từ chốt ' + ky.ma + ' (' + phieu.ma_phieu + ')' });
     });
     Db.updateMany('THU_NHAP_NEN', ups, 'system');
@@ -152,11 +152,14 @@ var Calc = (function () {
       });
     }
 
+    // Trường và đối tượng của mỗi người lấy từ dòng "Quá trình ngạch bậc" đang hiệu lực tại ngày cuối kỳ.
+    var recAt = function (ma) { return (ngachBy[ma] || []).filter(function (r) { return activeAt(r, ky.den_ngay); })[0] || null; };
     var staff = Db.filter('NHAN_SU', function (s) {
-      if (truongMa && s.truong_ma !== truongMa) return false;
+      var rec = recAt(s.ma_nv), tr = rec ? rec.truong_ma : '';
+      if (truongMa && tr !== truongMa) return false;
       if (s.ngay_vao_lam > ky.den_ngay) return false;
       if (s.ngay_nghi_viec && s.ngay_nghi_viec < ky.tu_ngay) return false;
-      return Auth.canRow(user, 'calc.run', { cn: s.chi_nhanh_ma, tr: s.truong_ma, nv: s.ma_nv });
+      return Auth.canRow(user, 'calc.run', { cn: s.chi_nhanh_ma, tr: tr, nv: s.ma_nv });
     });
     if (!staff.length) throw new AppError('EMPTY', 'Không có nhân sự nào trong phạm vi để tính');
 
@@ -171,12 +174,13 @@ var Calc = (function () {
       if (!g) { warnings.push(tag + ': ngạch ' + cur.ngach_ma + ' chưa có hệ số trong đề án ' + dean.ma); return; }
       var lw = b.luong[s.chi_nhanh_ma];
       if (!lw) { warnings.push(tag + ': đề án ' + dean.ma + ' chưa có LCB/LTB cho chi nhánh ' + s.chi_nhanh_ma); return; }
-      var who = { ho_ten: s.ho_ten, chi_nhanh_ma: s.chi_nhanh_ma, truong_ma: s.truong_ma, doi_tuong: s.doi_tuong };
+      if (!cur.doi_tuong) { warnings.push(tag + ': dòng quá trình ngạch bậc chưa có "Đối tượng tính lương"'); return; }
+      var who = { ho_ten: s.ho_ten, chi_nhanh_ma: s.chi_nhanh_ma, truong_ma: cur.truong_ma, doi_tuong: cur.doi_tuong };
 
       var decls = declsBy[s.ma_nv] || [], settle = { tien_pt: 0 }, nguon = 'Đã duyệt';
       if (decls.length) {
         if (decls.some(function (d) { return d.trang_thai !== 'Đã duyệt'; })) { nguon = 'Gồm dòng chưa duyệt'; unapproved++; }
-        settle = Engine.settle({ decls: decls, doiTuong: s.doi_tuong, soTuan: ky.so_tuan, param: b.param, ltb: lw.ltb, hsTiet: g.hs_tiet === '' ? null : g.hs_tiet });
+        settle = Engine.settle({ decls: decls, doiTuong: cur.doi_tuong, soTuan: ky.so_tuan, param: b.param, ltb: lw.ltb, hsTiet: g.hs_tiet === '' ? null : g.hs_tiet });
         var row = { ky_ma: kyMa, ma_nv: s.ma_nv, de_an_ma: dean.ma, nguon: nguon, trang_thai: 'Tạm tính', phieu_ma: '' };
         Object.keys(who).forEach(function (k) { row[k] = who[k]; });
         Object.keys(settle).forEach(function (k) { row[k] = settle[k]; });
@@ -191,18 +195,19 @@ var Calc = (function () {
       var curInc = (tnBy[s.ma_nv] || []).filter(function (r) { return activeAt(r, refDate); })[0];
       var tienPt = isAdj ? (ptBy[s.ma_nv] || 0) : settle.tien_pt;
       var inc = Engine.income({
-        doiTuong: s.doi_tuong, ngach: g, tenure: Util.fullYears(s.ngay_vao_lam, ky.den_ngay),
+        doiTuong: cur.doi_tuong, ngach: g, tenure: Util.fullYears(s.ngay_vao_lam, ky.den_ngay),
         holdYears: holdYears(hist.filter(function (r) { return r.ngach_ma === cur.ngach_ma; }), ky.den_ngay),
-        kiemNhiem: kn, hangTruong: s.truong_ma ? b.hangTruong[(hang[s.truong_ma] || {}).hang] || null : null,
-        lcb: lw.lcb, ltb: lw.ltb, param: b.param, tran: b.tran, namXet: namXet, truongMa: s.truong_ma,
-        thuNhapHienTai: curInc ? curInc.thu_nhap : null, tienPt: tienPt, soThang: isAdj ? ptSoThang : ky.so_thang_chia
+        kiemNhiem: kn, hangTruong: cur.truong_ma ? b.hangTruong[(hang[cur.truong_ma] || {}).hang] || null : null,
+        lcb: lw.lcb, ltb: lw.ltb, param: b.param, tran: b.tran, namXet: namXet, truongMa: cur.truong_ma,
+        thuNhapHienTai: curInc ? Staff.incomeTotal(curInc) : null, tienPt: tienPt, soThang: isAdj ? ptSoThang : ky.so_thang_chia
       });
       var irow = { ky_ma: kyMa, ma_nv: s.ma_nv, de_an_ma: dean.ma, ngay_vao_lam: s.ngay_vao_lam, ngach_ma: cur.ngach_ma,
         ngach_ten: ngachName[cur.ngach_ma] || cur.ngach_ma, tham_nien: Util.fullYears(s.ngay_vao_lam, ky.den_ngay),
         nguon: nguon, trang_thai: 'Tạm tính', phieu_ma: '' };
       Object.keys(who).forEach(function (k) { irow[k] = who[k]; });
       Object.keys(inc).forEach(function (k) { irow[k] = inc[k]; });
-      if (!s.truong_ma && g.ho_tro_hang_truong) irow.ghi_chu = (irow.ghi_chu ? irow.ghi_chu + '; ' : '') + 'Nhân sự chưa gắn trường';
+      if (curInc) { irow.hien_tai_gvcn = Number(curInc.ho_tro_gvcn) || 0; irow.hien_tai_khac = Number(curInc.ho_tro_khac) || 0; }
+      if (!cur.truong_ma && g.ho_tro_hang_truong) irow.ghi_chu = (irow.ghi_chu ? irow.ghi_chu + '; ' : '') + 'Nhân sự chưa gắn trường';
       tm.push(irow);
     });
 

@@ -299,20 +299,11 @@ var SCHEMA = (function () {
       col_('dien_thoai', 'Điện thoại', 'text', { pattern: '^[0-9+]{8,15}$', hint: '8-15 chữ số, không dấu cách' }),
       col_('ngay_vao_lam', 'Ngày vào làm', 'date', { req: true }),
       col_('chi_nhanh_ma', 'Chi nhánh', 'ref', { ref: 'CHI_NHANH.ma', req: true }),
-      col_('truong_ma', 'Trường', 'ref', { ref: 'TRUONG.ma' }),
-      col_('to_chuyen_mon', 'Tổ chuyên môn/Bộ phận', 'text'),
-      col_('doi_tuong', 'Đối tượng tính lương', 'enum', {
-        values: ['GV Tiểu học nhiều môn', 'GV còn lại', 'Quản lý', 'Nhân viên', 'HĐHT'], req: true
-      }),
       col_('trang_thai', 'Trạng thái', 'enum', { values: ['Đang làm việc', 'Đã nghỉ việc'], def: 'Đang làm việc' }),
       col_('ngay_nghi_viec', 'Ngày nghỉ việc', 'date')
     ],
-    computed: [{ k: 'ngach_hien_tai', l: 'Ngạch hiện tại' }, { k: 'tham_nien', l: 'Thâm niên (năm)' }],
+    computed: [{ k: 'ngach_hien_tai', l: 'Ngạch hiện tại' }],
     check: function (r) {
-      if (r.truong_ma) {
-        var tr = Db.find('TRUONG', function (x) { return x.ma === r.truong_ma; });
-        if (tr && tr.chi_nhanh_ma !== r.chi_nhanh_ma) return 'Trường "' + r.truong_ma + '" thuộc chi nhánh "' + tr.chi_nhanh_ma + '", không phải "' + r.chi_nhanh_ma + '"';
-      }
       if (r.ngay_vao_lam <= r.ngay_sinh) return 'Ngày vào làm phải sau ngày sinh';
       if (r.trang_thai === 'Đã nghỉ việc' && !r.ngay_nghi_viec) return 'Trạng thái "Đã nghỉ việc" cần có Ngày nghỉ việc';
       if (r.trang_thai === 'Đang làm việc' && r.ngay_nghi_viec) return 'Đang làm việc thì không có Ngày nghỉ việc';
@@ -322,10 +313,24 @@ var SCHEMA = (function () {
   };
 
   S.QUA_TRINH_NGACH = {
-    label: 'Quá trình ngạch bậc', group: 'staff', key: ['ma_nv', 'hieu_luc_tu'], scope: 'staff',
+    label: 'Quá trình ngạch bậc', group: 'staff', key: ['ma_nv', 'hieu_luc_tu'], scope: 'qtn',
     temporal: { group: ['ma_nv'] }, perm: { r: 'staff.view', w: 'staff.edit', i: 'staff.import' },
-    cols: [nvRef(), ngachRef(), temporalFrom(), temporalTo(),
-      col_('so_quyet_dinh', 'Số quyết định', 'text'), col_('ly_do', 'Lý do', 'text')]
+    cols: [nvRef(), ngachRef(),
+      col_('truong_ma', 'Trường', 'ref', { ref: 'TRUONG.ma', hint: 'trường làm việc trong giai đoạn này; để trống nếu thuộc khối văn phòng/HĐHT' }),
+      col_('doi_tuong', 'Đối tượng tính lương', 'enum', { values: ['GV Tiểu học nhiều môn', 'GV còn lại', 'Quản lý', 'Nhân viên', 'HĐHT'], req: true }),
+      temporalFrom(), temporalTo(), col_('so_quyet_dinh', 'Số quyết định', 'text'), col_('ly_do', 'Lý do', 'text')],
+    // Thâm niên tính từ ngày vào làm đến NGÀY HIỆU LỰC BẮT ĐẦU của từng dòng nên nằm ở đây, không ở hồ sơ.
+    computed: [{ k: 'ho_ten', l: 'Họ tên', after: 'ma_nv' }, { k: 'tham_nien', l: 'Thâm niên tại ngày hiệu lực (năm)', after: 'hieu_luc_tu' }],
+    check: function (r) {
+      var s = Db.find('NHAN_SU', function (x) { return x.ma_nv === r.ma_nv; });
+      if (!s) return null;
+      if (r.hieu_luc_tu < s.ngay_vao_lam) return 'Hiệu lực từ (' + Util.displayDate(r.hieu_luc_tu) + ') không thể trước ngày vào làm (' + Util.displayDate(s.ngay_vao_lam) + ')';
+      if (r.truong_ma) {
+        var tr = Db.find('TRUONG', function (x) { return x.ma === r.truong_ma; });
+        if (tr && tr.chi_nhanh_ma !== s.chi_nhanh_ma) return 'Trường "' + r.truong_ma + '" thuộc chi nhánh "' + tr.chi_nhanh_ma + '", nhân sự thuộc chi nhánh "' + s.chi_nhanh_ma + '"';
+      }
+      return null;
+    }
   };
 
   S.QUA_TRINH_KIEMNHIEM = {
@@ -340,7 +345,10 @@ var SCHEMA = (function () {
     label: 'Thu nhập hiện tại (mốc bảo vệ lương)', group: 'staff', key: ['ma_nv', 'hieu_luc_tu'], scope: 'staff',
     temporal: { group: ['ma_nv'] }, perm: { r: 'salary.view', w: 'salary.edit', i: 'salary.edit' },
     cols: [nvRef(), col_('thu_nhap', 'Thu nhập/tháng', 'money', { req: true, min: 1 }),
-      temporalFrom(), temporalTo(), col_('ghi_chu', 'Ghi chú', 'text')]
+      col_('ho_tro_gvcn', 'Hỗ trợ GVCN', 'money', { def: 0, min: 0 }), col_('ho_tro_khac', 'Hỗ trợ khác', 'money', { def: 0, min: 0 }),
+      temporalFrom(), temporalTo(), col_('ghi_chu', 'Ghi chú', 'text')],
+    // Mốc so sánh trần/bảo vệ lương = Thu nhập/tháng + Hỗ trợ GVCN + Hỗ trợ khác.
+    computed: [{ k: 'ho_ten', l: 'Họ tên', after: 'ma_nv' }, { k: 'tong_thu_nhap', l: 'Tổng thu nhập hiện tại', t: 'money', after: 'ho_tro_khac' }]
   };
 
   /* ---------- HỆ THỐNG ---------- */
@@ -469,7 +477,7 @@ var SCHEMA = (function () {
       col_('hs_bgh', 'HS hạng trường', 'num'), col_('hs_kn', 'HS kiêm nhiệm', 'num'), col_('hs_kpi', 'HS KPI', 'num'),
       col_('luong_chuc_danh', 'Lương chức danh', 'money'), col_('ho_tro', 'Các khoản hỗ trợ', 'money'),
       col_('ho_tro_pt', 'Phụ trội bình quân/tháng', 'money'), col_('luong_kpi', 'Lương KPI', 'money'),
-      col_('pa_moi', 'Phương án mới', 'money'), col_('thu_nhap_hien_tai', 'Thu nhập hiện tại', 'money'), col_('ty_le_tran', 'Trần tăng', 'pct'),
+      col_('pa_moi', 'Phương án mới', 'money'), col_('thu_nhap_hien_tai', 'Thu nhập hiện tại (tổng)', 'money'), col_('hien_tai_gvcn', 'Trong đó hỗ trợ GVCN', 'money'), col_('hien_tai_khac', 'Trong đó hỗ trợ khác', 'money'), col_('ty_le_tran', 'Trần tăng', 'pct'),
       col_('max_income', 'Mức tối đa', 'money'), col_('chinh_thuc', 'Mức chính thức', 'money'), col_('chenh_lech', 'Chênh lệch so với hiện tại', 'money'),
       col_('luong_nen', 'Lương làm mốc cho đợt sau', 'money'), col_('chi_phi_thang', 'Chi phí/tháng (lương + phụ trội BQ)', 'money'),
       col_('tien_pt', 'Tiền phụ trội cả kỳ', 'money')
@@ -528,4 +536,42 @@ var SCHEMA = (function () {
   };
 
   return S;
+})();
+
+/**
+ * Giá trị ví dụ cho dòng mẫu nhập CSV (Validate.template). Cột bắt buộc không khai ở đây sẽ được sinh theo kiểu dữ liệu
+ * (danh mục/tham chiếu lấy mã thật đang có); cột không bắt buộc để trống trừ khi khai ở đây.
+ */
+(function () {
+  var EX = {
+    'CHI_NHANH.ma': 'HN', 'CHI_NHANH.ten': 'Chi nhánh Hà Nội', 'CHI_NHANH.tinh': 'Hà Nội',
+    'TRUONG.ma': 'HN_THCS', 'TRUONG.ten': 'THCS Hà Nội',
+    'NAM_HOC.ma': '2026-2027', 'NAM_HOC.tu_ngay': '01/09/2026', 'NAM_HOC.den_ngay': '31/05/2027',
+    'KY_LUONG.ma': '2026-2027-HK1', 'KY_LUONG.tu_ngay': '01/09/2026', 'KY_LUONG.den_ngay': '15/01/2027', 'KY_LUONG.so_tuan': '18',
+    'TRUONG_HANG.hang': '2', 'TRUONG_HANG.so_lop': '20',
+    'NGACH_DM.ma': 'GV4', 'NGACH_DM.ten': 'Giáo viên 4',
+    'SETTINGS.gia_tri': 'Có',
+    'DEAN.ma': 'DA02-2027', 'DEAN.so_hieu': 'HP.ĐA.02', 'DEAN.ten': 'Đề án lương khối phổ thông 2027', 'DEAN.hieu_luc_tu': '01/09/2027',
+    'DEAN_THAMSO.lcb': '6000000', 'DEAN_THAMSO.ltb': '100000',
+    'DEAN_NGACH.hs_chuc_danh': '1,2', 'DEAN_NGACH.hs_tiet': '1,3', 'DEAN_NGACH.nhom_tham_nien': 'TN2',
+    'DEAN_HANGTRUONG.hang': '1', 'DEAN_HANGTRUONG.hs_hieu_truong': '0,6', 'DEAN_HANGTRUONG.hs_pho_hieu_truong': '0,6',
+    'DEAN_QUYDOI.ma': 'QD11', 'DEAN_QUYDOI.ten': 'Giáo viên kiêm nhiệm công việc mới', 'DEAN_QUYDOI.so_tiet': '2',
+    'DEAN_TRAN.nam': '2027', 'DEAN_TRAN.tn_tu': '0', 'DEAN_TRAN.tn_den': '5', 'DEAN_TRAN.ty_le': '5%',
+    'DEAN_PARAM.gia_tri': '0,02',
+    'NHAN_SU.ma_nv': 'NV001', 'NHAN_SU.ho_ten': 'Nguyễn Thị A', 'NHAN_SU.ngay_sinh': '15/05/1990', 'NHAN_SU.email': 'nguyenthia@vaschools.edu.vn',
+    'NHAN_SU.dien_thoai': '0901234567', 'NHAN_SU.ngay_vao_lam': '01/09/2019',
+    'QUA_TRINH_NGACH.doi_tuong': 'GV còn lại', 'QUA_TRINH_NGACH.hieu_luc_tu': '01/09/2019', 'QUA_TRINH_NGACH.so_quyet_dinh': 'QĐ-01/2019',
+    'QUA_TRINH_KIEMNHIEM.ti_le': '50%', 'QUA_TRINH_KIEMNHIEM.hieu_luc_tu': '01/09/2026',
+    'THU_NHAP_NEN.thu_nhap': '15000000', 'THU_NHAP_NEN.ho_tro_gvcn': '500000', 'THU_NHAP_NEN.ho_tro_khac': '0', 'THU_NHAP_NEN.hieu_luc_tu': '01/01/2026',
+    'USERS.email': 'nguyenvana@vaschools.edu.vn', 'USERS.ho_ten': 'Nguyễn Văn A',
+    'ROLES.ma': 'ROLE_MOI', 'ROLES.ten': 'Vai trò mới',
+    'USER_ROLES.pham_vi': 'Toàn hệ thống',
+    'WORKFLOW_STEP.thu_tu': '1', 'WORKFLOW_STEP.ten_buoc': 'Hiệu trưởng xét duyệt', 'WORKFLOW_STEP.hanh_dong': 'Xét duyệt', 'WORKFLOW_STEP.vai_tro': 'PRINCIPAL',
+    'UY_QUYEN.hieu_luc_tu': '01/01/2026', 'UY_QUYEN.hieu_luc_den': '31/12/2026',
+    'KHAI_BAO.noi_dung': 'Toán 10A1', 'KHAI_BAO.so_luong': '22', 'KHAI_BAO.tu_ngay': '07/09/2026', 'KHAI_BAO.den_ngay': '27/12/2026'
+  };
+  Object.keys(EX).forEach(function (k) {
+    var p = k.split('.');
+    SCHEMA[p[0]].cols.forEach(function (c) { if (c.k === p[1]) c.ex = EX[k]; });
+  });
 })();

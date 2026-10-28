@@ -213,6 +213,18 @@
   var LOCK_KEY = { CHI_NHANH: 1, TRUONG: 1, NAM_HOC: 1, KY_LUONG: 1, NGACH_DM: 1, SETTINGS: 1, DEAN: 1, NHAN_SU: 1, USERS: 1, ROLES: 1 };
   function tableLocksKey(t) { return !!LOCK_KEY[t]; }
 
+  /** Tải file mẫu .csv (UTF-8 có BOM để Excel đọc đúng tiếng Việt): tiêu đề đúng yêu cầu + một dòng ví dụ hợp lệ. */
+  function downloadTemplate(table, ctx) {
+    api('import.template', { table: table, ctx: ctx }).then(function (t) {
+      try {
+        var blob = new Blob(['\uFEFF' + t.csv], { type: 'text/csv;charset=utf-8' }), a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = t.file; document.body.appendChild(a); a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        toast('Đã tạo file mẫu ' + t.file + '. Nếu trình duyệt không tải, dùng nút "Chèn mẫu + dòng ví dụ" trong hộp Nhập CSV.');
+      } catch (e) { toast('Trình duyệt không cho tải file. Hãy dùng nút "Chèn mẫu + dòng ví dụ" trong hộp Nhập CSV.'); }
+    }).catch(showErr);
+  }
+
   /* ---------- nhập CSV nghiêm ngặt ---------- */
   function openImport(table, opts, onDone) {
     var T = tt(table), md = openModal(true), checked = null;
@@ -270,7 +282,11 @@
     md.m.appendChild(el('p', { class: 'muted', text: 'Hệ thống không tự sửa dữ liệu. Khoảng trắng thừa, ký tự ẩn, sai danh mục hoặc sai định dạng đều bị báo lỗi và toàn bộ lần nhập bị từ chối.' }));
     md.m.appendChild(spec);
     md.m.appendChild(el('div', { class: 'bar', style: 'margin-top:10px' }, [mode,
-      el('button', { class: 'btn', text: 'Chèn tiêu đề mẫu', onclick: function () { ta.value = header.join('\t') + '\n' + ta.value; invalidate(); } })]));
+      el('button', { class: 'btn', text: 'Chèn tiêu đề mẫu', onclick: function () { ta.value = header.join('\t') + '\n' + ta.value; invalidate(); } }),
+      el('button', { class: 'btn', text: 'Chèn mẫu + dòng ví dụ', title: 'Tiêu đề và một dòng ví dụ hợp lệ (dùng mã thật đang có trong hệ thống) để sửa lại', onclick: function () {
+        api('import.template', { table: table, ctx: opts.ctx }).then(function (t) { ta.value = t.tsv + '\n'; invalidate(); toast('Đã chèn mẫu: sửa dòng ví dụ thành dữ liệu của bạn'); }).catch(showErr);
+      } }),
+      el('button', { class: 'btn', text: 'Tải file mẫu (.csv)', onclick: function () { downloadTemplate(table, opts.ctx); } })]));
     md.m.appendChild(ta);
     md.m.appendChild(out);
     md.m.appendChild(el('div', { class: 'row-end' }, [el('button', { class: 'btn', text: 'Đóng', onclick: md.close }), check, commit]));
@@ -307,22 +323,32 @@
         el('button', { class: 'btn', text: 'Tìm', onclick: function () { st.q = search.value; st.page = 0; load(); } }),
         el('span', { class: 'muted', text: st.loading ? 'Đang tải…' : st.total + ' bản ghi' + (st.refreshing ? ' · đang cập nhật…' : (S.ms !== null ? ' · ' + (S.ms / 1000).toFixed(1).replace('.', ',') + 's' : '')) }), el('span', { class: 'sp' }),
         st.locked ? el('span', { class: 'badge warn', text: st.appendOnly ? 'Đã ban hành - chỉ được thêm chi nhánh mới' : 'Đã ban hành - chỉ xem' }) : null,
+        canI ? el('button', { class: 'btn', text: 'Tải mẫu CSV', title: 'Tải file mẫu để nhập bằng CSV', onclick: function () { downloadTemplate(table, opts.ctx); } }) : null,
         canI ? el('button', { class: 'btn', text: 'Nhập CSV', onclick: function () { openImport(table, opts, afterWrite); } }) : null,
         canAdd ? el('button', { class: 'btn pri', text: '+ Thêm', onclick: function () { openForm(table, opts, null, afterWrite); } }) : null].concat(canAdd && opts.toolbar ? opts.toolbar(afterWrite) : [])));
 
       var cols = T.cols.filter(function (c) { return c.k !== T.ctx; });
-      var head = el('tr', null, cols.map(function (c) { return el('th', { text: c.l }); })
-        .concat((T.computed || []).map(function (c) { return el('th', { text: c.l }); })).concat([el('th', { text: '' })]));
+      // Cột tính toán (chỉ đọc) có thể khai "after" để nằm ngay cạnh cột liên quan; mặc định ở cuối.
+      var view = cols.map(function (c) { return { c: c, comp: false }; });
+      (T.computed || []).forEach(function (cc) {
+        var at = -1;
+        if (cc.after) view.forEach(function (v, i) { if (!v.comp && v.c.k === cc.after) at = i; });
+        if (at >= 0) view.splice(at + 1, 0, { c: cc, comp: true }); else view.push({ c: cc, comp: true });
+      });
+      var ncols = view.length;
+      var head = el('tr', null, view.map(function (v) { return el('th', { text: v.c.l }); }).concat([el('th', { text: '' })]));
       var body = el('tbody');
       st.rows.forEach(function (r) {
         var tr = el('tr');
-        cols.forEach(function (c) {
-          var v = c.t === 'ref' && r[c.k] !== '' && c.k !== T.ctx ? refLabel(c, r[c.k]) : fmtCell(c, r[c.k]);
-          tr.appendChild(el('td', { class: (c.t === 'money' || c.t === 'num' || c.t === 'int' || c.t === 'pct' ? 'num ' : '') + (c.t === 'longtext' ? 'wrap' : ''), text: v }));
-        });
-        (T.computed || []).forEach(function (c) {
-          var cv = r[c.k];
-          tr.appendChild(el('td', { text: cv === undefined || cv === null ? '' : (typeof cv === 'number' ? String(cv).replace('.', ',') : String(cv)) }));
+        view.forEach(function (v) {
+          var c = v.c;
+          if (v.comp) {
+            var cv = r[c.k];
+            tr.appendChild(el('td', { class: c.t === 'money' ? 'num' : '', text: cv === undefined || cv === null || cv === '' ? '' : (c.t === 'money' ? Number(cv).toLocaleString('vi-VN') : (typeof cv === 'number' ? String(cv).replace('.', ',') : String(cv))) }));
+            return;
+          }
+          var txt = c.t === 'ref' && r[c.k] !== '' && c.k !== T.ctx ? refLabel(c, r[c.k]) : fmtCell(c, r[c.k]);
+          tr.appendChild(el('td', { class: (c.t === 'money' || c.t === 'num' || c.t === 'int' || c.t === 'pct' ? 'num ' : '') + (c.t === 'longtext' ? 'wrap' : ''), text: txt }));
         });
         var acts = el('td');
         (opts.rowActions ? opts.rowActions(r, st) : []).forEach(function (a) {
@@ -340,8 +366,8 @@
         tr.appendChild(acts);
         body.appendChild(tr);
       });
-      if (st.loading) { for (var sk = 0; sk < 6; sk++) body.appendChild(el('tr', null, [el('td', { colspan: cols.length + (T.computed || []).length + 1 }, [el('div', { class: 'skel' })])])); }
-      if (!st.rows.length && !st.loading) body.appendChild(el('tr', null, [el('td', { class: 'muted', colspan: cols.length + (T.computed || []).length + 1, text: 'Chưa có dữ liệu.' })]));
+      if (st.loading) { for (var sk = 0; sk < 6; sk++) body.appendChild(el('tr', null, [el('td', { colspan: ncols + 1 }, [el('div', { class: 'skel' })])])); }
+      if (!st.rows.length && !st.loading) body.appendChild(el('tr', null, [el('td', { class: 'muted', colspan: ncols + 1, text: 'Chưa có dữ liệu.' })]));
       box.appendChild(el('div', { class: 'tw' }, [el('table', null, [el('thead', null, [head]), body])]));
 
       if (st.total > (st.size || 300)) {
@@ -898,6 +924,8 @@
       if (kind.value === 'ngach') {
         field('ma_nv', 'Mã nhân sự', el('input', { type: 'text', autocomplete: 'off' }));
         field('ngach_ma', 'Ngạch đề xuất', select(S.schema.refs['NGACH_DM.ma'] || [], '', '— chọn —'));
+        field('truong_ma', 'Trường làm việc', select(truongOptions(), '', '— không thuộc trường —'));
+        field('doi_tuong', 'Đối tượng tính lương', select(['GV Tiểu học nhiều môn', 'GV còn lại', 'Quản lý', 'Nhân viên', 'HĐHT'], '', '— chọn —', true));
         field('hieu_luc_tu', 'Hiệu lực từ (dd/MM/yyyy)', el('input', { type: 'text' }));
         field('so_quyet_dinh', 'Số quyết định (nếu có)', el('input', { type: 'text' }));
         field('ly_do', 'Lý do đề xuất', el('textarea', { rows: 2 }), true);

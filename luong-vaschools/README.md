@@ -81,6 +81,17 @@ Thêm quản trị khác: sửa email trong `setupAddAdmin` rồi chạy.
   *Cơ cấu phương án thu nhập mới* từ kỳ mới nhất đã tính trong phạm vi người xem, cùng danh sách các bước thiết lập.
 - Đổi màu thương hiệu/chủ đạo: sửa các biến `--side-bg`, `--accent` ở đầu `src/Style.html`.
 
+## Mô hình nhân sự (trường, đối tượng, thâm niên, thu nhập hiện tại)
+
+- **Hồ sơ nhân sự** chỉ giữ thông tin ổn định (mã, họ tên, ngày sinh, giới tính, email, điện thoại, ngày vào làm, chi nhánh, trạng thái). Đã bỏ *Tổ chuyên môn/Bộ phận*, *Trường*, *Đối tượng tính lương*, *Thâm niên*.
+- **Quá trình ngạch bậc** là nơi khai **Ngạch, Trường, Đối tượng tính lương** cho từng giai đoạn hiệu lực (chuyển trường/đổi đối tượng = thêm một dòng mới, dòng cũ tự kết thúc).
+  Cột **Thâm niên tại ngày hiệu lực** = số năm tròn từ *ngày vào làm* đến *ngày hiệu lực bắt đầu* của dòng đó. Trường phải thuộc đúng chi nhánh của nhân sự; hiệu lực không được trước ngày vào làm.
+  Khi tính toán, trường và đối tượng lấy từ dòng đang hiệu lực **tại ngày cuối kỳ** (đợt Điều chỉnh: ngày hiệu lực); phân quyền "phạm vi Trường" cũng dựa vào dòng đang hiệu lực.
+- **Thu nhập hiện tại** có thêm **Hỗ trợ GVCN** và **Hỗ trợ khác** (mặc định 0). Mốc dùng để so trần/bảo vệ lương = *Thu nhập/tháng + Hỗ trợ GVCN + Hỗ trợ khác* (hiển thị ở cột *Tổng thu nhập hiện tại*
+  và trong *Thu nhập từng người*). Mốc tự tạo khi chốt đợt Điều chỉnh chỉ gồm lương, hai khoản hỗ trợ để 0.
+- **Mẫu nhập CSV:** mọi bảng nhập được có nút **Tải mẫu CSV** (thanh công cụ) và, trong hộp *Nhập CSV*, **Chèn tiêu đề mẫu**, **Chèn mẫu + dòng ví dụ** (dùng mã thật đang có trong hệ thống) và **Tải file mẫu (.csv)**
+  (UTF-8 có BOM để Excel đọc đúng tiếng Việt). Dòng ví dụ luôn qua được bộ kiểm tra nghiêm ngặt (có kiểm thử cho từng bảng).
+
 ## Hiệu năng (vì sao mở tab từng chậm và đã cải thiện thế nào)
 
 Apps Script khác máy chủ thông thường: **mỗi lần trình duyệt gọi là một lượt chạy mới, không nhớ gì**, và dữ liệu nằm trong Google Sheets (mỗi lần đọc một bảng ~0,1–0,4 giây).
@@ -114,7 +125,7 @@ Các cải tiến:
 ## Kiểm thử
 
 ```bash
-npm test                      # 61 kiểm thử logic trên bản giả lập Apps Script
+npm test                      # 69 kiểm thử logic trên bản giả lập Apps Script
 node tests/ui-smoke.js ./ảnh  # chạy giao diện thật trên Chromium (cần playwright)
 ```
 

@@ -61,6 +61,12 @@ Bạn chỉ cần **4 tệp** trong thư mục `dist/`: `Code.gs`, `Index.html`,
 ## Khi có bản cập nhật mã
 Dán lại `Code.gs` / `Index.html` mới → **Triển khai → Quản lý triển khai → ✏ Sửa → Phiên bản mới → Triển khai** (URL không đổi). Nếu bản mới có thêm bảng/cột, chạy thêm hàm **`setupEnsureSheets`** (không mất dữ liệu).
 
+## Nâng cấp lên bản "Trường/Đối tượng nằm ở Quá trình ngạch bậc"
+1. Dán lại 4 tệp trong `dist/`, chạy **`setupEnsureSheets`**: hàm tự **chép Trường và Đối tượng tính lương từ hồ sơ cũ sang các dòng Quá trình ngạch bậc còn trống** (không ghi đè dòng đã có). Cột cũ trong sheet `NHAN_SU` vẫn còn nhưng hệ thống không dùng nữa, xóa tay được.
+2. Mẫu nhập **Hồ sơ nhân sự** không còn các cột *Trường*, *Đối tượng tính lương*, *Tổ chuyên môn/Bộ phận* (dùng mẫu cũ sẽ bị báo "Tiêu đề không có trong mẫu"). Hãy tải mẫu mới ở nút **Tải mẫu CSV**.
+3. Mẫu nhập **Quá trình ngạch bậc** có thêm *Trường* và *Đối tượng tính lương* (bắt buộc); mẫu **Thu nhập hiện tại** có thêm *Hỗ trợ GVCN*, *Hỗ trợ khác*.
+4. Nhân sự mới nên nhập theo thứ tự: Hồ sơ nhân sự → Quá trình ngạch bậc (dòng đầu tiên từ ngày vào làm) → Thu nhập hiện tại.
+
 ## Lưu ý
 - **Tốc độ:** ứng dụng dùng bộ nhớ đệm. Nếu có ai **sửa trực tiếp trong file Google Sheet CSDL** (không khuyến khích), bấm nút **⟳ Làm mới dữ liệu** ở thanh trên cùng (cần quyền *Sửa thiết lập*), nếu không dữ liệu có thể chưa cập nhật tới 10 phút.
 - **Không chia sẻ file Google Sheet CSDL** cho người dùng. Họ chỉ cần URL web app.

@@ -100,9 +100,9 @@ const html = read('Index.html').replace("<?!= include('Style') ?>", read('Style.
   must(env.api('importCommit', { table: 'NAM_HOC', text: tsv(['Năm học', 'Từ ngày', 'Đến ngày'], ['2026-2027', '01/09/2026', '31/05/2027']) }));
   must(env.api('importCommit', { table: 'KY_LUONG', text: tsv(['Mã kỳ', 'Năm học', 'Học kỳ', 'Từ ngày', 'Đến ngày', 'Số tuần quy định'], ['2026-2027-HK1', '2026-2027', 'HK1', '01/09/2026', '15/01/2027', '16']) }));
   must(env.api('importCommit', { table: 'TRUONG', text: tsv(['Mã trường', 'Tên trường', 'Chi nhánh', 'Cấp học'], ['HCM_THPT', 'THPT HCM', 'HCM', 'THPT']) }));
-  must(env.api('importCommit', { table: 'NHAN_SU', text: tsv(['Mã nhân sự', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Email', 'Ngày vào làm', 'Chi nhánh', 'Trường', 'Đối tượng tính lương'],
-    ['NV001', 'Nguyễn Thị A', '15/05/1990', 'Nữ', 'a@vaschools.edu.vn', '01/09/2019', 'HCM', 'HCM_THPT', 'GV còn lại']) }));
-  must(env.api('importCommit', { table: 'QUA_TRINH_NGACH', text: tsv(['Mã nhân sự', 'Ngạch', 'Hiệu lực từ'], ['NV001', 'GV2', '01/09/2019']) }));
+  must(env.api('importCommit', { table: 'NHAN_SU', text: tsv(['Mã nhân sự', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Email', 'Ngày vào làm', 'Chi nhánh'],
+    ['NV001', 'Nguyễn Thị A', '15/05/1990', 'Nữ', 'a@vaschools.edu.vn', '01/09/2019', 'HCM']) }));
+  must(env.api('importCommit', { table: 'QUA_TRINH_NGACH', text: tsv(['Mã nhân sự', 'Ngạch', 'Trường', 'Đối tượng tính lương', 'Hiệu lực từ'], ['NV001', 'GV2', 'HCM_THPT', 'GV còn lại', '01/09/2019']) }));
   must(env.api('importCommit', { table: 'USERS', text: tsv(['Email', 'Họ tên'], ['gv@vaschools.edu.vn', 'Giáo vụ'], ['ht@vaschools.edu.vn', 'Hiệu trưởng']) }));
   must(env.api('importCommit', { table: 'USER_ROLES', text: tsv(['Email', 'Vai trò', 'Phạm vi dữ liệu', 'Mã chi nhánh/trường'],
     ['gv@vaschools.edu.vn', 'PROPOSER', 'Trường', 'HCM_THPT'], ['ht@vaschools.edu.vn', 'PRINCIPAL', 'Trường', 'HCM_THPT']) }));
@@ -281,6 +281,36 @@ const html = read('Index.html').replace("<?!= include('Style') ?>", read('Style.
   await page.waitForSelector('.toast:not([hidden])');
   ok('Nút Làm mới dữ liệu hoạt động', (await page.textContent('#toast')).includes('Đã làm mới'));
 
+
+
+  // ---------- Phần 6: tab nhân sự theo mô hình mới và mẫu nhập CSV ----------
+  env.latency = 0;
+  await page.setViewportSize({ width: 1440, height: 860 });
+  await reload('#staff/NHAN_SU');
+  await page.waitForSelector('td:has-text("Nguyễn Thị A")');
+  const heads = (await page.locator('main table thead th').allTextContents()).join('|');
+  ok('Hồ sơ nhân sự không còn Trường/Đối tượng/Tổ chuyên môn/Thâm niên', !/Trường|Đối tượng|Tổ chuyên môn|Thâm niên/.test(heads) && heads.includes('Ngạch hiện tại'));
+  await page.screenshot({ path: path.join(out, '16-hosonhansu.png') });
+  await page.click('.tabs button:has-text("Quá trình ngạch bậc")');
+  await page.waitForSelector('td:has-text("GV2")');
+  const h2 = (await page.locator('main table thead th').allTextContents()).join('|');
+  ok('Quá trình ngạch bậc có Trường, Đối tượng, Thâm niên tại ngày hiệu lực', h2.includes('Trường') && h2.includes('Đối tượng tính lương') && h2.includes('Thâm niên tại ngày hiệu lực'));
+  await page.screenshot({ path: path.join(out, '17-quatrinhngach.png') });
+  await page.click('.tabs button:has-text("Thu nhập hiện tại")');
+  await page.waitForSelector('main table');
+  const h3 = (await page.locator('main table thead th').allTextContents()).join('|');
+  ok('Thu nhập hiện tại có Hỗ trợ GVCN, Hỗ trợ khác, Tổng', h3.includes('Hỗ trợ GVCN') && h3.includes('Hỗ trợ khác') && h3.includes('Tổng thu nhập hiện tại'));
+  await page.click('button:has-text("Nhập CSV")');
+  await page.waitForSelector('button:has-text("Chèn mẫu + dòng ví dụ")');
+  ok('Hộp nhập CSV có nút mẫu (tiêu đề, dòng ví dụ, tải file)', (await page.locator('.modal button:has-text("Tải file mẫu")').count()) === 1 && (await page.locator('.modal button:has-text("Chèn tiêu đề mẫu")').count()) === 1);
+  await page.click('button:has-text("Chèn mẫu + dòng ví dụ")');
+  await page.waitForFunction(() => document.querySelector('.modal textarea.paste').value.includes('Hỗ trợ GVCN'));
+  await page.click('.modal button:has-text("Kiểm tra dữ liệu")');
+  await page.waitForSelector('.modal .alert');
+  ok('Dòng ví dụ chèn từ mẫu là hợp lệ khi kiểm tra', (await page.textContent('.modal .alert')).includes('Hợp lệ'));
+  await page.screenshot({ path: path.join(out, '18-mau-csv.png') });
+  await page.click('.modal >> text=Đóng');
+  ok('Có nút Tải mẫu CSV trên thanh công cụ', (await page.locator('button:has-text("Tải mẫu CSV")').count()) === 1);
 
   console.log(steps.join('\n'));
   console.log(errors.length ? 'LỖI TRÌNH DUYỆT:\n' + errors.join('\n') : 'Không có lỗi console/JS.');

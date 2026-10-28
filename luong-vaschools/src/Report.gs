@@ -69,10 +69,10 @@ var Report = (function () {
   }
 
   function missingCount(user, ky, have) {
-    var global = Auth.hasGlobal(user, 'calc.view');
+    var global = Auth.hasGlobal(user, 'calc.view'), u = Staff.units(ky.den_ngay);
     return Db.filter('NHAN_SU', function (s) {
       if (have[s.ma_nv] || s.ngay_vao_lam > ky.den_ngay || (s.ngay_nghi_viec && s.ngay_nghi_viec < ky.tu_ngay)) return false;
-      return global || Auth.canRow(user, 'calc.view', { cn: s.chi_nhanh_ma, tr: s.truong_ma, nv: s.ma_nv });
+      return global || Auth.canRow(user, 'calc.view', { cn: s.chi_nhanh_ma, tr: u[s.ma_nv] ? u[s.ma_nv].truong_ma : '', nv: s.ma_nv });
     }).length;
   }
 
@@ -121,14 +121,15 @@ var Report = (function () {
     var ky = Db.find('KY_LUONG', function (k) { return k.ma === kyMa; });
     var s = Db.find('NHAN_SU', function (x) { return x.ma_nv === maNv; });
     if (!ky || !s) throw new AppError('NOT_FOUND', 'Không tìm thấy kỳ hoặc nhân sự');
-    if (!Auth.canRow(user, 'calc.view', { cn: s.chi_nhanh_ma, tr: s.truong_ma, nv: s.ma_nv })) throw new AppError('FORBIDDEN', 'Nhân sự nằm ngoài phạm vi của bạn');
+    var un = Staff.units(ky.den_ngay)[s.ma_nv] || {};
+    if (!Auth.canRow(user, 'calc.view', { cn: s.chi_nhanh_ma, tr: un.truong_ma || '', nv: s.ma_nv })) throw new AppError('FORBIDDEN', 'Nhân sự nằm ngoài phạm vi của bạn');
     var dean = Policy.effective(ky.den_ngay), param = dean ? Policy.bundle(dean.ma).param : {};
     var lines = Db.filter('KHAI_BAO', function (d) { return d.ky_ma === kyMa && d.ma_nv === maNv; }).map(function (d) {
       return { loai: d.loai, noi_dung: d.noi_dung, so_luong: d.so_luong, don_vi: d.don_vi, dac_thu: d.dac_thu, tu: d.tu_ngay, den: d.den_ngay,
         ngay: Engine.daysInclusive(d.tu_ngay, d.den_ngay), tiet: Math.round(Engine.tietOf(d, param) * 100) / 100, trang_thai: d.trang_thai, phieu: d.phieu_ma };
     });
     var qt = Db.find('QUYET_TOAN', function (r) { return r.ky_ma === kyMa && r.ma_nv === maNv; });
-    return { ho_ten: s.ho_ten, doi_tuong: s.doi_tuong, so_tuan: ky.so_tuan, lines: lines, ketqua: qt || null };
+    return { ho_ten: s.ho_ten, doi_tuong: un.doi_tuong || '', so_tuan: ky.so_tuan, lines: lines, ketqua: qt || null };
   }
 
   /** Dữ liệu biểu đồ trang Tổng quan: kỳ mới nhất có kết quả trong phạm vi người xem (null nếu chưa có hoặc không có quyền). */

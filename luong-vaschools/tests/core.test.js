@@ -154,49 +154,69 @@ function seedOrg(e) {
     ['HCM_THPT', 'THPT HCM', 'HCM', 'THPT'], ['HN_THCS', 'THCS Hà Nội', 'HN', 'THCS'], ['HN_THPT', 'THPT Hà Nội', 'HN', 'THPT']) });
   assert.ok(r.ok, JSON.stringify(r));
 }
-const NS_HEAD = ['Mã nhân sự', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Email', 'Ngày vào làm', 'Chi nhánh', 'Trường', 'Đối tượng tính lương'];
-const nsRow = (ma, ten, email, cn, tr, vao = '01/09/2019', dt = 'GV còn lại') => [ma, ten, '15/05/1990', 'Nữ', email, vao, cn, tr, dt];
+const NS_HEAD = ['Mã nhân sự', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Email', 'Ngày vào làm', 'Chi nhánh'];
+const nsRow = (ma, ten, email, cn, vao = '01/09/2019') => [ma, ten, '15/05/1990', 'Nữ', email, vao, cn];
+// Trường và đối tượng tính lương thuộc quá trình ngạch bậc (có hiệu lực theo thời gian)
+const QT_HEAD = ['Mã nhân sự', 'Ngạch', 'Trường', 'Đối tượng tính lương', 'Hiệu lực từ', 'Hiệu lực đến', 'Số quyết định'];
+const qtRow = (ma, ng, tr, tu, den = '', qd = '', dt = 'GV còn lại') => [ma, ng, tr, dt, tu, den, qd];
 
-test('Nhân sự: import, kiểm tra chéo trường–chi nhánh, email trùng, thâm niên & ngạch hiện tại', () => {
+test('Hồ sơ nhân sự không còn Trường/Đối tượng/Tổ chuyên môn; mẫu cũ bị báo lỗi rõ', () => {
   const e = fresh();
   seedOrg(e);
-  const bad = tsv(NS_HEAD,
-    nsRow('NV001', 'Nguyễn Thị A', 'a@vaschools.edu.vn', 'HN', 'HN_THCS'),
-    nsRow('NV002', 'Trần Văn B', 'b@vaschools.edu.vn', 'HN', 'HCM_THPT'),
-    nsRow('NV003', 'Lê C', 'a@vaschools.edu.vn', 'HN', 'HN_THPT'));
-  let r = e.api('importCheck', { table: 'NHAN_SU', text: bad });
-  assert.ok(r.data.errors.some(x => x.n === 3 && /không phải "HN"/.test(x.msg)), JSON.stringify(r.data.errors));
-  assert.ok(r.data.errors.some(x => x.n === 4 && x.field === 'email' && /Trùng/.test(x.msg)));
-  const good = tsv(NS_HEAD,
-    nsRow('NV001', 'Nguyễn Thị A', 'a@vaschools.edu.vn', 'HN', 'HN_THCS', '15/03/2021'),
-    nsRow('NV002', 'Trần Văn B', 'b@vaschools.edu.vn', 'HN', 'HN_THPT'));
-  r = e.api('importCommit', { table: 'NHAN_SU', text: good });
+  const cols = j(e.ctx.SCHEMA.NHAN_SU.cols.map(c => c.k));
+  assert.ok(!cols.includes('truong_ma') && !cols.includes('doi_tuong') && !cols.includes('to_chuyen_mon'));
+  const old = tsv([...NS_HEAD, 'Trường', 'Đối tượng tính lương'], [...nsRow('NV001', 'A', 'a@vaschools.edu.vn', 'HN'), 'HN_THCS', 'GV còn lại']);
+  const r = e.api('importCheck', { table: 'NHAN_SU', text: old });
+  assert.strictEqual(r.data.ok, false);
+  assert.ok(r.data.errors.some(x => /Tiêu đề không có trong mẫu/.test(x.msg) && /Trường/.test(x.value)), JSON.stringify(r.data.errors));
+});
+
+test('Nhân sự và quá trình ngạch: email trùng, trường–chi nhánh, thâm niên tính đến ngày hiệu lực của từng dòng', () => {
+  const e = fresh();
+  seedOrg(e);
+  let r = e.api('importCheck', { table: 'NHAN_SU', text: tsv(NS_HEAD,
+    nsRow('NV001', 'Nguyễn Thị A', 'a@vaschools.edu.vn', 'HN', '15/03/2021'), nsRow('NV003', 'Lê C', 'a@vaschools.edu.vn', 'HN')) });
+  assert.ok(r.data.errors.some(x => x.n === 3 && x.field === 'email' && /Trùng/.test(x.msg)));
+  r = e.api('importCommit', { table: 'NHAN_SU', text: tsv(NS_HEAD, nsRow('NV001', 'Nguyễn Thị A', 'a@vaschools.edu.vn', 'HN', '15/03/2021'), nsRow('NV002', 'Trần Văn B', 'b@vaschools.edu.vn', 'HN')) });
   assert.strictEqual(r.data.inserted, 2);
 
-  const ng = tsv(['Mã nhân sự', 'Ngạch', 'Hiệu lực từ', 'Hiệu lực đến', 'Số quyết định'],
-    ['NV001', 'GV1', '15/03/2021', '28/02/2026', 'QĐ-1'], ['NV001', 'GV2', '01/03/2026', '', 'QĐ-2']);
-  r = e.api('importCommit', { table: 'QUA_TRINH_NGACH', text: ng });
+  // trường phải thuộc đúng chi nhánh của nhân sự; hiệu lực không được trước ngày vào làm
+  r = e.api('importCheck', { table: 'QUA_TRINH_NGACH', text: tsv(QT_HEAD, qtRow('NV001', 'GV1', 'HCM_THPT', '15/03/2021'), qtRow('NV002', 'GV1', 'HN_THPT', '01/01/2019')) });
+  assert.ok(r.data.errors.some(x => x.n === 2 && /thuộc chi nhánh "HCM"/.test(x.msg)), JSON.stringify(r.data.errors));
+  assert.ok(r.data.errors.some(x => x.n === 3 && /không thể trước ngày vào làm/.test(x.msg)));
+  r = e.api('importCheck', { table: 'QUA_TRINH_NGACH', text: tsv(QT_HEAD, ['NV001', 'GV1', 'HN_THCS', '', '15/03/2021', '', '']) });
+  assert.ok(r.data.errors.some(x => x.field === 'doi_tuong' && /Bắt buộc/.test(x.msg)));
+
+  r = e.api('importCommit', { table: 'QUA_TRINH_NGACH', text: tsv(QT_HEAD,
+    qtRow('NV001', 'GV1', 'HN_THCS', '15/03/2021', '28/02/2026', 'QĐ-1'), qtRow('NV001', 'GV2', 'HN_THPT', '01/03/2026', '', 'QĐ-2', 'Quản lý')) });
   assert.strictEqual(r.data.inserted, 2, JSON.stringify(r));
+
   const list = e.api('list', { table: 'NHAN_SU', q: 'nguyen thi a' });
   assert.strictEqual(list.data.total, 1);
   assert.strictEqual(list.data.rows[0].ngach_hien_tai, 'Giáo viên 2');
-  assert.ok(list.data.rows[0].tham_nien >= 5);
+  assert.strictEqual(list.data.rows[0].tham_nien, undefined);
+  const hist = e.api('list', { table: 'QUA_TRINH_NGACH', filter: { ma_nv: 'NV001' } }).data.rows;
+  assert.deepStrictEqual(j(hist.map(h => [h.ngach_ma, h.truong_ma, h.doi_tuong, h.ho_ten, h.tham_nien])),
+    [['GV1', 'HN_THCS', 'GV còn lại', 'Nguyễn Thị A', 0], ['GV2', 'HN_THPT', 'Quản lý', 'Nguyễn Thị A', 4]]); // 15/03/2021 → 01/03/2026 = 4 năm tròn
+  // đơn vị hiện tại suy ra từ dòng đang hiệu lực
+  assert.strictEqual(j(e.run('Staff.units("2025-01-01").NV001.truong_ma')), 'HN_THCS');
+  assert.strictEqual(j(e.run('Staff.units("2026-06-01").NV001.truong_ma')), 'HN_THPT');
 });
 
 test('Quá trình ngạch: chồng chéo bị chặn; form tự đóng bản ghi cũ', () => {
   const e = fresh();
   seedOrg(e);
-  e.api('importCommit', { table: 'NHAN_SU', text: tsv(NS_HEAD, nsRow('NV001', 'Nguyễn Thị A', 'a@vaschools.edu.vn', 'HN', 'HN_THCS')) });
-  const hd = ['Mã nhân sự', 'Ngạch', 'Hiệu lực từ', 'Hiệu lực đến'];
-  assert.ok(e.api('importCommit', { table: 'QUA_TRINH_NGACH', text: tsv(hd, ['NV001', 'GV1', '01/09/2019', '']) }).ok);
-  let r = e.api('importCheck', { table: 'QUA_TRINH_NGACH', text: tsv(hd, ['NV001', 'GV2', '01/03/2026', '']) });
+  e.api('importCommit', { table: 'NHAN_SU', text: tsv(NS_HEAD, nsRow('NV001', 'Nguyễn Thị A', 'a@vaschools.edu.vn', 'HN')) });
+  assert.ok(e.api('importCommit', { table: 'QUA_TRINH_NGACH', text: tsv(QT_HEAD, qtRow('NV001', 'GV1', 'HN_THCS', '01/09/2019')) }).ok);
+  let r = e.api('importCheck', { table: 'QUA_TRINH_NGACH', text: tsv(QT_HEAD, qtRow('NV001', 'GV2', 'HN_THCS', '01/03/2026')) });
   assert.ok(r.data.errors.some(x => /trùng/.test(x.msg)), JSON.stringify(r.data.errors));
-  r = e.api('importCheck', { table: 'QUA_TRINH_NGACH', text: tsv(hd, ['NV001', 'GV2', '01/03/2026', '31/12/2025']) });
+  r = e.api('importCheck', { table: 'QUA_TRINH_NGACH', text: tsv(QT_HEAD, qtRow('NV001', 'GV2', 'HN_THCS', '01/03/2026', '31/12/2025')) });
   assert.ok(r.data.errors.some(x => /Hiệu lực đến phải/.test(x.msg)));
 
-  r = e.api('save', { table: 'QUA_TRINH_NGACH', row: { ma_nv: 'NV001', ngach_ma: 'GV2', hieu_luc_tu: '01/03/2026', hieu_luc_den: '' }, autoClose: false });
+  const row = { ma_nv: 'NV001', ngach_ma: 'GV2', truong_ma: 'HN_THCS', doi_tuong: 'GV còn lại', hieu_luc_tu: '01/03/2026', hieu_luc_den: '' };
+  r = e.api('save', { table: 'QUA_TRINH_NGACH', row, autoClose: false });
   assert.strictEqual(r.ok, false);
-  r = e.api('save', { table: 'QUA_TRINH_NGACH', row: { ma_nv: 'NV001', ngach_ma: 'GV2', hieu_luc_tu: '01/03/2026', hieu_luc_den: '' }, autoClose: true });
+  r = e.api('save', { table: 'QUA_TRINH_NGACH', row, autoClose: true });
   assert.ok(r.ok, JSON.stringify(r));
   const rows = j(e.run('Db.all("QUA_TRINH_NGACH").map(function(x){return x.ngach_ma+":"+x.hieu_luc_tu+">"+x.hieu_luc_den;})'));
   assert.deepStrictEqual(rows, ['GV1:2019-09-01>2026-02-28', 'GV2:2026-03-01>']);
@@ -255,9 +275,9 @@ test('Phân quyền theo phạm vi: Hiệu trưởng chỉ thấy/ghi nhân sự
   const e = fresh();
   seedOrg(e);
   e.api('importCommit', { table: 'NHAN_SU', text: tsv(NS_HEAD,
-    nsRow('NV001', 'A', 'a@vaschools.edu.vn', 'HN', 'HN_THCS'),
-    nsRow('NV002', 'B', 'b@vaschools.edu.vn', 'HN', 'HN_THPT'),
-    nsRow('NV003', 'C', 'c@vaschools.edu.vn', 'HCM', 'HCM_THPT')) });
+    nsRow('NV001', 'A', 'a@vaschools.edu.vn', 'HN'), nsRow('NV002', 'B', 'b@vaschools.edu.vn', 'HN'), nsRow('NV003', 'C', 'c@vaschools.edu.vn', 'HCM')) });
+  assert.ok(e.api('importCommit', { table: 'QUA_TRINH_NGACH', text: tsv(QT_HEAD,
+    qtRow('NV001', 'GV1', 'HN_THCS', '01/09/2019'), qtRow('NV002', 'GV1', 'HN_THPT', '01/09/2019'), qtRow('NV003', 'GV1', 'HCM_THPT', '01/09/2019')) }).ok);
   e.api('importCommit', { table: 'THU_NHAP_NEN', text: tsv(['Mã nhân sự', 'Thu nhập/tháng', 'Hiệu lực từ'], ['NV001', '15.000.000', '01/01/2026'], ['NV002', '18.000.000', '01/01/2026']) });
   e.api('importCommit', { table: 'USERS', text: tsv(['Email', 'Họ tên', 'Mã nhân sự'], ['ht.hn@vaschools.edu.vn', 'HT Hà Nội', 'NV001'], ['nv2@vaschools.edu.vn', 'B', 'NV002'], ['x@vaschools.edu.vn', 'X', '']) });
   const g = tsv(['Email', 'Vai trò', 'Phạm vi dữ liệu', 'Mã chi nhánh/trường'],
@@ -270,7 +290,12 @@ test('Phân quyền theo phạm vi: Hiệu trưởng chỉ thấy/ghi nhân sự
   assert.deepStrictEqual(j(r.data.rows.map(x => x.ma_nv)), ['NV001']);
   r = e.api('list', { table: 'THU_NHAP_NEN' });
   assert.deepStrictEqual(j(r.data.rows.map(x => x.ma_nv)), ['NV001']);
-  assert.strictEqual(e.api('save', { table: 'NHAN_SU', row: { ma_nv: 'NV009', ho_ten: 'Z', ngay_sinh: '01/01/1990', gioi_tinh: 'Nam', ngay_vao_lam: '01/09/2020', chi_nhanh_ma: 'HN', truong_ma: 'HN_THPT', doi_tuong: 'GV còn lại' } }).ok, false);
+  assert.strictEqual(e.api('save', { table: 'NHAN_SU', row: { ma_nv: 'NV009', ho_ten: 'Z', ngay_sinh: '01/01/1990', gioi_tinh: 'Nam', ngay_vao_lam: '01/09/2020', chi_nhanh_ma: 'HN' } }).ok, false); // hồ sơ mới chưa có đơn vị nên người phạm vi Trường không tạo được
+  // quá trình ngạch bậc: chỉ ghi được dòng thuộc trường mình phụ trách
+  assert.deepStrictEqual(j(e.api('list', { table: 'QUA_TRINH_NGACH' }).data.rows.map(x => x.ma_nv)), ['NV001']);
+  const qrow = (tr) => ({ ma_nv: 'NV001', ngach_ma: 'GV2', truong_ma: tr, doi_tuong: 'GV còn lại', hieu_luc_tu: '01/03/2026' });
+  assert.ok(e.api('save', { table: 'QUA_TRINH_NGACH', row: qrow('HN_THCS'), autoClose: true }).ok);
+  assert.strictEqual(e.api('save', { table: 'QUA_TRINH_NGACH', row: Object.assign(qrow('HN_THPT'), { hieu_luc_tu: '01/03/2027' }), autoClose: true }).ok, false);
   assert.strictEqual(e.api('list', { table: 'USERS' }).code, 'FORBIDDEN');
   assert.strictEqual(e.api('list', { table: 'AUDIT_LOG' }).code, 'FORBIDDEN');
   assert.strictEqual(e.api('dean.publish', { ma: 'DA01-2026' }).code, 'FORBIDDEN');

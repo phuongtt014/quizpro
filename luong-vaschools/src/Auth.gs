@@ -68,7 +68,15 @@ var Auth = (function () {
       if (!sc) return null;
       if (sc === 'chi_nhanh') return function (r) { return { cn: r.ma }; };
       if (sc === 'truong') return function (r) { return { cn: r.chi_nhanh_ma, tr: r.ma }; };
-      if (sc === 'nhan_su') return function (r) { return { cn: r.chi_nhanh_ma, tr: r.truong_ma, nv: r.ma_nv }; };
+      if (sc === 'nhan_su') {
+        var un = Staff.units(Util.todayIso());
+        return function (r) { return { cn: r.chi_nhanh_ma, tr: un[r.ma_nv] ? un[r.ma_nv].truong_ma : '', nv: r.ma_nv }; };
+      }
+      if (sc === 'qtn') {
+        map = {};
+        Db.all('NHAN_SU').forEach(function (x) { map[x.ma_nv] = x; });
+        return function (r) { return { cn: map[r.ma_nv] ? map[r.ma_nv].chi_nhanh_ma : '', tr: r.truong_ma, nv: r.ma_nv }; };
+      }
       if (sc === 'truong_ma') {
         map = {};
         Db.all('TRUONG').forEach(function (x) { map[x.ma] = x; });
@@ -76,10 +84,11 @@ var Auth = (function () {
       }
       if (sc === 'staff') {
         map = {};
+        var us = Staff.units(Util.todayIso());
         Db.all('NHAN_SU').forEach(function (x) { map[x.ma_nv] = x; });
         return function (r) {
           var s = map[r.ma_nv];
-          return s ? { cn: s.chi_nhanh_ma, tr: s.truong_ma, nv: s.ma_nv } : {};
+          return s ? { cn: s.chi_nhanh_ma, tr: us[s.ma_nv] ? us[s.ma_nv].truong_ma : '', nv: s.ma_nv } : {};
         };
       }
       return null;

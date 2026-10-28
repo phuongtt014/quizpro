@@ -103,8 +103,8 @@ test('Cảnh báo "chưa tính" khi có nhân sự bị bỏ qua (thiếu ngạc
   adjustment(e);
   e.as('admin@vaschools.edu.vn');
   e.api('importCommit', { table: 'NHAN_SU', text: tsv(
-    ['Mã nhân sự', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Email', 'Ngày vào làm', 'Chi nhánh', 'Trường', 'Đối tượng tính lương'],
-    ['NV003', 'Lê Văn C', '01/01/1991', 'Nam', 'c@vaschools.edu.vn', '01/09/2020', 'HCM', 'HCM_THPT', 'GV còn lại']) });
+    ['Mã nhân sự', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Email', 'Ngày vào làm', 'Chi nhánh'],
+    ['NV003', 'Lê Văn C', '01/01/1991', 'Nam', 'c@vaschools.edu.vn', '01/09/2020', 'HCM']) });
   e.as('tro.ly@vaschools.edu.vn');
   const r = e.api('calc.run', { ky_ma: DC });
   assert.match(r.data.warnings.join('|'), /NV003.*chưa có ngạch/);

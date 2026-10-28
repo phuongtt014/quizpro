@@ -18,10 +18,12 @@ function world() {
   ok(e.api('importCommit', { table: 'NAM_HOC', text: tsv(['Năm học', 'Từ ngày', 'Đến ngày'], ['2026-2027', '01/09/2026', '31/05/2027']) }));
   ok(e.api('importCommit', { table: 'KY_LUONG', text: tsv(['Mã kỳ', 'Năm học', 'Học kỳ', 'Từ ngày', 'Đến ngày', 'Số tuần quy định'], [KY, '2026-2027', 'HK1', '01/09/2026', '15/01/2027', '16']) }));
   ok(e.api('importCommit', { table: 'NHAN_SU', text: tsv(
-    ['Mã nhân sự', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Email', 'Ngày vào làm', 'Chi nhánh', 'Trường', 'Đối tượng tính lương'],
-    ['NV001', 'Nguyễn Thị A', '15/05/1990', 'Nữ', 'a@vaschools.edu.vn', '01/09/2019', 'HCM', 'HCM_THPT', 'GV còn lại'],
-    ['NV002', 'Trần Văn B', '15/05/1990', 'Nam', 'b@vaschools.edu.vn', '01/09/2019', 'HN', 'HN_THPT', 'GV còn lại']) }));
-  ok(e.api('importCommit', { table: 'QUA_TRINH_NGACH', text: tsv(['Mã nhân sự', 'Ngạch', 'Hiệu lực từ'], ['NV001', 'GV2', '01/09/2019'], ['NV002', 'GV2', '01/09/2019']) }));
+    ['Mã nhân sự', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Email', 'Ngày vào làm', 'Chi nhánh'],
+    ['NV001', 'Nguyễn Thị A', '15/05/1990', 'Nữ', 'a@vaschools.edu.vn', '01/09/2019', 'HCM'],
+    ['NV002', 'Trần Văn B', '15/05/1990', 'Nam', 'b@vaschools.edu.vn', '01/09/2019', 'HN']) }));
+  // Trường và đối tượng tính lương nằm ở quá trình ngạch bậc (có hiệu lực theo thời gian)
+  ok(e.api('importCommit', { table: 'QUA_TRINH_NGACH', text: tsv(['Mã nhân sự', 'Ngạch', 'Trường', 'Đối tượng tính lương', 'Hiệu lực từ'],
+    ['NV001', 'GV2', 'HCM_THPT', 'GV còn lại', '01/09/2019'], ['NV002', 'GV2', 'HN_THPT', 'GV còn lại', '01/09/2019']) }));
   ok(e.api('importCommit', { table: 'THU_NHAP_NEN', text: tsv(['Mã nhân sự', 'Thu nhập/tháng', 'Hiệu lực từ'], ['NV001', '15.000.000', '01/01/2026'], ['NV002', '15.000.000', '01/01/2026']) }));
   const users = ['gv.hcm', 'ht.hcm', 'ht.hn', 'nhansu', 'tgd', 'tro.ly', 'khac.truong'].map(u => u + '@vaschools.edu.vn');
   ok(e.api('importCommit', { table: 'USERS', text: tsv(['Email', 'Họ tên'], ...users.map(u => [u, u.split('@')[0]])) }));

@@ -161,7 +161,7 @@ var Validate = (function () {
     var typeName = { text: 'Văn bản', longtext: 'Văn bản dài', email: 'Email (chữ thường)', int: 'Số nguyên', num: 'Số (vd 1,1)',
       money: 'Số tiền (vd 6000000)', pct: 'Tỷ lệ (vd 5%)', date: 'Ngày dd/MM/yyyy', enum: 'Chọn từ danh sách', ref: 'Phải có trong danh mục' };
     return T.cols.filter(function (c) { return c.k !== T.ctx && !c.ro; }).map(function (c) {
-      return { k: c.k, label: c.l, type: typeName[c.t], req: !!c.req && c.def === undefined,
+      return { k: c.k, label: c.l, type: typeName[c.t], req: !!c.req && c.def === undefined, ex: c.ex,
         values: c.t === 'enum' ? c.values : (c.t === 'ref' ? 'Mã trong ' + c.ref : (c.hint || '')) };
     });
   }
@@ -216,5 +216,40 @@ var Validate = (function () {
     return res;
   }
 
-  return { rows: rows, importText: importText, spec: spec };
+  function csvCell(v) {
+    var s = String(v === undefined || v === null ? '' : v);
+    return /[",\n\r;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  /**
+   * Mẫu nhập: tiêu đề cột đúng như bộ kiểm tra yêu cầu + một dòng ví dụ hợp lệ (cột tham chiếu lấy mã thật đang có;
+   * hai cột cùng tham chiếu một danh mục lấy hai mã khác nhau nếu có). Trả { header, example, tsv, csv }.
+   */
+  function template(table, ctx) {
+    var T = SCHEMA[table], env = makeEnv(), used = {};
+    var cols = T.cols.filter(function (c) { return c.k !== T.ctx && !c.ro; });
+    var example = cols.map(function (c) {
+      if (c.ex !== undefined) return c.ex;
+      if (!c.req) return '';
+      switch (c.t) {
+        case 'enum': return c.values[0];
+        case 'ref':
+          var keys = Object.keys(env.refSet(c.ref));
+          used[c.ref] = (used[c.ref] || 0) + 1;
+          return keys.length ? keys[Math.min(used[c.ref] - 1, keys.length - 1)] : '';
+        case 'date': return '01/09/2026';
+        case 'int': return String(Math.max(c.min === undefined ? 1 : c.min, 1));
+        case 'num': return '1,1';
+        case 'money': return '6000000';
+        case 'pct': return '5%';
+        case 'email': return 'ten@vaschools.edu.vn';
+        default: return 'Ví dụ';
+      }
+    });
+    var header = cols.map(function (c) { return c.l; });
+    return { header: header, example: example, tsv: header.join('\t') + '\n' + example.join('\t'),
+      csv: header.map(csvCell).join(',') + '\n' + example.map(csvCell).join(',') };
+  }
+
+  return { rows: rows, importText: importText, spec: spec, template: template };
 })();

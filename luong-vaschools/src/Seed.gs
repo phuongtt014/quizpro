@@ -215,7 +215,16 @@ var Seed = (function () {
         });
         Db.insertMany('DEAN_PARAM', addParam, 'system');
         n.thamSoMoi = addParam.length;
-        if (add.length || n.quyTrinh || ups.length || newRoles.length || addParam.length) Audit.log(null, 'NANG_CAP', '', '', n);
+
+        // Hệ thống cũ lưu Trường/Đối tượng ở hồ sơ nhân sự (cột còn nằm trong sheet nhưng không còn dùng): chép sang các dòng quá trình ngạch bậc còn trống.
+        var staffBy = {};
+        Db.all('NHAN_SU').forEach(function (s) { staffBy[s.ma_nv] = s; });
+        var moved = Db.filter('QUA_TRINH_NGACH', function (q) { return q.doi_tuong === '' && staffBy[q.ma_nv] && staffBy[q.ma_nv].doi_tuong; }).map(function (q) {
+          return { id: q.id, patch: { doi_tuong: staffBy[q.ma_nv].doi_tuong, truong_ma: q.truong_ma || staffBy[q.ma_nv].truong_ma || '' } };
+        });
+        Db.updateMany('QUA_TRINH_NGACH', moved, 'system');
+        n.chuyenDonVi = moved.length;
+        if (add.length || n.quyTrinh || ups.length || newRoles.length || addParam.length || moved.length) Audit.log(null, 'NANG_CAP', '', '', n);
       });
       return n;
     }

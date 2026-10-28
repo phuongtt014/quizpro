@@ -164,15 +164,17 @@ test('Quy trình tùy biến theo trường; thiếu/đứt bước báo lỗi r
 test('Đề xuất ngạch: duyệt xong tự đóng ngạch cũ và mở ngạch mới', () => {
   const { e } = world();
   e.as('gv.hcm@vaschools.edu.vn');
-  const bad = e.api('ngach.propose', { ma_nv: 'NV001', ngach_ma: 'GV9', hieu_luc_tu: '01/03/2027' });
+  const bad = e.api('ngach.propose', { ma_nv: 'NV001', ngach_ma: 'GV9', truong_ma: 'HCM_THPT', doi_tuong: 'GV còn lại', hieu_luc_tu: '01/03/2027' });
   assert.strictEqual(bad.code, 'VALIDATION');
-  assert.strictEqual(e.api('ngach.propose', { ma_nv: 'NV002', ngach_ma: 'GV3', hieu_luc_tu: '01/03/2027' }).code, 'FORBIDDEN');
-  const r = e.api('ngach.propose', { ma_nv: 'NV001', ngach_ma: 'GV3', hieu_luc_tu: '01/03/2027', so_quyet_dinh: 'QĐ-77', ly_do: 'Đủ 7 năm' });
+  assert.strictEqual(e.api('ngach.propose', { ma_nv: 'NV002', ngach_ma: 'GV3', truong_ma: 'HN_THPT', doi_tuong: 'GV còn lại', hieu_luc_tu: '01/03/2027' }).code, 'FORBIDDEN');
+  assert.strictEqual(e.api('ngach.propose', { ma_nv: 'NV001', ngach_ma: 'GV3', hieu_luc_tu: '01/03/2027' }).code, 'VALIDATION'); // thiếu đối tượng tính lương
+  const r = e.api('ngach.propose', { ma_nv: 'NV001', ngach_ma: 'GV3', truong_ma: 'HCM_THPT', doi_tuong: 'Quản lý', hieu_luc_tu: '01/03/2027', so_quyet_dinh: 'QĐ-77', ly_do: 'Đủ 7 năm' });
   assert.ok(r.ok, JSON.stringify(r));
   const id = e.api('phieu.list', { tab: 'cua_toi' }).data.rows[0].id;
   approveAll(e, id, ['ht.hcm', 'nhansu', 'tgd']);
   const rows = j(e.run('Db.filter("QUA_TRINH_NGACH",function(x){return x.ma_nv==="NV001";}).map(function(x){return x.ngach_ma+":"+x.hieu_luc_tu+">"+x.hieu_luc_den+":"+x.so_quyet_dinh;})'));
   assert.deepStrictEqual(rows, ['GV2:2019-09-01>2027-02-28:', 'GV3:2027-03-01>:QĐ-77']);
+  assert.deepStrictEqual(j(e.run('Staff.units("2027-06-01").NV001.doi_tuong + "/" + Staff.units("2026-06-01").NV001.doi_tuong')), 'Quản lý/GV còn lại'); // đối tượng đổi theo thời gian
 });
 
 test('Nâng cấp hệ thống đã cài: thêm quyền/vai trò/quy trình mới, không ghi đè tùy chỉnh, chạy lại không nhân đôi', () => {

@@ -175,8 +175,8 @@ var Api = (function () {
       });
     } else if (p.loai_phieu === 'Đề xuất ngạch') {
       var d = Workflow.parse(p.noi_dung, {}).row || {};
-      head = ['Mã NV', 'Họ tên', 'Ngạch đề xuất', 'Hiệu lực từ', 'Số quyết định', 'Lý do'];
-      rows = [[d.ma_nv, names[d.ma_nv] || '', d.ngach_ma, d.hieu_luc_tu, d.so_quyet_dinh || '', d.ly_do || '']];
+      head = ['Mã NV', 'Họ tên', 'Ngạch đề xuất', 'Trường', 'Đối tượng', 'Hiệu lực từ', 'Số quyết định', 'Lý do'];
+      rows = [[d.ma_nv, names[d.ma_nv] || '', d.ngach_ma, d.truong_ma || '', d.doi_tuong || '', d.hieu_luc_tu, d.so_quyet_dinh || '', d.ly_do || '']];
     } else {
       head = ['Nội dung'];
       rows = [[Workflow.parse(p.noi_dung, {}).noi_dung || '']];
@@ -281,6 +281,8 @@ var Api = (function () {
       rows = rows.slice(page * PAGE, page * PAGE + PAGE);
       if (p.table === 'NHAN_SU') rows = Staff.decorate(rows);
       if (p.table === 'NGACH_DM') rows = Policy.decorateNgach(rows);
+      if (p.table === 'QUA_TRINH_NGACH') rows = Staff.decorateHistory(rows);
+      if (p.table === 'THU_NHAP_NEN') rows = Staff.decorateIncome(rows);
       var locked = false, appendOnly = false;
       if (T.ctx) {
         var d = Db.find('DEAN', function (x) { return x.ma === ctx[T.ctx]; });
@@ -424,6 +426,16 @@ var Api = (function () {
       return out;
     },
 
+    /** Mẫu nhập CSV cho một bảng (tiêu đề + dòng ví dụ hợp lệ) để chèn vào ô dán hoặc tải về. */
+    'import.template': function (p, user) {
+      var T = table(p.table);
+      if (T.readonly || T.noImport) throw new AppError('BAD_REQUEST', 'Bảng này không nhập bằng CSV');
+      Auth.require(user, T.perm.i || T.perm.w);
+      if (T.ctx && !(p.ctx && p.ctx[T.ctx])) throw new AppError('BAD_REQUEST', 'Thiếu ngữ cảnh đề án');
+      var t = Validate.template(p.table, p.ctx || {});
+      return { header: t.header, example: t.example, tsv: t.tsv, csv: t.csv, file: p.table.toLowerCase() + '_mau.csv' };
+    },
+
     'dean.check': function (p, user) {
       Auth.require(user, 'policy.view');
       return { issues: Policy.checkReady(p.ma) };
@@ -478,8 +490,10 @@ var Api = (function () {
       Auth.require(user, 'phieu.create');
       var out;
       Db.tx(function () {
-        var ky = findKy(p.ky_ma, true), tr = findTruong(p.truong_ma), staff = {};
-        Db.all('NHAN_SU').forEach(function (s) { if (s.truong_ma === tr.ma) staff[s.ma_nv] = s; });
+        var ky = findKy(p.ky_ma, true), tr = findTruong(p.truong_ma), staff = {}, units = Staff.units(ky.den_ngay);
+        Db.all('NHAN_SU').forEach(function (s) {
+          if (units[s.ma_nv] && units[s.ma_nv].truong_ma === tr.ma) staff[s.ma_nv] = { chi_nhanh_ma: s.chi_nhanh_ma, truong_ma: tr.ma, ma_nv: s.ma_nv };
+        });
         if (ky.loai === 'Điều chỉnh') throw new AppError('BAD_REQUEST', 'Đợt điều chỉnh không có khai báo giảng dạy');
         var tbl = 'KHAI_BAO';
         var lines = Db.filter(tbl, function (r) {
@@ -501,13 +515,15 @@ var Api = (function () {
       Db.tx(function () {
         var s = Db.find('NHAN_SU', function (x) { return x.ma_nv === p.ma_nv; });
         if (!s) throw new AppError('NOT_FOUND', 'Không tìm thấy nhân sự ' + p.ma_nv);
-        if (!Auth.canRow(user, 'staff.view', { cn: s.chi_nhanh_ma, tr: s.truong_ma, nv: s.ma_nv })) throw new AppError('FORBIDDEN', 'Nhân sự nằm ngoài phạm vi của bạn');
-        var vals = { ma_nv: p.ma_nv, ngach_ma: p.ngach_ma || '', hieu_luc_tu: p.hieu_luc_tu || '', hieu_luc_den: '', so_quyet_dinh: p.so_quyet_dinh || '', ly_do: p.ly_do || '' };
+        var cur = Staff.units(Util.todayIso())[s.ma_nv] || {};
+        if (!Auth.canRow(user, 'staff.view', { cn: s.chi_nhanh_ma, tr: cur.truong_ma || '', nv: s.ma_nv })) throw new AppError('FORBIDDEN', 'Nhân sự nằm ngoài phạm vi của bạn');
+        var vals = { ma_nv: p.ma_nv, ngach_ma: p.ngach_ma || '', truong_ma: p.truong_ma || '', doi_tuong: p.doi_tuong || '', hieu_luc_tu: p.hieu_luc_tu || '',
+          hieu_luc_den: '', so_quyet_dinh: p.so_quyet_dinh || '', ly_do: p.ly_do || '' };
         var res = Validate.rows('QUA_TRINH_NGACH', [{ n: 1, vals: vals }], {}, { mode: 'insert', autoClose: true });
         if (!res.ok) throw validationError(res);
         var ng = Db.find('NGACH_DM', function (n) { return n.ma === vals.ngach_ma; });
         var ph = Workflow.create(user, { loai: 'Đề xuất ngạch', tieu_de: 'Đề xuất ngạch ' + ng.ten + ' cho ' + s.ho_ten + ' (' + s.ma_nv + ')',
-          truong_ma: s.truong_ma, chi_nhanh_ma: s.chi_nhanh_ma, payload: { row: vals } });
+          truong_ma: vals.truong_ma || cur.truong_ma || '', chi_nhanh_ma: s.chi_nhanh_ma, payload: { row: vals } });
         out = { ma_phieu: ph.ma_phieu };
       });
       return out;
@@ -556,11 +572,11 @@ var Api = (function () {
       Auth.require(user, 'phieu.create');
       var out;
       Db.tx(function () {
-        var ky = findKy(p.ky_ma, true), tr = findTruong(p.truong_ma), staff = {};
-        Db.all('NHAN_SU').forEach(function (s) { if (s.truong_ma === tr.ma) staff[s.ma_nv] = s; });
+        var ky = findKy(p.ky_ma, true), tr = findTruong(p.truong_ma);
+        // Kết quả đã lưu kèm ảnh chụp trường tại thời điểm tính nên lọc thẳng theo đó.
         var mine = function (r) {
-          var s = staff[r.ma_nv];
-          return r.ky_ma === ky.ma && r.trang_thai === 'Tạm tính' && s && Auth.canRow(user, 'calc.run', { cn: s.chi_nhanh_ma, tr: s.truong_ma, nv: s.ma_nv });
+          return r.ky_ma === ky.ma && r.trang_thai === 'Tạm tính' && r.truong_ma === tr.ma &&
+            Auth.canRow(user, 'calc.run', { cn: r.chi_nhanh_ma, tr: r.truong_ma, nv: r.ma_nv });
         };
         var inc = Db.filter('THU_NHAP_MOI', mine), qt = Db.filter('QUYET_TOAN', mine);
         if (!inc.length) throw new AppError('EMPTY', 'Chưa có kết quả tạm tính của trường này. Hãy bấm "Tính toán" trước.');
