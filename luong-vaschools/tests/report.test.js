@@ -174,3 +174,14 @@ test('Xuất dữ liệu đúng định dạng mẫu nhập, nhập lại đư�
     assert.deepStrictEqual(j(chk.data.errors || []), [], t);
   }
 });
+
+test('Xóa kỳ nhập sai: tự bỏ kết quả tạm tính, còn kết quả đã chốt thì chặn', () => {
+  const { e } = world();
+  const ky = e.api('list', { table: 'KY_LUONG' }).data.rows.find(r => r.ma === KY);
+  assert.strictEqual(e.api('calc.run', { ky_ma: KY, gom: 'tat_ca' }).ok, true);
+  assert.ok(e.api('list', { table: 'THU_NHAP_MOI' }).data.total > 0);
+  const del = e.api('remove', { table: 'KY_LUONG', id: ky.id });
+  assert.strictEqual(del.ok, true, JSON.stringify(del));
+  assert.strictEqual(e.api('list', { table: 'THU_NHAP_MOI' }).data.total, 0);
+  assert.strictEqual(e.api('list', { table: 'QUYET_TOAN' }).data.total, 0);
+});

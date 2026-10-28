@@ -3173,6 +3173,12 @@ var Api = (function () {
             Db.removeMany(t, Db.filter(t, function (r) { return r.de_an_ma === row.ma; }).map(function (r) { return r.id; }));
           });
         } else {
+          if (p.table === 'KY_LUONG') {
+            // Kết quả "Tạm tính" chỉ là bản nháp của lần chạy: xóa cùng kỳ để sửa kỳ nhập sai. Kết quả đã chốt/chờ chốt, khai báo vẫn chặn xóa.
+            ['QUYET_TOAN', 'THU_NHAP_MOI'].forEach(function (t) {
+              Db.removeMany(t, Db.filter(t, function (r) { return r.ky_ma === row.ma && r.trang_thai === 'Tạm tính'; }).map(function (r) { return r.id; }));
+            });
+          }
           var refs = referencedBy(p.table, row);
           if (refs.length) throw new AppError('IN_USE', 'Không xóa được vì đang được dùng ở: ' + refs.join(', ') + '. Hãy chuyển trạng thái sang Ngừng/Đã nghỉ việc thay vì xóa.');
         }
