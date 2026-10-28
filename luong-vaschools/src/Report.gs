@@ -31,7 +31,7 @@ var Report = (function () {
   };
 
   function blank() {
-    return { so_nv: 0, hien_tai: 0, so_co_hien_tai: 0, chinh_thuc: 0, chinh_thuc_ss: 0, pa_moi: 0, tien_pt: 0, giu_luong: 0, bi_tran: 0, chua_chot: 0 };
+    return { so_nv: 0, hien_tai: 0, so_co_hien_tai: 0, chinh_thuc: 0, chinh_thuc_ss: 0, pa_moi: 0, tien_pt: 0, pt_bq: 0, chi_phi: 0, giu_luong: 0, bi_tran: 0, chua_chot: 0 };
   }
 
   function add(a, r) {
@@ -39,6 +39,8 @@ var Report = (function () {
     a.chinh_thuc += r.chinh_thuc || 0;
     a.pa_moi += r.pa_moi || 0;
     a.tien_pt += r.tien_pt || 0;
+    a.pt_bq += r.ho_tro_pt || 0;
+    a.chi_phi += isNum(r.chi_phi_thang) ? r.chi_phi_thang : (r.chinh_thuc || 0);
     if (isNum(r.thu_nhap_hien_tai)) { a.hien_tai += r.thu_nhap_hien_tai; a.so_co_hien_tai++; a.chinh_thuc_ss += r.chinh_thuc || 0; }
     if (/giữ mức thu nhập/.test(r.ghi_chu)) a.giu_luong++;
     if (/trần/.test(r.ghi_chu)) a.bi_tran++;
@@ -49,7 +51,7 @@ var Report = (function () {
     var tang = a.chinh_thuc_ss - a.hien_tai;
     return { key: key, label: label, so_nv: a.so_nv, hien_tai: a.hien_tai, so_co_hien_tai: a.so_co_hien_tai, pa_moi: a.pa_moi, chinh_thuc: a.chinh_thuc,
       tang: tang, pct_tang: a.hien_tai > 0 ? Math.round(tang / a.hien_tai * 10000) / 100 : null, tien_pt: a.tien_pt,
-      quy_nam: a.chinh_thuc * 12, giu_luong: a.giu_luong, bi_tran: a.bi_tran, chua_chot: a.chua_chot };
+      quy_nam: a.chinh_thuc * 12, pt_binh_quan: a.pt_bq, chi_phi_thang: a.chi_phi, chi_phi_nam: a.chi_phi * 12, giu_luong: a.giu_luong, bi_tran: a.bi_tran, chua_chot: a.chua_chot };
   }
 
   /** Bảng tổng hợp theo nhóm + dòng tổng toàn bộ phạm vi người xem. */
@@ -94,12 +96,12 @@ var Report = (function () {
       rows = scopedRows(user, 'QUYET_TOAN', kyMa);
     } else {
       head = ['Mã NV', 'Họ tên', 'Chi nhánh', 'Trường', 'Đối tượng', 'Ngày vào làm', 'Ngạch', 'Thâm niên (năm)', 'HS chức danh', 'HS thâm niên', 'HS vượt khung',
-        'HS hạng trường', 'HS kiêm nhiệm', 'HS KPI', 'Lương chức danh', 'Các khoản hỗ trợ', 'Trong đó hỗ trợ từ phụ trội/tháng', 'Lương KPI', 'Phương án mới',
-        'Thu nhập hiện tại', 'Trần tăng', 'Mức tối đa', 'Mức chính thức', 'Chênh lệch', 'Tiền phụ trội cả kỳ', 'Trạng thái', 'Nguồn', 'Ghi chú'];
+        'HS hạng trường', 'HS kiêm nhiệm', 'HS KPI', 'Lương chức danh', 'Các khoản hỗ trợ', 'Phụ trội bình quân/tháng', 'Lương KPI', 'Phương án mới',
+        'Thu nhập hiện tại', 'Trần tăng', 'Mức tối đa', 'Mức chính thức', 'Chênh lệch', 'Lương làm mốc đợt sau', 'Chi phí/tháng (lương + phụ trội BQ)', 'Tiền phụ trội cả kỳ', 'Trạng thái', 'Nguồn', 'Ghi chú'];
       map = function (r) {
         return [r.ma_nv, r.ho_ten, r.chi_nhanh_ma, r.truong_ma, r.doi_tuong, Util.displayDate(r.ngay_vao_lam), r.ngach_ten, r.tham_nien, r.hs_cd, r.hs_tn, r.hs_vk,
           r.hs_bgh, r.hs_kn, r.hs_kpi, r.luong_chuc_danh, r.ho_tro, r.ho_tro_pt, r.luong_kpi, r.pa_moi, r.thu_nhap_hien_tai, pct(r.ty_le_tran), r.max_income,
-          r.chinh_thuc, r.chenh_lech, r.tien_pt, r.trang_thai, r.nguon, r.ghi_chu];
+          r.chinh_thuc, r.chenh_lech, r.luong_nen, r.chi_phi_thang, r.tien_pt, r.trang_thai, r.nguon, r.ghi_chu];
       };
       rows = scopedRows(user, 'THU_NHAP_MOI', kyMa);
     }

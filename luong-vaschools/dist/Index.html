@@ -629,18 +629,19 @@
         clear(box);
         if (!d.total.so_nv) { box.appendChild(el('div', { class: 'alert warn', text: 'Kỳ này chưa có kết quả tính trong phạm vi của bạn. Bấm "Tính toán" ở phía trên.' })); return; }
         if (d.chua_tinh) box.appendChild(el('div', { class: 'alert warn', text: d.chua_tinh + ' nhân sự chưa có kết quả (thiếu ngạch, LCB/LTB hoặc hệ số). Bấm "Tính toán" để xem cảnh báo chi tiết.' }));
-        var heads = ['Nhóm', 'Số NV', 'Thu nhập hiện tại', 'Phương án mới', 'Mức chính thức', 'Tăng so với hiện tại', '% tăng', 'Quỹ năm (×12)', 'Tiền phụ trội cả kỳ', 'Giữ lương', 'Bị trần', 'Chưa chốt'];
+        var heads = ['Nhóm', 'Số NV', 'Thu nhập hiện tại (mốc)', 'Phương án mới', 'Mức chính thức (lương)', 'Tăng so với mốc', '% tăng', 'Quỹ lương năm (×12)',
+          'Phụ trội BQ/tháng', 'Chi phí/tháng (lương + phụ trội)', 'Chi phí năm (×12)', 'Tiền phụ trội cả kỳ', 'Giữ lương', 'Bị trần', 'Chưa chốt'];
         var body = el('tbody');
         function row(g, strong) {
           var noBase = !g.so_co_hien_tai;
           var cells = [g.label, g.so_nv, noBase ? '—' : money(g.hien_tai), money(g.pa_moi), money(g.chinh_thuc), noBase ? '—' : money(g.tang), g.pct_tang === null ? '' : String(g.pct_tang).replace('.', ',') + '%',
-            money(g.quy_nam), money(g.tien_pt), g.giu_luong, g.bi_tran, g.chua_chot];
+            money(g.quy_nam), money(g.pt_binh_quan), money(g.chi_phi_thang), money(g.chi_phi_nam), money(g.tien_pt), g.giu_luong, g.bi_tran, g.chua_chot];
           body.appendChild(el('tr', { style: strong ? 'font-weight:700;background:var(--head)' : '' }, cells.map(function (v, i) { return el('td', { class: i ? 'num' : '', text: String(v) }); })));
         }
         d.groups.forEach(function (g) { row(g, false); });
         row(d.total, true);
         box.appendChild(el('div', { class: 'tw' }, [el('table', null, [el('thead', null, [el('tr', null, heads.map(function (h) { return el('th', { text: h }); }))]), body])]));
-        box.appendChild(el('p', { class: 'muted', style: 'margin-top:8px', text: 'Đề án áp dụng: ' + d.de_an + ' · Loại kỳ: ' + d.ky.loai + ' · "—" nghĩa là chưa nhập "Thu nhập hiện tại" (Nhân sự → Thu nhập hiện tại); "Tăng" chỉ tính trên nhân sự đã có mốc này; "Quỹ năm" là ước tính = mức chính thức × 12.' }));
+        box.appendChild(el('p', { class: 'muted', style: 'margin-top:8px', text: 'Đề án áp dụng: ' + d.de_an + ' · Loại kỳ: ' + d.ky.loai + ' · Mức chính thức chỉ gồm lương (không gồm phụ trội); phụ trội bình quân chỉ nằm ở các cột chi phí. "—" nghĩa là chưa có mốc "Thu nhập hiện tại" (Nhân sự → Thu nhập hiện tại). Khi chốt một đợt Điều chỉnh, mức chính thức tự thành mốc cho đợt sau. Quỹ/chi phí năm là ước tính ×12.' }));
       }).catch(function (e) { clear(box).appendChild(errBox(e)); });
     }
     group.addEventListener('change', load);

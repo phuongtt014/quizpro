@@ -42,10 +42,11 @@ test('Quyết toán: GV còn lại, định mức tự động 20 tiết/tuần 
   assert.match(j(e.settle({ decls: [d('Thực dạy', 30, 'Tiết/Tuần', '2026-09-07', '2026-09-13')], doiTuong: 'Quản lý', soTuan: 1, param: P, ltb: 1, hsTiet: null })).ghi_chu, /HS tiết/);
 });
 
-test('Thu nhập mới: GV còn lại, KPI tiết dạy, trần 10% theo thâm niên 7 năm', () => {
+test('Thu nhập mới (đề án bật cộng phụ trội BQ vào thu nhập): GV còn lại, KPI tiết dạy, trần 10% theo thâm niên 7 năm', () => {
   const e = E();
+  const P1 = Object.assign({}, P, { pt_vao_thu_nhap: 1 });
   const r = j(e.income({ doiTuong: 'GV còn lại', ngach: { hs_chuc_danh: 1.1, hs_kpi: '', hs_tiet: 1.1, nhom_tham_nien: 'TN2', vuot_khung: 'Không', ho_tro_hang_truong: '' },
-    tenure: 7, holdYears: 7, kiemNhiem: [], hangTruong: null, lcb: 6000000, ltb: 100000, param: P, tran: TRAN, namXet: 2027,
+    tenure: 7, holdYears: 7, kiemNhiem: [], hangTruong: null, lcb: 6000000, ltb: 100000, param: P1, tran: TRAN, namXet: 2027,
     thuNhapHienTai: 15000000, tienPt: 9920000, soThang: 5 }));
   assert.strictEqual(r.hs_tn, 0.14);
   assert.strictEqual(r.luong_chuc_danh, 6600000);
@@ -56,6 +57,21 @@ test('Thu nhập mới: GV còn lại, KPI tiết dạy, trần 10% theo thâm n
   assert.strictEqual(r.max_income, 16500000);
   assert.strictEqual(r.chinh_thuc, 16500000);
   assert.match(r.ghi_chu, /trần 10%/);
+  assert.strictEqual(r.luong_nen, 16500000 - 1984000); // mốc không gồm phụ trội
+  assert.strictEqual(r.chi_phi_thang, 16500000);
+});
+
+test('Thu nhập mới (mặc định): phụ trội bình quân KHÔNG vào thu nhập, chỉ vào chi phí; mốc = mức chính thức', () => {
+  const e = E();
+  const r = j(e.income({ doiTuong: 'GV còn lại', ngach: { hs_chuc_danh: 1.1, hs_kpi: '', hs_tiet: 1.1, nhom_tham_nien: 'TN2', vuot_khung: 'Không', ho_tro_hang_truong: '' },
+    tenure: 7, holdYears: 7, kiemNhiem: [], hangTruong: null, lcb: 6000000, ltb: 100000, param: P, tran: TRAN, namXet: 2027,
+    thuNhapHienTai: 15000000, tienPt: 9920000, soThang: 5 }));
+  assert.strictEqual(r.ho_tro, 840000);            // chỉ thâm niên
+  assert.strictEqual(r.ho_tro_pt, 1984000);        // phụ trội bình quân/tháng vẫn được tính để báo cáo
+  assert.strictEqual(r.pa_moi, 6600000 + 840000 + 8800000);
+  assert.strictEqual(r.chinh_thuc, 16240000);
+  assert.strictEqual(r.luong_nen, 16240000);
+  assert.strictEqual(r.chi_phi_thang, 16240000 + 1984000);
 });
 
 test('Thu nhập mới: Phó hiệu trưởng (không dạy) có hỗ trợ hạng trường, vượt khung, KPI theo hệ số; kiêm nhiệm', () => {

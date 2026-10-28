@@ -96,7 +96,9 @@ var Engine = (function () {
     else if (input.doiTuong === 'GV còn lại') kpiTiet = input.ltb * hsTiet * num(p.kpi_tiet_khac_so_tiet);
     var luongKPI = kpiTiet > 0 ? kpiTiet : input.lcb * hsKPI;
 
-    var pa = luongCD + troCap + hoTroDK + luongKPI;
+    // Mặc định phụ trội bình quân KHÔNG nằm trong thu nhập tháng (chỉ vào báo cáo chi phí); đề án có thể bật bằng tham số pt_vao_thu_nhap = 1.
+    var ptIn = num(p.pt_vao_thu_nhap) === 1, hoTroTN = ptIn ? hoTroDK : 0;
+    var pa = luongCD + troCap + hoTroTN + luongKPI;
 
     var cur = input.thuNhapHienTai, tran = null, max = null, official = pa;
     if (cur === null || cur === undefined) {
@@ -109,11 +111,13 @@ var Engine = (function () {
     }
     return {
       hs_cd: hsCD, hs_tn: round(hsTN, 4), hs_vk: round(hsVK, 4), hs_bgh: hsBGH, hs_kn: round(hsKN, 4), hs_kpi: hsKPI,
-      luong_chuc_danh: Math.round(luongCD), ho_tro: Math.round(troCap + hoTroDK), ho_tro_pt: Math.round(hoTroDK), luong_kpi: Math.round(luongKPI),
+      luong_chuc_danh: Math.round(luongCD), ho_tro: Math.round(troCap + hoTroTN), ho_tro_pt: Math.round(hoTroDK), luong_kpi: Math.round(luongKPI),
       pa_moi: Math.round(pa), thu_nhap_hien_tai: cur === null || cur === undefined ? '' : cur,
       ty_le_tran: tran === null ? '' : tran, max_income: max === null ? '' : Math.round(max),
       chinh_thuc: Math.round(official),
       chenh_lech: cur === null || cur === undefined ? '' : Math.round(official) - cur, tien_pt: Math.round(input.tienPt || 0),
+      luong_nen: Math.max(Math.round(official) - (ptIn ? Math.round(hoTroDK) : 0), 0),
+      chi_phi_thang: Math.round(official) + (ptIn ? 0 : Math.round(hoTroDK)),
       ghi_chu: notes.join('; ')
     };
   }

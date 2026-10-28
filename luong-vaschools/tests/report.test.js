@@ -64,9 +64,11 @@ test('Đợt điều chỉnh lấy hỗ trợ dự kiến từ phụ trội củ
   assert.ok(e.api('calc.run', { ky_ma: DC }).ok);
   const a = e.api('list', { table: 'THU_NHAP_MOI', filter: { ky_ma: DC, ma_nv: 'NV001' } }).data.rows[0];
   const b = e.api('list', { table: 'THU_NHAP_MOI', filter: { ky_ma: DC, ma_nv: 'NV002' } }).data.rows[0];
-  assert.deepStrictEqual([a.tien_pt, a.ho_tro_pt, a.pa_moi, a.max_income, a.chinh_thuc], [9920000, 1984000, 18104000, 16500000, 16500000]);
-  assert.match(a.ghi_chu, /trần 10%/);
-  assert.deepStrictEqual([b.tien_pt, b.ho_tro_pt, b.chinh_thuc], [0, 0, 16120000]);
+  // Phụ trội bình quân (1.984.000/tháng) chỉ vào chi phí, KHÔNG làm tăng thu nhập hay mốc
+  assert.deepStrictEqual([a.tien_pt, a.ho_tro_pt, a.pa_moi, a.chinh_thuc, a.luong_nen, a.chi_phi_thang], [9920000, 1984000, 16120000, 16120000, 16120000, 18104000]);
+  assert.deepStrictEqual([b.tien_pt, b.ho_tro_pt, b.chinh_thuc, b.chi_phi_thang], [0, 0, 16120000, 16120000]);
+  const s = e.api('tonghop', { ky_ma: DC, group: 'tat_ca' }).data.total;
+  assert.deepStrictEqual([s.chinh_thuc, s.pt_binh_quan, s.chi_phi_thang, s.chi_phi_nam], [32240000, 1984000, 34224000, 410688000]);
 });
 
 test('Tổng hợp toàn công ty: theo chi nhánh/trường/ngạch, tổng quỹ, tăng so với hiện tại; lọc theo phạm vi', () => {
@@ -118,7 +120,7 @@ test('Xuất bảng để dán vào Excel: tiêu đề, số cột nhất quán,
   const lines = t.text.split('\n');
   assert.strictEqual(t.rows, 2);
   assert.strictEqual(lines.length, 3);
-  assert.ok(lines.every(l => l.split('\t').length === 28));
+  assert.ok(lines.every(l => l.split('\t').length === 30));
   assert.match(lines[0], /^Mã NV\tHọ tên\tChi nhánh/);
   assert.match(lines[1], /NV001\tNguyễn Thị A\tHCM\tHCM_THPT\tGV còn lại\t01\/09\/2019\tGiáo viên 2\t6/);
   assert.ok(lines[1].includes('\t16120000\t'));

@@ -44,6 +44,13 @@ Bạn chỉ cần **4 tệp** trong thư mục `dist/`: `Code.gs`, `Index.html`,
 4. **Thu nhập & phụ trội:** chọn kỳ → **Tính toán** → xem **Tổng hợp toàn công ty** → **Sao chép bảng thu nhập** dán vào Excel.
 5. **Phụ trội:** menu **Khai báo** nhập số tiết (có thể Nhập CSV) → **Gửi duyệt**; hoặc chọn chế độ **Tính thử** để xem trước phụ trội khi chưa duyệt.
 
+## Mốc thu nhập cho năm sau (tự động)
+- Mỗi năm thường có **1 đợt Điều chỉnh**. Sau khi đợt đó **gửi duyệt chốt và được duyệt xong**, hệ thống tự tạo "Thu nhập hiện tại" mới cho từng người
+  (**chỉ lương, không gồm phụ trội**), hiệu lực từ **ngày hiệu lực của đợt**. Xem ở *Nhân sự → Thu nhập hiện tại* (ghi chú "Từ chốt …").
+- Đợt Điều chỉnh năm sau sẽ tự so trần với mốc này. Chỉ cần tạo kỳ `2026-2027-DC1`… với ngày hiệu lực mới rồi bấm Tính toán.
+- Phụ trội bình quân/tháng chỉ nằm ở cột **Chi phí/tháng** của bảng tổng hợp, không nằm trong thu nhập.
+- Sau khi dán bản mới, chạy **`setupEnsureSheets`** để bổ sung tham số `pt_vao_thu_nhap` (=0) vào các đề án hiện có.
+
 ## Khi có bản cập nhật mã
 Dán lại `Code.gs` / `Index.html` mới → **Triển khai → Quản lý triển khai → ✏ Sửa → Phiên bản mới → Triển khai** (URL không đổi). Nếu bản mới có thêm bảng/cột, chạy thêm hàm **`setupEnsureSheets`** (không mất dữ liệu).
 

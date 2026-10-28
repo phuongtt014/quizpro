@@ -55,6 +55,12 @@ Thêm quản trị khác: sửa email trong `setupAddAdmin` rồi chạy.
 - **Thu nhập & phụ trội** (menu): *Tổng hợp toàn công ty* (theo chi nhánh / chi nhánh › trường / trường / đối tượng / ngạch / toàn công ty, có tổng cộng,
   tăng so với hiện tại, % tăng, quỹ năm ước tính, tiền phụ trội, số người giữ lương/bị trần), *Thu nhập từng người* (đủ thông tin nhân sự + từng thành phần),
   *Phụ trội từng người* (nút **Chi tiết** xem từng dòng khai báo quy ra tiết). Có nút **Sao chép bảng (dán vào Excel)**.
+- **Mốc "Thu nhập hiện tại" tự cập nhật theo đợt Điều chỉnh:** khi phiếu chốt của một đợt **Điều chỉnh** được duyệt xong, mức chính thức (chỉ lương, **không gồm phụ trội**)
+  của từng người trở thành mốc mới, **hiệu lực từ ngày hiệu lực của đợt**, mốc cũ tự kết thúc ngày liền trước. Đợt sau (thường 1 lần/năm) so trần với mốc này.
+  Mốc đã có cùng ngày được giữ nguyên (ghi nhật ký). Học kỳ khi chốt **không** tạo mốc. Mọi kỳ lấy mốc theo *kết quả của đợt Điều chỉnh liền kề trước* nên các học kỳ
+  cùng năm không cộng dồn trần.
+- **Phụ trội và thu nhập:** theo mặc định phụ trội bình quân/tháng (tiền phụ trội ÷ số tháng) **không cộng vào thu nhập tháng** mà chỉ vào cột *Chi phí/tháng* của báo cáo.
+  Muốn cộng lại như PRD: đặt tham số đề án `pt_vao_thu_nhap = 1` (Đề án → Tham số khác, ở bản Nháp).
 - **Tính thử:** chế độ "Tính thử cả dòng chưa duyệt" cho thấy phụ trội ngay khi mới nhập khai báo; kết quả được gắn nhãn *Gồm dòng chưa duyệt* và **không gửi chốt được**
   cho tới khi tính lại bằng "Chỉ dòng đã duyệt".
 - **Điều kiện để có số liệu:** nhân sự cần có ngạch hiệu lực tại ngày cuối kỳ; đề án cần có LCB/LTB cho chi nhánh; muốn có "tăng so với hiện tại" và áp trần cần nhập
@@ -78,7 +84,7 @@ Thêm quản trị khác: sửa email trong `setupAddAdmin` rồi chạy.
 ## Kiểm thử
 
 ```bash
-npm test                      # 41 kiểm thử logic trên bản giả lập Apps Script
+npm test                      # 46 kiểm thử logic trên bản giả lập Apps Script
 node tests/ui-smoke.js ./ảnh  # chạy giao diện thật trên Chromium (cần playwright)
 ```
 

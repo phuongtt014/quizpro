@@ -204,7 +204,18 @@ var Seed = (function () {
         });
         Db.updateMany('DEAN_NGACH', ups, 'system');
         n.capNhatNgach = ups.length;
-        if (add.length || n.quyTrinh || ups.length || newRoles.length) Audit.log(null, 'NANG_CAP', '', '', n);
+        // Tham số mới của PARAMS được bổ sung (giá trị mặc định) vào MỌI phiên bản đề án hiện có, kể cả bản đã ban hành (chỉ thêm dòng thiếu).
+        var addParam = [];
+        Db.all('DEAN').forEach(function (d) {
+          var have = {};
+          Db.filter('DEAN_PARAM', function (x) { return x.de_an_ma === d.ma; }).forEach(function (x) { have[x.khoa] = true; });
+          PARAMS.forEach(function (pp) {
+            if (!have[pp.k]) addParam.push({ de_an_ma: d.ma, khoa: pp.k, gia_tri: pp.def, don_vi: pp.unit, mo_ta: pp.l });
+          });
+        });
+        Db.insertMany('DEAN_PARAM', addParam, 'system');
+        n.thamSoMoi = addParam.length;
+        if (add.length || n.quyTrinh || ups.length || newRoles.length || addParam.length) Audit.log(null, 'NANG_CAP', '', '', n);
       });
       return n;
     }

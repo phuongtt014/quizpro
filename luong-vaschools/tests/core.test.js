@@ -64,7 +64,7 @@ test('Util: thâm niên tính số năm tròn (4 năm 11 tháng = 4)', () => {
 test('Cài đặt: tạo đủ sheet và nạp dữ liệu đề án HP.ĐA.01', () => {
   const e = fresh();
   const n = j(e.run('({ngach: Db.all("NGACH_DM").length, dn: Db.all("DEAN_NGACH").length, qd: Db.all("DEAN_QUYDOI").length, tran: Db.all("DEAN_TRAN").length, par: Db.all("DEAN_PARAM").length})'));
-  assert.deepStrictEqual(n, { ngach: 31, dn: 31, qd: 10, tran: 3, par: 15 });
+  assert.deepStrictEqual(n, { ngach: 31, dn: 31, qd: 10, tran: 3, par: 16 });
   const b = j(e.run('Policy.bundle("DA01-2026")'));
   assert.deepStrictEqual(b.luong.HCM, { lcb: 6000000, ltb: 100000 });
   assert.strictEqual(b.ngach.GV3.hs_tiet, 1.3);

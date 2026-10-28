@@ -77,7 +77,7 @@ test('Khai báo → gửi duyệt → 3 bậc duyệt → quyết toán → thu 
   assert.strictEqual(qt.de_an_ma, 'DA01-2026');
   const tm = e.api('list', { table: 'THU_NHAP_MOI', filter: { ky_ma: KY } }).data.rows;
   const a = tm.find(x => x.ma_nv === 'NV001'), b = tm.find(x => x.ma_nv === 'NV002');
-  assert.deepStrictEqual([a.pa_moi, a.max_income, a.chinh_thuc, a.tham_nien], [18224000, 16500000, 16500000, 7]);
+  assert.deepStrictEqual([a.pa_moi, a.max_income, a.chinh_thuc, a.tham_nien], [16240000, 16500000, 16240000, 7]);
   assert.strictEqual(b.pa_moi, 6600000 + 840000 + 8800000); // không có phụ trội
   assert.strictEqual(b.chinh_thuc, 16240000); // thấp hơn trần 16.500.000 nên giữ nguyên phương án mới
 

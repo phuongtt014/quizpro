@@ -108,7 +108,13 @@ var Workflow = (function () {
     revert: function (p) { setLines('KHAI_BAO', p.ma_phieu, 'Chờ duyệt', 'Nháp', true); }
   };
   APPLY['Quyết toán kỳ'] = {
-    approve: function (p) { setLines('QUYET_TOAN', p.ma_phieu, 'Chờ chốt', 'Đã chốt'); setLines('THU_NHAP_MOI', p.ma_phieu, 'Chờ chốt', 'Đã chốt'); },
+    approve: function (p) {
+      setLines('QUYET_TOAN', p.ma_phieu, 'Chờ chốt', 'Đã chốt');
+      setLines('THU_NHAP_MOI', p.ma_phieu, 'Chờ chốt', 'Đã chốt');
+      var r = Calc.promoteBaseline(p);
+      return r.created ? ' Đã tạo ' + r.created + ' mốc "Thu nhập hiện tại" hiệu lực từ ' + Util.displayDate(r.date) + ' làm cơ sở cho đợt sau' +
+        (r.skipped.length ? ' (bỏ qua ' + r.skipped.length + ': ' + r.skipped.slice(0, 3).join('; ') + ')' : '') + '.' : '';
+    },
     revert: function (p) { setLines('QUYET_TOAN', p.ma_phieu, 'Chờ chốt', 'Tạm tính', true); setLines('THU_NHAP_MOI', p.ma_phieu, 'Chờ chốt', 'Tạm tính', true); }
   };
   APPLY['Đề xuất ngạch'] = {
@@ -149,10 +155,10 @@ var Workflow = (function () {
       Notify.queue({ to: [p.nguoi_tao], title: 'Phiếu bị trả lại: ' + p.tieu_de, body: p.ma_phieu + ': ' + note, link: 'phieu', type: 'Phiếu duyệt' });
     } else if (action === 'Duyệt') {
       if (p.buoc_hien_tai >= p.so_buoc) {
-        APPLY[p.loai_phieu].approve(p); // lỗi ở đây thì phiếu giữ nguyên ở bước cuối
+        var extra = APPLY[p.loai_phieu].approve(p) || ''; // lỗi ở đây thì phiếu giữ nguyên ở bước cuối
         log(p, p.buoc_hien_tai, label, user.email, note);
         setStatus(p, 'Đã duyệt');
-        Notify.queue({ to: [p.nguoi_tao], title: 'Phiếu đã được duyệt: ' + p.tieu_de, body: p.ma_phieu, link: 'phieu', type: 'Phiếu duyệt' });
+        Notify.queue({ to: [p.nguoi_tao], title: 'Phiếu đã được duyệt: ' + p.tieu_de, body: p.ma_phieu + extra, link: 'phieu', type: 'Phiếu duyệt' });
       } else {
         log(p, p.buoc_hien_tai, label, user.email, note);
         setStatus(p, 'Đang duyệt', { buoc_hien_tai: p.buoc_hien_tai + 1 });

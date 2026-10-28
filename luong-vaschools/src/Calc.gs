@@ -13,6 +13,45 @@ var Calc = (function () {
 
   function activeAt(r, d) { return r.hieu_luc_tu <= d && (!r.hieu_luc_den || r.hieu_luc_den >= d); }
 
+  /**
+   * Ngày dùng để lấy "Thu nhập hiện tại" làm mốc so sánh trần. Mốc của một kỳ là kết quả của đợt Điều chỉnh LIỀN KỀ TRƯỚC
+   * (hoặc chính đợt đó nếu nó là đợt mới nhất): lấy mốc đang có hiệu lực vào NGÀY LIỀN TRƯỚC ngày hiệu lực của đợt Điều chỉnh gần nhất.
+   * Nhờ vậy các học kỳ trong cùng một năm không so với kết quả vừa chốt của chính năm đó (không cộng dồn trần).
+   */
+  function baselineDate(ky) {
+    var last = '';
+    Db.all('KY_LUONG').forEach(function (k) {
+      if (k.loai === 'Điều chỉnh' && k.den_ngay <= ky.tu_ngay && k.den_ngay > last) last = k.den_ngay;
+    });
+    return last ? Util.addDays(last, -1) : ky.tu_ngay;
+  }
+
+  /**
+   * Khi chốt một đợt Điều chỉnh: mức lương chính thức (không gồm phụ trội) của từng người trở thành "Thu nhập hiện tại" mới,
+   * hiệu lực từ ngày hiệu lực của đợt, tự kết thúc mốc cũ vào ngày liền trước. Không ghi đè mốc đã có cùng ngày. Gọi trong Db.tx().
+   */
+  function promoteBaseline(phieu) {
+    var ky = Db.find('KY_LUONG', function (k) { return k.ma === phieu.ky_ma; });
+    if (!ky || ky.loai !== 'Điều chỉnh') return { created: 0, skipped: [] };
+    var date = ky.den_ngay, hist = groupBy(Db.all('THU_NHAP_NEN'), 'ma_nv'), ups = [], ins = [], skipped = [];
+    Db.filter('THU_NHAP_MOI', function (r) { return r.phieu_ma === phieu.ma_phieu && r.ky_ma === ky.ma; }).forEach(function (r) {
+      var luong = Math.round(r.luong_nen !== '' && r.luong_nen !== undefined ? r.luong_nen : r.chinh_thuc);
+      if (!(luong > 0)) { skipped.push(r.ma_nv + ': không có mức lương hợp lệ'); return; }
+      var rows = hist[r.ma_nv] || [];
+      if (rows.some(function (h) { return h.hieu_luc_tu === date; })) { skipped.push(r.ma_nv + ': đã có mốc hiệu lực ' + Util.displayDate(date) + ', giữ nguyên'); return; }
+      var later = rows.filter(function (h) { return h.hieu_luc_tu > date; }).map(function (h) { return h.hieu_luc_tu; }).sort()[0];
+      rows.forEach(function (h) {
+        if (h.hieu_luc_tu < date && (!h.hieu_luc_den || h.hieu_luc_den >= date)) ups.push({ id: h.id, patch: { hieu_luc_den: Util.addDays(date, -1) } });
+      });
+      ins.push({ ma_nv: r.ma_nv, thu_nhap: luong, hieu_luc_tu: date, hieu_luc_den: later ? Util.addDays(later, -1) : '',
+        ghi_chu: 'Từ chốt ' + ky.ma + ' (' + phieu.ma_phieu + ')' });
+    });
+    Db.updateMany('THU_NHAP_NEN', ups, 'system');
+    Db.insertMany('THU_NHAP_NEN', ins, 'system');
+    Audit.log(null, 'TAO_MOC_THU_NHAP', 'THU_NHAP_NEN', ky.ma, { phieu: phieu.ma_phieu, hieu_luc_tu: date, tao_moi: ins.length, bo_qua: skipped });
+    return { created: ins.length, skipped: skipped, date: date };
+  }
+
   /** Số năm tròn giữ liên tục một ngạch, tính đến ngày d (nối các bản ghi liền kề cùng ngạch). */
   function holdYears(hist, d) {
     var cur = hist.filter(function (r) { return activeAt(r, d); })[0];
@@ -67,6 +106,7 @@ var Calc = (function () {
       } else warnings.push('Đợt điều chỉnh chưa chọn "Lấy phụ trội từ kỳ": hỗ trợ dự kiến từ phụ trội tạm tính = 0');
     }
 
+    var refDate = baselineDate(ky);
     var locked = {};
     Db.all('QUYET_TOAN').concat(Db.all('THU_NHAP_MOI')).forEach(function (r) {
       if (r.ky_ma === kyMa && r.trang_thai !== 'Tạm tính') locked[r.ma_nv] = true;
@@ -108,7 +148,7 @@ var Calc = (function () {
         if (!kg) warnings.push(tag + ': ngạch kiêm nhiệm ' + r.ngach_ma + ' chưa có hệ số trong đề án');
         return { hs_kpi: kg ? kg.hs_kpi : 0, ti_le: r.ti_le };
       });
-      var curInc = (tnBy[s.ma_nv] || []).filter(function (r) { return activeAt(r, ky.tu_ngay); })[0];
+      var curInc = (tnBy[s.ma_nv] || []).filter(function (r) { return activeAt(r, refDate); })[0];
       var tienPt = isAdj ? (ptBy[s.ma_nv] || 0) : settle.tien_pt;
       var inc = Engine.income({
         doiTuong: s.doi_tuong, ngach: g, tenure: Util.fullYears(s.ngay_vao_lam, ky.den_ngay),
@@ -139,5 +179,5 @@ var Calc = (function () {
       unapproved: unapproved, warnings: warnings };
   }
 
-  return { run: run, holdYears: holdYears };
+  return { run: run, holdYears: holdYears, baselineDate: baselineDate, promoteBaseline: promoteBaseline };
 })();

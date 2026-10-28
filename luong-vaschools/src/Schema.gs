@@ -56,6 +56,7 @@ var PARAMS = [
   { k: 'he_so_quy_doi_dac_thu', l: 'Quy đổi 1 tiết thực dạy môn đặc thù (bồi dưỡng, phụ đạo...)', def: 1.5, unit: 'tiết' },
   { k: 'he_so_tiet_trach_nhiem', l: 'Hệ số tiết trách nhiệm khi tính tiền', def: 1, unit: 'hệ số' },
   { k: 'he_ngay_chia', l: 'Số ngày chia thu nhập tháng ra thu nhập ngày (chế độ hè)', def: 24, unit: 'ngày' },
+  { k: 'pt_vao_thu_nhap', l: 'Cộng phụ trội bình quân/tháng vào thu nhập tháng (1 = có; 0 = không, chỉ đưa vào báo cáo chi phí)', def: 0, unit: '0/1' },
   { k: 'he_ty_le_khong_phan_cong', l: 'Tỷ lệ hưởng khi sẵn sàng điều động nhưng không phân công (hè)', def: 0.6, unit: 'tỷ lệ' }
 ];
 
@@ -451,9 +452,10 @@ var SCHEMA = (function () {
       col_('hs_cd', 'HS chức danh', 'num'), col_('hs_tn', 'HS thâm niên', 'num'), col_('hs_vk', 'HS vượt khung', 'num'),
       col_('hs_bgh', 'HS hạng trường', 'num'), col_('hs_kn', 'HS kiêm nhiệm', 'num'), col_('hs_kpi', 'HS KPI', 'num'),
       col_('luong_chuc_danh', 'Lương chức danh', 'money'), col_('ho_tro', 'Các khoản hỗ trợ', 'money'),
-      col_('ho_tro_pt', 'Trong đó hỗ trợ từ phụ trội/tháng', 'money'), col_('luong_kpi', 'Lương KPI', 'money'),
+      col_('ho_tro_pt', 'Phụ trội bình quân/tháng', 'money'), col_('luong_kpi', 'Lương KPI', 'money'),
       col_('pa_moi', 'Phương án mới', 'money'), col_('thu_nhap_hien_tai', 'Thu nhập hiện tại', 'money'), col_('ty_le_tran', 'Trần tăng', 'pct'),
       col_('max_income', 'Mức tối đa', 'money'), col_('chinh_thuc', 'Mức chính thức', 'money'), col_('chenh_lech', 'Chênh lệch so với hiện tại', 'money'),
+      col_('luong_nen', 'Lương làm mốc cho đợt sau', 'money'), col_('chi_phi_thang', 'Chi phí/tháng (lương + phụ trội BQ)', 'money'),
       col_('tien_pt', 'Tiền phụ trội cả kỳ', 'money')
     ]).concat(tail())
   };
