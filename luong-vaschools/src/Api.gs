@@ -164,17 +164,13 @@ var Api = (function () {
       head = ['Mã NV', 'Họ tên', 'Loại', 'Nội dung', 'Số lượng', 'Thời gian'];
       rows = Db.filter('KHAI_BAO', function (r) { return r.phieu_ma === p.ma_phieu; }).map(function (r) {
         return [r.ma_nv, names[r.ma_nv] || '', r.loai, r.noi_dung, r.so_luong + ' ' + r.don_vi + (r.dac_thu === 'Có' ? ' (đặc thù)' : ''), Util.displayDate(r.tu_ngay) + ' – ' + Util.displayDate(r.den_ngay)];
-      }).concat(Db.filter('HE_KHAI_BAO', function (r) { return r.phieu_ma === p.ma_phieu; }).map(function (r) {
-        return [r.ma_nv, names[r.ma_nv] || '', 'Lương hè', 'Ngày vào trường (x) / ngày sẵn sàng (y)', r.so_ngay_lam + ' / ' + r.so_ngay_san_sang, r.ky_ma];
-      }));
+      });
     } else if (p.loai_phieu === 'Quyết toán kỳ') {
       head = ['Mã NV', 'Họ tên', 'Thu nhập hiện tại', 'Mức chính thức', 'Ghi chú'];
       var money = function (v) { return v === '' ? '' : Number(v).toLocaleString('vi-VN'); };
       rows = Db.filter('THU_NHAP_MOI', function (r) { return r.phieu_ma === p.ma_phieu; }).map(function (r) {
         return [r.ma_nv, names[r.ma_nv] || '', money(r.thu_nhap_hien_tai), money(r.chinh_thuc), r.ghi_chu];
-      }).concat(Db.filter('HE_THU_NHAP', function (r) { return r.phieu_ma === p.ma_phieu; }).map(function (r) {
-        return [r.ma_nv, names[r.ma_nv] || '', money(r.thu_nhap_thang), money(r.tong_he) + ' (lương hè)', r.ghi_chu];
-      }));
+      });
     } else if (p.loai_phieu === 'Đề xuất ngạch') {
       var d = Workflow.parse(p.noi_dung, {}).row || {};
       head = ['Mã NV', 'Họ tên', 'Ngạch đề xuất', 'Hiệu lực từ', 'Số quyết định', 'Lý do'];
@@ -462,13 +458,13 @@ var Api = (function () {
         var ky = findKy(p.ky_ma, true), tr = findTruong(p.truong_ma), staff = {};
         Db.all('NHAN_SU').forEach(function (s) { if (s.truong_ma === tr.ma) staff[s.ma_nv] = s; });
         if (ky.loai === 'Điều chỉnh') throw new AppError('BAD_REQUEST', 'Đợt điều chỉnh không có khai báo giảng dạy');
-        var tbl = ky.loai === 'Hè' ? 'HE_KHAI_BAO' : 'KHAI_BAO';
+        var tbl = 'KHAI_BAO';
         var lines = Db.filter(tbl, function (r) {
           var s = staff[r.ma_nv];
           return r.ky_ma === ky.ma && r.trang_thai === 'Nháp' && s && Auth.canRow(user, 'declare.edit', { cn: s.chi_nhanh_ma, tr: s.truong_ma, nv: s.ma_nv });
         });
         if (!lines.length) throw new AppError('EMPTY', 'Không có dòng khai báo nào ở trạng thái Nháp của trường này trong kỳ ' + ky.ma);
-        var ph = Workflow.create(user, { loai: 'Khai báo', tieu_de: (ky.loai === 'Hè' ? 'Khai báo ngày làm việc hè ' : 'Khai báo giảng dạy ') + ky.ma + ' · ' + tr.ten + ' (' + lines.length + ' dòng)',
+        var ph = Workflow.create(user, { loai: 'Khai báo', tieu_de: 'Khai báo giảng dạy ' + ky.ma + ' · ' + tr.ten + ' (' + lines.length + ' dòng)',
           truong_ma: tr.ma, chi_nhanh_ma: tr.chi_nhanh_ma, ky_ma: ky.ma, payload: { lines: lines.length } });
         Db.updateMany(tbl, lines.map(function (l) { return { id: l.id, patch: { trang_thai: 'Chờ duyệt', phieu_ma: ph.ma_phieu } }; }), user.email);
         out = { ma_phieu: ph.ma_phieu, lines: lines.length };
@@ -543,16 +539,15 @@ var Api = (function () {
           var s = staff[r.ma_nv];
           return r.ky_ma === ky.ma && r.trang_thai === 'Tạm tính' && s && Auth.canRow(user, 'calc.run', { cn: s.chi_nhanh_ma, tr: s.truong_ma, nv: s.ma_nv });
         };
-        var isHe = ky.loai === 'Hè';
-        var inc = Db.filter(isHe ? 'HE_THU_NHAP' : 'THU_NHAP_MOI', mine), qt = isHe ? [] : Db.filter('QUYET_TOAN', mine);
+        var inc = Db.filter('THU_NHAP_MOI', mine), qt = Db.filter('QUYET_TOAN', mine);
         if (!inc.length) throw new AppError('EMPTY', 'Chưa có kết quả tạm tính của trường này. Hãy bấm "Tính toán" trước.');
         if (inc.concat(qt).some(function (r) { return r.nguon === 'Gồm dòng chưa duyệt'; })) {
           throw new AppError('UNAPPROVED', 'Kết quả đang gồm dòng khai báo CHƯA duyệt (chế độ tính thử). Hãy duyệt hết khai báo rồi bấm "Tính toán" với chế độ "Chỉ dòng đã duyệt" trước khi gửi chốt.');
         }
-        var ph = Workflow.create(user, { loai: 'Quyết toán kỳ', tieu_de: (isHe ? 'Lương hè ' : 'Quyết toán & thu nhập mới ') + ky.ma + ' · ' + tr.ten + ' (' + inc.length + ' nhân sự)',
+        var ph = Workflow.create(user, { loai: 'Quyết toán kỳ', tieu_de: 'Quyết toán & thu nhập mới ' + ky.ma + ' · ' + tr.ten + ' (' + inc.length + ' nhân sự)',
           truong_ma: tr.ma, chi_nhanh_ma: tr.chi_nhanh_ma, ky_ma: ky.ma, payload: { nhan_su: inc.length } });
         var patch = function (r) { return { id: r.id, patch: { trang_thai: 'Chờ chốt', phieu_ma: ph.ma_phieu } }; };
-        Db.updateMany(isHe ? 'HE_THU_NHAP' : 'THU_NHAP_MOI', inc.map(patch), user.email);
+        Db.updateMany('THU_NHAP_MOI', inc.map(patch), user.email);
         Db.updateMany('QUYET_TOAN', qt.map(patch), user.email);
         out = { ma_phieu: ph.ma_phieu, nhan_su: inc.length };
       });

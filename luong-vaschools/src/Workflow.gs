@@ -104,21 +104,19 @@ var Workflow = (function () {
   }
 
   APPLY['Khai báo'] = {
-    approve: function (p) { setLines('KHAI_BAO', p.ma_phieu, 'Chờ duyệt', 'Đã duyệt'); setLines('HE_KHAI_BAO', p.ma_phieu, 'Chờ duyệt', 'Đã duyệt'); },
-    revert: function (p) { setLines('KHAI_BAO', p.ma_phieu, 'Chờ duyệt', 'Nháp', true); setLines('HE_KHAI_BAO', p.ma_phieu, 'Chờ duyệt', 'Nháp', true); }
+    approve: function (p) { setLines('KHAI_BAO', p.ma_phieu, 'Chờ duyệt', 'Đã duyệt'); },
+    revert: function (p) { setLines('KHAI_BAO', p.ma_phieu, 'Chờ duyệt', 'Nháp', true); }
   };
   APPLY['Quyết toán kỳ'] = {
     approve: function (p) {
       setLines('QUYET_TOAN', p.ma_phieu, 'Chờ chốt', 'Đã chốt');
       setLines('THU_NHAP_MOI', p.ma_phieu, 'Chờ chốt', 'Đã chốt');
-      setLines('HE_THU_NHAP', p.ma_phieu, 'Chờ chốt', 'Đã chốt');
       var r = Calc.promoteBaseline(p);
       return r.created ? ' Đã tạo ' + r.created + ' mốc "Thu nhập hiện tại" hiệu lực từ ' + Util.displayDate(r.date) + ' làm cơ sở cho đợt sau' +
         (r.skipped.length ? ' (bỏ qua ' + r.skipped.length + ': ' + r.skipped.slice(0, 3).join('; ') + ')' : '') + '.' : '';
     },
     revert: function (p) {
       setLines('QUYET_TOAN', p.ma_phieu, 'Chờ chốt', 'Tạm tính', true); setLines('THU_NHAP_MOI', p.ma_phieu, 'Chờ chốt', 'Tạm tính', true);
-      setLines('HE_THU_NHAP', p.ma_phieu, 'Chờ chốt', 'Tạm tính', true);
     }
   };
   APPLY['Đề xuất ngạch'] = {

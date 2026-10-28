@@ -55,9 +55,7 @@ var PARAMS = [
   { k: 'kpi_tiet_khac_so_tiet', l: 'KPI tiết dạy GV còn lại - số tiết', def: 80, unit: 'tiết' },
   { k: 'he_so_quy_doi_dac_thu', l: 'Quy đổi 1 tiết thực dạy môn đặc thù (bồi dưỡng, phụ đạo...)', def: 1.5, unit: 'tiết' },
   { k: 'he_so_tiet_trach_nhiem', l: 'Hệ số tiết trách nhiệm khi tính tiền', def: 1, unit: 'hệ số' },
-  { k: 'he_ngay_chia', l: 'Số ngày chia thu nhập tháng ra thu nhập ngày (chế độ hè)', def: 24, unit: 'ngày' },
   { k: 'pt_vao_thu_nhap', l: 'Cộng phụ trội bình quân/tháng vào thu nhập tháng (1 = có; 0 = không, chỉ đưa vào báo cáo chi phí)', def: 0, unit: '0/1' },
-  { k: 'he_ty_le_khong_phan_cong', l: 'Tỷ lệ hưởng khi sẵn sàng điều động nhưng không phân công (hè)', def: 0.6, unit: 'tỷ lệ' }
 ];
 
 var SCHEMA = (function () {
@@ -115,10 +113,10 @@ var SCHEMA = (function () {
     label: 'Kỳ tính (học kỳ / đợt điều chỉnh thu nhập)', group: 'setup', key: ['ma'], lockKey: true,
     perm: { r: 'setup.view', w: 'setup.edit' },
     cols: [
-      col_('ma', 'Mã kỳ', 'text', { req: true, pattern: '^\\d{4}-\\d{4}-(HK[12]|DC[1-9]|HE)$', hint: 'học kỳ: 2026-2027-HK1; đợt điều chỉnh: 2025-2026-DC1; hè: 2025-2026-HE' }),
+      col_('ma', 'Mã kỳ', 'text', { req: true, pattern: '^\\d{4}-\\d{4}-(HK[12]|DC[1-9])$', hint: 'học kỳ: 2026-2027-HK1; đợt điều chỉnh: 2025-2026-DC1' }),
       col_('nam_hoc_ma', 'Năm học', 'ref', { ref: 'NAM_HOC.ma', req: true }),
-      col_('hoc_ky', 'Học kỳ', 'enum', { values: ['HK1', 'HK2', 'DC1', 'DC2', 'DC3', 'DC4', 'DC5', 'DC6', 'DC7', 'DC8', 'DC9', 'HE'], req: true }),
-      col_('loai', 'Loại', 'enum', { values: ['Học kỳ', 'Điều chỉnh', 'Hè'], def: 'Học kỳ' }),
+      col_('hoc_ky', 'Học kỳ', 'enum', { values: ['HK1', 'HK2', 'DC1', 'DC2', 'DC3', 'DC4', 'DC5', 'DC6', 'DC7', 'DC8', 'DC9'], req: true }),
+      col_('loai', 'Loại', 'enum', { values: ['Học kỳ', 'Điều chỉnh'], def: 'Học kỳ' }),
       col_('tu_ngay', 'Từ ngày', 'date', { req: true, hint: 'đợt điều chỉnh: ngày hiệu lực' }),
       col_('den_ngay', 'Đến ngày', 'date', { req: true, hint: 'đợt điều chỉnh: bằng ngày hiệu lực' }),
       col_('so_tuan', 'Số tuần quy định', 'int', { min: 0, max: 30, def: 0, hint: 'bắt buộc ≥ 1 với học kỳ' }),
@@ -128,7 +126,7 @@ var SCHEMA = (function () {
     ],
     check: function (r) {
       if (r.ma !== r.nam_hoc_ma + '-' + r.hoc_ky) return 'Mã kỳ phải = Năm học + "-" + Học kỳ/Đợt (vd ' + r.nam_hoc_ma + '-' + r.hoc_ky + ')';
-      var kind = r.hoc_ky === 'HE' ? 'Hè' : (r.hoc_ky.indexOf('DC') === 0 ? 'Điều chỉnh' : 'Học kỳ');
+      var kind = r.hoc_ky.indexOf('DC') === 0 ? 'Điều chỉnh' : 'Học kỳ';
       if (r.loai !== kind) return 'Mã ' + r.hoc_ky + ' thì Loại phải là "' + kind + '"';
       if (kind === 'Điều chỉnh') {
         if (r.den_ngay < r.tu_ngay) return 'Đến ngày phải ≥ Từ ngày';
@@ -136,7 +134,6 @@ var SCHEMA = (function () {
         return null;
       }
       if (r.ky_phu_troi) return 'Chỉ đợt điều chỉnh mới chọn "Kỳ lấy phụ trội"';
-      if (kind === 'Hè') return r.den_ngay <= r.tu_ngay ? 'Đến ngày phải sau Từ ngày (kỳ hè thường 01/06 – 31/07)' : null;
       if (r.so_tuan < 1) return 'Học kỳ cần nhập Số tuần quy định (≥ 1)';
       return r.den_ngay <= r.tu_ngay ? 'Đến ngày phải sau Từ ngày' : null;
     }
@@ -479,42 +476,6 @@ var SCHEMA = (function () {
     ]).concat(tail())
   };
 
-
-  /* ---------- LƯƠNG HÈ (đề án VI.2) ---------- */
-  S.HE_KHAI_BAO = {
-    label: 'Khai báo ngày làm việc trong hè', group: 'declare', scope: 'staff', key: ['ky_ma', 'ma_nv'],
-    perm: { r: 'declare.view', w: 'declare.edit', i: 'declare.edit' },
-    cols: [
-      col_('ky_ma', 'Kỳ hè', 'ref', { ref: 'KY_LUONG.ma', req: true }),
-      col_('ma_nv', 'Mã nhân sự', 'ref', { ref: 'NHAN_SU.ma_nv', req: true }),
-      col_('so_ngay_lam', 'Số ngày vào trường theo kế hoạch (x)', 'num', { req: true, min: 0 }),
-      col_('so_ngay_san_sang', 'Số ngày không vào trường nhưng sẵn sàng (y)', 'num', { req: true, min: 0 }),
-      col_('ghi_chu', 'Ghi chú', 'text'),
-      col_('trang_thai', 'Trạng thái', 'enum', { values: ['Nháp', 'Chờ duyệt', 'Đã duyệt'], def: 'Nháp', ro: true }),
-      col_('phieu_ma', 'Phiếu', 'text', { ro: true })
-    ],
-    guard: function (r) { return r.trang_thai !== 'Nháp' ? 'Dòng khai báo đang ' + r.trang_thai.toLowerCase() + ' nên không sửa/xóa được.' : null; },
-    check: function (r) {
-      var ky = Db.find('KY_LUONG', function (k) { return k.ma === r.ky_ma; });
-      if (ky && ky.loai !== 'Hè') return 'Kỳ ' + ky.ma + ' không phải kỳ hè';
-      if (ky) {
-        var days = Engine.daysInclusive(ky.tu_ngay, ky.den_ngay);
-        if (r.so_ngay_lam + r.so_ngay_san_sang > days) return 'x + y (' + (r.so_ngay_lam + r.so_ngay_san_sang) + ') vượt số ngày của kỳ hè (' + days + ')';
-      }
-      return null;
-    }
-  };
-
-  S.HE_THU_NHAP = {
-    label: 'Lương hè từng người', group: 'calc', scope: 'staff', readonly: true, key: ['ky_ma', 'ma_nv'],
-    perm: { r: 'calc.view', w: 'calc.run' },
-    cols: resultCols().concat([
-      col_('ngach_ma', 'Ngạch'), col_('ngach_ten', 'Tên ngạch'),
-      col_('so_ngay_lam', 'Ngày làm theo kế hoạch (x)', 'num'), col_('so_ngay_san_sang', 'Ngày sẵn sàng (y)', 'num'),
-      col_('thu_nhap_thang', 'Thu nhập tháng', 'money'), col_('thu_nhap_ngay', 'Thu nhập ngày', 'money'),
-      col_('tien_x', 'Tiền x', 'money'), col_('tien_y', 'Tiền y (60%)', 'money'), col_('tong_he', 'Lương hè', 'money')
-    ]).concat(tail())
-  };
 
   /* ---------- QUY TRÌNH DUYỆT ---------- */
   S.WORKFLOW_STEP = {

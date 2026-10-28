@@ -51,13 +51,12 @@ Bạn chỉ cần **4 tệp** trong thư mục `dist/`: `Code.gs`, `Index.html`,
 - Phụ trội bình quân/tháng chỉ nằm ở cột **Chi phí/tháng** của bảng tổng hợp, không nằm trong thu nhập.
 - Sau khi dán bản mới, chạy **`setupEnsureSheets`** để bổ sung tham số `pt_vao_thu_nhap` (=0) vào các đề án hiện có.
 
-## Trần theo từng trường, lương hè, mô phỏng
+## Trần theo từng trường và mô phỏng
 - **Trần riêng cho trường / cho năm sau:** *Đề án → mở đề án → Trần tăng thu nhập*. Bấm **Sao chép trần sang năm mới** (vd 2026 → 2027) rồi **+ Thêm** dòng
   riêng cho trường cần khác (cột *Trường* chọn mã trường; để trống là trần chung). Không cần nhân bản cả đề án.
-- **Lương hè:** *Thiết lập → Kỳ quyết toán* tạo kỳ `2025-2026-HE` (Học kỳ `HE`, Loại `Hè`, 01/06–31/07). *Khai báo* chọn kỳ hè nhập x, y → Gửi duyệt;
-  *Thu nhập & phụ trội* chọn kỳ hè → Tính toán → Tổng hợp → Sao chép bảng.
 - **Mô phỏng:** *Thu nhập & phụ trội* chọn học kỳ/đợt điều chỉnh → tab **Mô phỏng** → nhập thay đổi → Chạy mô phỏng (không làm thay đổi dữ liệu thật).
-- Sau khi dán bản mới chạy `setupEnsureSheets` (thêm cột *Trường* cho bảng trần, sheet lương hè).
+- Sau khi dán bản mới chạy `setupEnsureSheets` (thêm cột *Trường* cho bảng trần).
+- **Lương hè không có trong hệ thống** (tính riêng trên bảng công). Bản cũ có thể đã tạo các sheet `HE_KHAI_BAO`, `HE_THU_NHAP` trong Google Sheet CSDL: hệ thống không còn dùng, anh/chị xóa tay được. Nếu đã tạo kỳ loại *Hè* thì xóa dòng đó ở Thiết lập → Kỳ quyết toán.
 
 ## Khi có bản cập nhật mã
 Dán lại `Code.gs` / `Index.html` mới → **Triển khai → Quản lý triển khai → ✏ Sửa → Phiên bản mới → Triển khai** (URL không đổi). Nếu bản mới có thêm bảng/cột, chạy thêm hàm **`setupEnsureSheets`** (không mất dữ liệu).

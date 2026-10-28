@@ -76,33 +76,10 @@ var Report = (function () {
     }).length;
   }
 
-  function blankHe() { return { so_nv: 0, thang: 0, ngay_x: 0, ngay_y: 0, tong_he: 0, chua_chot: 0 }; }
-  function addHe(a, r) {
-    a.so_nv++; a.thang += r.thu_nhap_thang || 0; a.ngay_x += r.so_ngay_lam || 0; a.ngay_y += r.so_ngay_san_sang || 0; a.tong_he += r.tong_he || 0;
-    if (r.trang_thai !== 'Đã chốt') a.chua_chot++;
-  }
-
-  /** Tổng hợp lương hè theo nhóm. */
-  function summaryHe(user, ky, group) {
-    var keyFn = GROUPS[group || 'chi_nhanh'];
-    if (!keyFn) throw new AppError('BAD_REQUEST', 'Nhóm tổng hợp không hợp lệ');
-    var n = { cn: nameMap('CHI_NHANH'), tr: nameMap('TRUONG') }, rows = scopedRows(user, 'HE_THU_NHAP', ky.ma), map = {}, order = [], all = blankHe(), have = {};
-    rows.forEach(function (r) {
-      var g = keyFn(r, n);
-      if (!map[g.key]) { map[g.key] = { label: g.label, a: blankHe() }; order.push(g.key); }
-      addHe(map[g.key].a, r); addHe(all, r); have[r.ma_nv] = true;
-    });
-    order.sort();
-    var fin = function (label, key, a) { return { key: key, label: label, so_nv: a.so_nv, thu_nhap_thang: a.thang, ngay_lam: a.ngay_x, ngay_san_sang: a.ngay_y, tong_he: a.tong_he, chua_chot: a.chua_chot }; };
-    return { he: true, ky: { ma: ky.ma, loai: 'Hè', den_ngay: ky.den_ngay, trang_thai: ky.trang_thai }, de_an: rows.length ? rows[0].de_an_ma : '', group: group || 'chi_nhanh',
-      groups: order.map(function (k) { return fin(map[k].label, k, map[k].a); }), total: fin('TỔNG CỘNG', 'ALL', all), chua_tinh: missingCount(user, ky, have) };
-  }
-
   /** Bảng tổng hợp theo nhóm + dòng tổng toàn bộ phạm vi người xem. */
   function summary(user, kyMa, group) {
     var ky = Db.find('KY_LUONG', function (k) { return k.ma === kyMa; });
     if (!ky) throw new AppError('NOT_FOUND', 'Không tìm thấy kỳ ' + kyMa);
-    if (ky.loai === 'Hè') return summaryHe(user, ky, group);
     var rows = scopedRows(user, 'THU_NHAP_MOI', kyMa), agg = aggregate(rows, group), have = {};
     rows.forEach(function (r) { have[r.ma_nv] = true; });
     return { ky: { ma: ky.ma, loai: ky.loai || 'Học kỳ', den_ngay: ky.den_ngay, trang_thai: ky.trang_thai },
@@ -115,15 +92,7 @@ var Report = (function () {
   /** Văn bản TSV để dán thẳng vào Excel/Google Sheets. */
   function exportTable(user, kyMa, which) {
     var head, map, rows;
-    if (which === 'he') {
-      head = ['Mã NV', 'Họ tên', 'Chi nhánh', 'Trường', 'Đối tượng', 'Ngạch', 'Thu nhập tháng', 'Thu nhập ngày', 'Số ngày làm việc theo kế hoạch (x)', 'Số ngày sẵn sàng không phân công (y)',
-        'Tiền x', 'Tiền y (60%)', 'Lương hè', 'Trạng thái', 'Nguồn', 'Ghi chú'];
-      map = function (r) {
-        return [r.ma_nv, r.ho_ten, r.chi_nhanh_ma, r.truong_ma, r.doi_tuong, r.ngach_ten, r.thu_nhap_thang, r.thu_nhap_ngay, r.so_ngay_lam, r.so_ngay_san_sang,
-          r.tien_x, r.tien_y, r.tong_he, r.trang_thai, r.nguon, r.ghi_chu];
-      };
-      rows = scopedRows(user, 'HE_THU_NHAP', kyMa);
-    } else if (which === 'phu_troi') {
+    if (which === 'phu_troi') {
       head = ['Mã NV', 'Họ tên', 'Chi nhánh', 'Trường', 'Đối tượng', 'Thực dạy (tiết)', 'Trách nhiệm (tiết)', 'Định mức (tiết)', 'Tổng phụ trội', 'PT trách nhiệm',
         'PT giảng dạy', 'HS tiết', 'LTB', 'Tiền phụ trội', 'Trạng thái', 'Nguồn', 'Ghi chú'];
       map = function (r) {

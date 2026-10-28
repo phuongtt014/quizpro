@@ -133,14 +133,5 @@ var Engine = (function () {
     };
   }
 
-  /** Lương hè: thu nhập ngày × x + tỷ lệ(60%) × thu nhập ngày × y; thu nhập ngày = thu nhập tháng / số ngày chia (24). Đăng ký nghỉ (x = y = 0) thì không hưởng. */
-  function summer(input) {
-    var p = input.param, chia = num(p.he_ngay_chia) || 24, ty = num(p.he_ty_le_khong_phan_cong);
-    var x = num(input.x), y = num(input.y), ngay = input.thuNhapThang / chia;
-    var tienX = ngay * x, tienY = ngay * ty * y;
-    return { thu_nhap_thang: Math.round(input.thuNhapThang), thu_nhap_ngay: Math.round(ngay), tien_x: Math.round(tienX), tien_y: Math.round(tienY),
-      tong_he: Math.round(tienX + tienY), ghi_chu: x + y === 0 ? 'Đăng ký nghỉ hè: không hưởng lương' : '' };
-  }
-
-  return { summer: summer, daysInclusive: daysInclusive, tietOf: tietOf, allocate: allocate, settle: settle, income: income, capRate: capRate, capRateInfo: capRateInfo };
+  return { daysInclusive: daysInclusive, tietOf: tietOf, allocate: allocate, settle: settle, income: income, capRate: capRate, capRateInfo: capRateInfo };
 })();

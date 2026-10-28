@@ -184,10 +184,9 @@ const html = read('Index.html').replace("<?!= include('Style') ?>", read('Style.
   ok('Hệ thống → Quy trình duyệt hiển thị quy trình mặc định', true);
   await page.screenshot({ path: path.join(out, '10-quytrinh.png') });
 
-  // ---------- Phần 3: mô phỏng, lương hè, trần theo trường ----------
+  // ---------- Phần 3: mô phỏng, trần theo trường ----------
   must(env.api('importCommit', { table: 'NAM_HOC', text: tsv(['Năm học', 'Từ ngày', 'Đến ngày'], ['2025-2026', '01/09/2025', '31/05/2026']) }));
   must(env.api('save', { table: 'KY_LUONG', row: { ma: '2025-2026-DC1', nam_hoc_ma: '2025-2026', hoc_ky: 'DC1', loai: 'Điều chỉnh', tu_ngay: '01/03/2026', den_ngay: '01/03/2026' } }));
-  must(env.api('save', { table: 'KY_LUONG', row: { ma: '2025-2026-HE', nam_hoc_ma: '2025-2026', hoc_ky: 'HE', loai: 'Hè', tu_ngay: '01/06/2026', den_ngay: '31/07/2026' } }));
   await reload('#calc');
   await page.waitForSelector('button:has-text("Tính toán")');
   await page.locator('.bar select').first().selectOption('2025-2026-DC1');
@@ -198,14 +197,6 @@ const html = read('Index.html').replace("<?!= include('Style') ?>", read('Style.
   await page.waitForSelector('td:has-text("TỔNG CỘNG")');
   ok('Mô phỏng chạy và so sánh với hiện hành', (await page.textContent('main')).includes('Dữ liệu thật KHÔNG bị thay đổi'));
   await page.screenshot({ path: path.join(out, '11-mophong.png') });
-  await page.locator('.bar select').first().selectOption('2025-2026-HE');
-  await page.waitForSelector('.tabs button:has-text("Tổng hợp lương hè")');
-  ok('Kỳ hè hiện tab lương hè, không có tab mô phỏng', !(await page.textContent('main')).includes('Mô phỏng'));
-  await page.click('button:has-text("Tính toán")');
-  await page.waitForSelector('.modal .alert');
-  ok('Tính lương hè báo nhân sự chưa khai báo', (await page.textContent('.modal')).includes('chưa khai báo ngày hè'));
-  await page.click('.modal >> text=Đóng');
-
   await reload('#dean/DA01-2026');
   await page.waitForSelector('.tabs button:has-text("Trần tăng thu nhập")');
   await page.click('.tabs button:has-text("Trần tăng thu nhập")');

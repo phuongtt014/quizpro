@@ -209,41 +209,6 @@ var Calc = (function () {
     return { dean: dean, qt: qt, tm: tm, warnings: warnings, skippedLocked: skippedLocked, unapproved: unapproved, staff: staff };
   }
 
-  /** Lương hè (đề án VI.2): thu nhập hè = thu nhập ngày × x + 60% × thu nhập ngày × y; thu nhập ngày = thu nhập tháng / 24. */
-  function buildSummer(user, ky, truongMa, gom) {
-    var dean = Policy.effective(ky.den_ngay);
-    if (!dean) throw new AppError('NO_POLICY', 'Không có đề án đang hiệu lực vào ngày ' + Util.displayDate(ky.den_ngay));
-    var b = Policy.bundle(dean.ma), warnings = [], skippedLocked = 0, unapproved = 0, rows = [];
-    var heBy = {}, locked = {};
-    Db.filter('HE_KHAI_BAO', function (d) { return d.ky_ma === ky.ma && (gom === 'tat_ca' || d.trang_thai === 'Đã duyệt'); }).forEach(function (d) { heBy[d.ma_nv] = d; });
-    Db.all('HE_THU_NHAP').forEach(function (r) { if (r.ky_ma === ky.ma && r.trang_thai !== 'Tạm tính') locked[r.ma_nv] = true; });
-    var tnBy = groupBy(Db.all('THU_NHAP_NEN'), 'ma_nv'), ngachBy = groupBy(Db.all('QUA_TRINH_NGACH'), 'ma_nv'), ngachName = {};
-    Db.all('NGACH_DM').forEach(function (n) { ngachName[n.ma] = n.ten; });
-    var staff = Db.filter('NHAN_SU', function (s) {
-      if (truongMa && s.truong_ma !== truongMa) return false;
-      if (s.ngay_vao_lam > ky.den_ngay || (s.ngay_nghi_viec && s.ngay_nghi_viec < ky.tu_ngay)) return false;
-      return Auth.canRow(user, 'calc.run', { cn: s.chi_nhanh_ma, tr: s.truong_ma, nv: s.ma_nv });
-    });
-    if (!staff.length) throw new AppError('EMPTY', 'Không có nhân sự nào trong phạm vi để tính');
-    staff.forEach(function (s) {
-      if (locked[s.ma_nv]) { skippedLocked++; return; }
-      var tag = s.ma_nv + ' (' + s.ho_ten + ')', d = heBy[s.ma_nv];
-      if (!d) { warnings.push(tag + ': chưa khai báo ngày hè (hoặc khai báo chưa được duyệt)'); return; }
-      var cur = (tnBy[s.ma_nv] || []).filter(function (r) { return activeAt(r, ky.tu_ngay); })[0];
-      if (!cur) { warnings.push(tag + ': chưa có "Thu nhập hiện tại" hiệu lực tại ' + Util.displayDate(ky.tu_ngay)); return; }
-      var res = Engine.summer({ thuNhapThang: cur.thu_nhap, x: d.so_ngay_lam, y: d.so_ngay_san_sang, param: b.param });
-      var nguon = d.trang_thai === 'Đã duyệt' ? 'Đã duyệt' : 'Gồm dòng chưa duyệt';
-      if (nguon !== 'Đã duyệt') unapproved++;
-      var ng = (ngachBy[s.ma_nv] || []).filter(function (r) { return activeAt(r, ky.den_ngay); })[0];
-      var row = { ky_ma: ky.ma, ma_nv: s.ma_nv, ho_ten: s.ho_ten, chi_nhanh_ma: s.chi_nhanh_ma, truong_ma: s.truong_ma, doi_tuong: s.doi_tuong,
-        de_an_ma: dean.ma, ngach_ma: ng ? ng.ngach_ma : '', ngach_ten: ng ? ngachName[ng.ngach_ma] || ng.ngach_ma : '',
-        so_ngay_lam: d.so_ngay_lam, so_ngay_san_sang: d.so_ngay_san_sang, nguon: nguon, trang_thai: 'Tạm tính', phieu_ma: '' };
-      Object.keys(res).forEach(function (k) { row[k] = res[k]; });
-      rows.push(row);
-    });
-    return { dean: dean, rows: rows, warnings: warnings, skippedLocked: skippedLocked, unapproved: unapproved, staff: staff };
-  }
-
   function replaceTemporary(tables, kyMa, inScope) {
     Object.keys(tables).forEach(function (t) {
       Db.removeMany(t, Db.filter(t, function (r) { return r.ky_ma === kyMa && r.trang_thai === 'Tạm tính' && inScope[r.ma_nv]; }).map(function (r) { return r.id; }));
@@ -251,7 +216,7 @@ var Calc = (function () {
   }
 
   /**
-   * Tính và LƯU kết quả tạm tính cho một kỳ (Học kỳ, Điều chỉnh hoặc Hè).
+   * Tính và LƯU kết quả tạm tính cho một kỳ (Học kỳ hoặc Điều chỉnh).
    * gom: 'da_duyet' (mặc định, dùng để chốt) hoặc 'tat_ca' (tính thử cả dòng Nháp/Chờ duyệt, không chốt được).
    */
   function run(user, kyMa, truongMa, gom) {
@@ -259,14 +224,6 @@ var Calc = (function () {
     var ky = getKy(kyMa);
     if (ky.trang_thai !== 'Mở') throw new AppError('LOCKED', 'Kỳ ' + kyMa + ' đã chốt');
     var inScope = {}, out;
-    if (ky.loai === 'Hè') {
-      var h = buildSummer(user, ky, truongMa, gom);
-      h.staff.forEach(function (s) { inScope[s.ma_nv] = true; });
-      replaceTemporary({ HE_THU_NHAP: 1 }, kyMa, inScope);
-      Db.insertMany('HE_THU_NHAP', h.rows, user.email);
-      Audit.log(user, 'CHAY_LUONG_HE', 'HE_THU_NHAP', kyMa, { truong: truongMa || '', de_an: h.dean.ma, gom: gom, so_nv: h.rows.length, bo_qua_da_chot: h.skippedLocked, canh_bao: h.warnings.length });
-      return { de_an: h.dean.ma, loai: 'Hè', settled: 0, incomes: h.rows.length, skippedLocked: h.skippedLocked, unapproved: h.unapproved, warnings: h.warnings };
-    }
     var r = build(user, ky, truongMa, gom, null);
     r.staff.forEach(function (s) { inScope[s.ma_nv] = true; });
     replaceTemporary({ QUYET_TOAN: 1, THU_NHAP_MOI: 1 }, kyMa, inScope);
@@ -284,7 +241,6 @@ var Calc = (function () {
    */
   function simulate(user, kyMa, truongMa, rawOv, group, gom) {
     var ky = getKy(kyMa);
-    if (ky.loai === 'Hè') throw new AppError('BAD_REQUEST', 'Mô phỏng áp dụng cho học kỳ và đợt điều chỉnh, chưa áp dụng cho kỳ hè');
     var ov = checkOverrides(rawOv || {});
     if (!Object.keys(ov).length) throw new AppError('BAD_REQUEST', 'Hãy nhập ít nhất một thay đổi để mô phỏng');
     gom = gom === 'tat_ca' ? 'tat_ca' : 'da_duyet';

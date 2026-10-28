@@ -3,7 +3,7 @@
 Số hóa Đề án lương khối Phổ thông (HP.ĐA.01, hiệu lực 01/03/2026) để dùng nhiều năm:
 lịch sử ngạch bậc, phiên bản đề án, phân quyền theo phạm vi, nhập dữ liệu nghiêm ngặt.
 
-**Trạng thái:** GĐ1 (nền tảng), GĐ2 (nhân sự), GĐ3 (quy trình duyệt nhiều bậc), GĐ4 (khai báo, quyết toán phụ trội, thu nhập mới) và GĐ5 (trần theo trường, lương hè, mô phỏng, báo cáo/xuất Excel) hoàn tất.
+**Trạng thái:** GĐ1 (nền tảng), GĐ2 (nhân sự), GĐ3 (quy trình duyệt nhiều bậc), GĐ4 (khai báo, quyết toán phụ trội, thu nhập mới) và GĐ5 (trần theo trường, mô phỏng, báo cáo/xuất Excel) hoàn tất. Lương hè **không** nằm trong hệ thống (tính riêng trên bảng công).
 
 ## Cài đặt
 
@@ -64,10 +64,6 @@ Thêm quản trị khác: sửa email trong `setupAddAdmin` rồi chạy.
 - **Trần theo từng trường:** *Đề án → Trần tăng thu nhập* có cột **Trường** (trống = trần chung). Trường có dòng riêng thì dùng trần riêng của **năm gần nhất không quá năm xét**;
   khoảng thâm niên nào trần riêng không phủ thì lùi về trần chung. Khoảng thâm niên cùng (trường, năm) không được chồng nhau. Với đề án **đã ban hành** vẫn được
   **thêm** trần của năm/trường mới (không sửa/xóa dòng cũ) và dùng nút **Sao chép trần sang năm mới** để chép cả bộ rồi chỉnh. Ghi chú kết quả nêu "trần riêng của trường".
-- **Lương hè** (đề án VI.2): tạo kỳ loại **Hè** (mã `2025-2026-HE`, học kỳ `HE`, vd 01/06–31/07). Menu *Khai báo* chọn kỳ hè để nhập **x** (ngày vào trường theo kế hoạch) và
-  **y** (ngày không vào trường nhưng sẵn sàng); đăng ký nghỉ: x = y = 0. Gửi duyệt như khai báo thường. *Thu nhập & phụ trội → Tính toán*:
-  lương hè = thu nhập ngày × x + 60% × thu nhập ngày × y, thu nhập ngày = thu nhập tháng ÷ 24 (tham số đề án `he_ngay_chia`, `he_ty_le_khong_phan_cong`);
-  thu nhập tháng lấy từ "Thu nhập hiện tại" tại ngày bắt đầu kỳ hè. Có tổng hợp theo nhóm, xuất Excel và chốt qua phiếu duyệt (lương hè không tạo mốc thu nhập).
 - **Mô phỏng** (*Thu nhập & phụ trội → Mô phỏng*, cho học kỳ/đợt điều chỉnh): nhập đổi LCB %, LTB %, cộng/trừ điểm % vào mọi tỷ lệ trần và/hoặc đổi một tham số đề án,
   hệ thống tính hai lần trong bộ nhớ (hiện hành và kịch bản, kể cả nhân sự đã chốt) rồi so sánh theo nhóm, cả lương và chi phí/tháng. **Không ghi dữ liệu.**
 - **Tính thử:** chế độ "Tính thử cả dòng chưa duyệt" cho thấy phụ trội ngay khi mới nhập khai báo; kết quả được gắn nhãn *Gồm dòng chưa duyệt* và **không gửi chốt được**
@@ -93,7 +89,7 @@ Thêm quản trị khác: sửa email trong `setupAddAdmin` rồi chạy.
 ## Kiểm thử
 
 ```bash
-npm test                      # 54 kiểm thử logic trên bản giả lập Apps Script
+npm test                      # 51 kiểm thử logic trên bản giả lập Apps Script
 node tests/ui-smoke.js ./ảnh  # chạy giao diện thật trên Chromium (cần playwright)
 ```
 

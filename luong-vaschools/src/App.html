@@ -491,7 +491,7 @@
 
   /* ---------- khai báo, quyết toán, phiếu duyệt ---------- */
   function kyOptions() { return (S.schema.refs['KY_LUONG.ma'] || []).map(function (o) { return o.v; }); }
-  /** Loại kỳ (Học kỳ / Điều chỉnh / Hè) lấy từ nhãn danh mục kỳ. */
+  /** Loại kỳ (Học kỳ / Điều chỉnh) lấy từ nhãn danh mục kỳ. */
   function kyKind(v) {
     var o = (S.schema.refs['KY_LUONG.ma'] || []).filter(function (x) { return x.v === v; })[0];
     return o && o.l ? o.l.split(' · ')[0] : 'Học kỳ';
@@ -524,11 +524,6 @@
       clear(body);
       var kind = kyKind(ky.value);
       if (kind === 'Điều chỉnh') { body.appendChild(el('div', { class: 'alert warn', text: 'Đợt điều chỉnh không có khai báo: thu nhập mới được tính trực tiếp từ ngạch bậc, hệ số và thu nhập hiện tại. Vào menu "Thu nhập & phụ trội".' })); return; }
-      if (kind === 'Hè') {
-        body.appendChild(el('p', { class: 'muted', text: 'Kỳ hè: nhập số ngày vào trường theo kế hoạch (x) và số ngày không vào trường nhưng sẵn sàng khi được điều động (y). Đăng ký nghỉ hè: x = 0 và y = 0 (không hưởng lương).' }));
-        TableView(body, 'HE_KHAI_BAO', { filter: { ky_ma: ky.value }, defaults: { ky_ma: ky.value }, rowEditable: function (r) { return r.trang_thai === 'Nháp'; } });
-        return;
-      }
       TableView(body, 'KHAI_BAO', { filter: { ky_ma: ky.value }, defaults: { ky_ma: ky.value }, rowEditable: function (r) { return r.trang_thai === 'Nháp'; } });
     }
     ky.addEventListener('change', draw);
@@ -564,7 +559,7 @@
     }).catch(showErr);
   }
 
-  function summaryView(host, kyMa, isHe) {
+  function summaryView(host, kyMa) {
     var group = select([{ v: 'chi_nhanh', l: 'Theo chi nhánh' }, { v: 'chi_nhanh_truong', l: 'Theo chi nhánh › trường' }, { v: 'truong', l: 'Theo trường' },
       { v: 'doi_tuong', l: 'Theo đối tượng' }, { v: 'ngach', l: 'Theo ngạch' }, { v: 'tat_ca', l: 'Toàn công ty' }], 'chi_nhanh', null, true);
     var box = el('div');
@@ -582,14 +577,8 @@
       api('tonghop', { ky_ma: kyMa, group: group.value }).then(function (d) {
         clear(box);
         if (!d.total.so_nv) { box.appendChild(el('div', { class: 'alert warn', text: 'Kỳ này chưa có kết quả tính trong phạm vi của bạn. Bấm "Tính toán" ở phía trên.' })); return; }
-        if (d.chua_tinh) box.appendChild(el('div', { class: 'alert warn', text: d.chua_tinh + ' nhân sự chưa có kết quả (thiếu ngạch, LCB/LTB, hệ số' + (d.he ? ', khai báo hè hoặc thu nhập hiện tại' : '') + '). Bấm "Tính toán" để xem cảnh báo chi tiết.' }));
+        if (d.chua_tinh) box.appendChild(el('div', { class: 'alert warn', text: d.chua_tinh + ' nhân sự chưa có kết quả (thiếu ngạch, LCB/LTB hoặc hệ số). Bấm "Tính toán" để xem cảnh báo chi tiết.' }));
         var all = d.groups.concat([d.total]);
-        if (d.he) {
-          table(['Nhóm', 'Số NV', 'Tổng thu nhập tháng', 'Ngày làm theo kế hoạch (x)', 'Ngày sẵn sàng (y)', 'Lương hè', 'Chưa chốt'],
-            all.map(function (g) { return [g.label, g.so_nv, money(g.thu_nhap_thang), String(g.ngay_lam).replace('.', ','), String(g.ngay_san_sang).replace('.', ','), money(g.tong_he), g.chua_chot]; }),
-            'Đề án áp dụng: ' + d.de_an + ' · Lương hè = thu nhập ngày × x + 60% × thu nhập ngày × y (thu nhập ngày = thu nhập tháng ÷ 24). Thu nhập tháng lấy từ "Thu nhập hiện tại" tại ngày bắt đầu kỳ hè.');
-          return;
-        }
         table(['Nhóm', 'Số NV', 'Thu nhập hiện tại (mốc)', 'Phương án mới', 'Mức chính thức (lương)', 'Tăng so với mốc', '% tăng', 'Quỹ lương năm (×12)',
           'Phụ trội BQ/tháng', 'Chi phí/tháng (lương + phụ trội)', 'Chi phí năm (×12)', 'Tiền phụ trội cả kỳ', 'Giữ lương', 'Bị trần', 'Chưa chốt'],
         all.map(function (g) {
@@ -602,10 +591,8 @@
       }).catch(function (e) { clear(box).appendChild(errBox(e)); });
     }
     group.addEventListener('change', load);
-    var btns = isHe
-      ? [el('button', { class: 'btn', text: 'Sao chép bảng lương hè (dán vào Excel)', onclick: function () { openExport(kyMa, 'he', 'Bảng lương hè'); } })]
-      : [el('button', { class: 'btn', text: 'Sao chép bảng thu nhập (dán vào Excel)', onclick: function () { openExport(kyMa, 'thu_nhap', 'Bảng thu nhập'); } }),
-        el('button', { class: 'btn', text: 'Sao chép bảng phụ trội', onclick: function () { openExport(kyMa, 'phu_troi', 'Bảng phụ trội'); } })];
+    var btns = [el('button', { class: 'btn', text: 'Sao chép bảng thu nhập (dán vào Excel)', onclick: function () { openExport(kyMa, 'thu_nhap', 'Bảng thu nhập'); } }),
+      el('button', { class: 'btn', text: 'Sao chép bảng phụ trội', onclick: function () { openExport(kyMa, 'phu_troi', 'Bảng phụ trội'); } })];
     host.appendChild(el('div', { class: 'bar' }, [group, el('span', { class: 'sp' })].concat(btns)));
     host.appendChild(box);
     load();
@@ -672,23 +659,17 @@
 
   function pageCalc(host) {
     host.appendChild(el('h2', { text: 'Thu nhập & phụ trội' }));
-    host.appendChild(el('p', { class: 'muted', text: 'Ba loại kỳ (tạo ở Thiết lập → Kỳ quyết toán): "Học kỳ" (phụ trội từ khai báo), "Điều chỉnh" (thu nhập mới tại một ngày hiệu lực khi đổi đề án/ngạch bậc) và "Hè" (lương hè). Kết quả "Tạm tính" tính lại được; sau khi duyệt chốt thì khóa.' }));
+    host.appendChild(el('p', { class: 'muted', text: 'Hai loại kỳ (tạo ở Thiết lập → Kỳ quyết toán): "Học kỳ" (phụ trội từ khai báo) và "Điều chỉnh" (thu nhập mới tại một ngày hiệu lực khi đổi đề án/ngạch bậc). Kết quả "Tạm tính" tính lại được; sau khi duyệt chốt thì khóa.' }));
     var kys = kyOptions();
-    if (!kys.length) { host.appendChild(el('div', { class: 'alert warn', text: 'Chưa có kỳ. Vào Thiết lập → Kỳ quyết toán để tạo học kỳ, đợt điều chỉnh hoặc kỳ hè.' })); return; }
+    if (!kys.length) { host.appendChild(el('div', { class: 'alert warn', text: 'Chưa có kỳ. Vào Thiết lập → Kỳ quyết toán để tạo học kỳ hoặc đợt điều chỉnh.' })); return; }
     var kyList = S.schema.refs['KY_LUONG.ma'] || [];
     var ky = select(kyList, kys[kys.length - 1]), tr = select(truongOptions(), '', 'Tất cả trường trong phạm vi'), body = el('div');
     var gom = select([{ v: 'da_duyet', l: 'Chỉ dòng khai báo đã duyệt (để chốt)' }, { v: 'tat_ca', l: 'Tính thử cả dòng chưa duyệt (không chốt được)' }], 'da_duyet', null, true);
     function draw() {
       clear(body);
       var kind = kyKind(ky.value);
-      if (kind === 'Hè') {
-        Tabs(body, [
-          { key: 'TONGHOP', label: 'Tổng hợp lương hè', render: function (b) { summaryView(b, ky.value, true); } },
-          { key: 'HE_THU_NHAP', label: 'Lương hè từng người', render: function (b) { TableView(b, 'HE_THU_NHAP', { filter: { ky_ma: ky.value } }); } }]);
-        return;
-      }
       Tabs(body, [
-        { key: 'TONGHOP', label: 'Tổng hợp toàn công ty', render: function (b) { summaryView(b, ky.value, false); } },
+        { key: 'TONGHOP', label: 'Tổng hợp toàn công ty', render: function (b) { summaryView(b, ky.value); } },
         { key: 'THU_NHAP_MOI', label: 'Thu nhập từng người', render: function (b) { TableView(b, 'THU_NHAP_MOI', { filter: { ky_ma: ky.value } }); } },
         { key: 'QUYET_TOAN', label: 'Phụ trội từng người', render: function (b) {
           TableView(b, 'QUYET_TOAN', { filter: { ky_ma: ky.value }, rowActions: function () { return [{ label: 'Chi tiết', fn: function (r) { openPtDetail(ky.value, r); } }]; } });
@@ -700,7 +681,7 @@
       run.disabled = true; run.textContent = 'Đang tính…';
       api('calc.run', { ky_ma: ky.value, truong_ma: tr.value, gom: gom.value }).then(function (r) {
         run.disabled = false; run.textContent = 'Tính toán'; draw();
-        var nodes = [el('div', { class: 'alert ok', text: 'Đề án ' + r.de_an + ' (' + r.loai + '): ' + (r.loai === 'Hè' ? r.incomes + ' lương hè' : r.settled + ' dòng phụ trội, ' + r.incomes + ' thu nhập mới') + (r.skippedLocked ? ', bỏ qua ' + r.skippedLocked + ' nhân sự đã chốt/chờ chốt' : '') + '.' })];
+        var nodes = [el('div', { class: 'alert ok', text: 'Đề án ' + r.de_an + ' (' + r.loai + '): ' + r.settled + ' dòng phụ trội, ' + r.incomes + ' thu nhập mới' + (r.skippedLocked ? ', bỏ qua ' + r.skippedLocked + ' nhân sự đã chốt/chờ chốt' : '') + '.' })];
         if (r.unapproved) nodes.push(el('div', { class: 'alert warn', text: r.unapproved + ' nhân sự đang gồm dòng khai báo CHƯA duyệt: chỉ để xem thử, chưa gửi chốt được.' }));
         if (r.warnings.length) {
           nodes.push(el('div', { class: 'alert warn', text: r.warnings.length + ' cảnh báo cần xử lý:' }));
