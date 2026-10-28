@@ -251,5 +251,26 @@ var Validate = (function () {
       csv: header.map(csvCell).join(',') + '\n' + example.map(csvCell).join(',') };
   }
 
-  return { rows: rows, importText: importText, spec: spec, template: template };
+  function fmtOut(c, v) {
+    if (v === '' || v === undefined || v === null) return '';
+    switch (c.t) {
+      case 'date': return Util.displayDate(v);
+      case 'num': return String(v).replace('.', ',');
+      case 'pct': return String(Math.round(Number(v) * 1e8) / 1e6).replace('.', ',') + '%';
+      default: return String(v);
+    }
+  }
+
+  /** Xuất dữ liệu đúng định dạng mẫu nhập (tiêu đề = nhãn cột nhập, giá trị theo định dạng nghiêm ngặt) để nhập lại được. */
+  function exportRows(table, list) {
+    var T = SCHEMA[table];
+    var cols = T.cols.filter(function (c) { return c.k !== T.ctx && !c.ro; });
+    var header = cols.map(function (c) { return c.l; });
+    var data = list.map(function (r) { return cols.map(function (c) { return fmtOut(c, r[c.k]); }); });
+    function cell(v, sep) { return /["\n\r]/.test(v) || v.indexOf(sep) >= 0 ? '"' + v.replace(/"/g, '""') + '"' : v; }
+    function join(sep) { return [header].concat(data).map(function (a) { return a.map(function (v) { return cell(v, sep); }).join(sep); }).join('\n'); }
+    return { header: header, tsv: join('\t'), csv: join(','), count: data.length };
+  }
+
+  return { rows: rows, importText: importText, spec: spec, template: template, exportRows: exportRows };
 })();

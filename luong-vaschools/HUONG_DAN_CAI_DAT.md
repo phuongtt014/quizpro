@@ -67,6 +67,11 @@ Dán lại `Code.gs` / `Index.html` mới → **Triển khai → Quản lý tri�
 3. Mẫu nhập **Quá trình ngạch bậc** có thêm *Trường* và *Đối tượng tính lương* (bắt buộc); mẫu **Thu nhập hiện tại** có thêm *Hỗ trợ GVCN*, *Hỗ trợ khác*.
 4. Nhân sự mới nên nhập theo thứ tự: Hồ sơ nhân sự → Quá trình ngạch bậc (dòng đầu tiên từ ngày vào làm) → Thu nhập hiện tại.
 
+## Xuất dữ liệu để lấy mã nhập sang tab khác
+- Mỗi bảng có nút **Xuất dữ liệu** (Thiết lập → Chi nhánh, Trường, Năm học, Kỳ quyết toán, Hạng trường, Danh mục ngạch, Cấu hình chung; cũng có ở các bảng khác).
+  Tiêu đề và giá trị **đúng định dạng mẫu nhập**: bấm **Sao chép** dán vào Excel/Google Sheets, hoặc **Tải file .csv**, rồi dán lại bằng *Nhập CSV* (chế độ *Thêm mới hoặc cập nhật theo khóa*).
+- Tab *Quá trình ngạch bậc* không còn cột Họ tên riêng: cột Mã nhân sự đã hiện kèm tên.
+
 ## Lưu ý
 - **Tốc độ:** ứng dụng dùng bộ nhớ đệm. Nếu có ai **sửa trực tiếp trong file Google Sheet CSDL** (không khuyến khích), bấm nút **⟳ Làm mới dữ liệu** ở thanh trên cùng (cần quyền *Sửa thiết lập*), nếu không dữ liệu có thể chưa cập nhật tới 10 phút.
 - **Không chia sẻ file Google Sheet CSDL** cho người dùng. Họ chỉ cần URL web app.

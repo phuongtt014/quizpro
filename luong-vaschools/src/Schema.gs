@@ -320,7 +320,7 @@ var SCHEMA = (function () {
       col_('doi_tuong', 'Đối tượng tính lương', 'enum', { values: ['GV Tiểu học nhiều môn', 'GV còn lại', 'Quản lý', 'Nhân viên', 'HĐHT'], req: true }),
       temporalFrom(), temporalTo(), col_('so_quyet_dinh', 'Số quyết định', 'text'), col_('ly_do', 'Lý do', 'text')],
     // Thâm niên tính từ ngày vào làm đến NGÀY HIỆU LỰC BẮT ĐẦU của từng dòng nên nằm ở đây, không ở hồ sơ.
-    computed: [{ k: 'ho_ten', l: 'Họ tên', after: 'ma_nv' }, { k: 'tham_nien', l: 'Thâm niên tại ngày hiệu lực (năm)', after: 'hieu_luc_tu' }],
+    computed: [{ k: 'tham_nien', l: 'Thâm niên tại ngày hiệu lực (năm)', after: 'hieu_luc_tu' }],
     check: function (r) {
       var s = Db.find('NHAN_SU', function (x) { return x.ma_nv === r.ma_nv; });
       if (!s) return null;

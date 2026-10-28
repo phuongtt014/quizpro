@@ -311,6 +311,10 @@ const html = read('Index.html').replace("<?!= include('Style') ?>", read('Style.
   await page.screenshot({ path: path.join(out, '18-mau-csv.png') });
   await page.click('.modal >> text=Đóng');
   ok('Có nút Tải mẫu CSV trên thanh công cụ', (await page.locator('button:has-text("Tải mẫu CSV")').count()) === 1);
+  await page.click('button:has-text("Xuất dữ liệu")');
+  await page.waitForSelector('.modal textarea.paste');
+  ok('Xuất dữ liệu cho tiêu đề đúng mẫu nhập', (await page.inputValue('.modal textarea.paste')).startsWith('Mã nhân sự\t'));
+  await page.click('.modal >> text=Đóng');
 
   console.log(steps.join('\n'));
   console.log(errors.length ? 'LỖI TRÌNH DUYỆT:\n' + errors.join('\n') : 'Không có lỗi console/JS.');

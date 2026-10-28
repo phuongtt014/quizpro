@@ -41,14 +41,13 @@ var Staff = {
     });
   },
 
-  /** Quá trình ngạch bậc: thêm họ tên và thâm niên tại NGÀY HIỆU LỰC BẮT ĐẦU (số năm tròn từ ngày vào làm). */
+  /** Quá trình ngạch bậc: thêm thâm niên tại NGÀY HIỆU LỰC BẮT ĐẦU (số năm tròn từ ngày vào làm). */
   decorateHistory: function (rows) {
     var by = {};
     Db.all('NHAN_SU').forEach(function (s) { by[s.ma_nv] = s; });
     return rows.map(function (r) {
       var o = {}, s = by[r.ma_nv];
       Object.keys(r).forEach(function (k) { o[k] = r[k]; });
-      o.ho_ten = s ? s.ho_ten : '';
       o.tham_nien = s && s.ngay_vao_lam && r.hieu_luc_tu ? Util.fullYears(s.ngay_vao_lam, r.hieu_luc_tu) : '';
       return o;
     });

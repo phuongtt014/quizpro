@@ -109,7 +109,7 @@ var Api = (function () {
       if (!Auth.can(user, T.perm.r)) return;
       tables[t] = {
         label: T.label, group: T.group, cols: T.cols, key: T.key, ctx: T.ctx || null, hidden: !!T.hidden,
-        readonly: !!T.readonly, temporal: !!T.temporal, computed: T.computed || [],
+        readonly: !!T.readonly, canExport: !T.readonly && !T.noImport, temporal: !!T.temporal, computed: T.computed || [],
         canWrite: !T.readonly && Auth.can(user, T.perm.w),
         canImport: !T.readonly && !T.noImport && Auth.can(user, T.perm.i || T.perm.w),
         spec: T.readonly ? [] : Validate.spec(t)
@@ -434,6 +434,21 @@ var Api = (function () {
       if (T.ctx && !(p.ctx && p.ctx[T.ctx])) throw new AppError('BAD_REQUEST', 'Thiếu ngữ cảnh đề án');
       var t = Validate.template(p.table, p.ctx || {});
       return { header: t.header, example: t.example, tsv: t.tsv, csv: t.csv, file: p.table.toLowerCase() + '_mau.csv' };
+    },
+
+    'export.table': function (p, user) {
+      var T = table(p.table);
+      if (T.readonly || T.noImport || T.internal) throw new AppError('BAD_REQUEST', 'Bảng này không xuất theo mẫu nhập');
+      Auth.require(user, T.perm.r);
+      var ctx = p.ctx || {}, rows = Db.all(p.table);
+      if (T.ctx) {
+        if (!ctx[T.ctx]) throw new AppError('BAD_REQUEST', 'Thiếu ngữ cảnh đề án');
+        rows = rows.filter(function (r) { return r[T.ctx] === ctx[T.ctx]; });
+      }
+      var sf = Auth.scopeFn(p.table);
+      if (sf && !Auth.hasGlobal(user, T.perm.r)) rows = rows.filter(function (r) { return Auth.canRow(user, T.perm.r, sf(r)); });
+      var x = Validate.exportRows(p.table, rows);
+      return { header: x.header, tsv: x.tsv, csv: x.csv, rows: x.count, file: p.table.toLowerCase() + '_xuat.csv' };
     },
 
     'dean.check': function (p, user) {

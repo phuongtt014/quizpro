@@ -225,6 +225,32 @@
     }).catch(showErr);
   }
 
+  /** Xuất dữ liệu đúng định dạng mẫu nhập: sao chép (TSV) hoặc tải .csv; lấy mã chuẩn để nhập sang tab khác. */
+  function exportData(table, ctx) {
+    api('export.table', { table: table, ctx: ctx }).then(function (d) {
+      var md = openModal(true), ta = el('textarea', { class: 'paste', readonly: true, spellcheck: 'false' });
+      ta.value = d.tsv;
+      var copy = el('button', { class: 'btn pri', text: 'Sao chép', onclick: function () {
+        ta.focus(); ta.select();
+        var done = false;
+        try { done = document.execCommand('copy'); } catch (e) { done = false; }
+        if (!done && navigator.clipboard) navigator.clipboard.writeText(ta.value).then(function () { toast('Đã sao chép'); });
+        else toast(done ? 'Đã sao chép, hãy dán vào Excel/Google Sheets' : 'Hãy nhấn Ctrl+C để sao chép');
+      } });
+      var dl = el('button', { class: 'btn', text: 'Tải file .csv', onclick: function () {
+        try {
+          var blob = new Blob(['\uFEFF' + d.csv], { type: 'text/csv;charset=utf-8' }), a = document.createElement('a');
+          a.href = URL.createObjectURL(blob); a.download = d.file; document.body.appendChild(a); a.click();
+          setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        } catch (e) { toast('Trình duyệt không cho tải file, hãy dùng nút Sao chép.'); }
+      } });
+      md.m.appendChild(el('h3', { text: 'Xuất dữ liệu: ' + tt(table).label + ' (' + d.rows + ' dòng)' }));
+      md.m.appendChild(el('p', { class: 'muted', text: 'Tiêu đề và giá trị đúng định dạng mẫu nhập. Dán vào Excel/Google Sheets để lấy mã chuẩn, hoặc nhập lại bằng Nhập CSV (chế độ cập nhật).' }));
+      md.m.appendChild(ta);
+      md.m.appendChild(el('div', { class: 'row-end' }, [el('button', { class: 'btn', text: 'Đóng', onclick: md.close }), dl, copy]));
+    }).catch(showErr);
+  }
+
   /* ---------- nhập CSV nghiêm ngặt ---------- */
   function openImport(table, opts, onDone) {
     var T = tt(table), md = openModal(true), checked = null;
@@ -323,6 +349,7 @@
         el('button', { class: 'btn', text: 'Tìm', onclick: function () { st.q = search.value; st.page = 0; load(); } }),
         el('span', { class: 'muted', text: st.loading ? 'Đang tải…' : st.total + ' bản ghi' + (st.refreshing ? ' · đang cập nhật…' : (S.ms !== null ? ' · ' + (S.ms / 1000).toFixed(1).replace('.', ',') + 's' : '')) }), el('span', { class: 'sp' }),
         st.locked ? el('span', { class: 'badge warn', text: st.appendOnly ? 'Đã ban hành - chỉ được thêm chi nhánh mới' : 'Đã ban hành - chỉ xem' }) : null,
+        T.canExport ? el('button', { class: 'btn', text: 'Xuất dữ liệu', title: 'Xuất dữ liệu đúng định dạng mẫu nhập', onclick: function () { exportData(table, opts.ctx); } }) : null,
         canI ? el('button', { class: 'btn', text: 'Tải mẫu CSV', title: 'Tải file mẫu để nhập bằng CSV', onclick: function () { downloadTemplate(table, opts.ctx); } }) : null,
         canI ? el('button', { class: 'btn', text: 'Nhập CSV', onclick: function () { openImport(table, opts, afterWrite); } }) : null,
         canAdd ? el('button', { class: 'btn pri', text: '+ Thêm', onclick: function () { openForm(table, opts, null, afterWrite); } }) : null].concat(canAdd && opts.toolbar ? opts.toolbar(afterWrite) : [])));

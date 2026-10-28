@@ -196,8 +196,8 @@ test('Nhân sự và quá trình ngạch: email trùng, trường–chi nhánh, 
   assert.strictEqual(list.data.rows[0].ngach_hien_tai, 'Giáo viên 2');
   assert.strictEqual(list.data.rows[0].tham_nien, undefined);
   const hist = e.api('list', { table: 'QUA_TRINH_NGACH', filter: { ma_nv: 'NV001' } }).data.rows;
-  assert.deepStrictEqual(j(hist.map(h => [h.ngach_ma, h.truong_ma, h.doi_tuong, h.ho_ten, h.tham_nien])),
-    [['GV1', 'HN_THCS', 'GV còn lại', 'Nguyễn Thị A', 0], ['GV2', 'HN_THPT', 'Quản lý', 'Nguyễn Thị A', 4]]); // 15/03/2021 → 01/03/2026 = 4 năm tròn
+  assert.deepStrictEqual(j(hist.map(h => [h.ngach_ma, h.truong_ma, h.doi_tuong, h.tham_nien])),
+    [['GV1', 'HN_THCS', 'GV còn lại', 0], ['GV2', 'HN_THPT', 'Quản lý', 4]]); // 15/03/2021 → 01/03/2026 = 4 năm tròn
   // đơn vị hiện tại suy ra từ dòng đang hiệu lực
   assert.strictEqual(j(e.run('Staff.units("2025-01-01").NV001.truong_ma')), 'HN_THCS');
   assert.strictEqual(j(e.run('Staff.units("2026-06-01").NV001.truong_ma')), 'HN_THPT');

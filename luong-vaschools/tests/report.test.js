@@ -160,3 +160,17 @@ test('Chi tiết phụ trội từng người: từng dòng khai báo quy ra ti�
   e.as('ht.hn@vaschools.edu.vn');
   assert.strictEqual(e.api('phutroi.chitiet', { ky_ma: KY, ma_nv: 'NV001' }).code, 'FORBIDDEN');
 });
+
+test('Xuất dữ liệu đúng định dạng mẫu nhập, nhập lại được', () => {
+  const { e } = world();
+  for (const t of ['CHI_NHANH', 'TRUONG', 'NAM_HOC', 'KY_LUONG', 'TRUONG_HANG', 'NGACH_DM', 'SETTINGS']) {
+    const x = e.api('export.table', { table: t });
+    assert.strictEqual(x.ok, true, t + ' ' + JSON.stringify(x));
+    const tpl = e.api('import.template', { table: t }).data;
+    assert.strictEqual(x.data.tsv.split('\n')[0], tpl.tsv.split('\n')[0], 'tiêu đề trùng mẫu ' + t);
+    if (!x.data.rows) continue; // bảng trống: chỉ có tiêu đề
+    const chk = e.api('importCheck', { table: t, text: x.data.tsv, mode: 'upsert' });
+    assert.strictEqual(chk.ok, true, t + ' ' + JSON.stringify(chk));
+    assert.deepStrictEqual(j(chk.data.errors || []), [], t);
+  }
+});

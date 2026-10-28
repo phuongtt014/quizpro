@@ -546,7 +546,7 @@ var SCHEMA = (function () {
       col_('doi_tuong', 'Đối tượng tính lương', 'enum', { values: ['GV Tiểu học nhiều môn', 'GV còn lại', 'Quản lý', 'Nhân viên', 'HĐHT'], req: true }),
       temporalFrom(), temporalTo(), col_('so_quyet_dinh', 'Số quyết định', 'text'), col_('ly_do', 'Lý do', 'text')],
     // Thâm niên tính từ ngày vào làm đến NGÀY HIỆU LỰC BẮT ĐẦU của từng dòng nên nằm ở đây, không ở hồ sơ.
-    computed: [{ k: 'ho_ten', l: 'Họ tên', after: 'ma_nv' }, { k: 'tham_nien', l: 'Thâm niên tại ngày hiệu lực (năm)', after: 'hieu_luc_tu' }],
+    computed: [{ k: 'tham_nien', l: 'Thâm niên tại ngày hiệu lực (năm)', after: 'hieu_luc_tu' }],
     check: function (r) {
       var s = Db.find('NHAN_SU', function (x) { return x.ma_nv === r.ma_nv; });
       if (!s) return null;
@@ -1362,7 +1362,28 @@ var Validate = (function () {
       csv: header.map(csvCell).join(',') + '\n' + example.map(csvCell).join(',') };
   }
 
-  return { rows: rows, importText: importText, spec: spec, template: template };
+  function fmtOut(c, v) {
+    if (v === '' || v === undefined || v === null) return '';
+    switch (c.t) {
+      case 'date': return Util.displayDate(v);
+      case 'num': return String(v).replace('.', ',');
+      case 'pct': return String(Math.round(Number(v) * 1e8) / 1e6).replace('.', ',') + '%';
+      default: return String(v);
+    }
+  }
+
+  /** Xuất dữ liệu đúng định dạng mẫu nhập (tiêu đề = nhãn cột nhập, giá trị theo định dạng nghiêm ngặt) để nhập lại được. */
+  function exportRows(table, list) {
+    var T = SCHEMA[table];
+    var cols = T.cols.filter(function (c) { return c.k !== T.ctx && !c.ro; });
+    var header = cols.map(function (c) { return c.l; });
+    var data = list.map(function (r) { return cols.map(function (c) { return fmtOut(c, r[c.k]); }); });
+    function cell(v, sep) { return /["\n\r]/.test(v) || v.indexOf(sep) >= 0 ? '"' + v.replace(/"/g, '""') + '"' : v; }
+    function join(sep) { return [header].concat(data).map(function (a) { return a.map(function (v) { return cell(v, sep); }).join(sep); }).join('\n'); }
+    return { header: header, tsv: join('\t'), csv: join(','), count: data.length };
+  }
+
+  return { rows: rows, importText: importText, spec: spec, template: template, exportRows: exportRows };
 })();
 
 
@@ -1728,14 +1749,13 @@ var Staff = {
     });
   },
 
-  /** Quá trình ngạch bậc: thêm họ tên và thâm niên tại NGÀY HIỆU LỰC BẮT ĐẦU (số năm tròn từ ngày vào làm). */
+  /** Quá trình ngạch bậc: thêm thâm niên tại NGÀY HIỆU LỰC BẮT ĐẦU (số năm tròn từ ngày vào làm). */
   decorateHistory: function (rows) {
     var by = {};
     Db.all('NHAN_SU').forEach(function (s) { by[s.ma_nv] = s; });
     return rows.map(function (r) {
       var o = {}, s = by[r.ma_nv];
       Object.keys(r).forEach(function (k) { o[k] = r[k]; });
-      o.ho_ten = s ? s.ho_ten : '';
       o.tham_nien = s && s.ngay_vao_lam && r.hieu_luc_tu ? Util.fullYears(s.ngay_vao_lam, r.hieu_luc_tu) : '';
       return o;
     });
@@ -2911,7 +2931,7 @@ var Api = (function () {
       if (!Auth.can(user, T.perm.r)) return;
       tables[t] = {
         label: T.label, group: T.group, cols: T.cols, key: T.key, ctx: T.ctx || null, hidden: !!T.hidden,
-        readonly: !!T.readonly, temporal: !!T.temporal, computed: T.computed || [],
+        readonly: !!T.readonly, canExport: !T.readonly && !T.noImport, temporal: !!T.temporal, computed: T.computed || [],
         canWrite: !T.readonly && Auth.can(user, T.perm.w),
         canImport: !T.readonly && !T.noImport && Auth.can(user, T.perm.i || T.perm.w),
         spec: T.readonly ? [] : Validate.spec(t)
@@ -3236,6 +3256,21 @@ var Api = (function () {
       if (T.ctx && !(p.ctx && p.ctx[T.ctx])) throw new AppError('BAD_REQUEST', 'Thiếu ngữ cảnh đề án');
       var t = Validate.template(p.table, p.ctx || {});
       return { header: t.header, example: t.example, tsv: t.tsv, csv: t.csv, file: p.table.toLowerCase() + '_mau.csv' };
+    },
+
+    'export.table': function (p, user) {
+      var T = table(p.table);
+      if (T.readonly || T.noImport || T.internal) throw new AppError('BAD_REQUEST', 'Bảng này không xuất theo mẫu nhập');
+      Auth.require(user, T.perm.r);
+      var ctx = p.ctx || {}, rows = Db.all(p.table);
+      if (T.ctx) {
+        if (!ctx[T.ctx]) throw new AppError('BAD_REQUEST', 'Thiếu ngữ cảnh đề án');
+        rows = rows.filter(function (r) { return r[T.ctx] === ctx[T.ctx]; });
+      }
+      var sf = Auth.scopeFn(p.table);
+      if (sf && !Auth.hasGlobal(user, T.perm.r)) rows = rows.filter(function (r) { return Auth.canRow(user, T.perm.r, sf(r)); });
+      var x = Validate.exportRows(p.table, rows);
+      return { header: x.header, tsv: x.tsv, csv: x.csv, rows: x.count, file: p.table.toLowerCase() + '_xuat.csv' };
     },
 
     'dean.check': function (p, user) {
