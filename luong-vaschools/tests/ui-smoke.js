@@ -265,6 +265,8 @@ const html = read('Index.html').replace("<?!= include('Style') ?>", read('Style.
   console.log('ĐO mở thẳng #setup: ' + tDeep + 'ms (≈ 1 vòng chờ 1000ms + dựng giao diện)');
   console.log('ĐO (độ trễ giả lập 1000ms/lần gọi): mở trang lần đầu ' + tFirst + 'ms · chuyển tab đã tải trước ' + tPrefetched + 'ms · xem lại tab ' + tRevisit + 'ms');
   ok('Chuyển tab đã được tải trước hiện dữ liệu gần như tức thì (<400ms dù mỗi lần gọi mất 1s)', tPrefetched < 400 && tRevisit < 400);
+  await page.click('.tabs button:has-text("Trường")');
+  await page.waitForSelector('td:has-text("THPT HCM")');
   // sau khi ghi, dữ liệu mới phải hiện ngay (không bị đệm cũ che)
   await page.click('button:has-text("+ Thêm")');
   await page.fill('.form input >> nth=0', 'DN_TH');
@@ -279,9 +281,6 @@ const html = read('Index.html').replace("<?!= include('Style') ?>", read('Style.
   await page.waitForSelector('.toast:not([hidden])');
   ok('Nút Làm mới dữ liệu hoạt động', (await page.textContent('#toast')).includes('Đã làm mới'));
 
-  await page.click('button[aria-label="Làm mới dữ liệu"]');
-  await page.waitForSelector('#toast:not([hidden])');
-  ok('Nút Làm mới dữ liệu hoạt động', (await page.textContent('#toast')).includes('Đã làm mới'));
 
   console.log(steps.join('\n'));
   console.log(errors.length ? 'LỖI TRÌNH DUYỆT:\n' + errors.join('\n') : 'Không có lỗi console/JS.');
