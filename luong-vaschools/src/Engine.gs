@@ -109,10 +109,12 @@ var Engine = (function () {
     }
     return {
       hs_cd: hsCD, hs_tn: round(hsTN, 4), hs_vk: round(hsVK, 4), hs_bgh: hsBGH, hs_kn: round(hsKN, 4), hs_kpi: hsKPI,
-      luong_chuc_danh: Math.round(luongCD), ho_tro: Math.round(troCap + hoTroDK), luong_kpi: Math.round(luongKPI),
+      luong_chuc_danh: Math.round(luongCD), ho_tro: Math.round(troCap + hoTroDK), ho_tro_pt: Math.round(hoTroDK), luong_kpi: Math.round(luongKPI),
       pa_moi: Math.round(pa), thu_nhap_hien_tai: cur === null || cur === undefined ? '' : cur,
       ty_le_tran: tran === null ? '' : tran, max_income: max === null ? '' : Math.round(max),
-      chinh_thuc: Math.round(official), ghi_chu: notes.join('; ')
+      chinh_thuc: Math.round(official),
+      chenh_lech: cur === null || cur === undefined ? '' : Math.round(official) - cur, tien_pt: Math.round(input.tienPt || 0),
+      ghi_chu: notes.join('; ')
     };
   }
 

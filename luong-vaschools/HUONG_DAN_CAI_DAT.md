@@ -36,6 +36,14 @@ Bạn chỉ cần **4 tệp** trong thư mục `dist/`: `Code.gs`, `Index.html`,
 4. Gán vai trò: người nhập khai báo → **Giáo vụ / Người đề xuất** (phạm vi *Trường*), Hiệu trưởng → **Hiệu trưởng** (phạm vi *Trường*),
    Nhân sự → **Giám đốc Nhân sự**, Tổng giám đốc → **Tổng Giám đốc** (*Toàn hệ thống*). Xem/sửa chuỗi duyệt ở **Hệ thống → Quy trình duyệt**.
 
+## Dùng thế nào để ra bảng thu nhập toàn công ty (tóm tắt)
+1. **Thiết lập:** chi nhánh → trường → năm học → **kỳ**. Để tính thu nhập mới tại mốc đổi đề án (vd 01/03/2026): tạo kỳ loại **Điều chỉnh**
+   (mã `2025-2026-DC1`, Học kỳ `DC1`, Loại `Điều chỉnh`, Từ ngày = Đến ngày = ngày hiệu lực; số tuần để 0).
+2. **Nhân sự:** nhập hồ sơ, **Quá trình ngạch bậc** (ngạch hiệu lực tại ngày đó), **Thu nhập hiện tại** (mốc trước đề án, để tính trần và bảo vệ lương), kiêm nhiệm.
+3. **Đề án:** bảo đảm có LCB/LTB cho mọi chi nhánh (chi nhánh mở sau được thêm mới vào đề án đã ban hành).
+4. **Thu nhập & phụ trội:** chọn kỳ → **Tính toán** → xem **Tổng hợp toàn công ty** → **Sao chép bảng thu nhập** dán vào Excel.
+5. **Phụ trội:** menu **Khai báo** nhập số tiết (có thể Nhập CSV) → **Gửi duyệt**; hoặc chọn chế độ **Tính thử** để xem trước phụ trội khi chưa duyệt.
+
 ## Khi có bản cập nhật mã
 Dán lại `Code.gs` / `Index.html` mới → **Triển khai → Quản lý triển khai → ✏ Sửa → Phiên bản mới → Triển khai** (URL không đổi). Nếu bản mới có thêm bảng/cột, chạy thêm hàm **`setupEnsureSheets`** (không mất dữ liệu).
 

@@ -50,6 +50,15 @@ Thêm quản trị khác: sửa email trong `setupAddAdmin` rồi chạy.
 - **Quy ước tính toán:** dùng đề án hiệu lực **vào ngày cuối kỳ**; ngạch, kiêm nhiệm, thâm niên tại ngày cuối kỳ; thu nhập hiện tại tại ngày đầu kỳ.
   Định mức tự động (24/20 tiết/tuần × số tuần) chỉ áp dụng cho "GV Tiểu học nhiều môn" / "GV còn lại" khi không có dòng Định mức khai báo.
   Chi nhánh mở sau khi đề án ban hành: được **thêm mới** LCB/LTB vào đề án đã ban hành (không sửa/xóa).
+- **Hai loại kỳ** (*Thiết lập → Kỳ quyết toán*): **Học kỳ** (HK1/HK2: tính phụ trội từ khai báo) và **Điều chỉnh** (mã `2025-2026-DC1`…: tính thu nhập mới
+  tại một **ngày hiệu lực**, dùng khi đổi đề án hoặc đổi ngạch bậc, không cần khai báo; chọn "Kỳ lấy phụ trội" để cộng hỗ trợ dự kiến từ phụ trội của một học kỳ).
+- **Thu nhập & phụ trội** (menu): *Tổng hợp toàn công ty* (theo chi nhánh / chi nhánh › trường / trường / đối tượng / ngạch / toàn công ty, có tổng cộng,
+  tăng so với hiện tại, % tăng, quỹ năm ước tính, tiền phụ trội, số người giữ lương/bị trần), *Thu nhập từng người* (đủ thông tin nhân sự + từng thành phần),
+  *Phụ trội từng người* (nút **Chi tiết** xem từng dòng khai báo quy ra tiết). Có nút **Sao chép bảng (dán vào Excel)**.
+- **Tính thử:** chế độ "Tính thử cả dòng chưa duyệt" cho thấy phụ trội ngay khi mới nhập khai báo; kết quả được gắn nhãn *Gồm dòng chưa duyệt* và **không gửi chốt được**
+  cho tới khi tính lại bằng "Chỉ dòng đã duyệt".
+- **Điều kiện để có số liệu:** nhân sự cần có ngạch hiệu lực tại ngày cuối kỳ; đề án cần có LCB/LTB cho chi nhánh; muốn có "tăng so với hiện tại" và áp trần cần nhập
+  *Nhân sự → Thu nhập hiện tại*. Nhân sự thiếu dữ liệu được liệt kê trong cảnh báo sau khi bấm Tính toán và đếm ở "chưa tính".
 - **Chưa có trong GĐ4:** hỗ trợ đặc thù do Giám đốc chi nhánh quyết định; tiết quy đổi theo "buổi" (QD09) phải tự quy ra Tiết/Tuần khi khai báo.
 
 ## Cấu trúc mã
@@ -69,7 +78,7 @@ Thêm quản trị khác: sửa email trong `setupAddAdmin` rồi chạy.
 ## Kiểm thử
 
 ```bash
-npm test                      # 33 kiểm thử logic trên bản giả lập Apps Script
+npm test                      # 41 kiểm thử logic trên bản giả lập Apps Script
 node tests/ui-smoke.js ./ảnh  # chạy giao diện thật trên Chromium (cần playwright)
 ```
 

@@ -472,9 +472,10 @@
   /* ---------- khai báo, quyết toán, phiếu duyệt ---------- */
   function kyOptions() { return (S.schema.refs['KY_LUONG.ma'] || []).map(function (o) { return o.v; }); }
   function truongOptions() { return S.schema.refs['TRUONG.ma'] || []; }
-  function select(options, value, placeholder) {
+  /** plain=true: chỉ hiện nhãn (danh sách tự đặt). Mặc định danh mục tham chiếu hiện "mã – tên". */
+  function select(options, value, placeholder, plain) {
     var s = el('select', null, (placeholder ? [el('option', { value: '', text: placeholder })] : []).concat(options.map(function (o) {
-      var v = typeof o === 'string' ? o : o.v, l = typeof o === 'string' ? o : (o.l && o.l !== o.v ? o.v + ' – ' + o.l : o.v);
+      var v = typeof o === 'string' ? o : o.v, l = typeof o === 'string' ? o : (plain ? o.l : (o.l && o.l !== o.v ? o.v + ' – ' + o.l : o.v));
       return el('option', { value: v, text: l });
     })));
     s.value = value || '';
@@ -509,26 +510,110 @@
     draw();
   }
 
+  function money(v) { return v === '' || v === null || v === undefined ? '' : Number(v).toLocaleString('vi-VN'); }
+
+  function openExport(kyMa, bang, title) {
+    api('tonghop.export', { ky_ma: kyMa, bang: bang }).then(function (d) {
+      var md = openModal(true), ta = el('textarea', { class: 'paste', readonly: true, spellcheck: 'false' });
+      ta.value = d.text;
+      var copy = el('button', { class: 'btn pri', text: 'Sao chép', onclick: function () {
+        ta.focus(); ta.select();
+        var done = false;
+        try { done = document.execCommand('copy'); } catch (e) { done = false; }
+        if (!done && navigator.clipboard) navigator.clipboard.writeText(ta.value).then(function () { toast('Đã sao chép'); });
+        else toast(done ? 'Đã sao chép, hãy dán vào Excel/Google Sheets' : 'Hãy nhấn Ctrl+C để sao chép');
+      } });
+      md.m.appendChild(el('h3', { text: title + ' · ' + kyMa + ' (' + d.rows + ' dòng)' }));
+      md.m.appendChild(el('p', { class: 'muted', text: 'Bấm "Sao chép" rồi dán (Ctrl+V) vào ô A1 của Excel hoặc Google Sheets. Dòng đầu là tiêu đề cột.' }));
+      md.m.appendChild(ta);
+      md.m.appendChild(el('div', { class: 'row-end' }, [el('button', { class: 'btn', text: 'Đóng', onclick: md.close }), copy]));
+    }).catch(showErr);
+  }
+
+  function summaryView(host, kyMa) {
+    var group = select([{ v: 'chi_nhanh', l: 'Theo chi nhánh' }, { v: 'chi_nhanh_truong', l: 'Theo chi nhánh › trường' }, { v: 'truong', l: 'Theo trường' },
+      { v: 'doi_tuong', l: 'Theo đối tượng' }, { v: 'ngach', l: 'Theo ngạch' }, { v: 'tat_ca', l: 'Toàn công ty' }], 'chi_nhanh', null, true);
+    var box = el('div');
+    function load() {
+      clear(box).appendChild(el('div', { class: 'muted', text: 'Đang tổng hợp…' }));
+      api('tonghop', { ky_ma: kyMa, group: group.value }).then(function (d) {
+        clear(box);
+        if (!d.total.so_nv) { box.appendChild(el('div', { class: 'alert warn', text: 'Kỳ này chưa có kết quả tính trong phạm vi của bạn. Bấm "Tính toán" ở phía trên.' })); return; }
+        if (d.chua_tinh) box.appendChild(el('div', { class: 'alert warn', text: d.chua_tinh + ' nhân sự chưa có kết quả (thiếu ngạch, LCB/LTB hoặc hệ số). Bấm "Tính toán" để xem cảnh báo chi tiết.' }));
+        var heads = ['Nhóm', 'Số NV', 'Thu nhập hiện tại', 'Phương án mới', 'Mức chính thức', 'Tăng so với hiện tại', '% tăng', 'Quỹ năm (×12)', 'Tiền phụ trội cả kỳ', 'Giữ lương', 'Bị trần', 'Chưa chốt'];
+        var body = el('tbody');
+        function row(g, strong) {
+          var noBase = !g.so_co_hien_tai;
+          var cells = [g.label, g.so_nv, noBase ? '—' : money(g.hien_tai), money(g.pa_moi), money(g.chinh_thuc), noBase ? '—' : money(g.tang), g.pct_tang === null ? '' : String(g.pct_tang).replace('.', ',') + '%',
+            money(g.quy_nam), money(g.tien_pt), g.giu_luong, g.bi_tran, g.chua_chot];
+          body.appendChild(el('tr', { style: strong ? 'font-weight:700;background:var(--head)' : '' }, cells.map(function (v, i) { return el('td', { class: i ? 'num' : '', text: String(v) }); })));
+        }
+        d.groups.forEach(function (g) { row(g, false); });
+        row(d.total, true);
+        box.appendChild(el('div', { class: 'tw' }, [el('table', null, [el('thead', null, [el('tr', null, heads.map(function (h) { return el('th', { text: h }); }))]), body])]));
+        box.appendChild(el('p', { class: 'muted', style: 'margin-top:8px', text: 'Đề án áp dụng: ' + d.de_an + ' · Loại kỳ: ' + d.ky.loai + ' · "—" nghĩa là chưa nhập "Thu nhập hiện tại" (Nhân sự → Thu nhập hiện tại); "Tăng" chỉ tính trên nhân sự đã có mốc này; "Quỹ năm" là ước tính = mức chính thức × 12.' }));
+      }).catch(function (e) { clear(box).appendChild(errBox(e)); });
+    }
+    group.addEventListener('change', load);
+    host.appendChild(el('div', { class: 'bar' }, [group, el('span', { class: 'sp' }),
+      el('button', { class: 'btn', text: 'Sao chép bảng thu nhập (dán vào Excel)', onclick: function () { openExport(kyMa, 'thu_nhap', 'Bảng thu nhập'); } }),
+      el('button', { class: 'btn', text: 'Sao chép bảng phụ trội', onclick: function () { openExport(kyMa, 'phu_troi', 'Bảng phụ trội'); } })]));
+    host.appendChild(box);
+    load();
+  }
+
+  function openPtDetail(kyMa, row) {
+    api('phutroi.chitiet', { ky_ma: kyMa, ma_nv: row.ma_nv }).then(function (d) {
+      var md = openModal(true);
+      md.m.appendChild(el('h3', { text: 'Phụ trội: ' + d.ho_ten + ' (' + row.ma_nv + ') · kỳ ' + kyMa }));
+      md.m.appendChild(el('p', { class: 'muted', text: d.doi_tuong + ' · số tuần quy định của kỳ: ' + d.so_tuan }));
+      var body = el('tbody');
+      d.lines.forEach(function (l) {
+        body.appendChild(el('tr', null, [l.loai, l.noi_dung, l.so_luong + ' ' + l.don_vi + (l.dac_thu === 'Có' ? ' (đặc thù ×1,5)' : ''), dmy(l.tu) + ' – ' + dmy(l.den), l.ngay,
+          String(l.tiet).replace('.', ','), l.trang_thai].map(function (v, i) { return el('td', { class: i === 5 || i === 4 ? 'num' : 'wrap', text: String(v) }); })));
+      });
+      md.m.appendChild(el('div', { class: 'tw', style: 'max-height:260px' }, [el('table', null, [el('thead', null, [el('tr', null,
+        ['Loại', 'Nội dung', 'Khai báo', 'Thời gian', 'Số ngày', 'Quy ra tiết', 'Trạng thái'].map(function (h) { return el('th', { text: h }); }))]), body])]));
+      var k = d.ketqua;
+      if (k) {
+        var f = function (n) { return String(n).replace('.', ','); };
+        md.m.appendChild(el('h3', { style: 'margin-top:12px', text: 'Kết quả tính' }));
+        md.m.appendChild(el('ul', null, [
+          'Thực dạy ' + f(k.thuc_day) + ' + Trách nhiệm ' + f(k.trach_nhiem) + ' − Định mức ' + f(k.dinh_muc) + ' = Tổng phụ trội ' + f(k.tong_pt) + ' tiết',
+          'Phân bổ: ' + f(k.pt_trach_nhiem) + ' tiết trách nhiệm (hệ số 1,0) + ' + f(k.pt_giang_day) + ' tiết giảng dạy (HS tiết ' + f(k.hs_tiet) + ')',
+          'Thành tiền: ' + money(k.tien_pt) + ' đ (LTB ' + money(k.ltb) + ' đ)' + (k.ghi_chu ? ' · ' + k.ghi_chu : '')
+        ].map(function (t) { return el('li', { text: t }); })));
+      } else md.m.appendChild(el('div', { class: 'alert warn', text: 'Chưa có kết quả tính cho nhân sự này (chưa có dòng khai báo hợp lệ, hoặc chưa bấm Tính toán).' }));
+      md.m.appendChild(el('div', { class: 'row-end' }, [el('button', { class: 'btn', text: 'Đóng', onclick: md.close })]));
+    }).catch(showErr);
+  }
+
   function pageCalc(host) {
-    host.appendChild(el('h2', { text: 'Quyết toán phụ trội & thu nhập mới' }));
-    host.appendChild(el('p', { class: 'muted', text: 'Tính theo phiên bản đề án đang hiệu lực vào ngày cuối kỳ. Kết quả "Tạm tính" tính lại được; gửi chốt để duyệt, sau khi duyệt xong kết quả "Đã chốt" không bị ghi đè.' }));
+    host.appendChild(el('h2', { text: 'Thu nhập & phụ trội' }));
+    host.appendChild(el('p', { class: 'muted', text: 'Hai loại kỳ: "Học kỳ" (tính phụ trội từ khai báo) và "Điều chỉnh" (tính thu nhập mới tại một ngày hiệu lực khi đổi đề án/ngạch bậc, tạo ở Thiết lập → Kỳ quyết toán). Kết quả "Tạm tính" tính lại được; sau khi duyệt chốt thì khóa.' }));
     var kys = kyOptions();
-    if (!kys.length) { host.appendChild(el('div', { class: 'alert warn', text: 'Chưa có kỳ quyết toán. Vào Thiết lập → Kỳ quyết toán để khai báo.' })); return; }
-    var ky = select(kys, kys[kys.length - 1]), tr = select(truongOptions(), '', 'Tất cả trường trong phạm vi'), body = el('div');
+    if (!kys.length) { host.appendChild(el('div', { class: 'alert warn', text: 'Chưa có kỳ. Vào Thiết lập → Kỳ quyết toán để tạo học kỳ hoặc đợt điều chỉnh.' })); return; }
+    var kyList = S.schema.refs['KY_LUONG.ma'] || [];
+    var ky = select(kyList, kys[kys.length - 1]), tr = select(truongOptions(), '', 'Tất cả trường trong phạm vi'), body = el('div');
+    var gom = select([{ v: 'da_duyet', l: 'Chỉ dòng khai báo đã duyệt (để chốt)' }, { v: 'tat_ca', l: 'Tính thử cả dòng chưa duyệt (không chốt được)' }], 'da_duyet', null, true);
     function draw() {
       clear(body);
       Tabs(body, [
-        { key: 'QUYET_TOAN', label: 'Quyết toán phụ trội', render: function (b) { TableView(b, 'QUYET_TOAN', { filter: { ky_ma: ky.value } }); } },
-        { key: 'THU_NHAP_MOI', label: 'Thu nhập mới', render: function (b) { TableView(b, 'THU_NHAP_MOI', { filter: { ky_ma: ky.value } }); } }]);
+        { key: 'TONGHOP', label: 'Tổng hợp toàn công ty', render: function (b) { summaryView(b, ky.value); } },
+        { key: 'THU_NHAP_MOI', label: 'Thu nhập từng người', render: function (b) { TableView(b, 'THU_NHAP_MOI', { filter: { ky_ma: ky.value } }); } },
+        { key: 'QUYET_TOAN', label: 'Phụ trội từng người', render: function (b) {
+          TableView(b, 'QUYET_TOAN', { filter: { ky_ma: ky.value }, rowActions: function () { return [{ label: 'Chi tiết', fn: function (r) { openPtDetail(ky.value, r); } }]; } });
+        } }]);
     }
     ky.addEventListener('change', draw);
     var run = el('button', { class: 'btn pri', text: 'Tính toán', onclick: function () {
       run.disabled = true; run.textContent = 'Đang tính…';
-      api('calc.run', { ky_ma: ky.value, truong_ma: tr.value }).then(function (r) {
+      api('calc.run', { ky_ma: ky.value, truong_ma: tr.value, gom: gom.value }).then(function (r) {
         run.disabled = false; run.textContent = 'Tính toán'; draw();
-        var nodes = [el('div', { class: 'alert ok', text: 'Đề án ' + r.de_an + ': ' + r.settled + ' quyết toán phụ trội, ' + r.incomes + ' thu nhập mới' + (r.skippedLocked ? ', bỏ qua ' + r.skippedLocked + ' nhân sự đã chốt/chờ chốt' : '') + '.' })];
+        var nodes = [el('div', { class: 'alert ok', text: 'Đề án ' + r.de_an + ' (' + r.loai + '): ' + r.settled + ' dòng phụ trội, ' + r.incomes + ' thu nhập mới' + (r.skippedLocked ? ', bỏ qua ' + r.skippedLocked + ' nhân sự đã chốt/chờ chốt' : '') + '.' })];
+        if (r.unapproved) nodes.push(el('div', { class: 'alert warn', text: r.unapproved + ' nhân sự đang gồm dòng khai báo CHƯA duyệt: chỉ để xem thử, chưa gửi chốt được.' }));
         if (r.warnings.length) {
-          nodes.push(el('div', { class: 'alert warn', text: r.warnings.length + ' nhân sự chưa tính được, cần xử lý:' }));
+          nodes.push(el('div', { class: 'alert warn', text: r.warnings.length + ' cảnh báo cần xử lý:' }));
           nodes.push(el('ul', null, r.warnings.slice(0, 100).map(function (w) { return el('li', { text: w }); })));
         }
         modalMsg('Kết quả tính toán', nodes);
@@ -540,7 +625,7 @@
         toast('Đã gửi phiếu ' + r.ma_phieu); location.hash = '#phieu/cua_toi';
       }).catch(function (e) { modalMsg('Chưa gửi được', [errBox(e)]); });
     } });
-    host.appendChild(el('div', { class: 'bar' }, [el('b', { text: 'Kỳ' }), ky, tr, run, send]));
+    host.appendChild(el('div', { class: 'bar' }, [el('b', { text: 'Kỳ' }), ky, tr, gom, run, send]));
     host.appendChild(body);
     draw();
   }
@@ -613,7 +698,7 @@
   }
 
   function openNewPhieu() {
-    var md = openModal(), kind = select([{ v: 'ngach', l: 'Đề xuất ngạch bậc' }, { v: 'khac', l: 'Phiếu khác' }], 'ngach'), form = el('div', { class: 'form' }), errHost = el('div');
+    var md = openModal(), kind = select([{ v: 'ngach', l: 'Đề xuất ngạch bậc' }, { v: 'khac', l: 'Phiếu khác' }], 'ngach', null, true), form = el('div', { class: 'form' }), errHost = el('div');
     var f = {};
     function field(k, label, node, full) { f[k] = node; form.appendChild(el('div', { class: full ? 'full' : '' }, [el('label', { text: label }), node])); }
     function build() {
@@ -685,7 +770,7 @@
     { id: 'dean', label: 'Đề án', show: function () { return !!tt('DEAN'); }, render: pageDean },
     { id: 'staff', label: 'Nhân sự', show: function () { return !!tt('NHAN_SU') || !!tt('THU_NHAP_NEN'); }, render: pageStaff },
     { id: 'declare', label: 'Khai báo', show: function () { return !!tt('KHAI_BAO'); }, render: pageDeclare },
-    { id: 'calc', label: 'Quyết toán', show: function () { return !!tt('QUYET_TOAN'); }, render: pageCalc },
+    { id: 'calc', label: 'Thu nhập & phụ trội', show: function () { return !!tt('QUYET_TOAN'); }, render: pageCalc },
     { id: 'phieu', label: 'Phiếu duyệt', show: function () { return true; }, render: pagePhieu },
     { id: 'admin', label: 'Hệ thống', show: function () { return !!tt('USERS') || !!tt('AUDIT_LOG'); }, render: pageAdmin }
   ];

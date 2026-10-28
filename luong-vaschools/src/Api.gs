@@ -93,7 +93,10 @@ var Api = (function () {
     return Util.uniq(hits);
   }
 
-  function labelOf(r) { return r.ten || r.ho_ten || r.ma || ''; }
+  function labelOf(r) {
+    if (r.hoc_ky) return (r.loai || 'Học kỳ') + ' · ' + Util.displayDate(r.tu_ngay) + (r.den_ngay !== r.tu_ngay ? ' – ' + Util.displayDate(r.den_ngay) : '');
+    return r.ten || r.ho_ten || r.ma || '';
+  }
 
   function clientSchema(user) {
     var tables = {}, refs = {};
@@ -472,8 +475,23 @@ var Api = (function () {
     'calc.run': function (p, user) {
       Auth.require(user, 'calc.run');
       var out;
-      Db.tx(function () { out = Calc.run(user, p.ky_ma, p.truong_ma || ''); });
+      Db.tx(function () { out = Calc.run(user, p.ky_ma, p.truong_ma || '', p.gom); });
       return out;
+    },
+
+    tonghop: function (p, user) {
+      Auth.require(user, 'calc.view');
+      return Report.summary(user, p.ky_ma, p.group);
+    },
+
+    'tonghop.export': function (p, user) {
+      Auth.require(user, 'calc.view');
+      return Report.exportTable(user, p.ky_ma, p.bang);
+    },
+
+    'phutroi.chitiet': function (p, user) {
+      Auth.require(user, 'calc.view');
+      return Report.ptDetail(user, p.ky_ma, p.ma_nv);
     },
 
     'quyettoan.submit': function (p, user) {
@@ -488,6 +506,9 @@ var Api = (function () {
         };
         var inc = Db.filter('THU_NHAP_MOI', mine), qt = Db.filter('QUYET_TOAN', mine);
         if (!inc.length) throw new AppError('EMPTY', 'Chưa có kết quả tạm tính của trường này. Hãy bấm "Tính toán" trước.');
+        if (inc.concat(qt).some(function (r) { return r.nguon === 'Gồm dòng chưa duyệt'; })) {
+          throw new AppError('UNAPPROVED', 'Kết quả đang gồm dòng khai báo CHƯA duyệt (chế độ tính thử). Hãy duyệt hết khai báo rồi bấm "Tính toán" với chế độ "Chỉ dòng đã duyệt" trước khi gửi chốt.');
+        }
         var ph = Workflow.create(user, { loai: 'Quyết toán kỳ', tieu_de: 'Quyết toán & thu nhập mới ' + ky.ma + ' · ' + tr.ten + ' (' + inc.length + ' nhân sự)',
           truong_ma: tr.ma, chi_nhanh_ma: tr.chi_nhanh_ma, ky_ma: ky.ma, payload: { nhan_su: inc.length } });
         var patch = function (r) { return { id: r.id, patch: { trang_thai: 'Chờ chốt', phieu_ma: ph.ma_phieu } }; };

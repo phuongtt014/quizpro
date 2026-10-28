@@ -9,7 +9,7 @@ const vm = require('vm');
 const crypto = require('crypto');
 
 const SRC = path.join(__dirname, '..', 'src');
-const ORDER = ['Util', 'Csv', 'Strict', 'Schema', 'Db', 'Validate', 'Auth', 'Audit', 'Notify', 'Policy', 'Staff', 'Engine', 'Calc', 'Workflow', 'Seed', 'Setup', 'Api'];
+const ORDER = ['Util', 'Csv', 'Strict', 'Schema', 'Db', 'Validate', 'Auth', 'Audit', 'Notify', 'Policy', 'Staff', 'Engine', 'Calc', 'Report', 'Workflow', 'Seed', 'Setup', 'Api'];
 
 class Range {
   constructor(sheet, r, c, nr, nc) { Object.assign(this, { sheet, r, c, nr, nc }); }
