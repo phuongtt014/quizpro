@@ -56,7 +56,7 @@ class Sheet {
   insertRowsAfter(after, n) { this.maxRows += n; }
   insertColumnsAfter(after, n) { this.maxCols += n; }
   getRange(r, c, nr, nc) { return new Range(this, r, c, nr || 1, nc || 1); }
-  getDataRange() { return new Range(this, 1, 1, this.getLastRow(), this.getLastColumn()); }
+  getDataRange() { if (this.onRead) this.onRead(this.name); return new Range(this, 1, 1, this.getLastRow(), this.getLastColumn()); }
   deleteRow(n) { this.data.splice(n - 1, 1); }
   setFrozenRows() {}
 }
@@ -71,8 +71,8 @@ class Spreadsheet {
 }
 
 function createEnv(opts = {}) {
-  const books = {}, props = {}, mails = [];
-  const env = { email: (opts.email || 'admin@vaschools.edu.vn').toLowerCase(), owner: 'admin@vaschools.edu.vn', mails, books, mailQuota: 100, failMail: false };
+  const books = {}, props = {}, mails = [], cache = new Map();
+  const env = { email: (opts.email || 'admin@vaschools.edu.vn').toLowerCase(), owner: 'admin@vaschools.edu.vn', mails, books, mailQuota: 100, failMail: false, cache, sheetReads: 0, cacheFail: false };
   let locked = false;
 
   const ctx = {
@@ -102,6 +102,17 @@ function createEnv(opts = {}) {
         return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}`;
       }
     },
+    CacheService: { getScriptCache: () => {
+      if (env.cacheFail) throw new Error('Đệm không khả dụng');
+      const chk = (v) => { if (Buffer.byteLength(String(v)) > 100 * 1024) throw new Error('Argument too large: value'); };
+      return {
+        get: (k) => (cache.has(k) ? cache.get(k) : null),
+        getAll: (ks) => Object.fromEntries(ks.filter(k => cache.has(k)).map(k => [k, cache.get(k)])),
+        put: (k, v) => { chk(v); cache.set(k, String(v)); },
+        putAll: (o) => { Object.entries(o).forEach(([k, v]) => { chk(v); cache.set(k, String(v)); }); },
+        remove: (k) => { cache.delete(k); }
+      };
+    } },
     Logger: { log() {} },
     HtmlService: {}
   };
@@ -117,7 +128,13 @@ function createEnv(opts = {}) {
     return ctx.Seed.run(env.email, 'Quản trị');
   };
   env.as = (email) => { env.email = email.toLowerCase(); ctx.Auth.reset(); };
-  env.api = (name, payload) => ctx.apiCall(name, payload || {});
+  // Mỗi lần gọi API là một "lượt chạy" mới như Apps Script: không nhớ biến của lượt trước, chỉ còn CacheService.
+  env.reads = {};
+  env.api = (name, payload) => {
+    ctx.Db.reset(); ctx.Auth.reset();
+    Object.values(books).forEach(b => b.sheets.forEach(s => { s.onRead = (n) => { env.sheetReads++; env.reads[n] = (env.reads[n] || 0) + 1; }; }));
+    return ctx.apiCall(name, payload || {});
+  };
   env.sheet = (name) => books[Object.keys(books)[0]].getSheetByName(name);
   return env;
 }

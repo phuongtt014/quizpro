@@ -62,6 +62,7 @@ Bạn chỉ cần **4 tệp** trong thư mục `dist/`: `Code.gs`, `Index.html`,
 Dán lại `Code.gs` / `Index.html` mới → **Triển khai → Quản lý triển khai → ✏ Sửa → Phiên bản mới → Triển khai** (URL không đổi). Nếu bản mới có thêm bảng/cột, chạy thêm hàm **`setupEnsureSheets`** (không mất dữ liệu).
 
 ## Lưu ý
+- **Tốc độ:** ứng dụng dùng bộ nhớ đệm. Nếu có ai **sửa trực tiếp trong file Google Sheet CSDL** (không khuyến khích), bấm nút **⟳ Làm mới dữ liệu** ở thanh trên cùng (cần quyền *Sửa thiết lập*), nếu không dữ liệu có thể chưa cập nhật tới 10 phút.
 - **Không chia sẻ file Google Sheet CSDL** cho người dùng. Họ chỉ cần URL web app.
 - Thêm người dùng: vào **Hệ thống → Người dùng** (nhập CSV được), rồi **Gán vai trò**.
 - Muốn cập nhật `dist/` sau khi sửa mã trong `src/`: chạy `npm run build`.

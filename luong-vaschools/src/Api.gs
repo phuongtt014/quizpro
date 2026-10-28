@@ -14,17 +14,19 @@ function doGet() {
 function include(name) { return HtmlService.createHtmlOutputFromFile(name).getContent(); }
 
 function apiCall(name, payload) {
+  var t0 = Date.now();
   try {
     var h = Api.handlers[name];
     if (!h) throw new AppError('NOT_FOUND', 'API không tồn tại: ' + name);
+    Db.preload(['USERS', 'ROLE_PERMS', 'USER_ROLES']);
     var user = Auth.current();
     if (!user) throw new AppError('FORBIDDEN', 'Tài khoản chưa được cấp quyền sử dụng hệ thống');
     var data = h(payload || {}, user);
     Notify.flush();
-    return { ok: true, data: data };
+    return { ok: true, data: data, ms: Date.now() - t0 };
   } catch (e) {
     Notify.discard();
-    if (e instanceof AppError) return { ok: false, code: e.code, error: e.message, details: e.details };
+    if (e instanceof AppError) return { ok: false, code: e.code, error: e.message, details: e.details, ms: Date.now() - t0 };
     console.error(e && e.stack ? e.stack : e);
     return { ok: false, code: 'ERROR', error: 'Lỗi hệ thống: ' + (e && e.message ? e.message : e) };
   }
@@ -206,6 +208,26 @@ var Api = (function () {
     },
 
     schema: function (p, user) { return clientSchema(user); },
+
+    /** Một lần gọi cho lúc mở ứng dụng (thay cho 'me' + 'schema' riêng, bớt một vòng chờ). */
+    boot: function (p, user) { return { me: handlers.me(p, user), schema: clientSchema(user) }; },
+
+    /** Chạy gộp nhiều thao tác ĐỌC trong một lần gọi để tải trước các tab. Mỗi mục vẫn kiểm tra quyền như thường. */
+    batch: function (p, user) {
+      var allowed = { list: 1, tonghop: 1, 'phieu.list': 1 };
+      return (p.calls || []).slice(0, 12).map(function (c) {
+        if (!allowed[c.name]) return { ok: false, error: 'Không cho phép gộp thao tác này' };
+        try { return { ok: true, data: handlers[c.name](c.payload || {}, user) }; }
+        catch (e) { return e instanceof AppError ? { ok: false, code: e.code, error: e.message } : { ok: false, error: 'Lỗi hệ thống' }; }
+      });
+    },
+
+    /** Xóa bộ nhớ đệm: dùng khi có người sửa trực tiếp trong file Google Sheet CSDL. */
+    'cache.flush': function (p, user) {
+      Auth.require(user, 'setup.edit');
+      Db.flushCache();
+      return {};
+    },
 
     dashboard: function (p, user) {
       var cnt = function (t, pred) { return Db.all(t).filter(pred || function () { return true; }).length; };

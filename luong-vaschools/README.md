@@ -81,6 +81,22 @@ Thêm quản trị khác: sửa email trong `setupAddAdmin` rồi chạy.
   *Cơ cấu phương án thu nhập mới* từ kỳ mới nhất đã tính trong phạm vi người xem, cùng danh sách các bước thiết lập.
 - Đổi màu thương hiệu/chủ đạo: sửa các biến `--side-bg`, `--accent` ở đầu `src/Style.html`.
 
+## Hiệu năng (vì sao mở tab từng chậm và đã cải thiện thế nào)
+
+Apps Script khác máy chủ thông thường: **mỗi lần trình duyệt gọi là một lượt chạy mới, không nhớ gì**, và dữ liệu nằm trong Google Sheets (mỗi lần đọc một bảng ~0,1–0,4 giây).
+Trước đây mỗi lần bấm tab đọc 4–6 bảng (kể cả bảng người dùng/quyền), riêng khởi động và Tổng quan đọc 11 bảng, cộng độ trễ cố hữu của mỗi lần gọi.
+Các cải tiến:
+
+- **Bộ nhớ đệm máy chủ** (CacheService, 10 phút): mở tab thứ hai trở đi hầu như không đọc Google Sheets (0 lần đọc, đo bằng kiểm thử). Mỗi bảng có *số phiên bản* lưu bền ở Script Properties, tăng ở **cuối mọi thao tác ghi**
+  trong lúc còn giữ khóa, nên đệm cũ không bao giờ được dùng lại, kể cả khi đệm của Google gặp sự cố đúng lúc ghi. Trong cùng một giao dịch, bảng vừa ghi luôn đọc thẳng từ trang tính.
+- **Nạp sẵn bảng quyền** bằng vài lần gọi đệm gộp; **gộp lần khởi động** (`boot` = người dùng + cấu trúc) và **gọi đoán trước** dữ liệu của trang đang mở song song với khởi động.
+- **Trình duyệt:** hiện ngay dữ liệu đã xem rồi cập nhật ngầm ("đang cập nhật…"), **tải trước các tab cùng nhóm bằng một lần gọi gộp** (`batch`, chỉ thao tác đọc, vẫn kiểm tra quyền từng mục),
+  khung xương khi chờ, bỏ đệm ngay khi có thao tác ghi. Thanh dữ liệu hiện thêm thời gian xử lý của máy chủ (vd "· 0,4s") để dễ chẩn đoán.
+- **Nút ⟳ (Làm mới dữ liệu)** ở thanh tiêu đề: xóa đệm trình duyệt (và đệm máy chủ nếu có quyền thiết lập). Dùng sau khi ai đó **sửa trực tiếp trong file Google Sheet CSDL**
+  (nên tránh; cách đúng là sửa qua ứng dụng).
+- Đo trên trình duyệt thật với độ trễ giả lập 1 giây/lần gọi: chuyển sang tab đã tải trước **~40 ms**, mở thẳng một trang **~1,3 s**.
+  Lần gọi đầu tiên sau một thời gian không dùng vẫn có thể chậm ~1–2 s do Apps Script khởi động lại: đó là giới hạn của nền tảng.
+
 ## Cấu trúc mã
 
 | Tệp | Vai trò |
@@ -98,7 +114,7 @@ Thêm quản trị khác: sửa email trong `setupAddAdmin` rồi chạy.
 ## Kiểm thử
 
 ```bash
-npm test                      # 51 kiểm thử logic trên bản giả lập Apps Script
+npm test                      # 61 kiểm thử logic trên bản giả lập Apps Script
 node tests/ui-smoke.js ./ảnh  # chạy giao diện thật trên Chromium (cần playwright)
 ```
 

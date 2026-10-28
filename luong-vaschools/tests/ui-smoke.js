@@ -18,7 +18,8 @@ const html = read('Index.html').replace("<?!= include('Style') ?>", read('Style.
   const errors = global.__errors = [];
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
-  await page.exposeFunction('nodeApi', (name, payload) => JSON.parse(JSON.stringify(env.api(name, payload))));
+  env.latency = 0;
+  await page.exposeFunction('nodeApi', async (name, payload) => { if (env.latency) await new Promise((r) => setTimeout(r, env.latency)); return JSON.parse(JSON.stringify(env.api(name, payload))); });
   const shim = `<script>(function(){
     function mk(ok, fail){ return new Proxy({}, { get: function(_, k){
       if (k === 'withSuccessHandler') return function(f){ return mk(f, fail); };
@@ -236,6 +237,51 @@ const html = read('Index.html').replace("<?!= include('Style') ?>", read('Style.
   await page.waitForTimeout(300);
   ok('Điện thoại: menu trượt ra', (await page.locator('aside.side').evaluate((n) => n.getBoundingClientRect().left)) >= 0);
   await page.screenshot({ path: path.join(out, '15-dienthoai-menu.png') });
+
+  // ---------- Phần 5: tốc độ cảm nhận khi mỗi lần gọi máy chủ mất ~1 giây (như Apps Script thật) ----------
+  env.latency = 1000;
+  await page.setViewportSize({ width: 1440, height: 860 });
+  let t0 = Date.now();
+  await reload('#setup');
+  await page.waitForSelector('td:has-text("TP. Hồ Chí Minh")');
+  const tFirst = Date.now() - t0;
+  await page.waitForTimeout(2500);                                  // thời gian tải trước chạy ngầm
+  t0 = Date.now();
+  await page.click('.tabs button:has-text("Trường")');
+  await page.waitForSelector('td:has-text("THPT HCM")');
+  const tPrefetched = Date.now() - t0;
+  await page.click('.tabs button:has-text("Chi nhánh")');
+  await page.waitForSelector('td:has-text("TP. Hồ Chí Minh")');
+  t0 = Date.now();
+  await page.click('.tabs button:has-text("Trường")');
+  await page.waitForSelector('td:has-text("THPT HCM")');
+  const tRevisit = Date.now() - t0;
+  // mở thẳng đường dẫn #setup (như nhấn vào liên kết đã lưu)
+  await page.goto('about:blank#setup');
+  t0 = Date.now();
+  await page.setContent(page_html, { waitUntil: 'load' });
+  await page.waitForSelector('td:has-text("TP. Hồ Chí Minh")');
+  const tDeep = Date.now() - t0;
+  console.log('ĐO mở thẳng #setup: ' + tDeep + 'ms (≈ 1 vòng chờ 1000ms + dựng giao diện)');
+  console.log('ĐO (độ trễ giả lập 1000ms/lần gọi): mở trang lần đầu ' + tFirst + 'ms · chuyển tab đã tải trước ' + tPrefetched + 'ms · xem lại tab ' + tRevisit + 'ms');
+  ok('Chuyển tab đã được tải trước hiện dữ liệu gần như tức thì (<400ms dù mỗi lần gọi mất 1s)', tPrefetched < 400 && tRevisit < 400);
+  // sau khi ghi, dữ liệu mới phải hiện ngay (không bị đệm cũ che)
+  await page.click('button:has-text("+ Thêm")');
+  await page.fill('.form input >> nth=0', 'DN_TH');
+  await page.fill('.form input >> nth=1', 'Tiểu học Đà Nẵng');
+  await page.selectOption('.form select >> nth=0', 'HCM');
+  await page.selectOption('.form select >> nth=1', 'Tiểu học');
+  await page.click('.modal >> text=Lưu');
+  await page.waitForSelector('td:has-text("Tiểu học Đà Nẵng")', { timeout: 8000 });
+  ok('Sau khi thêm, bảng hiện ngay dòng mới (đệm trình duyệt đã được làm mới)', true);
+  env.latency = 0;
+  await page.click('button[aria-label="Làm mới dữ liệu"]');
+  await page.waitForSelector('.toast:not([hidden])');
+  ok('Nút Làm mới dữ liệu hoạt động', (await page.textContent('#toast')).includes('Đã làm mới'));
+
+  await page.click('button[aria-label="Làm mới dữ liệu"]');
+  await page.waitForSelector('#toast:not([hidden])');
+  ok('Nút Làm mới dữ liệu hoạt động', (await page.textContent('#toast')).includes('Đã làm mới'));
 
   console.log(steps.join('\n'));
   console.log(errors.length ? 'LỖI TRÌNH DUYỆT:\n' + errors.join('\n') : 'Không có lỗi console/JS.');

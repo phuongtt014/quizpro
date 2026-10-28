@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var S = { schema: null, me: null, main: null, nav: null, bellBox: null };
+  var S = { schema: null, me: null, main: null, nav: null, bellBox: null, cache: {}, gen: 0, ms: null, pre: {} };
 
   /* ---------- tiện ích DOM ---------- */
   function el(tag, a, kids) {
@@ -33,10 +33,13 @@
     toastTimer = setTimeout(function () { t.hidden = true; }, 3200);
   }
 
+  /** Các thao tác chỉ đọc: mọi thao tác khác (ghi) thành công thì bỏ toàn bộ đệm trình duyệt để không hiện dữ liệu cũ. */
+  var READ_ONLY = { list: 1, tonghop: 1, 'tonghop.export': 1, 'phieu.list': 1, 'phieu.get': 1, batch: 1, boot: 1, me: 1, schema: 1, dashboard: 1,
+    'notify.list': 1, 'dean.check': 1, 'calc.simulate': 1, 'phutroi.chitiet': 1, 'roles.matrix': 1 };
   function api(name, payload) {
     return new Promise(function (resolve, reject) {
       google.script.run
-        .withSuccessHandler(function (r) { if (r && r.ok) resolve(r.data); else reject(r || { error: 'Lỗi không xác định' }); })
+        .withSuccessHandler(function (r) { if (r && r.ms !== undefined) S.ms = r.ms; if (r && r.ok && !READ_ONLY[name]) { S.cache = {}; S.gen++; } if (r && r.ok) resolve(r.data); else reject(r || { error: 'Lỗi không xác định' }); })
         .withFailureHandler(function (e) { reject({ error: e && e.message ? e.message : String(e) }); })
         .apiCall(name, payload || {});
     });
@@ -70,6 +73,25 @@
     toast(e.error || 'Có lỗi xảy ra');
   }
 
+  /* ---------- đệm danh sách phía trình duyệt: hiện ngay dữ liệu đã xem, cập nhật ngầm ---------- */
+  function listKey(table, ctx, filter, q, page) { return JSON.stringify([table, ctx || null, filter || null, q || '', page || 0]); }
+  /** Bỏ các bản đệm của một bảng (gọi sau khi ghi để lần xem sau luôn là dữ liệu mới). */
+  function cacheDrop(table) {
+    Object.keys(S.cache).forEach(function (k) { if (k.indexOf('["' + table + '"') === 0) delete S.cache[k]; });
+  }
+  /**
+   * Tải trước trang đầu của nhiều bảng bằng MỘT lần gọi (máy chủ đọc từ bộ nhớ đệm nên rất nhanh), để chuyển tab là có dữ liệu ngay.
+   * items: [{ table, ctx, filter }]. Lỗi/thiếu quyền thì bỏ qua, tab tự tải khi mở.
+   */
+  function prefetch(items) {
+    items = items.filter(function (i) { return tt(i.table) && !S.cache[listKey(i.table, i.ctx, i.filter, '', 0)]; });
+    if (!items.length) return;
+    var gen = S.gen;
+    api('batch', { calls: items.map(function (i) { return { name: 'list', payload: { table: i.table, ctx: i.ctx, filter: i.filter, q: '', page: 0 } }; }) }).then(function (res) {
+      res.forEach(function (r, i) { if (r.ok && gen === S.gen) S.cache[listKey(items[i].table, items[i].ctx, items[i].filter, '', 0)] = r.data; });
+    }).catch(function () { /* im lặng */ });
+  }
+
   /* ---------- biểu tượng (SVG nội tuyến, hằng số tin cậy) ---------- */
   var ICONS = {
     dash: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
@@ -82,6 +104,7 @@
     admin: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
     menu: '<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>',
     collapse: '<polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/>',
+    refresh: '<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
     bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
     building: '<path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><line x1="9" y1="9" x2="9" y2="9.01"/><line x1="9" y1="13" x2="9" y2="13.01"/><line x1="9" y1="17" x2="9" y2="17.01"/>',
     school: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
@@ -261,14 +284,19 @@
     var st = { q: '', page: 0, rows: [], total: 0, locked: false, appendOnly: false, loading: true }, box = el('div');
     host.appendChild(box);
 
+    function apply(d) { st.rows = d.rows; st.total = d.total; st.locked = d.locked; st.appendOnly = !!d.appendOnly; st.size = d.pageSize; }
+
     function load() {
-      st.loading = true; render();
+      var key = listKey(table, opts.ctx, opts.filter, st.q, st.page), hit = S.cache[key];
+      if (hit) { apply(hit); st.loading = false; st.refreshing = true; } else { st.loading = true; st.refreshing = false; }
+      render();
+      var gen = S.gen;
       api('list', { table: table, ctx: opts.ctx, q: st.q, page: st.page, filter: opts.filter }).then(function (d) {
-        st.rows = d.rows; st.total = d.total; st.locked = d.locked; st.appendOnly = !!d.appendOnly; st.size = d.pageSize; st.loading = false; render();
-      }).catch(function (e) { st.loading = false; clear(box).appendChild(errBox(e)); });
+        if (gen === S.gen) S.cache[key] = d; apply(d); st.loading = false; st.refreshing = false; render();
+      }).catch(function (e) { st.loading = false; st.refreshing = false; clear(box).appendChild(errBox(e)); });
     }
 
-    function afterWrite() { refreshSchema().then(load); }
+    function afterWrite() { cacheDrop(table); refreshSchema().then(load); }
 
     function render() {
       clear(box);
@@ -277,7 +305,7 @@
       search.addEventListener('keydown', function (e) { if (e.key === 'Enter') { st.q = search.value; st.page = 0; load(); } });
       box.appendChild(el('div', { class: 'bar' }, [search,
         el('button', { class: 'btn', text: 'Tìm', onclick: function () { st.q = search.value; st.page = 0; load(); } }),
-        el('span', { class: 'muted', text: st.loading ? 'Đang tải…' : st.total + ' bản ghi' }), el('span', { class: 'sp' }),
+        el('span', { class: 'muted', text: st.loading ? 'Đang tải…' : st.total + ' bản ghi' + (st.refreshing ? ' · đang cập nhật…' : (S.ms !== null ? ' · ' + (S.ms / 1000).toFixed(1).replace('.', ',') + 's' : '')) }), el('span', { class: 'sp' }),
         st.locked ? el('span', { class: 'badge warn', text: st.appendOnly ? 'Đã ban hành - chỉ được thêm chi nhánh mới' : 'Đã ban hành - chỉ xem' }) : null,
         canI ? el('button', { class: 'btn', text: 'Nhập CSV', onclick: function () { openImport(table, opts, afterWrite); } }) : null,
         canAdd ? el('button', { class: 'btn pri', text: '+ Thêm', onclick: function () { openForm(table, opts, null, afterWrite); } }) : null].concat(canAdd && opts.toolbar ? opts.toolbar(afterWrite) : [])));
@@ -312,6 +340,7 @@
         tr.appendChild(acts);
         body.appendChild(tr);
       });
+      if (st.loading) { for (var sk = 0; sk < 6; sk++) body.appendChild(el('tr', null, [el('td', { colspan: cols.length + (T.computed || []).length + 1 }, [el('div', { class: 'skel' })])])); }
       if (!st.rows.length && !st.loading) body.appendChild(el('tr', null, [el('td', { class: 'muted', colspan: cols.length + (T.computed || []).length + 1, text: 'Chưa có dữ liệu.' })]));
       box.appendChild(el('div', { class: 'tw' }, [el('table', null, [el('thead', null, [head]), body])]));
 
@@ -345,6 +374,8 @@
       return { key: t, label: tt(t).label, render: function (b) { TableView(b, t, { ctx: ctx }); } };
     });
     if (!items.length) { host.appendChild(el('div', { class: 'alert warn', text: 'Bạn không có quyền xem mục này.' })); return; }
+    var active = items.some(function (i) { return i.key === sub; }) ? sub : items[0].key;
+    prefetch(items.filter(function (i) { return i.key !== active; }).map(function (i) { return { table: i.key, ctx: ctx }; }));
     Tabs(host, items, sub, function (k) { history.replaceState(null, '', '#' + base + '/' + k); });
   }
 
@@ -394,7 +425,8 @@
 
   function pageDash(host) {
     var box = el('div'); host.appendChild(box);
-    api('dashboard').then(function (d) {
+    var pre = S.pre.dash; delete S.pre.dash;
+    (pre ? Promise.resolve(pre) : api('dashboard')).then(function (d) {
       var t = d.thu_nhap, k = el('div', { class: 'kpis' });
       k.appendChild(kpi('g', 'building', 'Chi nhánh hoạt động', d.counts.chi_nhanh, '', function () { location.hash = '#setup/CHI_NHANH'; }));
       k.appendChild(kpi('b', 'school', 'Trường hoạt động', d.counts.truong, '', function () { location.hash = '#setup/TRUONG'; }));
@@ -505,6 +537,7 @@
       if (r.trang_thai === 'Nháp' && S.me.perms.indexOf('policy.publish') >= 0)
         head.appendChild(el('button', { class: 'btn pri', text: 'Ban hành', onclick: function () { publish(ma, function () { route(); }); } }));
       var ctx = { de_an_ma: ma };
+      prefetch(['DEAN_NGACH', 'DEAN_HANGTRUONG', 'DEAN_QUYDOI', 'DEAN_TRAN', 'DEAN_PARAM'].map(function (t) { return { table: t, ctx: ctx }; }));
       var items = [['DEAN_THAMSO', 'LCB / LTB'], ['DEAN_NGACH', 'Ngạch - bậc'], ['DEAN_HANGTRUONG', 'Hạng trường'], ['DEAN_QUYDOI', 'Quy đổi trách nhiệm'],
         ['DEAN_TRAN', 'Trần tăng thu nhập'], ['DEAN_PARAM', 'Tham số khác']];
       Tabs(body, items.map(function (i) {
@@ -571,6 +604,8 @@
     if (tt('ROLE_PERMS')) items.push({ key: 'MATRIX', label: 'Ma trận quyền', render: rolesMatrix });
     if (tt('AUDIT_LOG')) items.push({ key: 'AUDIT_LOG', label: 'Nhật ký', render: function (b) { TableView(b, 'AUDIT_LOG'); } });
     if (!items.length) { host.appendChild(el('div', { class: 'alert warn', text: 'Bạn không có quyền xem mục này.' })); return; }
+    var activeA = items.some(function (i) { return i.key === sub; }) ? sub : items[0].key;
+    prefetch(items.filter(function (i) { return i.key !== activeA && i.key !== 'MATRIX' && i.key !== 'AUDIT_LOG'; }).map(function (i) { return { table: i.key }; }));
     Tabs(host, items, sub, function (k) { history.replaceState(null, '', '#admin/' + k); });
   }
 
@@ -752,6 +787,7 @@
     function draw() {
       clear(body);
       var kind = kyKind(ky.value);
+      prefetch([{ table: 'THU_NHAP_MOI', filter: { ky_ma: ky.value } }, { table: 'QUYET_TOAN', filter: { ky_ma: ky.value } }]);
       Tabs(body, [
         { key: 'TONGHOP', label: 'Tổng hợp toàn công ty', render: function (b) { summaryView(b, ky.value); } },
         { key: 'THU_NHAP_MOI', label: 'Thu nhập từng người', render: function (b) { TableView(b, 'THU_NHAP_MOI', { filter: { ky_ma: ky.value } }); } },
@@ -764,6 +800,7 @@
     var run = el('button', { class: 'btn pri', text: 'Tính toán', onclick: function () {
       run.disabled = true; run.textContent = 'Đang tính…';
       api('calc.run', { ky_ma: ky.value, truong_ma: tr.value, gom: gom.value }).then(function (r) {
+        cacheDrop('THU_NHAP_MOI'); cacheDrop('QUYET_TOAN');
         run.disabled = false; run.textContent = 'Tính toán'; draw();
         var nodes = [el('div', { class: 'alert ok', text: 'Đề án ' + r.de_an + ' (' + r.loai + '): ' + r.settled + ' dòng phụ trội, ' + r.incomes + ' thu nhập mới' + (r.skippedLocked ? ', bỏ qua ' + r.skippedLocked + ' nhân sự đã chốt/chờ chốt' : '') + '.' })];
         if (r.unapproved) nodes.push(el('div', { class: 'alert warn', text: r.unapproved + ' nhân sự đang gồm dòng khai báo CHƯA duyệt: chỉ để xem thử, chưa gửi chốt được.' }));
@@ -970,8 +1007,12 @@
   }
 
   function start() {
-    Promise.all([api('me'), api('schema')]).then(function (r) {
-      S.me = r[0]; S.schema = r[1];
+    // Gọi "đoán trước" dữ liệu của trang đang mở song song với bước khởi động để bớt một vòng chờ (lỗi/thiếu quyền thì bỏ qua).
+    var first = (location.hash.replace(/^#/, '').split('/')[0]) || 'dash', SPEC = { setup: 'CHI_NHANH', staff: 'NHAN_SU', dean: 'DEAN', admin: 'USERS' };
+    var spec = first === 'dash' ? api('dashboard').then(function (d) { S.pre.dash = d; }) :
+      (SPEC[first] ? api('list', { table: SPEC[first], q: '', page: 0 }).then(function (d) { S.cache[listKey(SPEC[first], null, null, '', 0)] = d; }) : Promise.resolve());
+    Promise.all([api('boot'), spec.catch(function () { /* bỏ qua */ })]).then(function (r) { return r[0]; }).then(function (b) {
+      S.me = b.me; S.schema = b.schema;
       restoreSide();
       var app = clear(document.getElementById('app'));
 
@@ -997,10 +1038,15 @@
           el('button', { class: 'collapse-btn', 'aria-label': 'Thu gọn hoặc mở rộng thanh bên', title: 'Thu gọn / mở rộng', onclick: toggleSide }, [icon('collapse', 18), el('span', { class: 'lb', text: 'Thu gọn menu' })])])]);
 
       var bell = el('button', { class: 'icon-btn', 'aria-label': 'Thông báo', title: 'Thông báo', onclick: function () { toggleBell(bell); } }, [icon('bell', 19)]);
+      var refresh = el('button', { class: 'icon-btn', 'aria-label': 'Làm mới dữ liệu', title: 'Làm mới dữ liệu (tải lại bản mới nhất)', onclick: function () {
+        refresh.disabled = true;
+        var done = function () { S.cache = {}; S.gen++; refresh.disabled = false; route(); toast('Đã làm mới dữ liệu'); };
+        if (S.me.perms.indexOf('setup.edit') >= 0) api('cache.flush').then(done).catch(function (e) { refresh.disabled = false; showErr(e); }); else done();
+      } }, [icon('refresh', 19)]);
       S.title = el('h1'); S.subtitle = el('p');
       var top = el('header', { class: 'topbar' }, [
         el('button', { class: 'icon-btn', 'aria-label': 'Ẩn/hiện thanh bên', title: 'Ẩn/hiện menu', onclick: toggleSide }, [icon('menu', 20)]),
-        el('div', { class: 'ptitle' }, [S.title, S.subtitle]), el('div', { class: 'top-actions' }, [bell])]);
+        el('div', { class: 'ptitle' }, [S.title, S.subtitle]), el('div', { class: 'top-actions' }, [refresh, bell])]);
       S.main = el('main', { id: 'content' });
 
       app.appendChild(el('div', { class: 'shell' }, [side, el('div', { class: 'col' }, [top, S.main]), el('div', { class: 'scrim', onclick: function () { document.body.classList.remove('side-open'); } })]));
