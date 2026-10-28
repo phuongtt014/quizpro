@@ -72,6 +72,15 @@ Thêm quản trị khác: sửa email trong `setupAddAdmin` rồi chạy.
   *Nhân sự → Thu nhập hiện tại*. Nhân sự thiếu dữ liệu được liệt kê trong cảnh báo sau khi bấm Tính toán và đếm ở "chưa tính".
 - **Chưa có trong GĐ4:** hỗ trợ đặc thù do Giám đốc chi nhánh quyết định; tiết quy đổi theo "buổi" (QD09) phải tự quy ra Tiết/Tuần khi khai báo.
 
+## Giao diện
+
+- **Thanh bên trái** (xanh đậm) chia nhóm *Tổng quan / Dữ liệu / Tính lương / Hệ thống*, có biểu tượng, số phiếu chờ xử lý, thông tin người dùng.
+  **Thu gọn/mở rộng** bằng nút *Thu gọn menu* ở cuối thanh bên hoặc nút ☰ ở thanh tiêu đề (trạng thái được nhớ trên trình duyệt). Trên điện thoại menu trượt ra từ bên trái.
+- **Thanh tiêu đề** hiện tên trang, mô tả ngắn, chuông thông báo.
+- **Tổng quan:** thẻ chỉ số (chi nhánh, trường, nhân sự, đề án hiệu lực, phiếu chờ, quỹ lương), biểu đồ *Quỹ lương theo chi nhánh* (lương + phụ trội bình quân) và
+  *Cơ cấu phương án thu nhập mới* từ kỳ mới nhất đã tính trong phạm vi người xem, cùng danh sách các bước thiết lập.
+- Đổi màu thương hiệu/chủ đạo: sửa các biến `--side-bg`, `--accent` ở đầu `src/Style.html`.
+
 ## Cấu trúc mã
 
 | Tệp | Vai trò |

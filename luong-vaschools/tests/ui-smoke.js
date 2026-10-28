@@ -85,7 +85,7 @@ const html = read('Index.html').replace("<?!= include('Style') ?>", read('Style.
   await page.screenshot({ path: path.join(out, '4-matrix.png') });
 
   await page.setViewportSize({ width: 390, height: 800 });
-  await page.click('nav a[data-p=staff]');
+  await page.evaluate(() => { location.hash = '#staff'; });
   await page.waitForSelector('table');
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   ok('Điện thoại: không tràn ngang cả trang', !overflow);
@@ -207,6 +207,35 @@ const html = read('Index.html').replace("<?!= include('Style') ?>", read('Style.
   ok('Form trần có chọn Trường (trống = chung)', true);
   await page.screenshot({ path: path.join(out, '12-tran-truong.png') });
   await page.click('.modal >> text=Hủy');
+
+  // ---------- Phần 4: khung giao diện, thanh bên thu gọn ----------
+  await page.setViewportSize({ width: 1440, height: 860 });
+  env.as('admin@vaschools.edu.vn');
+  must(env.api('calc.run', { ky_ma: '2025-2026-DC1' }));
+  await reload('#dash');
+  await page.waitForSelector('.kpi');
+  await page.waitForSelector('.hbar');
+  ok('Tổng quan có thẻ chỉ số và biểu đồ quỹ lương', (await page.locator('.kpi').count()) >= 5 && (await page.locator('svg circle').count()) >= 2);
+  await page.screenshot({ path: path.join(out, '13-tongquan.png') });
+  const wExpanded = await page.locator('aside.side').evaluate((n) => n.getBoundingClientRect().width);
+  await page.click('.collapse-btn');
+  await page.waitForTimeout(300);
+  const wCollapsed = await page.locator('aside.side').evaluate((n) => n.getBoundingClientRect().width);
+  ok('Thu gọn thanh bên làm hẹp menu và mở rộng vùng nội dung', wExpanded > 200 && wCollapsed < 90 && (await page.evaluate(() => document.body.classList.contains('side-collapsed'))));
+  await page.screenshot({ path: path.join(out, '14-thugon.png') });
+  await page.click('header.topbar .icon-btn >> nth=0');
+  await page.waitForTimeout(300);
+  ok('Nút ☰ trên thanh tiêu đề mở lại menu', (await page.locator('aside.side').evaluate((n) => n.getBoundingClientRect().width)) > 200);
+  await page.click('nav a[data-p=calc]');
+  await page.waitForSelector('.tabs');
+  ok('Tiêu đề trang cập nhật theo menu', (await page.textContent('.ptitle h1')) === 'Thu nhập & phụ trội');
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.waitForTimeout(250);
+  ok('Điện thoại: menu ẩn mặc định, mở bằng nút ☰', (await page.locator('aside.side').evaluate((n) => n.getBoundingClientRect().right)) <= 1);
+  await page.click('header.topbar .icon-btn >> nth=0');
+  await page.waitForTimeout(300);
+  ok('Điện thoại: menu trượt ra', (await page.locator('aside.side').evaluate((n) => n.getBoundingClientRect().left)) >= 0);
+  await page.screenshot({ path: path.join(out, '15-dienthoai-menu.png') });
 
   console.log(steps.join('\n'));
   console.log(errors.length ? 'LỖI TRÌNH DUYỆT:\n' + errors.join('\n') : 'Không có lỗi console/JS.');

@@ -131,5 +131,21 @@ var Report = (function () {
     return { ho_ten: s.ho_ten, doi_tuong: s.doi_tuong, so_tuan: ky.so_tuan, lines: lines, ketqua: qt || null };
   }
 
-  return { summary: summary, aggregate: aggregate, exportTable: exportTable, ptDetail: ptDetail };
+  /** Dữ liệu biểu đồ trang Tổng quan: kỳ mới nhất có kết quả trong phạm vi người xem (null nếu chưa có hoặc không có quyền). */
+  function dashboard(user) {
+    if (!Auth.can(user, 'calc.view')) return null;
+    var kys = Db.all('KY_LUONG').slice().sort(function (a, b) { return a.den_ngay < b.den_ngay ? 1 : -1; });
+    for (var i = 0; i < kys.length; i++) {
+      var rows = scopedRows(user, 'THU_NHAP_MOI', kys[i].ma);
+      if (!rows.length) continue;
+      var agg = aggregate(rows, 'chi_nhanh'), sum = function (k) { return rows.reduce(function (s, r) { return s + (Number(r[k]) || 0); }, 0); };
+      return { ky: { ma: kys[i].ma, loai: kys[i].loai || 'Học kỳ', trang_thai: kys[i].trang_thai },
+        groups: agg.groups.map(function (g) { return { label: g.label, so_nv: g.so_nv, chinh_thuc: g.chinh_thuc, chi_phi_thang: g.chi_phi_thang }; }),
+        total: { so_nv: agg.total.so_nv, chinh_thuc: agg.total.chinh_thuc, chi_phi_thang: agg.total.chi_phi_thang, pt_binh_quan: agg.total.pt_binh_quan, tang: agg.total.tang, pct_tang: agg.total.pct_tang },
+        cocau: [{ label: 'Lương chức danh', value: sum('luong_chuc_danh') }, { label: 'Hỗ trợ (thâm niên, trách nhiệm…)', value: sum('ho_tro') }, { label: 'Lương KPI', value: sum('luong_kpi') }] };
+    }
+    return null;
+  }
+
+  return { summary: summary, dashboard: dashboard, aggregate: aggregate, exportTable: exportTable, ptDetail: ptDetail };
 })();

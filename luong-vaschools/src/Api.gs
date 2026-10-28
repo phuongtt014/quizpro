@@ -202,7 +202,7 @@ var Api = (function () {
   var handlers = {
     me: function (p, user) {
       return { email: user.email, name: user.name, ma_nv: user.ma_nv, perms: user.perms, isAdmin: user.isAdmin,
-        unread: Notify.unread(user.email) };
+        unread: Notify.unread(user.email), pending: pendingFor(user).length, roles: Util.uniq(user.grants.map(function (g) { return g.role; })) };
     },
 
     schema: function (p, user) { return clientSchema(user); },
@@ -222,6 +222,7 @@ var Api = (function () {
       return {
         checklist: checklist,
         pending: pendingFor(user).length,
+        thu_nhap: Report.dashboard(user),
         dean: dean ? { ma: dean.ma, so_hieu: dean.so_hieu, tu: dean.hieu_luc_tu } : null,
         counts: {
           chi_nhanh: cnt('CHI_NHANH', function (r) { return r.trang_thai === 'Hoạt động'; }),
