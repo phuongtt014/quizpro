@@ -345,7 +345,7 @@ var SCHEMA = (function () {
       col_('loai', 'Loại', 'enum', { values: ['Học kỳ', 'Điều chỉnh'], def: 'Học kỳ' }),
       col_('tu_ngay', 'Từ ngày', 'date', { req: true, hint: 'đợt điều chỉnh: ngày hiệu lực' }),
       col_('den_ngay', 'Đến ngày', 'date', { req: true, hint: 'đợt điều chỉnh: bằng ngày hiệu lực' }),
-      col_('so_tuan', 'Số tuần quy định', 'int', { min: 0, max: 30, def: 0, hint: 'bắt buộc ≥ 1 với học kỳ' }),
+      col_('so_tuan', 'Số tuần quy định', 'num', { min: 0, max: 30, def: 0, hint: 'bắt buộc ≥ 1 với học kỳ; trừ tuần nghỉ lễ (vd 14 hoặc 14,5)' }),
       col_('so_thang_chia', 'Số tháng chia hỗ trợ', 'num', { def: 5, min: 1, max: 12 }),
       col_('ky_phu_troi', 'Kỳ lấy phụ trội', 'ref', { ref: 'KY_LUONG.ma' }),
       col_('trang_thai', 'Trạng thái', 'enum', { values: ['Mở', 'Đã chốt'], def: 'Mở' })
