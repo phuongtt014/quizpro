@@ -316,6 +316,22 @@ const html = read('Index.html').replace("<?!= include('Style') ?>", read('Style.
   ok('Xuất dữ liệu cho tiêu đề đúng mẫu nhập', (await page.inputValue('.modal textarea.paste')).startsWith('Mã nhân sự\t'));
   await page.click('.modal >> text=Đóng');
 
+  // Danh mục dài (>8): ô chọn có tìm theo tên, không phân biệt dấu
+  must(env.api('importCommit', { table: 'NHAN_SU', text: tsv(['Mã nhân sự', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Email', 'Ngày vào làm', 'Chi nhánh'],
+    ...Array.from({ length: 10 }, (_, i) => ['TS' + String(i).padStart(2, '0'), i === 7 ? 'Lê Thị Hương' : 'Người số ' + i, '01/01/1990', 'Nữ', 'ts' + i + '@vaschools.edu.vn', '01/09/2020', 'HCM'])) }));
+  await reload('#declare');
+  await page.waitForSelector('.bar select');
+  await page.selectOption('.bar select >> nth=0', '2026-2027-HK1');
+  await page.waitForSelector('button:has-text("+ Thêm")');
+  await page.click('button:has-text("+ Thêm")');
+  const cbField = page.locator('.form > div', { has: page.locator('label:text-is("Mã nhân sự")') });
+  await cbField.locator('input').fill('huong');
+  await page.waitForSelector('.combo-it');
+  ok('Ô chọn nhân sự tìm theo tên không dấu', (await page.locator('.combo-it').count()) === 1 && (await page.textContent('.combo-it')).includes('TS07'));
+  await page.keyboard.press('Enter');
+  ok('Chọn xong ô hiển thị mã – tên', (await cbField.locator('input').inputValue()).startsWith('TS07'));
+  await page.click('.modal >> text=Hủy');
+
   console.log(steps.join('\n'));
   console.log(errors.length ? 'LỖI TRÌNH DUYỆT:\n' + errors.join('\n') : 'Không có lỗi console/JS.');
   if (errors.length) process.exitCode = 1;

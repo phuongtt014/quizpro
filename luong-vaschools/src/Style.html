@@ -106,6 +106,10 @@
   .modal h3 { font-size:17px; }
   .form { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px 14px; }
   .form label { display:block; font-size:12px; color:var(--muted); margin-bottom:3px; }
+  .combo { position:relative; }
+  .combo-pop { position:absolute; left:0; right:0; top:100%; z-index:30; max-height:240px; overflow:auto; background:var(--card); border:1px solid var(--line); border-radius:8px; box-shadow:0 6px 20px rgba(16,24,40,.18); margin-top:2px; }
+  .combo-it { padding:7px 10px; cursor:pointer; font-size:13.5px; }
+  .combo-it.on, .combo-it:hover { background:var(--accent-soft); }
   .form .full { grid-column:1/-1; }
   .req::after { content:" *"; color:var(--bad); }
   .alert { padding:10px 14px; border-radius:10px; margin:8px 0; }

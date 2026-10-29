@@ -113,6 +113,10 @@
   .modal h3 { font-size:17px; }
   .form { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px 14px; }
   .form label { display:block; font-size:12px; color:var(--muted); margin-bottom:3px; }
+  .combo { position:relative; }
+  .combo-pop { position:absolute; left:0; right:0; top:100%; z-index:30; max-height:240px; overflow:auto; background:var(--card); border:1px solid var(--line); border-radius:8px; box-shadow:0 6px 20px rgba(16,24,40,.18); margin-top:2px; }
+  .combo-it { padding:7px 10px; cursor:pointer; font-size:13.5px; }
+  .combo-it.on, .combo-it:hover { background:var(--accent-soft); }
   .form .full { grid-column:1/-1; }
   .req::after { content:" *"; color:var(--bad); }
   .alert { padding:10px 14px; border-radius:10px; margin:8px 0; }
@@ -329,18 +333,75 @@
   /** Làm mới danh mục chọn (khóa ngoại) sau khi dữ liệu thay đổi, để form luôn thấy mục mới. */
   function refreshSchema() { return api('schema').then(function (sc) { S.schema = sc; }).catch(function () { /* giữ bản cũ */ }); }
 
+  /** Bỏ dấu + chữ thường để tìm không phân biệt dấu ("nguyen" khớp "Nguyễn"). */
+  function fold(t) { return String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'd').toLowerCase(); }
+
+  /**
+   * Ô chọn có tìm kiếm cho danh mục dài (vd 200 nhân sự): gõ một phần mã hoặc tên, chọn bằng chuột hoặc ↑ ↓ Enter.
+   * Trả { node, ctl } — ctl có value (mã đã chọn) và disabled như một ô nhập thường.
+   */
+  function combo(list, labelOf, initial) {
+    var code = initial || '', box = el('input', { type: 'text', autocomplete: 'off', placeholder: 'Gõ mã hoặc tên để tìm…', role: 'combobox' });
+    var pop = el('div', { class: 'combo-pop', role: 'listbox', style: 'display:none' }), wrap = el('div', { class: 'combo' }, [box, pop]), act = -1, shown = [];
+    var items = list.map(function (o) { var t = labelOf(o); return { v: o.v, t: t, f: fold(o.v + ' ' + t) }; });
+    function textOf(v) { for (var i = 0; i < items.length; i++) if (items[i].v === v) return items[i].t; return v; }
+    function close() { pop.style.display = 'none'; act = -1; }
+    function choose(v) { code = v; box.value = v === '' ? '' : textOf(v); close(); }
+    function paint() {
+      clear(pop);
+      shown.forEach(function (it, i) {
+        pop.appendChild(el('div', { class: 'combo-it' + (i === act ? ' on' : ''), role: 'option', text: it.t,
+          onmousedown: function (e) { e.preventDefault(); choose(it.v); } }));
+      });
+      if (!shown.length) pop.appendChild(el('div', { class: 'combo-it muted', text: 'Không có kết quả' }));
+      pop.style.display = '';
+    }
+    function find() {
+      var q = fold(box.value.trim());
+      shown = items.filter(function (it) { return !q || it.f.indexOf(q) >= 0; }).slice(0, 60);
+      act = shown.length ? 0 : -1; paint();
+    }
+    box.addEventListener('input', function () { code = ''; find(); });
+    box.addEventListener('focus', function () { if (!code) find(); else { box.select(); } });
+    box.addEventListener('blur', function () {
+      close();
+      if (code === '') { // gõ đúng mã thì nhận luôn, còn lại xóa để tránh nhầm
+        var v = box.value.trim(), hit = items.filter(function (it) { return it.v === v; })[0];
+        if (hit) choose(hit.v); else if (shown.length === 1 && v) choose(shown[0].v); else box.value = '';
+      }
+    });
+    box.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (pop.style.display === 'none') find();
+        else { act = Math.max(0, Math.min(shown.length - 1, act + (e.key === 'ArrowDown' ? 1 : -1))); paint(); }
+      } else if (e.key === 'Enter' && pop.style.display !== 'none') {
+        e.preventDefault();
+        if (shown[act]) choose(shown[act].v);
+      } else if (e.key === 'Escape' && pop.style.display !== 'none') { e.stopPropagation(); close(); }
+    });
+    box.value = code === '' ? '' : textOf(code);
+    return { node: wrap, ctl: {
+      get value() { return code; }, set value(v) { choose(v); },
+      get disabled() { return box.disabled; }, set disabled(d) { box.disabled = d; }
+    } };
+  }
+
   /* ---------- form thêm/sửa ---------- */
   function openForm(table, opts, row, onDone) {
     var T = tt(table), md = openModal(), inputs = {}, fixed = opts.fixed || {};
     var form = el('div', { class: 'form' });
     T.cols.forEach(function (c) {
       if (c.k === T.ctx || c.ro) return;
-      var input, list = c.t === 'ref' ? S.schema.refs[c.ref] : null;
+      var input, node = null, list = c.t === 'ref' ? S.schema.refs[c.ref] : null;
       var dflt = opts.defaults || {};
       var cur = row ? toRaw(c, row[c.k]) : (fixed[c.k] !== undefined ? fixed[c.k] : (dflt[c.k] !== undefined ? dflt[c.k] : (c.def !== undefined ? toRaw(c, c.def) : '')));
       if (c.t === 'enum') {
         input = el('select', null, (c.req && c.def === undefined ? [] : [el('option', { value: '', text: '— chọn —' })]).concat(
           c.values.map(function (v) { return el('option', { value: v, text: v }); })));
+      } else if (list && list.length > 8) {
+        var cb = combo(list, function (o) { return o.l && o.l !== o.v ? o.v + ' – ' + o.l : o.v; }, '');
+        input = cb.ctl; node = cb.node;
       } else if (list) {
         input = el('select', null, [el('option', { value: '', text: '— chọn —' })].concat(
           list.map(function (o) { return el('option', { value: o.v, text: o.l && o.l !== o.v ? o.v + ' – ' + o.l : o.v }); })));
@@ -354,7 +415,7 @@
       if (row && T.key.indexOf(c.k) >= 0 && c.k !== 'hieu_luc_tu' && tableLocksKey(table)) input.disabled = true;
       inputs[c.k] = input;
       form.appendChild(el('div', { class: c.t === 'longtext' ? 'full' : '' }, [
-        el('label', { class: c.req && c.def === undefined ? 'req' : '', text: c.l }), input
+        el('label', { class: c.req && c.def === undefined ? 'req' : '', text: c.l }), node || input
       ]));
     });
     var autoClose = null, errHost = el('div');
