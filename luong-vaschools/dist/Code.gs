@@ -365,6 +365,43 @@ var SCHEMA = (function () {
     }
   };
 
+  S.DINH_MUC_TUAN = {
+    label: 'Điều chỉnh định mức theo tuần (nghỉ lễ…)', group: 'setup', key: ['ky_ma', 'truong_ma', 'doi_tuong', 'tu_ngay'],
+    perm: { r: 'setup.view', w: 'setup.edit' },
+    cols: [
+      col_('ky_ma', 'Kỳ', 'ref', { ref: 'KY_LUONG.ma', req: true }),
+      col_('truong_ma', 'Trường', 'ref', { ref: 'TRUONG.ma', hint: 'để trống = áp dụng cho mọi trường chưa có dòng riêng' }),
+      col_('doi_tuong', 'Đối tượng tính lương', 'enum', { values: ['GV Tiểu học nhiều môn', 'GV còn lại'], req: true }),
+      col_('tu_ngay', 'Từ ngày', 'date', { req: true }),
+      col_('den_ngay', 'Đến ngày', 'date', { req: true }),
+      col_('dinh_muc_tuan', 'Định mức trong giai đoạn (tiết/tuần)', 'num', { req: true, min: 0, hint: 'thay cho định mức mặc định của đề án trong khoảng ngày này' }),
+      col_('ly_do', 'Lý do', 'text')
+    ],
+    check: function (r) {
+      if (r.den_ngay < r.tu_ngay) return 'Đến ngày phải ≥ Từ ngày';
+      var ky = Db.find('KY_LUONG', function (k) { return k.ma === r.ky_ma; });
+      if (ky && ky.loai === 'Điều chỉnh') return 'Chỉ áp dụng cho kỳ Học kỳ';
+      if (ky && (r.tu_ngay < ky.tu_ngay || r.den_ngay > ky.den_ngay)) return 'Thời gian phải nằm trong kỳ ' + ky.ma + ' (' + Util.displayDate(ky.tu_ngay) + ' – ' + Util.displayDate(ky.den_ngay) + ')';
+      return null;
+    },
+    // Cùng (kỳ, trường, đối tượng) các khoảng ngày không được chồng nhau.
+    checkSet: function (rows, existing, updated, push) {
+      var groups = {}, key = function (r) { return r.ky_ma + '|' + r.truong_ma + '|' + r.doi_tuong; };
+      existing.forEach(function (r) { if (!updated[r.id]) (groups[key(r)] = groups[key(r)] || []).push({ r: r, own: false }); });
+      rows.forEach(function (r) { (groups[key(r)] = groups[key(r)] || []).push({ r: r, own: true }); });
+      Object.keys(groups).forEach(function (g) {
+        var l = groups[g].sort(function (a, b) { return a.r.tu_ngay < b.r.tu_ngay ? -1 : 1; });
+        for (var i = 0; i < l.length; i++) for (var j = i + 1; j < l.length; j++) {
+          if (l[j].r.tu_ngay > l[i].r.den_ngay) break;
+          [[l[i], l[j]], [l[j], l[i]]].forEach(function (p) {
+            if (p[0].own) push(p[0].r.__n, 'tu_ngay', p[0].r.tu_ngay, 'Khoảng ngày chồng với ' + (p[1].own ? 'dòng ' + p[1].r.__n + ' trong file' : 'dòng đã có') +
+              ' (' + Util.displayDate(p[1].r.tu_ngay) + ' – ' + Util.displayDate(p[1].r.den_ngay) + ')');
+          });
+        }
+      });
+    }
+  };
+
   S.TRUONG_HANG = {
     label: 'Hạng trường theo năm học', group: 'setup', key: ['truong_ma', 'nam_hoc_ma'], scope: 'truong_ma',
     perm: { r: 'setup.view', w: 'setup.edit' },
@@ -794,6 +831,7 @@ var SCHEMA = (function () {
     'USER_ROLES.pham_vi': 'Toàn hệ thống',
     'WORKFLOW_STEP.thu_tu': '1', 'WORKFLOW_STEP.ten_buoc': 'Hiệu trưởng xét duyệt', 'WORKFLOW_STEP.hanh_dong': 'Xét duyệt', 'WORKFLOW_STEP.vai_tro': 'PRINCIPAL',
     'UY_QUYEN.hieu_luc_tu': '01/01/2026', 'UY_QUYEN.hieu_luc_den': '31/12/2026',
+    'DINH_MUC_TUAN.doi_tuong': 'GV còn lại', 'DINH_MUC_TUAN.dinh_muc_tuan': '6',
     'KHAI_BAO.noi_dung': 'Toán 10A1', 'KHAI_BAO.so_luong': '22', 'KHAI_BAO.tu_ngay': '07/09/2026', 'KHAI_BAO.den_ngay': '27/12/2026'
   };
   Object.keys(EX).forEach(function (k) {
@@ -1792,6 +1830,28 @@ var Engine = (function () {
     return Math.round((Date.UTC(+b[0], +b[1] - 1, +b[2]) - Date.UTC(+a[0], +a[1] - 1, +a[2])) / 86400000) + 1;
   }
 
+  function isoPlus(iso, n) {
+    var a = iso.split('-'), d = new Date(Date.UTC(+a[0], +a[1] - 1, +a[2] + n));
+    return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2);
+  }
+
+  /**
+   * Số tiết định mức bị giảm do tuần nghỉ lễ... trong kỳ [tu, den]. base = định mức mặc định (tiết/tuần).
+   * own = dòng điều chỉnh riêng của trường, chung = dòng áp cho mọi trường (cùng đối tượng). Mỗi ngày: dòng riêng trước, rồi dòng chung, nếu không thì giữ mức mặc định.
+   * Giảm = Σ ngày (base − mức tuần ngày đó)/7, mức tuần lớn hơn base thì không làm tăng định mức.
+   */
+  function quotaCut(tu, den, own, chung, base) {
+    var cut = 0, n = daysInclusive(tu, den), at = function (rows, d) {
+      for (var i = 0; i < rows.length; i++) if (rows[i].tu_ngay <= d && d <= rows[i].den_ngay) return rows[i];
+      return null;
+    };
+    for (var i = 0; i < n; i++) {
+      var d = isoPlus(tu, i), r = at(own, d) || at(chung, d);
+      if (r && num(r.dinh_muc_tuan) < base) cut += (base - num(r.dinh_muc_tuan)) / 7;
+    }
+    return cut;
+  }
+
   /** Quy đổi một dòng khai báo ra tổng số tiết tuyệt đối (PRD 2.1; môn đặc thù nhân hệ số quy đổi). */
   function tietOf(d, param) {
     var days = daysInclusive(d.tu_ngay, d.den_ngay), so = num(d.so_luong), t;
@@ -1822,6 +1882,10 @@ var Engine = (function () {
     if (dm === 0) {
       if (input.doiTuong === 'GV Tiểu học nhiều môn') dm = input.soTuan * num(p.dinh_muc_tieu_hoc);
       else if (input.doiTuong === 'GV còn lại') dm = input.soTuan * num(p.dinh_muc_khac);
+    }
+    if (dm > 0 && input.dmGiam) {
+      dm = Math.max(0, dm - input.dmGiam);
+      notes.push('Định mức đã giảm ' + round(input.dmGiam, 2) + ' tiết do điều chỉnh theo tuần');
     }
     var hs = input.hsTiet;
     if (hs === null || hs === undefined || hs === '' || hs === 0) { hs = 1; notes.push('Ngạch không có HS tiết, tạm dùng 1,0'); }
@@ -1913,7 +1977,7 @@ var Engine = (function () {
     };
   }
 
-  return { daysInclusive: daysInclusive, tietOf: tietOf, allocate: allocate, settle: settle, income: income, capRate: capRate, capRateInfo: capRateInfo };
+  return { quotaCut: quotaCut, daysInclusive: daysInclusive, tietOf: tietOf, allocate: allocate, settle: settle, income: income, capRate: capRate, capRateInfo: capRateInfo };
 })();
 
 
@@ -2048,6 +2112,7 @@ var Calc = (function () {
     var declsBy = isAdj ? {} : groupBy(Db.filter('KHAI_BAO', function (d) {
       return d.ky_ma === kyMa && (gom === 'tat_ca' || d.trang_thai === 'Đã duyệt');
     }), 'ma_nv');
+    var dmTuan = isAdj ? [] : Db.filter('DINH_MUC_TUAN', function (r) { return r.ky_ma === kyMa; });
     var ngachBy = groupBy(Db.all('QUA_TRINH_NGACH'), 'ma_nv');
     var knBy = groupBy(Db.all('QUA_TRINH_KIEMNHIEM'), 'ma_nv');
     var tnBy = groupBy(Db.all('THU_NHAP_NEN'), 'ma_nv');
@@ -2100,7 +2165,11 @@ var Calc = (function () {
       var decls = declsBy[s.ma_nv] || [], settle = { tien_pt: 0 }, nguon = 'Đã duyệt';
       if (decls.length) {
         if (decls.some(function (d) { return d.trang_thai !== 'Đã duyệt'; })) { nguon = 'Gồm dòng chưa duyệt'; unapproved++; }
-        settle = Engine.settle({ decls: decls, doiTuong: cur.doi_tuong, soTuan: ky.so_tuan, param: b.param, ltb: lw.ltb, hsTiet: g.hs_tiet === '' ? null : g.hs_tiet });
+        var base = cur.doi_tuong === 'GV Tiểu học nhiều môn' ? +b.param.dinh_muc_tieu_hoc : (cur.doi_tuong === 'GV còn lại' ? +b.param.dinh_muc_khac : 0);
+        var adj = dmTuan.filter(function (r) { return r.doi_tuong === cur.doi_tuong; });
+        var dmGiam = base > 0 && adj.length ? Engine.quotaCut(ky.tu_ngay, ky.den_ngay,
+          adj.filter(function (r) { return r.truong_ma && r.truong_ma === cur.truong_ma; }), adj.filter(function (r) { return !r.truong_ma; }), base) : 0;
+        settle = Engine.settle({ decls: decls, doiTuong: cur.doi_tuong, soTuan: ky.so_tuan, dmGiam: dmGiam, param: b.param, ltb: lw.ltb, hsTiet: g.hs_tiet === '' ? null : g.hs_tiet });
         var row = { ky_ma: kyMa, ma_nv: s.ma_nv, de_an_ma: dean.ma, nguon: nguon, trang_thai: 'Tạm tính', phieu_ma: '' };
         Object.keys(who).forEach(function (k) { row[k] = who[k]; });
         Object.keys(settle).forEach(function (k) { row[k] = settle[k]; });

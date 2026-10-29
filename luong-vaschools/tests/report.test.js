@@ -185,3 +185,27 @@ test('Xóa kỳ nhập sai: tự bỏ kết quả tạm tính, còn kết quả 
   assert.strictEqual(e.api('list', { table: 'THU_NHAP_MOI' }).data.total, 0);
   assert.strictEqual(e.api('list', { table: 'QUYET_TOAN' }).data.total, 0);
 });
+
+test('Định mức giảm theo tuần nghỉ lễ, riêng từng trường', () => {
+  const { e } = world();
+  declare(e, 'Nháp');
+  const dm = () => {
+    assert.ok(e.api('calc.run', { ky_ma: KY, gom: 'tat_ca' }).ok);
+    return j(e.api('list', { table: 'QUYET_TOAN', filter: { ky_ma: KY, ma_nv: 'NV001' } }).data.rows[0].dinh_muc);
+  };
+  assert.strictEqual(dm(), 320); // 16 tuần × 20
+  const row = (truong, tu, den, v) => tsv(['Kỳ', 'Trường', 'Đối tượng tính lương', 'Từ ngày', 'Đến ngày', 'Định mức trong giai đoạn (tiết/tuần)', 'Lý do'],
+    [KY, truong, 'GV còn lại', tu, den, v, 'Nghỉ lễ']);
+  // chung: 1 tuần (7 ngày) còn 6 tiết → giảm 14
+  assert.ok(e.api('importCommit', { table: 'DINH_MUC_TUAN', text: row('', '27/09/2026', '03/10/2026', '6') }).ok);
+  assert.strictEqual(dm(), 306);
+  // dòng riêng của trường HCM_THPT thay dòng chung trong khoảng chồng: 10 tiết/tuần → giảm 10
+  assert.ok(e.api('importCommit', { table: 'DINH_MUC_TUAN', text: row('HCM_THPT', '27/09/2026', '03/10/2026', '10') }).ok);
+  assert.strictEqual(dm(), 310);
+  // trường khác không bị ảnh hưởng bởi dòng riêng; chồng ngày cùng phạm vi bị chặn
+  const bad = e.api('importCheck', { table: 'DINH_MUC_TUAN', text: row('HCM_THPT', '01/10/2026', '05/10/2026', '8') });
+  assert.strictEqual(bad.data.ok, false);
+  const out = e.api('importCheck', { table: 'DINH_MUC_TUAN', text: row('', '01/03/2025', '02/03/2025', '8') });
+  assert.strictEqual(out.data.ok, false); // ngoài kỳ
+  assert.ok(e.api('export.table', { table: 'DINH_MUC_TUAN' }).data.rows === 2);
+});

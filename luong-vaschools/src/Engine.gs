@@ -12,6 +12,28 @@ var Engine = (function () {
     return Math.round((Date.UTC(+b[0], +b[1] - 1, +b[2]) - Date.UTC(+a[0], +a[1] - 1, +a[2])) / 86400000) + 1;
   }
 
+  function isoPlus(iso, n) {
+    var a = iso.split('-'), d = new Date(Date.UTC(+a[0], +a[1] - 1, +a[2] + n));
+    return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2);
+  }
+
+  /**
+   * Số tiết định mức bị giảm do tuần nghỉ lễ... trong kỳ [tu, den]. base = định mức mặc định (tiết/tuần).
+   * own = dòng điều chỉnh riêng của trường, chung = dòng áp cho mọi trường (cùng đối tượng). Mỗi ngày: dòng riêng trước, rồi dòng chung, nếu không thì giữ mức mặc định.
+   * Giảm = Σ ngày (base − mức tuần ngày đó)/7, mức tuần lớn hơn base thì không làm tăng định mức.
+   */
+  function quotaCut(tu, den, own, chung, base) {
+    var cut = 0, n = daysInclusive(tu, den), at = function (rows, d) {
+      for (var i = 0; i < rows.length; i++) if (rows[i].tu_ngay <= d && d <= rows[i].den_ngay) return rows[i];
+      return null;
+    };
+    for (var i = 0; i < n; i++) {
+      var d = isoPlus(tu, i), r = at(own, d) || at(chung, d);
+      if (r && num(r.dinh_muc_tuan) < base) cut += (base - num(r.dinh_muc_tuan)) / 7;
+    }
+    return cut;
+  }
+
   /** Quy đổi một dòng khai báo ra tổng số tiết tuyệt đối (PRD 2.1; môn đặc thù nhân hệ số quy đổi). */
   function tietOf(d, param) {
     var days = daysInclusive(d.tu_ngay, d.den_ngay), so = num(d.so_luong), t;
@@ -42,6 +64,10 @@ var Engine = (function () {
     if (dm === 0) {
       if (input.doiTuong === 'GV Tiểu học nhiều môn') dm = input.soTuan * num(p.dinh_muc_tieu_hoc);
       else if (input.doiTuong === 'GV còn lại') dm = input.soTuan * num(p.dinh_muc_khac);
+    }
+    if (dm > 0 && input.dmGiam) {
+      dm = Math.max(0, dm - input.dmGiam);
+      notes.push('Định mức đã giảm ' + round(input.dmGiam, 2) + ' tiết do điều chỉnh theo tuần');
     }
     var hs = input.hsTiet;
     if (hs === null || hs === undefined || hs === '' || hs === 0) { hs = 1; notes.push('Ngạch không có HS tiết, tạm dùng 1,0'); }
@@ -133,5 +159,5 @@ var Engine = (function () {
     };
   }
 
-  return { daysInclusive: daysInclusive, tietOf: tietOf, allocate: allocate, settle: settle, income: income, capRate: capRate, capRateInfo: capRateInfo };
+  return { quotaCut: quotaCut, daysInclusive: daysInclusive, tietOf: tietOf, allocate: allocate, settle: settle, income: income, capRate: capRate, capRateInfo: capRateInfo };
 })();

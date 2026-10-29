@@ -139,6 +139,43 @@ var SCHEMA = (function () {
     }
   };
 
+  S.DINH_MUC_TUAN = {
+    label: 'Điều chỉnh định mức theo tuần (nghỉ lễ…)', group: 'setup', key: ['ky_ma', 'truong_ma', 'doi_tuong', 'tu_ngay'],
+    perm: { r: 'setup.view', w: 'setup.edit' },
+    cols: [
+      col_('ky_ma', 'Kỳ', 'ref', { ref: 'KY_LUONG.ma', req: true }),
+      col_('truong_ma', 'Trường', 'ref', { ref: 'TRUONG.ma', hint: 'để trống = áp dụng cho mọi trường chưa có dòng riêng' }),
+      col_('doi_tuong', 'Đối tượng tính lương', 'enum', { values: ['GV Tiểu học nhiều môn', 'GV còn lại'], req: true }),
+      col_('tu_ngay', 'Từ ngày', 'date', { req: true }),
+      col_('den_ngay', 'Đến ngày', 'date', { req: true }),
+      col_('dinh_muc_tuan', 'Định mức trong giai đoạn (tiết/tuần)', 'num', { req: true, min: 0, hint: 'thay cho định mức mặc định của đề án trong khoảng ngày này' }),
+      col_('ly_do', 'Lý do', 'text')
+    ],
+    check: function (r) {
+      if (r.den_ngay < r.tu_ngay) return 'Đến ngày phải ≥ Từ ngày';
+      var ky = Db.find('KY_LUONG', function (k) { return k.ma === r.ky_ma; });
+      if (ky && ky.loai === 'Điều chỉnh') return 'Chỉ áp dụng cho kỳ Học kỳ';
+      if (ky && (r.tu_ngay < ky.tu_ngay || r.den_ngay > ky.den_ngay)) return 'Thời gian phải nằm trong kỳ ' + ky.ma + ' (' + Util.displayDate(ky.tu_ngay) + ' – ' + Util.displayDate(ky.den_ngay) + ')';
+      return null;
+    },
+    // Cùng (kỳ, trường, đối tượng) các khoảng ngày không được chồng nhau.
+    checkSet: function (rows, existing, updated, push) {
+      var groups = {}, key = function (r) { return r.ky_ma + '|' + r.truong_ma + '|' + r.doi_tuong; };
+      existing.forEach(function (r) { if (!updated[r.id]) (groups[key(r)] = groups[key(r)] || []).push({ r: r, own: false }); });
+      rows.forEach(function (r) { (groups[key(r)] = groups[key(r)] || []).push({ r: r, own: true }); });
+      Object.keys(groups).forEach(function (g) {
+        var l = groups[g].sort(function (a, b) { return a.r.tu_ngay < b.r.tu_ngay ? -1 : 1; });
+        for (var i = 0; i < l.length; i++) for (var j = i + 1; j < l.length; j++) {
+          if (l[j].r.tu_ngay > l[i].r.den_ngay) break;
+          [[l[i], l[j]], [l[j], l[i]]].forEach(function (p) {
+            if (p[0].own) push(p[0].r.__n, 'tu_ngay', p[0].r.tu_ngay, 'Khoảng ngày chồng với ' + (p[1].own ? 'dòng ' + p[1].r.__n + ' trong file' : 'dòng đã có') +
+              ' (' + Util.displayDate(p[1].r.tu_ngay) + ' – ' + Util.displayDate(p[1].r.den_ngay) + ')');
+          });
+        }
+      });
+    }
+  };
+
   S.TRUONG_HANG = {
     label: 'Hạng trường theo năm học', group: 'setup', key: ['truong_ma', 'nam_hoc_ma'], scope: 'truong_ma',
     perm: { r: 'setup.view', w: 'setup.edit' },
@@ -568,6 +605,7 @@ var SCHEMA = (function () {
     'USER_ROLES.pham_vi': 'Toàn hệ thống',
     'WORKFLOW_STEP.thu_tu': '1', 'WORKFLOW_STEP.ten_buoc': 'Hiệu trưởng xét duyệt', 'WORKFLOW_STEP.hanh_dong': 'Xét duyệt', 'WORKFLOW_STEP.vai_tro': 'PRINCIPAL',
     'UY_QUYEN.hieu_luc_tu': '01/01/2026', 'UY_QUYEN.hieu_luc_den': '31/12/2026',
+    'DINH_MUC_TUAN.doi_tuong': 'GV còn lại', 'DINH_MUC_TUAN.dinh_muc_tuan': '6',
     'KHAI_BAO.noi_dung': 'Toán 10A1', 'KHAI_BAO.so_luong': '22', 'KHAI_BAO.tu_ngay': '07/09/2026', 'KHAI_BAO.den_ngay': '27/12/2026'
   };
   Object.keys(EX).forEach(function (k) {

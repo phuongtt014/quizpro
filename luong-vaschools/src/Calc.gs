@@ -128,6 +128,7 @@ var Calc = (function () {
     var declsBy = isAdj ? {} : groupBy(Db.filter('KHAI_BAO', function (d) {
       return d.ky_ma === kyMa && (gom === 'tat_ca' || d.trang_thai === 'Đã duyệt');
     }), 'ma_nv');
+    var dmTuan = isAdj ? [] : Db.filter('DINH_MUC_TUAN', function (r) { return r.ky_ma === kyMa; });
     var ngachBy = groupBy(Db.all('QUA_TRINH_NGACH'), 'ma_nv');
     var knBy = groupBy(Db.all('QUA_TRINH_KIEMNHIEM'), 'ma_nv');
     var tnBy = groupBy(Db.all('THU_NHAP_NEN'), 'ma_nv');
@@ -180,7 +181,11 @@ var Calc = (function () {
       var decls = declsBy[s.ma_nv] || [], settle = { tien_pt: 0 }, nguon = 'Đã duyệt';
       if (decls.length) {
         if (decls.some(function (d) { return d.trang_thai !== 'Đã duyệt'; })) { nguon = 'Gồm dòng chưa duyệt'; unapproved++; }
-        settle = Engine.settle({ decls: decls, doiTuong: cur.doi_tuong, soTuan: ky.so_tuan, param: b.param, ltb: lw.ltb, hsTiet: g.hs_tiet === '' ? null : g.hs_tiet });
+        var base = cur.doi_tuong === 'GV Tiểu học nhiều môn' ? +b.param.dinh_muc_tieu_hoc : (cur.doi_tuong === 'GV còn lại' ? +b.param.dinh_muc_khac : 0);
+        var adj = dmTuan.filter(function (r) { return r.doi_tuong === cur.doi_tuong; });
+        var dmGiam = base > 0 && adj.length ? Engine.quotaCut(ky.tu_ngay, ky.den_ngay,
+          adj.filter(function (r) { return r.truong_ma && r.truong_ma === cur.truong_ma; }), adj.filter(function (r) { return !r.truong_ma; }), base) : 0;
+        settle = Engine.settle({ decls: decls, doiTuong: cur.doi_tuong, soTuan: ky.so_tuan, dmGiam: dmGiam, param: b.param, ltb: lw.ltb, hsTiet: g.hs_tiet === '' ? null : g.hs_tiet });
         var row = { ky_ma: kyMa, ma_nv: s.ma_nv, de_an_ma: dean.ma, nguon: nguon, trang_thai: 'Tạm tính', phieu_ma: '' };
         Object.keys(who).forEach(function (k) { row[k] = who[k]; });
         Object.keys(settle).forEach(function (k) { row[k] = settle[k]; });

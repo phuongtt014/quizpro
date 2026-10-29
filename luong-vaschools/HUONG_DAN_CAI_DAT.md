@@ -72,6 +72,12 @@ Dán lại `Code.gs` / `Index.html` mới → **Triển khai → Quản lý tri�
   Tiêu đề và giá trị **đúng định dạng mẫu nhập**: bấm **Sao chép** dán vào Excel/Google Sheets, hoặc **Tải file .csv**, rồi dán lại bằng *Nhập CSV* (chế độ *Thêm mới hoặc cập nhật theo khóa*).
 - Tab *Quá trình ngạch bậc* không còn cột Họ tên riêng: cột Mã nhân sự đã hiện kèm tên.
 
+## Định mức giảm theo tuần nghỉ lễ
+- *Thiết lập → Điều chỉnh định mức theo tuần*: mỗi dòng = (Kỳ, Trường, Đối tượng, Từ ngày – Đến ngày, Định mức tiết/tuần trong giai đoạn). Sau khi nâng cấp chạy **`setupEnsureSheets`** để tạo sheet mới.
+- **Trường để trống** = áp cho mọi trường; dòng có Trường riêng thay dòng chung trong khoảng ngày chồng nhau. Hai đối tượng (*GV Tiểu học nhiều môn*, *GV còn lại*) khai riêng.
+- Định mức kỳ = số tuần quy định × định mức mặc định − Σ (mặc định − mức giai đoạn) × số ngày/7. Ví dụ 27/04–03/05 (7 ngày) còn 6 tiết, mặc định 20 → giảm 14 tiết.
+- Chỉ áp dụng khi nhân sự không có dòng khai báo *Định mức* riêng (dòng khai báo luôn được ưu tiên). Tính lại ở *Thu nhập & phụ trội* để cập nhật.
+
 ## Lưu ý
 - **Tốc độ:** ứng dụng dùng bộ nhớ đệm. Nếu có ai **sửa trực tiếp trong file Google Sheet CSDL** (không khuyến khích), bấm nút **⟳ Làm mới dữ liệu** ở thanh trên cùng (cần quyền *Sửa thiết lập*), nếu không dữ liệu có thể chưa cập nhật tới 10 phút.
 - **Không chia sẻ file Google Sheet CSDL** cho người dùng. Họ chỉ cần URL web app.
