@@ -35,7 +35,7 @@
 
   /** Các thao tác chỉ đọc: mọi thao tác khác (ghi) thành công thì bỏ toàn bộ đệm trình duyệt để không hiện dữ liệu cũ. */
   var READ_ONLY = { list: 1, tonghop: 1, 'tonghop.export': 1, 'phieu.list': 1, 'phieu.get': 1, batch: 1, boot: 1, me: 1, schema: 1, dashboard: 1,
-    'notify.list': 1, 'dean.check': 1, 'calc.simulate': 1, 'phutroi.chitiet': 1, 'roles.matrix': 1 };
+    'notify.list': 1, 'quydoi.list': 1, 'dean.check': 1, 'calc.simulate': 1, 'phutroi.chitiet': 1, 'roles.matrix': 1 };
   function api(name, payload) {
     return new Promise(function (resolve, reject) {
       google.script.run
@@ -229,6 +229,27 @@
       if (c.t === 'enum') {
         input = el('select', null, (c.req && c.def === undefined ? [] : [el('option', { value: '', text: '— chọn —' })]).concat(
           c.values.map(function (v) { return el('option', { value: v, text: v }); })));
+      } else if (table === 'KHAI_BAO' && c.k === 'qd_ma') {
+        input = el('select', null, [el('option', { value: '', text: '— không dùng (nhập tự do) —' })]);
+        (function (sel, keep) {
+          var kyMa = row ? row.ky_ma : ((opts.defaults || {}).ky_ma || '');
+          api('quydoi.list', { ky_ma: kyMa }).then(function (d) {
+            d.rows.forEach(function (q) {
+              sel.appendChild(el('option', { value: q.ma, text: q.ma + ' – ' + q.ten + ' (' + String(q.so_tiet).replace('.', ',') + ' tiết/' + q.don_vi + ')' }));
+              sel._q = sel._q || {}; sel._q[q.ma] = q;
+            });
+            sel.value = keep;
+          }).catch(function () { /* không tải được bảng quy đổi: vẫn nhập tự do được */ });
+          sel.addEventListener('change', function () {
+            var q = (sel._q || {})[sel.value];
+            if (!q) return;
+            inputs.loai.value = 'Trách nhiệm';
+            inputs.noi_dung.value = q.ten;
+            inputs.don_vi.value = q.don_vi === 'buổi' ? 'Buổi' : 'Tiết/' + q.don_vi.charAt(0).toUpperCase() + q.don_vi.slice(1);
+            inputs.so_luong.value = q.don_vi === 'buổi' ? '' : String(q.so_tiet).replace('.', ',');
+            if (q.don_vi === 'buổi') inputs.so_luong.placeholder = 'Số buổi (mỗi buổi ' + String(q.so_tiet).replace('.', ',') + ' tiết)';
+          });
+        })(input, cur);
       } else if (list && list.length > 8) {
         var cb = combo(list, function (o) { return o.l && o.l !== o.v ? o.v + ' – ' + o.l : o.v; }, '');
         input = cb.ctl; node = cb.node;

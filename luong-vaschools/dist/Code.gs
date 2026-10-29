@@ -688,9 +688,10 @@ var SCHEMA = (function () {
       col_('ky_ma', 'Kỳ', 'ref', { ref: 'KY_LUONG.ma', req: true }),
       col_('ma_nv', 'Mã nhân sự', 'ref', { ref: 'NHAN_SU.ma_nv', req: true }),
       col_('loai', 'Loại', 'enum', { values: ['Thực dạy', 'Trách nhiệm', 'Định mức'], req: true }),
+      col_('qd_ma', 'Mã quy đổi trách nhiệm', 'text', { pattern: '^QD\\d{2}$', hint: 'QD01… theo bảng quy đổi của đề án (chỉ cho loại Trách nhiệm)' }),
       col_('noi_dung', 'Nội dung (môn/lớp/chức trách)', 'text', { req: true }),
-      col_('so_luong', 'Số lượng', 'num', { req: true, min: 0 }),
-      col_('don_vi', 'Đơn vị', 'enum', { values: ['Tiết/Tuần', 'Tiết/Tháng', 'Tiết/Ngày'], req: true }),
+      col_('so_luong', 'Số lượng', 'num', { req: true, min: 0, hint: 'có mã quy đổi: số tiết theo bảng (không vượt); đơn vị Buổi: số buổi' }),
+      col_('don_vi', 'Đơn vị', 'enum', { values: ['Tiết/Tuần', 'Tiết/Tháng', 'Tiết/Ngày', 'Buổi'], req: true }),
       col_('dac_thu', 'Môn đặc thù (1 tiết = 1,5)', 'enum', { values: YN, def: 'Không' }),
       col_('tu_ngay', 'Từ ngày', 'date', { req: true }),
       col_('den_ngay', 'Đến ngày', 'date', { req: true }),
@@ -701,6 +702,17 @@ var SCHEMA = (function () {
     check: function (r) {
       if (r.den_ngay < r.tu_ngay) return 'Đến ngày phải ≥ Từ ngày';
       if (r.dac_thu === 'Có' && r.loai !== 'Thực dạy') return 'Chỉ môn Thực dạy mới đánh dấu đặc thù';
+      if (r.don_vi === 'Buổi' && !r.qd_ma) return 'Đơn vị "Buổi" chỉ dùng với mã quy đổi trách nhiệm (vd QD09)';
+      if (r.qd_ma) {
+        if (r.loai !== 'Trách nhiệm') return 'Mã quy đổi chỉ dùng cho loại Trách nhiệm';
+        var kyq = Db.find('KY_LUONG', function (k) { return k.ma === r.ky_ma; });
+        var da = kyq ? Policy.effective(kyq.den_ngay) : null;
+        var qd = da ? Policy.bundle(da.ma).quyDoi[r.qd_ma] : null;
+        if (!qd) return 'Mã quy đổi ' + r.qd_ma + ' không có trong đề án đang hiệu lực' + (da ? ' (' + da.ma + ')' : '');
+        var want = qd.don_vi === 'buổi' ? 'Buổi' : 'Tiết/' + { 'tuần': 'Tuần', 'tháng': 'Tháng', 'ngày': 'Ngày' }[qd.don_vi];
+        if (r.don_vi !== want) return qd.ma + ' (' + qd.ten + ') tính theo "' + want + '", không phải "' + r.don_vi + '"';
+        if (want !== 'Buổi' && r.so_luong > Number(qd.so_tiet)) return 'Số lượng ' + r.so_luong + ' vượt mức quy đổi ' + qd.so_tiet + ' ' + want.toLowerCase() + ' của ' + qd.ma;
+      }
       var ky = Db.find('KY_LUONG', function (k) { return k.ma === r.ky_ma; });
       if (ky && (r.tu_ngay < ky.tu_ngay || r.den_ngay > ky.den_ngay)) {
         return 'Thời gian khai báo phải nằm trong kỳ ' + ky.ma + ' (' + Util.displayDate(ky.tu_ngay) + ' – ' + Util.displayDate(ky.den_ngay) + ')';
@@ -1855,7 +1867,8 @@ var Engine = (function () {
   /** Quy đổi một dòng khai báo ra tổng số tiết tuyệt đối (PRD 2.1; môn đặc thù nhân hệ số quy đổi). */
   function tietOf(d, param) {
     var days = daysInclusive(d.tu_ngay, d.den_ngay), so = num(d.so_luong), t;
-    if (d.don_vi === 'Tiết/Tuần') t = so * (days / 7);
+    if (d.don_vi === 'Buổi') t = so * num(d.qd_so_tiet);
+    else if (d.don_vi === 'Tiết/Tuần') t = so * (days / 7);
     else if (d.don_vi === 'Tiết/Tháng') t = so * (days / 30);
     else t = so * days;
     if (d.loai === 'Thực dạy' && d.dac_thu === 'Có') t *= num(param.he_so_quy_doi_dac_thu) || 1;
@@ -1989,6 +2002,14 @@ var Engine = (function () {
  * thu nhập hiện tại lấy tại ngày đầu kỳ.
  */
 var Calc = (function () {
+  /** Bản sao dòng khai báo kèm số tiết quy đổi của mã trách nhiệm (dùng cho đơn vị "Buổi"). */
+  function withQd(d, quyDoi) {
+    var o = {};
+    Object.keys(d).forEach(function (k) { o[k] = d[k]; });
+    o.qd_so_tiet = d.qd_ma && quyDoi[d.qd_ma] ? quyDoi[d.qd_ma].so_tiet : 0;
+    return o;
+  }
+
   function groupBy(rows, key) {
     var m = {};
     rows.forEach(function (r) { (m[r[key]] = m[r[key]] || []).push(r); });
@@ -2162,7 +2183,7 @@ var Calc = (function () {
       if (!cur.doi_tuong) { warnings.push(tag + ': dòng quá trình ngạch bậc chưa có "Đối tượng tính lương"'); return; }
       var who = { ho_ten: s.ho_ten, chi_nhanh_ma: s.chi_nhanh_ma, truong_ma: cur.truong_ma, doi_tuong: cur.doi_tuong };
 
-      var decls = declsBy[s.ma_nv] || [], settle = { tien_pt: 0 }, nguon = 'Đã duyệt';
+      var decls = (declsBy[s.ma_nv] || []).map(function (d) { return withQd(d, b.quyDoi); }), settle = { tien_pt: 0 }, nguon = 'Đã duyệt';
       if (decls.length) {
         if (decls.some(function (d) { return d.trang_thai !== 'Đã duyệt'; })) { nguon = 'Gồm dòng chưa duyệt'; unapproved++; }
         var base = cur.doi_tuong === 'GV Tiểu học nhiều môn' ? +b.param.dinh_muc_tieu_hoc : (cur.doi_tuong === 'GV còn lại' ? +b.param.dinh_muc_khac : 0);
@@ -2393,10 +2414,11 @@ var Report = (function () {
     if (!ky || !s) throw new AppError('NOT_FOUND', 'Không tìm thấy kỳ hoặc nhân sự');
     var un = Staff.units(ky.den_ngay)[s.ma_nv] || {};
     if (!Auth.canRow(user, 'calc.view', { cn: s.chi_nhanh_ma, tr: un.truong_ma || '', nv: s.ma_nv })) throw new AppError('FORBIDDEN', 'Nhân sự nằm ngoài phạm vi của bạn');
-    var dean = Policy.effective(ky.den_ngay), param = dean ? Policy.bundle(dean.ma).param : {};
+    var dean = Policy.effective(ky.den_ngay), bun = dean ? Policy.bundle(dean.ma) : null, param = bun ? bun.param : {};
     var lines = Db.filter('KHAI_BAO', function (d) { return d.ky_ma === kyMa && d.ma_nv === maNv; }).map(function (d) {
       return { loai: d.loai, noi_dung: d.noi_dung, so_luong: d.so_luong, don_vi: d.don_vi, dac_thu: d.dac_thu, tu: d.tu_ngay, den: d.den_ngay,
-        ngay: Engine.daysInclusive(d.tu_ngay, d.den_ngay), tiet: Math.round(Engine.tietOf(d, param) * 100) / 100, trang_thai: d.trang_thai, phieu: d.phieu_ma };
+        ngay: Engine.daysInclusive(d.tu_ngay, d.den_ngay), qd_ma: d.qd_ma,
+        tiet: Math.round(Engine.tietOf(Object.assign({}, d, { qd_so_tiet: bun && d.qd_ma && bun.quyDoi[d.qd_ma] ? bun.quyDoi[d.qd_ma].so_tiet : 0 }), param) * 100) / 100, trang_thai: d.trang_thai, phieu: d.phieu_ma };
     });
     var qt = Db.find('QUYET_TOAN', function (r) { return r.ky_ma === kyMa && r.ma_nv === maNv; });
     return { ho_ten: s.ho_ten, doi_tuong: un.doi_tuong || '', so_tuan: ky.so_tuan, lines: lines, ketqua: qt || null };
@@ -3352,6 +3374,15 @@ var Api = (function () {
       if (sf && !Auth.hasGlobal(user, T.perm.r)) rows = rows.filter(function (r) { return Auth.canRow(user, T.perm.r, sf(r)); });
       var x = Validate.exportRows(p.table, rows);
       return { header: x.header, tsv: x.tsv, csv: x.csv, rows: x.count, file: p.table.toLowerCase() + '_xuat.csv' };
+    },
+
+    'quydoi.list': function (p, user) {
+      Auth.require(user, 'declare.view');
+      var ky = Db.find('KY_LUONG', function (k) { return k.ma === p.ky_ma; });
+      var da = ky ? Policy.effective(ky.den_ngay) : null;
+      if (!da) return { de_an: '', rows: [] };
+      var q = Policy.bundle(da.ma).quyDoi;
+      return { de_an: da.ma, rows: Object.keys(q).sort().map(function (k) { return { ma: q[k].ma, ten: q[k].ten, so_tiet: q[k].so_tiet, don_vi: q[k].don_vi, ghi_chu: q[k].ghi_chu }; }) };
     },
 
     'dean.check': function (p, user) {

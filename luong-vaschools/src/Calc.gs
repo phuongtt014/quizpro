@@ -5,6 +5,14 @@
  * thu nhập hiện tại lấy tại ngày đầu kỳ.
  */
 var Calc = (function () {
+  /** Bản sao dòng khai báo kèm số tiết quy đổi của mã trách nhiệm (dùng cho đơn vị "Buổi"). */
+  function withQd(d, quyDoi) {
+    var o = {};
+    Object.keys(d).forEach(function (k) { o[k] = d[k]; });
+    o.qd_so_tiet = d.qd_ma && quyDoi[d.qd_ma] ? quyDoi[d.qd_ma].so_tiet : 0;
+    return o;
+  }
+
   function groupBy(rows, key) {
     var m = {};
     rows.forEach(function (r) { (m[r[key]] = m[r[key]] || []).push(r); });
@@ -178,7 +186,7 @@ var Calc = (function () {
       if (!cur.doi_tuong) { warnings.push(tag + ': dòng quá trình ngạch bậc chưa có "Đối tượng tính lương"'); return; }
       var who = { ho_ten: s.ho_ten, chi_nhanh_ma: s.chi_nhanh_ma, truong_ma: cur.truong_ma, doi_tuong: cur.doi_tuong };
 
-      var decls = declsBy[s.ma_nv] || [], settle = { tien_pt: 0 }, nguon = 'Đã duyệt';
+      var decls = (declsBy[s.ma_nv] || []).map(function (d) { return withQd(d, b.quyDoi); }), settle = { tien_pt: 0 }, nguon = 'Đã duyệt';
       if (decls.length) {
         if (decls.some(function (d) { return d.trang_thai !== 'Đã duyệt'; })) { nguon = 'Gồm dòng chưa duyệt'; unapproved++; }
         var base = cur.doi_tuong === 'GV Tiểu học nhiều môn' ? +b.param.dinh_muc_tieu_hoc : (cur.doi_tuong === 'GV còn lại' ? +b.param.dinh_muc_khac : 0);

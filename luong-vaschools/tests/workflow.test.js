@@ -214,3 +214,18 @@ test('Quản trị viên tự tạo phiếu: mặc định không tự duyệt �
   assert.strictEqual(e.api('phieu.act', { id, action: 'Duyệt', note: '' }).ok, false); // thiếu ghi chú
   assert.ok(e.api('phieu.act', { id, action: 'Duyệt', note: 'Duyệt thay để chạy thử' }).ok);
 });
+
+test('Khai báo trách nhiệm theo mã quy đổi của đề án: kiểm tra đơn vị/mức và quy đổi buổi', () => {
+  const { e } = world();
+  const qd = (o) => line(Object.assign({ loai: 'Trách nhiệm', noi_dung: 'GVCN', qd_ma: 'QD05', so_luong: '4', don_vi: 'Tiết/Tuần' }, o));
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: qd({}) }).ok);
+  assert.strictEqual(e.api('save', { table: 'KHAI_BAO', row: qd({ qd_ma: 'QD99', noi_dung: 'x' }) }).ok, false); // không có trong đề án
+  assert.strictEqual(e.api('save', { table: 'KHAI_BAO', row: qd({ noi_dung: 'GVCN 2', so_luong: '5' }) }).ok, false); // vượt 4 tiết/tuần
+  assert.strictEqual(e.api('save', { table: 'KHAI_BAO', row: qd({ noi_dung: 'GVCN 3', don_vi: 'Tiết/Tháng' }) }).ok, false); // sai đơn vị
+  assert.strictEqual(e.api('save', { table: 'KHAI_BAO', row: qd({ noi_dung: 'GVCN 4', loai: 'Thực dạy' }) }).ok, false);
+  // QD09 = 0,2 tiết/buổi: 40 buổi → 8 tiết
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: qd({ qd_ma: 'QD09', noi_dung: 'Bán trú', so_luong: '40', don_vi: 'Buổi' }) }).ok);
+  const d = e.api('phutroi.chitiet', { ky_ma: KY, ma_nv: 'NV001' });
+  assert.strictEqual(d.data.lines.filter(l => l.qd_ma === 'QD09')[0].tiet, 8);
+  assert.strictEqual(e.api('quydoi.list', { ky_ma: KY }).data.rows.length, 10);
+});

@@ -37,7 +37,8 @@ var Engine = (function () {
   /** Quy đổi một dòng khai báo ra tổng số tiết tuyệt đối (PRD 2.1; môn đặc thù nhân hệ số quy đổi). */
   function tietOf(d, param) {
     var days = daysInclusive(d.tu_ngay, d.den_ngay), so = num(d.so_luong), t;
-    if (d.don_vi === 'Tiết/Tuần') t = so * (days / 7);
+    if (d.don_vi === 'Buổi') t = so * num(d.qd_so_tiet);
+    else if (d.don_vi === 'Tiết/Tuần') t = so * (days / 7);
     else if (d.don_vi === 'Tiết/Tháng') t = so * (days / 30);
     else t = so * days;
     if (d.loai === 'Thực dạy' && d.dac_thu === 'Có') t *= num(param.he_so_quy_doi_dac_thu) || 1;

@@ -462,9 +462,10 @@ var SCHEMA = (function () {
       col_('ky_ma', 'Kỳ', 'ref', { ref: 'KY_LUONG.ma', req: true }),
       col_('ma_nv', 'Mã nhân sự', 'ref', { ref: 'NHAN_SU.ma_nv', req: true }),
       col_('loai', 'Loại', 'enum', { values: ['Thực dạy', 'Trách nhiệm', 'Định mức'], req: true }),
+      col_('qd_ma', 'Mã quy đổi trách nhiệm', 'text', { pattern: '^QD\\d{2}$', hint: 'QD01… theo bảng quy đổi của đề án (chỉ cho loại Trách nhiệm)' }),
       col_('noi_dung', 'Nội dung (môn/lớp/chức trách)', 'text', { req: true }),
-      col_('so_luong', 'Số lượng', 'num', { req: true, min: 0 }),
-      col_('don_vi', 'Đơn vị', 'enum', { values: ['Tiết/Tuần', 'Tiết/Tháng', 'Tiết/Ngày'], req: true }),
+      col_('so_luong', 'Số lượng', 'num', { req: true, min: 0, hint: 'có mã quy đổi: số tiết theo bảng (không vượt); đơn vị Buổi: số buổi' }),
+      col_('don_vi', 'Đơn vị', 'enum', { values: ['Tiết/Tuần', 'Tiết/Tháng', 'Tiết/Ngày', 'Buổi'], req: true }),
       col_('dac_thu', 'Môn đặc thù (1 tiết = 1,5)', 'enum', { values: YN, def: 'Không' }),
       col_('tu_ngay', 'Từ ngày', 'date', { req: true }),
       col_('den_ngay', 'Đến ngày', 'date', { req: true }),
@@ -475,6 +476,17 @@ var SCHEMA = (function () {
     check: function (r) {
       if (r.den_ngay < r.tu_ngay) return 'Đến ngày phải ≥ Từ ngày';
       if (r.dac_thu === 'Có' && r.loai !== 'Thực dạy') return 'Chỉ môn Thực dạy mới đánh dấu đặc thù';
+      if (r.don_vi === 'Buổi' && !r.qd_ma) return 'Đơn vị "Buổi" chỉ dùng với mã quy đổi trách nhiệm (vd QD09)';
+      if (r.qd_ma) {
+        if (r.loai !== 'Trách nhiệm') return 'Mã quy đổi chỉ dùng cho loại Trách nhiệm';
+        var kyq = Db.find('KY_LUONG', function (k) { return k.ma === r.ky_ma; });
+        var da = kyq ? Policy.effective(kyq.den_ngay) : null;
+        var qd = da ? Policy.bundle(da.ma).quyDoi[r.qd_ma] : null;
+        if (!qd) return 'Mã quy đổi ' + r.qd_ma + ' không có trong đề án đang hiệu lực' + (da ? ' (' + da.ma + ')' : '');
+        var want = qd.don_vi === 'buổi' ? 'Buổi' : 'Tiết/' + { 'tuần': 'Tuần', 'tháng': 'Tháng', 'ngày': 'Ngày' }[qd.don_vi];
+        if (r.don_vi !== want) return qd.ma + ' (' + qd.ten + ') tính theo "' + want + '", không phải "' + r.don_vi + '"';
+        if (want !== 'Buổi' && r.so_luong > Number(qd.so_tiet)) return 'Số lượng ' + r.so_luong + ' vượt mức quy đổi ' + qd.so_tiet + ' ' + want.toLowerCase() + ' của ' + qd.ma;
+      }
       var ky = Db.find('KY_LUONG', function (k) { return k.ma === r.ky_ma; });
       if (ky && (r.tu_ngay < ky.tu_ngay || r.den_ngay > ky.den_ngay)) {
         return 'Thời gian khai báo phải nằm trong kỳ ' + ky.ma + ' (' + Util.displayDate(ky.tu_ngay) + ' – ' + Util.displayDate(ky.den_ngay) + ')';

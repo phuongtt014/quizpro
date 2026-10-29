@@ -457,6 +457,15 @@ var Api = (function () {
       return { header: x.header, tsv: x.tsv, csv: x.csv, rows: x.count, file: p.table.toLowerCase() + '_xuat.csv' };
     },
 
+    'quydoi.list': function (p, user) {
+      Auth.require(user, 'declare.view');
+      var ky = Db.find('KY_LUONG', function (k) { return k.ma === p.ky_ma; });
+      var da = ky ? Policy.effective(ky.den_ngay) : null;
+      if (!da) return { de_an: '', rows: [] };
+      var q = Policy.bundle(da.ma).quyDoi;
+      return { de_an: da.ma, rows: Object.keys(q).sort().map(function (k) { return { ma: q[k].ma, ten: q[k].ten, so_tiet: q[k].so_tiet, don_vi: q[k].don_vi, ghi_chu: q[k].ghi_chu }; }) };
+    },
+
     'dean.check': function (p, user) {
       Auth.require(user, 'policy.view');
       return { issues: Policy.checkReady(p.ma) };

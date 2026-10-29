@@ -123,10 +123,11 @@ var Report = (function () {
     if (!ky || !s) throw new AppError('NOT_FOUND', 'Không tìm thấy kỳ hoặc nhân sự');
     var un = Staff.units(ky.den_ngay)[s.ma_nv] || {};
     if (!Auth.canRow(user, 'calc.view', { cn: s.chi_nhanh_ma, tr: un.truong_ma || '', nv: s.ma_nv })) throw new AppError('FORBIDDEN', 'Nhân sự nằm ngoài phạm vi của bạn');
-    var dean = Policy.effective(ky.den_ngay), param = dean ? Policy.bundle(dean.ma).param : {};
+    var dean = Policy.effective(ky.den_ngay), bun = dean ? Policy.bundle(dean.ma) : null, param = bun ? bun.param : {};
     var lines = Db.filter('KHAI_BAO', function (d) { return d.ky_ma === kyMa && d.ma_nv === maNv; }).map(function (d) {
       return { loai: d.loai, noi_dung: d.noi_dung, so_luong: d.so_luong, don_vi: d.don_vi, dac_thu: d.dac_thu, tu: d.tu_ngay, den: d.den_ngay,
-        ngay: Engine.daysInclusive(d.tu_ngay, d.den_ngay), tiet: Math.round(Engine.tietOf(d, param) * 100) / 100, trang_thai: d.trang_thai, phieu: d.phieu_ma };
+        ngay: Engine.daysInclusive(d.tu_ngay, d.den_ngay), qd_ma: d.qd_ma,
+        tiet: Math.round(Engine.tietOf(Object.assign({}, d, { qd_so_tiet: bun && d.qd_ma && bun.quyDoi[d.qd_ma] ? bun.quyDoi[d.qd_ma].so_tiet : 0 }), param) * 100) / 100, trang_thai: d.trang_thai, phieu: d.phieu_ma };
     });
     var qt = Db.find('QUYET_TOAN', function (r) { return r.ky_ma === kyMa && r.ma_nv === maNv; });
     return { ho_ten: s.ho_ten, doi_tuong: un.doi_tuong || '', so_tuan: ky.so_tuan, lines: lines, ketqua: qt || null };

@@ -331,6 +331,14 @@ const html = read('Index.html').replace("<?!= include('Style') ?>", read('Style.
   await page.keyboard.press('Enter');
   ok('Chọn xong ô hiển thị mã – tên', (await cbField.locator('input').inputValue()).startsWith('TS07'));
   await page.click('.modal >> text=Hủy');
+  // Ô chọn mã quy đổi trách nhiệm tự điền nội dung, số tiết, đơn vị
+  await page.click('button:has-text("+ Thêm")');
+  await page.waitForFunction(() => [...document.querySelectorAll('.form select option')].some(o => o.value === 'QD05'));
+  const qdField = page.locator('.form > div', { has: page.locator('label:text-is("Mã quy đổi trách nhiệm")') });
+  await qdField.locator('select').selectOption('QD05');
+  const fv = async (l) => page.locator('.form > div', { has: page.locator(`label:text-is("${l}")`) }).locator('input,select').first().inputValue();
+  ok('Chọn QD05 tự điền Trách nhiệm, 4 tiết/tuần', (await fv('Loại')) === 'Trách nhiệm' && (await fv('Số lượng')) === '4' && (await fv('Đơn vị')) === 'Tiết/Tuần' && (await fv('Nội dung (môn/lớp/chức trách)')).includes('chủ nhiệm'));
+  await page.click('.modal >> text=Hủy');
 
   console.log(steps.join('\n'));
   console.log(errors.length ? 'LỖI TRÌNH DUYỆT:\n' + errors.join('\n') : 'Không có lỗi console/JS.');

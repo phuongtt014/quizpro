@@ -82,6 +82,13 @@ Dán lại `Code.gs` / `Index.html` mới → **Triển khai → Quản lý tri�
 - Mặc định **không ai** duyệt được phiếu do chính mình tạo (kể cả quản trị viên). Muốn chạy thử một mình: *Thiết lập → Cấu hình chung → + Thêm*, Khóa `admin_tu_duyet`, Giá trị `Có`.
   Khi đó quản trị viên được **duyệt thay** từng bước (bắt buộc ghi chú, có nhật ký). Khi vận hành thật nên xóa dòng này hoặc đổi thành `Không`.
 
+## Khai báo trách nhiệm theo bảng quy đổi của đề án
+- Sau khi dán bản mới, chạy **`setupEnsureSheets`** (thêm cột *Mã quy đổi trách nhiệm* vào sheet Khai báo).
+- Form **Khai báo → + Thêm**: chọn **Mã quy đổi trách nhiệm** (QD01–QD10, lấy từ bảng *Đề án → Quy đổi trách nhiệm* của đề án hiệu lực tại kỳ), hệ thống tự điền Loại = Trách nhiệm, Nội dung, Số lượng (số tiết theo bảng) và Đơn vị. Để trống nếu trách nhiệm không có trong bảng (nhập tự do như cũ).
+- Hệ thống chặn: mã không có trong đề án, sai đơn vị, số tiết vượt mức quy đổi, mã dùng cho loại khác Trách nhiệm.
+- Mã tính theo **buổi** (vd QD09 = 0,2 tiết/buổi): chọn đơn vị **Buổi** và nhập **số buổi**; hệ thống nhân với số tiết/buổi của bảng.
+- Nhập CSV có thêm cột *Mã quy đổi trách nhiệm* (không bắt buộc; mẫu cũ không có cột này vẫn nhập được).
+
 ## Lưu ý
 - **Tốc độ:** ứng dụng dùng bộ nhớ đệm. Nếu có ai **sửa trực tiếp trong file Google Sheet CSDL** (không khuyến khích), bấm nút **⟳ Làm mới dữ liệu** ở thanh trên cùng (cần quyền *Sửa thiết lập*), nếu không dữ liệu có thể chưa cập nhật tới 10 phút.
 - **Không chia sẻ file Google Sheet CSDL** cho người dùng. Họ chỉ cần URL web app.
