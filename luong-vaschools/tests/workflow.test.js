@@ -202,3 +202,15 @@ test('Nâng cấp hệ thống đã cài: thêm quyền/vai trò/quy trình mớ
   const again = j(e.run('Seed.upgrade()'));
   assert.deepStrictEqual([again.vaiTroMoi.length, again.quyenMoi, again.quyTrinh, again.capNhatNgach], [0, 0, 0, 0]);
 });
+
+test('Quản trị viên tự tạo phiếu: mặc định không tự duyệt được, bật admin_tu_duyet thì duyệt thay (bắt buộc ghi chú)', () => {
+  const { e } = world();
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: line() }).ok);
+  assert.ok(e.api('khaibao.submit', { ky_ma: KY, truong_ma: 'HCM_THPT' }).ok);
+  const id = e.api('phieu.list', { tab: 'cua_toi' }).data.rows[0].id;
+  assert.strictEqual(e.api('phieu.act', { id, action: 'Duyệt', note: 'ok' }).code, 'FORBIDDEN');
+  assert.ok(e.api('save', { table: 'SETTINGS', row: { khoa: 'admin_tu_duyet', gia_tri: 'Có' } }).ok);
+  assert.strictEqual(e.api('phieu.get', { id }).data.can_act, true);
+  assert.strictEqual(e.api('phieu.act', { id, action: 'Duyệt', note: '' }).ok, false); // thiếu ghi chú
+  assert.ok(e.api('phieu.act', { id, action: 'Duyệt', note: 'Duyệt thay để chạy thử' }).ok);
+});

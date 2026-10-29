@@ -209,7 +209,7 @@ var SCHEMA = (function () {
     label: 'Cấu hình chung', group: 'setup', key: ['khoa'], lockKey: true,
     perm: { r: 'setup.view', w: 'setup.edit' },
     cols: [
-      col_('khoa', 'Khóa', 'enum', { values: ['email_bat', 'app_url', 'ten_he_thong', 'perms_da_nap'], req: true }),
+      col_('khoa', 'Khóa', 'enum', { values: ['email_bat', 'app_url', 'ten_he_thong', 'perms_da_nap', 'admin_tu_duyet'], req: true, hint: 'admin_tu_duyet = Có: quản trị viên được duyệt thay cả phiếu do chính mình tạo' }),
       col_('gia_tri', 'Giá trị', 'text')
     ]
   };

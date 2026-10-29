@@ -78,6 +78,10 @@ Dán lại `Code.gs` / `Index.html` mới → **Triển khai → Quản lý tri�
 - Định mức kỳ = số tuần quy định × định mức mặc định − Σ (mặc định − mức giai đoạn) × số ngày/7. Ví dụ 27/04–03/05 (7 ngày) còn 6 tiết, mặc định 20 → giảm 14 tiết.
 - Chỉ áp dụng khi nhân sự không có dòng khai báo *Định mức* riêng (dòng khai báo luôn được ưu tiên). Tính lại ở *Thu nhập & phụ trội* để cập nhật.
 
+## Quản trị viên tự duyệt phiếu do mình tạo
+- Mặc định **không ai** duyệt được phiếu do chính mình tạo (kể cả quản trị viên). Muốn chạy thử một mình: *Thiết lập → Cấu hình chung → + Thêm*, Khóa `admin_tu_duyet`, Giá trị `Có`.
+  Khi đó quản trị viên được **duyệt thay** từng bước (bắt buộc ghi chú, có nhật ký). Khi vận hành thật nên xóa dòng này hoặc đổi thành `Không`.
+
 ## Lưu ý
 - **Tốc độ:** ứng dụng dùng bộ nhớ đệm. Nếu có ai **sửa trực tiếp trong file Google Sheet CSDL** (không khuyến khích), bấm nút **⟳ Làm mới dữ liệu** ở thanh trên cùng (cần quyền *Sửa thiết lập*), nếu không dữ liệu có thể chưa cập nhật tới 10 phút.
 - **Không chia sẻ file Google Sheet CSDL** cho người dùng. Họ chỉ cần URL web app.

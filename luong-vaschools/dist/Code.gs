@@ -435,7 +435,7 @@ var SCHEMA = (function () {
     label: 'Cấu hình chung', group: 'setup', key: ['khoa'], lockKey: true,
     perm: { r: 'setup.view', w: 'setup.edit' },
     cols: [
-      col_('khoa', 'Khóa', 'enum', { values: ['email_bat', 'app_url', 'ten_he_thong', 'perms_da_nap'], req: true }),
+      col_('khoa', 'Khóa', 'enum', { values: ['email_bat', 'app_url', 'ten_he_thong', 'perms_da_nap', 'admin_tu_duyet'], req: true, hint: 'admin_tu_duyet = Có: quản trị viên được duyệt thay cả phiếu do chính mình tạo' }),
       col_('gia_tri', 'Giá trị', 'text')
     ]
   };
@@ -2481,7 +2481,13 @@ var Workflow = (function () {
 
   /** Quyền xử lý của user với bước hiện tại: { ok, mode: 'truc_tiep'|'uy_quyen'|'admin', from } */
   function authority(user, phieu) {
-    if (phieu.trang_thai !== 'Đang duyệt' || user.email === phieu.nguoi_tao) return { ok: false };
+    if (phieu.trang_thai !== 'Đang duyệt') return { ok: false };
+    if (user.email === phieu.nguoi_tao) {
+      // Mặc định không ai tự duyệt phiếu của mình; chủ hệ thống có thể bật cấu hình admin_tu_duyet = Có (mọi lần vẫn ghi nhật ký "duyệt thay").
+      if (!(user.isAdmin && Settings.get('admin_tu_duyet', 'Không') === 'Có')) return { ok: false };
+      var st = parse(phieu.quy_trinh, [])[phieu.buoc_hien_tai - 1];
+      return st ? { ok: true, mode: 'admin', step: st } : { ok: false };
+    }
     var step = parse(phieu.quy_trinh, [])[phieu.buoc_hien_tai - 1];
     if (!step) return { ok: false };
     var a = approvers(step, phieu);
@@ -2571,7 +2577,7 @@ var Workflow = (function () {
     var p = Db.get('PHIEU', id);
     if (!p) throw new AppError('NOT_FOUND', 'Không tìm thấy phiếu');
     var au = authority(user, p);
-    if (!au.ok) throw new AppError('FORBIDDEN', p.trang_thai !== 'Đang duyệt' ? 'Phiếu không còn ở trạng thái chờ duyệt' : (user.email === p.nguoi_tao ? 'Không được duyệt phiếu do chính mình tạo' : 'Bạn không phải người xử lý bước hiện tại'));
+    if (!au.ok) throw new AppError('FORBIDDEN', p.trang_thai !== 'Đang duyệt' ? 'Phiếu không còn ở trạng thái chờ duyệt' : (user.email === p.nguoi_tao ? 'Không được duyệt phiếu do chính mình tạo (quản trị viên có thể bật cấu hình admin_tu_duyet = Có ở Thiết lập → Cấu hình chung)' : 'Bạn không phải người xử lý bước hiện tại'));
     if ((au.mode === 'admin' || action === 'Trả lại') && !note) throw new AppError('BAD_REQUEST', au.mode === 'admin' && action === 'Duyệt' ? 'Duyệt thay cần ghi rõ lý do' : 'Trả lại cần ghi rõ lý do');
     var label = action + (au.mode === 'uy_quyen' ? ' (ủy quyền bởi ' + au.from + ')' : (au.mode === 'admin' ? ' (duyệt thay)' : ''));
 
