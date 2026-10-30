@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quản lý hồ sơ nhân sự</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--pri:#1a56db;--pri-d:#1241a8;--bg:#f3f5f9;--card:#fff;--bd:#d9dee8;--tx:#1d2433;--mu:#6b7385;--ok:#0f7b3f;--er:#c0262d;--wa:#b45309}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 -apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--tx)}
+[hidden]{display:none!important}
+h2{margin:0 0 10px;font-size:17px}h3{margin:14px 0 8px;font-size:15px}
+.muted{color:var(--mu)}.small{font-size:12px}
+.btn{border:1px solid var(--bd);background:#fff;color:var(--tx);padding:7px 13px;border-radius:7px;cursor:pointer;font-size:13px}
+.btn:hover{background:#eef2fa}.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.primary{background:var(--pri);border-color:var(--pri);color:#fff}.btn.primary:hover{background:var(--pri-d)}
+.btn.danger{color:var(--er);border-color:#efb7ba}.btn.danger:hover{background:#fdecec}
+.btn.sm{padding:3px 9px;font-size:12px}
+input,select,textarea{font:inherit;padding:7px 9px;border:1px solid var(--bd);border-radius:7px;background:#fff;color:var(--tx);max-width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid #bcd0fb;border-color:var(--pri)}
+input[readonly]{background:#f1f3f8}
+textarea{width:100%;font-family:Consolas,monospace;font-size:13px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:16px;margin-bottom:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.grow{flex:1}
+/* login */
+#login{max-width:400px;margin:9vh auto;padding:0 16px}
+#login .card{padding:24px}#login input{width:100%;margin:6px 0 12px}#login .btn{width:100%;padding:10px}
+.logo{font-size:20px;font-weight:700;color:var(--pri);margin-bottom:4px}
+/* top */
+.top{background:#fff;border-bottom:1px solid var(--bd);padding:10px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;position:sticky;top:0;z-index:20}
+.top .logo{margin:0;font-size:17px}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;background:#e3ecff;color:var(--pri-d);font-size:12px;font-weight:600}
+.tabs{display:flex;gap:4px;padding:10px 18px 0;flex-wrap:wrap}
+.tabs button{border:1px solid var(--bd);border-bottom:none;background:#e9edf5;padding:9px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-size:14px;color:var(--mu)}
+.tabs button.on{background:#fff;color:var(--pri);font-weight:600}
+.page{padding:0 18px 30px}.page>.tab{background:#fff;border:1px solid var(--bd);border-radius:0 10px 10px 10px;padding:16px}
+/* table */
+.tw{overflow:auto;max-height:66vh;border:1px solid var(--bd);border-radius:8px}
+table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+table.grid th,table.grid td{padding:7px 10px;border-bottom:1px solid #edf0f6;border-right:1px solid #f1f3f8;white-space:nowrap;background:#fff}
+table.grid th{position:sticky;top:0;background:#f0f4fb;z-index:2;text-align:left;cursor:pointer;user-select:none}
+table.grid tr:hover td{background:#f7faff}
+table.grid td.act,table.grid th.act{position:sticky;left:0;z-index:3;cursor:default}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.cfgt td{vertical-align:middle;white-space:normal}.cfgt input[type=text],.cfgt select{width:100%}
+.cfgt td.c{text-align:center}
+/* col panel */
+.dd{position:relative}
+.panel{position:absolute;right:0;top:110%;z-index:30;background:#fff;border:1px solid var(--bd);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:10px;width:300px;max-height:60vh;overflow:auto}
+.panel label{display:flex;gap:8px;align-items:center;padding:3px 2px;cursor:pointer}
+/* modal */
+.mask{position:fixed;inset:0;background:rgba(15,22,40,.5);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:4vh 12px;overflow:auto}
+.modal{background:#fff;border-radius:12px;width:100%;max-width:520px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.modal.wide{max-width:980px}
+.modal .mh{padding:14px 18px;border-bottom:1px solid var(--bd);font-weight:700;font-size:16px}
+.modal .mb{padding:16px 18px;max-height:68vh;overflow:auto}
+.modal .mf{padding:12px 18px;border-top:1px solid var(--bd);display:flex;gap:8px;justify-content:flex-end}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px 14px}
+.form label{display:block;font-size:12px;color:var(--mu);margin-bottom:3px}
+.form input,.form select{width:100%}.req{color:var(--er)}
+.errbox{background:#fdecec;color:var(--er);border:1px solid #f3b9bc;border-radius:8px;padding:9px 12px;white-space:pre-line;margin-bottom:10px;font-size:13px}
+.okbox{background:#e8f6ee;color:var(--ok);border:1px solid #b6e0c7;border-radius:8px;padding:9px 12px;margin:8px 0}
+.wabox{background:#fff6e5;color:var(--wa);border:1px solid #f1d49a;border-radius:8px;padding:9px 12px;margin:8px 0}
+/* chips */
+.chip{display:inline-flex;gap:4px;align-items:center;border:1px solid var(--bd);border-radius:99px;padding:2px 10px;margin:2px;cursor:pointer;font-size:12px;background:#fff}
+.chip:has(input:checked){background:#e3ecff;border-color:#9db9f5}
+.chip input{margin:0}
+.stat{display:inline-block;padding:3px 12px;border-radius:99px;font-weight:600;margin-right:6px}
+.stat.g{background:#e8f6ee;color:var(--ok)}.stat.r{background:#fdecec;color:var(--er)}.stat.b{background:#e3ecff;color:var(--pri-d)}
+.errlist td{white-space:normal;vertical-align:top}.errlist ul{margin:0;padding-left:16px}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;gap:8px;align-items:center}
+.t{background:#1d2433;color:#fff;padding:9px 16px;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.3);max-width:90vw;white-space:pre-line}
+.t.e{background:var(--er)}.t.s{background:var(--ok)}
+#busy{position:fixed;inset:0;background:rgba(255,255,255,.6);z-index:90;display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--pri)}
+@media(max-width:640px){.top,.tabs,.page{padding-left:10px;padding-right:10px}}
+</style>
+</head>
+<body>
+
+<!-- ĐĂNG NHẬP -->
+<section id="login" hidden>
+  <div class="card">
+    <div class="logo">Quản lý hồ sơ nhân sự</div>
+    <p class="muted" style="margin-top:0">Đăng nhập bằng mã xác thực gửi qua email.</p>
+    <div id="lg1">
+      <label>Email</label>
+      <input id="lgEmail" type="email" autocomplete="email" placeholder="ten@congty.vn">
+      <button class="btn primary" id="lgSend">Gửi mã xác thực</button>
+    </div>
+    <div id="lg2" hidden>
+      <div class="okbox" id="lgMsg"></div>
+      <label>Mã xác thực (6 số)</label>
+      <input id="lgCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="••••••">
+      <button class="btn primary" id="lgVerify">Đăng nhập</button>
+      <p class="small"><a href="#" id="lgBack">&larr; Đổi email</a> &nbsp;|&nbsp; <a href="#" id="lgResend">Gửi lại mã</a></p>
+    </div>
+    <div class="errbox" id="lgErr" hidden></div>
+  </div>
+</section>
+
+<!-- ỨNG DỤNG -->
+<section id="main" hidden>
+  <div class="top">
+    <div class="logo">Quản lý hồ sơ nhân sự</div>
+    <div class="grow"></div>
+    <span class="small muted" id="whoEmail"></span><span class="badge" id="whoRole"></span>
+    <span class="small muted" id="whoReg"></span>
+    <button class="btn sm" id="btnLogout">Đăng xuất</button>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="records" class="on">Hồ sơ nhân sự</button>
+    <button data-tab="io">Nhập / Xuất</button>
+    <button data-tab="config" data-admin>Thiết lập trường</button>
+    <button data-tab="perm" data-admin>Phân quyền</button>
+  </nav>
+  <div class="page">
+
+    <!-- TAB HỒ SƠ -->
+    <div class="tab" id="tab-records">
+      <div class="row" style="margin-bottom:10px">
+        <input id="q" placeholder="Tìm kiếm (mã, họ tên, đơn vị...)" style="min-width:240px">
+        <select id="fRegion"></select>
+        <div class="grow"></div>
+        <div class="dd">
+          <button class="btn" id="btnCols">Hiện / ẩn cột ▾</button>
+          <div class="panel" id="colPanel" hidden></div>
+        </div>
+        <button class="btn primary" id="btnAdd">+ Thêm nhân sự</button>
+      </div>
+      <div class="tw"><table class="grid" id="grid"></table></div>
+      <div class="row" style="margin-top:10px">
+        <span class="small muted" id="cnt"></span><div class="grow"></div>
+        <button class="btn sm" id="pPrev">‹ Trước</button><span class="small" id="pInfo"></span><button class="btn sm" id="pNext">Sau ›</button>
+      </div>
+    </div>
+
+    <!-- TAB NHẬP/XUẤT -->
+    <div class="tab" id="tab-io" hidden>
+      <div class="card">
+        <h2>Xuất dữ liệu</h2>
+        <p class="muted small" style="margin-top:0">Xuất các hồ sơ thuộc khu vực của bạn. Số xuất dạng số thuần, ngày dạng dd/mm/yyyy để có thể nhập lại.</p>
+        <label class="small"><input type="checkbox" id="expFiltered"> Chỉ xuất kết quả đang lọc/tìm kiếm ở tab Hồ sơ</label>
+        <div class="row" style="margin-top:8px">
+          <button class="btn primary" id="btnExpXlsx">Xuất Excel (.xlsx)</button>
+          <button class="btn" id="btnExpCsv">Xuất CSV</button>
+          <button class="btn" id="btnTplXlsx">Tải file mẫu Excel</button>
+          <button class="btn" id="btnTplCsv">Tải file mẫu CSV</button>
+        </div>
+      </div>
+      <div class="card" id="impCard">
+        <h2>Nhập dữ liệu từ Excel / CSV</h2>
+        <p class="muted small" style="margin-top:0">Dòng 1 là tên cột (khớp chính xác tên trường). Dữ liệu được kiểm tra nghiêm ngặt: <b>phân biệt chữ hoa/thường và khoảng trắng</b>
+          (VD: danh mục là "Mầm non" mà nhập "MẦM NON" sẽ báo lỗi). Dòng lỗi không được nhập, dòng hợp lệ vẫn được nhập.</p>
+        <div class="row">
+          <label><input type="radio" name="impMode" value="append" checked> Thêm mới (mã đã tồn tại sẽ báo lỗi)</label>
+          <label><input type="radio" name="impMode" value="replace"> Thay thế toàn bộ hồ sơ trong phạm vi quyền của tôi</label>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <input type="file" id="impFile" accept=".xlsx,.xls,.csv,.txt">
+          <button class="btn primary" id="btnImport" disabled>Nhập vào hệ thống</button>
+        </div>
+        <div id="impReport"></div>
+      </div>
+    </div>
+
+    <!-- TAB THIẾT LẬP TRƯỜNG -->
+    <div class="tab" id="tab-config" hidden>
+      <div class="row" style="margin-bottom:8px">
+        <h2 style="margin:0">Thiết lập trường &amp; danh mục</h2><div class="grow"></div>
+        <button class="btn" id="cfgAdd">+ Thêm trường</button>
+        <button class="btn" id="cfgPasteCfg">Dán / sửa CSV cấu hình trường</button>
+        <button class="btn" id="cfgPasteLists">Dán CSV danh mục</button>
+        <button class="btn primary" id="cfgSave">Lưu vào hệ thống</button>
+      </div>
+      <p class="muted small" style="margin-top:0">Kiểu: Văn bản, Danh mục (chọn trong danh sách, kiểm tra khớp chính xác), Số (hiển thị phân tách hàng nghìn), Ngày (dd/mm/yyyy).
+        "Hiện" = cột hiển thị mặc định ở tab Hồ sơ. Danh mục để trống = nhận mọi giá trị. Trường <b>Khu Vực</b> dùng để phân quyền. Mọi thay đổi chỉ có hiệu lực sau khi bấm <b>Lưu vào hệ thống</b>.</p>
+      <div class="tw"><table class="grid cfgt" id="cfgGrid"></table></div>
+    </div>
+
+    <!-- TAB PHÂN QUYỀN -->
+    <div class="tab" id="tab-perm" hidden>
+      <div class="row" style="margin-bottom:8px">
+        <h2 style="margin:0">Phân quyền người dùng</h2><div class="grow"></div>
+        <button class="btn" id="prmAdd">+ Thêm email</button>
+        <button class="btn" id="prmPaste">Dán CSV phân quyền</button>
+        <button class="btn primary" id="prmSave">Lưu vào hệ thống</button>
+      </div>
+      <p class="muted small" style="margin-top:0"><b>Admin</b>: toàn quyền, mọi khu vực, chỉnh thiết lập &amp; phân quyền. <b>Nhập liệu</b>: xem/thêm/sửa/xóa/nhập-xuất hồ sơ của khu vực được gán.
+        <b>Chỉ xem</b>: chỉ xem &amp; xuất hồ sơ của khu vực được gán.</p>
+      <div class="tw"><table class="grid cfgt" id="prmGrid"></table></div>
+    </div>
+  </div>
+</section>
+
+<div id="modalRoot"></div>
+<div id="toast"></div>
+<div id="busy" hidden>Đang xử lý...</div>
+
+<script>
+/* ============ Hằng số & trạng thái ============ */
+const CODE='Mã Nhân Viên', REGION='Khu Vực';
+const TYPES={text:'Văn bản',list:'Danh mục',number:'Số',date:'Ngày'};
+const ROLES=['Admin','Nhập liệu','Chỉ xem'];
+const S={token:null,user:null,config:[],records:[],q:'',region:'',page:1,size:50,sort:null,cols:{},cfg:null,prm:null,regions:[],imp:null};
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtNum=n=>(n===''||n==null)?'':String(n).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+const isAdmin=()=>S.user&&S.user.role==='Admin';
+const canEdit=()=>S.user&&S.user.role!=='Chỉ xem';
+const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+const lsDel=k=>{try{localStorage.removeItem(k)}catch(e){}};
+
+/* ============ UI helpers ============ */
+let busyN=0;
+function busy(on){busyN+=on?1:-1;$('#busy').hidden=busyN<=0;}
+function toast(msg,type){const t=document.createElement('div');t.className='t '+(type||'');t.textContent=msg;$('#toast').appendChild(t);setTimeout(()=>t.remove(),type==='e'?6000:3000);}
+function api(fn,...args){
+  busy(true);
+  return new Promise((res,rej)=>{
+    google.script.run
+      .withSuccessHandler(r=>{busy(false);
+        if(r&&r.auth){logoutLocal(r.error);return rej(new Error(r.error));}
+        if(r&&r.ok===false)return rej(new Error(r.error||'Có lỗi xảy ra'));
+        res(r);})
+      .withFailureHandler(e=>{busy(false);rej(new Error(e&&e.message||String(e)));})
+      [fn](...args);
+  });
+}
+function openModal({title,body,buttons,wide}){
+  const m=document.createElement('div');m.className='mask';
+  m.innerHTML=`<div class="modal ${wide?'wide':''}"><div class="mh"></div><div class="mb"></div><div class="mf"></div></div>`;
+  $('.mh',m).textContent=title;
+  const mb=$('.mb',m);typeof body==='string'?mb.innerHTML=body:mb.appendChild(body);
+  const api2={el:m,body:mb,close:()=>m.remove(),error(msg){let e=$('.errbox',mb);if(!e){e=document.createElement('div');e.className='errbox';mb.prepend(e);}e.textContent=msg;mb.scrollTop=0;}};
+  (buttons||[{label:'Đóng'}]).forEach(b=>{
+    const btn=document.createElement('button');btn.className='btn '+(b.cls||'');btn.textContent=b.label;
+    btn.onclick=async()=>{if(!b.onClick){api2.close();return;}try{const r=await b.onClick(api2);if(r!==false)api2.close();}catch(e){api2.error(e.message);}};
+    $('.mf',m).appendChild(btn);
+  });
+  $('#modalRoot').appendChild(m);return api2;
+}
+const confirmBox=(title,html,okLabel,cls)=>new Promise(res=>{
+  openModal({title,body:html,buttons:[{label:'Hủy',onClick:()=>{res(false)}},{label:okLabel||'Đồng ý',cls:cls||'primary',onClick:()=>{res(true)}}]});
+});
+function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);}
+function stamp(){const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'_'+p(d.getHours())+p(d.getMinutes());}
+
+/* ============ CSV ============ */
+function parseDelimited(text,delim){
+  text=String(text).replace(/^﻿/,'');
+  if(!delim){const first=(text.split(/\r?\n/).find(l=>l.trim())||'');
+    const t=(first.match(/\t/g)||[]).length,s=(first.match(/;/g)||[]).length,c=(first.match(/,/g)||[]).length;
+    delim=t>0?'\t':(s>c?';':',');}
+  const rows=[];let row=[],cur='',q=false;
+  for(let i=0;i<text.length;i++){const ch=text[i];
+    if(q){if(ch==='"'){if(text[i+1]==='"'){cur+='"';i++;}else q=false;}else cur+=ch;}
+    else if(ch==='"'&&cur==='')q=true;
+    else if(ch===delim){row.push(cur);cur='';}
+    else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(cur);cur='';rows.push(row);row=[];}
+    else cur+=ch;}
+  if(cur!==''||row.length){row.push(cur);rows.push(row);}
+  return rows;
+}
+function csvCell(v,isText){
+  if(v==null)return '';let s=String(v);
+  if(isText&&/^[=@+\-]/.test(s)&&isNaN(Number(s)))s="'"+s; // chống công thức độc hại khi mở bằng Excel
+  return /[",;\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+}
+const toCsv=aoa=>'﻿'+aoa.map(r=>r.map(c=>csvCell(c,typeof c==='string')).join(',')).join('\r\n');
+
+/* ============ ĐĂNG NHẬP ============ */
+function showLogin(msg){$('#main').hidden=true;$('#login').hidden=false;$('#lg1').hidden=false;$('#lg2').hidden=true;
+  const e=$('#lgErr');e.hidden=!msg;e.textContent=msg||'';}
+function lgErr(m){const e=$('#lgErr');e.hidden=!m;e.textContent=m||'';}
+async function sendOtp(){
+  lgErr('');const email=$('#lgEmail').value.trim();
+  try{const r=await api('requestOtp',email);$('#lg1').hidden=true;$('#lg2').hidden=false;$('#lgMsg').textContent=r.message;$('#lgCode').value='';$('#lgCode').focus();}
+  catch(e){lgErr(e.message);}
+}
+async function verifyOtp(){
+  lgErr('');
+  try{const r=await api('verifyOtp',$('#lgEmail').value.trim(),$('#lgCode').value.trim());
+    S.token=r.token;lsSet('qp_sess',JSON.stringify({t:r.token,exp:Date.now()+(r.ttl-300)*1000}));
+    await loadApp();}
+  catch(e){lgErr(e.message);}
+}
+function logoutLocal(msg){S.token=null;S.user=null;lsDel('qp_sess');showLogin(msg);}
+$('#lgSend').onclick=sendOtp;$('#lgVerify').onclick=verifyOtp;
+$('#lgEmail').onkeydown=e=>{if(e.key==='Enter')sendOtp();};
+$('#lgCode').onkeydown=e=>{if(e.key==='Enter')verifyOtp();};
+$('#lgBack').onclick=e=>{e.preventDefault();$('#lg1').hidden=false;$('#lg2').hidden=true;lgErr('');};
+$('#lgResend').onclick=e=>{e.preventDefault();sendOtp();};
+$('#btnLogout').onclick=async()=>{try{await api('logout',S.token);}catch(e){}logoutLocal();};
+
+/* ============ KHỞI TẠO ============ */
+async function loadApp(){
+  const r=await api('bootstrap',S.token);
+  S.user=r.user;S.config=r.config;S.records=r.records;
+  const saved=lsGet('qp_cols_'+S.user.email);try{S.cols=saved?JSON.parse(saved):{};}catch(e){S.cols={};}
+  $('#login').hidden=true;$('#main').hidden=false;
+  $('#whoEmail').textContent=S.user.email;$('#whoRole').textContent=S.user.role;
+  $('#whoReg').textContent=S.user.all?'Tất cả khu vực':'Khu vực: '+S.user.regions.join(', ');
+  $$('#tabs [data-admin]').forEach(b=>b.hidden=!isAdmin());
+  $('#impCard').hidden=!canEdit();$('#btnAdd').hidden=!canEdit();
+  switchTab('records');renderRegionFilter();renderRecords();
+}
+function switchTab(t){
+  $$('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
+  $$('.page>.tab').forEach(d=>d.hidden=d.id!=='tab-'+t);
+  if(t==='config')openConfig();
+  if(t==='perm')openPerm();
+}
+$('#tabs').onclick=e=>{const b=e.target.closest('button[data-tab]');if(b)switchTab(b.dataset.tab);};
+
+/* ============ TAB HỒ SƠ ============ */
+const colOn=f=>S.cols[f.name]!==undefined?S.cols[f.name]:f.visible;
+function renderRegionFilter(){
+  const regs=[...new Set(S.records.map(r=>r[REGION]))].sort();
+  $('#fRegion').innerHTML='<option value="">Tất cả khu vực</option>'+regs.map(r=>`<option>${esc(r)}</option>`).join('');
+  $('#fRegion').value=regs.includes(S.region)?S.region:'';S.region=$('#fRegion').value;
+  $('#fRegion').hidden=regs.length<2;
+}
+function filtered(){
+  const q=S.q.trim().toLowerCase();
+  let rows=S.records.filter(r=>(!S.region||r[REGION]===S.region)&&(!q||S.config.some(f=>String(r[f.name]).toLowerCase().includes(q))));
+  if(S.sort){const f=S.config.find(x=>x.name===S.sort.name),d=S.sort.dir;
+    const key=r=>{const v=r[f.name];if(f.type==='number')return v===''?-1:v;if(f.type==='date'){const m=/^(\d\d)\/(\d\d)\/(\d{4})$/.exec(v);return m?m[3]+m[2]+m[1]:'';}return String(v);};
+    rows=rows.slice().sort((a,b)=>{const x=key(a),y=key(b);return (typeof x==='number'?x-y:String(x).localeCompare(String(y),'vi'))*d;});}
+  return rows;
+}
+function cellHtml(f,v){return f.type==='number'?fmtNum(v):esc(v);}
+function renderRecords(){
+  const cols=S.config.filter(colOn), rows=filtered();
+  const pages=Math.max(1,Math.ceil(rows.length/S.size));if(S.page>pages)S.page=pages;
+  const slice=rows.slice((S.page-1)*S.size,S.page*S.size);
+  const arrow=f=>S.sort&&S.sort.name===f.name?(S.sort.dir>0?' ▲':' ▼'):'';
+  $('#grid').innerHTML='<thead><tr>'+(canEdit()?'<th class="act">Thao tác</th>':'')+
+    cols.map(f=>`<th data-sort="${esc(f.name)}">${esc(f.name)}${arrow(f)}</th>`).join('')+'</tr></thead><tbody>'+
+    (slice.length?slice.map((r,i)=>'<tr>'+(canEdit()?`<td class="act"><button class="btn sm" data-edit="${S.records.indexOf(r)}">Sửa</button> <button class="btn sm danger" data-del="${S.records.indexOf(r)}">Xóa</button></td>`:'')+
+      cols.map(f=>`<td class="${f.type==='number'?'num':''}">${cellHtml(f,r[f.name])}</td>`).join('')+'</tr>').join('')
+      :`<tr><td colspan="${cols.length+1}" class="muted" style="text-align:center;padding:30px">Chưa có hồ sơ nào</td></tr>`)+'</tbody>';
+  $('#cnt').textContent=`Hiển thị ${slice.length} / ${rows.length} hồ sơ (tổng ${S.records.length})`;
+  $('#pInfo').textContent=`Trang ${S.page}/${pages}`;$('#pPrev').disabled=S.page<=1;$('#pNext').disabled=S.page>=pages;
+  renderColPanel();
+}
+$('#q').oninput=e=>{S.q=e.target.value;S.page=1;renderRecords();};
+$('#fRegion').onchange=e=>{S.region=e.target.value;S.page=1;renderRecords();};
+$('#pPrev').onclick=()=>{S.page--;renderRecords();};$('#pNext').onclick=()=>{S.page++;renderRecords();};
+$('#grid').onclick=e=>{
+  const th=e.target.closest('th[data-sort]');
+  if(th){const n=th.dataset.sort;S.sort=S.sort&&S.sort.name===n?{name:n,dir:-S.sort.dir}:{name:n,dir:1};renderRecords();return;}
+  const ed=e.target.closest('[data-edit]'),dl=e.target.closest('[data-del]');
+  if(ed)openRecordForm(S.records[+ed.dataset.edit]);
+  if(dl)deleteRec(S.records[+dl.dataset.del]);
+};
+$('#btnAdd').onclick=()=>openRecordForm(null);
+
+/* hiện/ẩn cột */
+function renderColPanel(){
+  $('#colPanel').innerHTML=`<div class="row" style="margin-bottom:6px"><button class="btn sm" data-c="def">Mặc định</button><button class="btn sm" data-c="all">Hiện tất cả</button><button class="btn sm" data-c="none">Ẩn tất cả</button></div>`+
+    S.config.map(f=>`<label><input type="checkbox" data-col="${esc(f.name)}" ${colOn(f)?'checked':''}> ${esc(f.name)}</label>`).join('');
+}
+function saveCols(){lsSet('qp_cols_'+S.user.email,JSON.stringify(S.cols));renderRecords();}
+$('#btnCols').onclick=e=>{e.stopPropagation();$('#colPanel').hidden=!$('#colPanel').hidden;};
+$('#colPanel').onclick=e=>{e.stopPropagation();
+  const c=e.target.closest('[data-c]');if(c){if(c.dataset.c==='def')S.cols={};else S.config.forEach(f=>S.cols[f.name]=c.dataset.c==='all');saveCols();$('#colPanel').hidden=false;}};
+$('#colPanel').onchange=e=>{const n=e.target.dataset.col;if(n!==undefined){S.cols[n]=e.target.checked;lsSet('qp_cols_'+S.user.email,JSON.stringify(S.cols));
+  const sc=$('#colPanel').scrollTop;renderRecords();$('#colPanel').hidden=false;$('#colPanel').scrollTop=sc;}};
+document.addEventListener('click',()=>{$('#colPanel').hidden=true;});
+
+/* form thêm / sửa */
+function fieldInputHtml(f,v){
+  const n=esc(f.name);
+  if(f.type==='list'){
+    let opts=f.name===REGION?S.user.regions:f.options;
+    const legacy=v&&!opts.includes(v);
+    return `<select data-field="${n}">${f.required&&!legacy&&v?'':'<option value="">-- Chọn --</option>'}`+
+      (legacy?`<option value="${esc(v)}" selected>${esc(v)} (không có trong danh mục)</option>`:'')+
+      opts.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('')+'</select>';
+  }
+  if(f.type==='number')return `<input data-field="${n}" data-kind="number" inputmode="numeric" value="${esc(fmtNum(v))}" placeholder="0">`;
+  if(f.type==='date')return `<input data-field="${n}" data-kind="date" inputmode="numeric" maxlength="10" value="${esc(v)}" placeholder="dd/mm/yyyy">`;
+  return `<input data-field="${n}" value="${esc(v)}">`;
+}
+function openRecordForm(rec){
+  const body=document.createElement('div');
+  body.innerHTML='<div class="form">'+S.config.map(f=>`<div><label>${esc(f.name)}${f.required?' <span class="req">*</span>':''}</label>${fieldInputHtml(f,rec?rec[f.name]:(f.name===REGION&&S.user.regions.length===1?S.user.regions[0]:''))}</div>`).join('')+'</div>';
+  body.oninput=e=>{const t=e.target;
+    if(t.dataset.kind==='number'){const d=t.value.replace(/\D/g,'');t.value=fmtNum(d);}
+    if(t.dataset.kind==='date'){const d=t.value.replace(/\D/g,'').slice(0,8);t.value=d.length>4?d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4):d.length>2?d.slice(0,2)+'/'+d.slice(2):d;}};
+  openModal({title:rec?'Sửa hồ sơ: '+rec[CODE]:'Thêm nhân sự',body,wide:true,buttons:[
+    {label:'Hủy'},
+    {label:'Lưu vào hệ thống',cls:'primary',onClick:async()=>{
+      const out={};
+      $$('[data-field]',body).forEach(el=>{const f=S.config.find(x=>x.name===el.dataset.field);let v=el.value;
+        if(f.type==='number')v=v.replace(/\D/g,'');else if(f.type!=='list')v=v.trim();
+        out[f.name]=f.type==='number'&&v!==''?Number(v):v;});
+      const r=await api('saveRecord',S.token,out,rec?rec[CODE]:null);
+      if(rec)S.records[S.records.indexOf(rec)]=r.record;else S.records.unshift(r.record);
+      renderRegionFilter();renderRecords();toast('Đã lưu hồ sơ '+r.record[CODE],'s');}}
+  ]});
+}
+async function deleteRec(rec){
+  if(!await confirmBox('Xóa hồ sơ',`Xóa hồ sơ <b>${esc(rec[CODE])} - ${esc(rec['Họ Tên'])}</b>? Thao tác không thể hoàn tác.`,'Xóa','danger'))return;
+  try{await api('deleteRecord',S.token,rec[CODE]);S.records.splice(S.records.indexOf(rec),1);renderRegionFilter();renderRecords();toast('Đã xóa','s');}
+  catch(e){toast(e.message,'e');}
+}
+
+/* ============ NHẬP / XUẤT ============ */
+function exportMatrix(recs){
+  const head=S.config.map(f=>f.name);
+  return [head].concat(recs.map(r=>S.config.map(f=>r[f.name])));
+}
+function expRecs(){return $('#expFiltered').checked?filtered():S.records;}
+function listSheet(){
+  const lf=S.config.filter(f=>f.type==='list');const max=Math.max(0,...lf.map(f=>f.options.length));
+  const aoa=[lf.map(f=>f.name)];for(let i=0;i<max;i++)aoa.push(lf.map(f=>f.options[i]||''));
+  return aoa;
+}
+function writeXlsx(aoa,name,withLists){
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=aoa[0].map(h=>({wch:Math.max(12,String(h).length+2)}));
+  S.config.forEach((f,c)=>{if(f.type==='number')for(let r=1;r<aoa.length;r++){const a=XLSX.utils.encode_cell({r,c});if(ws[a]&&ws[a].t==='n')ws[a].z='#,##0';}});
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'NhanSu');
+  if(withLists){const w2=XLSX.utils.aoa_to_sheet(listSheet());XLSX.utils.book_append_sheet(wb,w2,'DanhMucHopLe');}
+  const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  download(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),name);
+}
+$('#btnExpXlsx').onclick=()=>writeXlsx(exportMatrix(expRecs()),`HoSoNhanSu_${stamp()}.xlsx`,false);
+$('#btnExpCsv').onclick=()=>download(new Blob([toCsv(exportMatrix(expRecs()))],{type:'text/csv;charset=utf-8'}),`HoSoNhanSu_${stamp()}.csv`);
+$('#btnTplXlsx').onclick=()=>writeXlsx([S.config.map(f=>f.name)],'MauNhapHoSo.xlsx',true);
+$('#btnTplCsv').onclick=()=>download(new Blob([toCsv([S.config.map(f=>f.name)])],{type:'text/csv;charset=utf-8'}),'MauNhapHoSo.csv');
+
+function dateStr(d){d=new Date(d.getTime()+12*3600*1000);const p=n=>String(n).padStart(2,'0');return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear();}
+function cellNorm(v){if(v==null)return '';if(v instanceof Date)return dateStr(v);return v;}
+const impMode=()=>$('input[name=impMode]:checked').value;
+
+async function readFile(file){
+  const name=file.name.toLowerCase();
+  const buf=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(new Error('Không đọc được file'));
+    /\.(csv|txt)$/.test(name)?r.readAsText(file,'UTF-8'):r.readAsArrayBuffer(file);});
+  let matrix;
+  if(/\.(csv|txt)$/.test(name))matrix=parseDelimited(buf);
+  else{const wb=XLSX.read(buf,{type:'array',cellDates:true});const ws=wb.Sheets[wb.SheetNames[0]];
+    matrix=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:'',blankrows:true});}
+  const hi=matrix.findIndex(r=>r.some(c=>String(c==null?'':c)!==''));
+  if(hi<0)throw new Error('File không có dữ liệu.');
+  const headers=matrix[hi].map(c=>String(cellNorm(c)));
+  const rows=[];
+  for(let i=hi+1;i<matrix.length;i++){const v=matrix[i].map(cellNorm);
+    if(v.every(c=>String(c)===''))continue;rows.push({n:i+1,v});}
+  return {headers,rows,name:file.name};
+}
+async function checkImport(){
+  if(!S.imp)return;
+  try{
+    const r=await api('importRecords',S.token,{headers:S.imp.headers,rows:S.imp.rows,mode:impMode(),dryRun:true});
+    S.imp.report=r;renderReport(r,false);$('#btnImport').disabled=r.valid===0;
+  }catch(e){S.imp.report=null;$('#btnImport').disabled=true;$('#impReport').innerHTML=`<div class="errbox">${esc(e.message)}</div>`;}
+}
+function renderReport(r,done){
+  const errRows=r.errors.map(e=>`<tr><td>${e.row}</td><td>${esc(e.code)}</td><td>${esc(e.name)}</td><td><ul>${e.errors.map(m=>`<li>${esc(m)}</li>`).join('')}</ul></td></tr>`).join('');
+  $('#impReport').innerHTML=`<div style="margin-top:12px">
+    <span class="stat b">Tổng: ${r.total} dòng</span><span class="stat g">${done?'Đã nhập':'Hợp lệ'}: ${done?r.inserted:r.valid}</span><span class="stat r">Lỗi (không nhập): ${r.invalid}</span>
+    ${done&&r.mode==='replace'?`<span class="stat b">Đã thay thế ${r.removed} hồ sơ cũ</span>`:''}</div>
+    ${r.unknown&&r.unknown.length?`<div class="wabox">Cột không nhận diện, đã bỏ qua: ${esc(r.unknown.join(', '))}</div>`:''}
+    ${!done&&r.mode==='replace'?`<div class="wabox">Chế độ thay thế: sẽ <b>xóa ${r.willRemove} hồ sơ hiện có</b> trong phạm vi quyền của bạn, rồi nhập ${r.valid} dòng hợp lệ.</div>`:''}
+    ${r.invalid?`<div class="row" style="margin:8px 0"><b>Chi tiết dòng lỗi</b><div class="grow"></div><button class="btn sm" id="btnErrCsv">Tải danh sách lỗi (CSV)</button></div>
+    <div class="tw" style="max-height:340px"><table class="grid errlist"><thead><tr><th>Dòng trong file</th><th>Mã NV</th><th>Họ tên</th><th>Lỗi</th></tr></thead><tbody>${errRows}</tbody></table></div>
+    ${r.errors.length<r.invalid?`<p class="small muted">Chỉ hiển thị ${r.errors.length} dòng lỗi đầu tiên.</p>`:''}`:''}`;
+  const b=$('#btnErrCsv');if(b)b.onclick=()=>download(new Blob([toCsv([['Dòng trong file','Mã NV','Họ tên','Lỗi']].concat(r.errors.map(e=>[e.row,e.code,e.name,e.errors.join(' | ')])))],{type:'text/csv;charset=utf-8'}),`LoiNhapLieu_${stamp()}.csv`);
+}
+$('#impFile').onchange=async e=>{
+  const f=e.target.files[0];S.imp=null;$('#btnImport').disabled=true;$('#impReport').innerHTML='';if(!f)return;
+  try{busy(true);S.imp=await readFile(f);}catch(err){toast(err.message,'e');return;}finally{busy(false);}
+  await checkImport();
+};
+document.addEventListener('change',e=>{if(e.target.name==='impMode')checkImport();});
+$('#btnImport').onclick=async()=>{
+  if(!S.imp||!S.imp.report)return;const rp=S.imp.report;
+  if(impMode()==='replace'&&!await confirmBox('Thay thế toàn bộ',`Hệ thống sẽ <b>XÓA ${rp.willRemove} hồ sơ</b> hiện có trong phạm vi quyền của bạn và nhập ${rp.valid} dòng hợp lệ. Không thể hoàn tác. Tiếp tục?`,'Thay thế','danger'))return;
+  try{
+    const r=await api('importRecords',S.token,{headers:S.imp.headers,rows:S.imp.rows,mode:impMode(),dryRun:false});
+    renderReport(r,true);$('#btnImport').disabled=true;S.imp=null;$('#impFile').value='';
+    S.records=(await api('getRecords',S.token)).records;renderRegionFilter();renderRecords();
+    toast(`Đã nhập ${r.inserted} hồ sơ`+(r.invalid?`, bỏ qua ${r.invalid} dòng lỗi`:''),r.invalid?'':'s');
+  }catch(e){toast(e.message,'e');}
+};
+
+/* ============ THIẾT LẬP TRƯỜNG ============ */
+const lockedType=f=>f.name===REGION||f.name===CODE;
+const lockedReq=f=>f.name===REGION||f.name===CODE;
+function openConfig(){if(!S.cfg)S.cfg=JSON.parse(JSON.stringify(S.config));renderConfig();}
+function renderConfig(){
+  $('#cfgGrid').innerHTML='<thead><tr><th style="width:70px">Thứ tự</th><th>Tên trường</th><th style="width:130px">Kiểu</th><th>Bắt buộc</th><th>Hiện</th><th>Danh mục</th><th></th></tr></thead><tbody>'+
+  S.cfg.map((f,i)=>`<tr data-i="${i}">
+    <td><button class="btn sm" data-a="up">↑</button><button class="btn sm" data-a="dn">↓</button></td>
+    <td><input type="text" data-k="name" value="${esc(f.name)}" ${f.core?'readonly':''}></td>
+    <td><select data-k="type" ${lockedType(f)?'disabled':''}>${Object.keys(TYPES).map(t=>`<option value="${t}" ${f.type===t?'selected':''}>${TYPES[t]}</option>`).join('')}</select></td>
+    <td class="c"><input type="checkbox" data-k="required" ${f.required?'checked':''} ${lockedReq(f)?'disabled':''}></td>
+    <td class="c"><input type="checkbox" data-k="visible" ${f.visible?'checked':''}></td>
+    <td>${f.type==='list'?`<button class="btn sm" data-a="opts">Danh mục (${f.options.length})</button>`:'<span class="muted">—</span>'}</td>
+    <td>${f.core?'<span class="muted small">Hệ thống</span>':'<button class="btn sm danger" data-a="del">Xóa</button>'}</td></tr>`).join('')+'</tbody>';
+}
+$('#cfgGrid').oninput=e=>{const tr=e.target.closest('tr[data-i]');if(!tr||e.target.dataset.k!=='name')return;S.cfg[+tr.dataset.i].name=e.target.value;};
+$('#cfgGrid').onchange=e=>{const tr=e.target.closest('tr[data-i]');if(!tr)return;const f=S.cfg[+tr.dataset.i],k=e.target.dataset.k;
+  if(k==='type'){f.type=e.target.value;renderConfig();}else if(k==='required'||k==='visible')f[k]=e.target.checked;};
+$('#cfgGrid').onclick=e=>{const b=e.target.closest('[data-a]');if(!b)return;const i=+b.closest('tr').dataset.i,a=b.dataset.a;
+  if(a==='up'&&i>0){[S.cfg[i-1],S.cfg[i]]=[S.cfg[i],S.cfg[i-1]];renderConfig();}
+  if(a==='dn'&&i<S.cfg.length-1){[S.cfg[i+1],S.cfg[i]]=[S.cfg[i],S.cfg[i+1]];renderConfig();}
+  if(a==='del'){S.cfg.splice(i,1);renderConfig();}
+  if(a==='opts')editOptions(S.cfg[i]);};
+$('#cfgAdd').onclick=()=>{S.cfg.push({name:'',type:'text',required:false,visible:true,options:[],core:false});renderConfig();
+  const t=$('#cfgGrid').parentElement;t.scrollTop=t.scrollHeight;};
+const cleanList=a=>{const s=new Set();a.forEach(x=>{x=String(x).trim();if(x)s.add(x);});return [...s];};
+function editOptions(f){
+  const body=document.createElement('div');
+  body.innerHTML=`<p class="muted small" style="margin-top:0">Mỗi giá trị một dòng (có thể dán trực tiếp từ Excel/CSV). Khoảng trắng đầu/cuối tự bỏ; giá trị trùng tự loại.</p><textarea rows="14">${esc(f.options.join('\n'))}</textarea>`;
+  openModal({title:'Danh mục: '+f.name,body,buttons:[{label:'Hủy'},{label:'Áp dụng',cls:'primary',onClick:()=>{
+    f.options=cleanList($('textarea',body).value.split(/\r?\n|\t|;/));renderConfig();}}]});
+}
+$('#cfgPasteLists').onclick=()=>{
+  const body=document.createElement('div');
+  body.innerHTML=`<p class="muted small" style="margin-top:0">Dán bảng CSV/Excel: <b>dòng đầu là tên trường</b>, các dòng dưới là giá trị danh mục của từng cột. Cột nào có tên trùng trường thì danh mục của trường đó được <b>thay thế</b>.</p>
+  <textarea rows="12" placeholder="Phân Loại,Giới Tính,Cơ Sở&#10;Giáo viên,Nam,Cơ sở 1&#10;Nhân viên,Nữ,Cơ sở 2"></textarea><div id="pl"></div>`;
+  openModal({title:'Dán CSV danh mục',body,wide:true,buttons:[{label:'Hủy'},{label:'Áp dụng',cls:'primary',onClick:()=>{
+    const m=parseDelimited($('textarea',body).value);if(m.length<2)throw new Error('Cần ít nhất 1 dòng tên trường và 1 dòng giá trị.');
+    const ok=[],bad=[];
+    m[0].forEach((h,j)=>{h=String(h).trim();if(!h)return;const f=S.cfg.find(x=>x.name===h);
+      if(!f){bad.push(h);return;}
+      f.options=cleanList(m.slice(1).map(r=>r[j]||''));if(f.type!=='list')f.type='list';ok.push(h);});
+    if(!ok.length)throw new Error('Không có tên cột nào khớp với tên trường (phân biệt hoa/thường). Cột không khớp: '+bad.join(', '));
+    renderConfig();toast(`Đã cập nhật danh mục ${ok.length} trường`+(bad.length?`. Bỏ qua: ${bad.join(', ')}`:'')+'. Nhớ bấm "Lưu vào hệ thống".',bad.length?'':'s');}}]});
+};
+$('#cfgPasteCfg').onclick=()=>{
+  const cur=[['Tên trường','Kiểu','Bắt buộc','Hiện','Danh mục (ngăn cách bằng |)']].concat(S.cfg.map(f=>[f.name,TYPES[f.type],f.required?'Có':'Không',f.visible?'Có':'Không',f.options.join('|')]));
+  const body=document.createElement('div');
+  body.innerHTML=`<p class="muted small" style="margin-top:0">Cột: Tên trường, Kiểu (Văn bản/Danh mục/Số/Ngày), Bắt buộc (Có/Không), Hiện (Có/Không), Danh mục (các giá trị ngăn cách bằng <b>|</b>). Nội dung dưới đây là cấu hình hiện tại — sửa rồi áp dụng, hoặc dán đè bảng mới. Trường có sẵn thì cập nhật, tên mới thì thêm trường.</p><textarea rows="14"></textarea>`;
+  $('textarea',body).value=cur.map(r=>r.map(c=>csvCell(c)).join(',')).join('\n');
+  openModal({title:'Dán / sửa CSV cấu hình trường',body,wide:true,buttons:[{label:'Hủy'},{label:'Áp dụng',cls:'primary',onClick:()=>{
+    let m=parseDelimited($('textarea',body).value).filter(r=>r.some(c=>String(c).trim()));
+    if(m.length&&String(m[0][0]).trim().toLowerCase()==='tên trường')m=m.slice(1);
+    if(!m.length)throw new Error('Không có dòng dữ liệu.');
+    const tmap={'văn bản':'text','danh mục':'list','số':'number','ngày':'date','text':'text','list':'list','number':'number','date':'date'};
+    const yes=v=>['có','co','yes','true','1','x','y'].includes(String(v||'').trim().toLowerCase());
+    let up=0,add=0;
+    m.forEach(r=>{const name=String(r[0]||'').trim();if(!name)return;
+      let f=S.cfg.find(x=>x.name===name);if(!f){f={name,type:'text',required:false,visible:true,options:[],core:false};S.cfg.push(f);add++;}else up++;
+      if(!lockedType(f))f.type=tmap[String(r[1]||'').trim().toLowerCase()]||f.type;
+      if(!lockedReq(f))f.required=yes(r[2]);
+      f.visible=r[3]===undefined||String(r[3]).trim()===''?f.visible:yes(r[3]);
+      if(f.type==='list'&&r[4]!==undefined)f.options=cleanList(String(r[4]).split('|'));});
+    renderConfig();toast(`Cập nhật ${up} trường, thêm ${add} trường. Nhớ bấm "Lưu vào hệ thống".`,'s');}}]});
+};
+$('#cfgSave').onclick=async()=>{
+  try{const r=await api('saveConfig',S.token,S.cfg);S.config=r.config;S.cfg=JSON.parse(JSON.stringify(r.config));
+    renderConfig();renderRecords();toast('Đã lưu thiết lập trường vào hệ thống','s');}
+  catch(e){openModal({title:'Không lưu được',body:`<div class="errbox" style="margin:0">${esc(e.message)}</div>`});}
+};
+
+/* ============ PHÂN QUYỀN ============ */
+async function openPerm(){
+  try{const r=await api('getPermissions',S.token);S.prm=r.permissions;S.regions=r.regions;renderPerm();}
+  catch(e){toast(e.message,'e');}
+}
+function renderPerm(){
+  $('#prmGrid').innerHTML='<thead><tr><th>Email</th><th style="width:130px">Vai trò</th><th>Khu vực</th><th style="width:120px">Trạng thái</th><th>Ghi chú</th><th></th></tr></thead><tbody>'+
+  S.prm.map((p,i)=>`<tr data-i="${i}">
+    <td><input type="text" data-k="email" value="${esc(p.email)}"></td>
+    <td><select data-k="role">${ROLES.map(r=>`<option ${p.role===r?'selected':''}>${r}</option>`).join('')}</select></td>
+    <td>${p.role==='Admin'?'<span class="muted">Tất cả khu vực</span>':
+      `<label class="chip"><input type="checkbox" data-k="all" ${p.all?'checked':''}> Tất cả</label>`+
+      S.regions.map(r=>`<label class="chip"><input type="checkbox" data-k="rg" value="${esc(r)}" ${p.all?'disabled':''} ${p.regions.includes(r)?'checked':''}> ${esc(r)}</label>`).join('')}</td>
+    <td><select data-k="active"><option value="1" ${p.active?'selected':''}>Hoạt động</option><option value="0" ${p.active?'':'selected'}>Khóa</option></select></td>
+    <td><input type="text" data-k="note" value="${esc(p.note)}"></td>
+    <td><button class="btn sm danger" data-a="del">Xóa</button></td></tr>`).join('')+'</tbody>';
+}
+$('#prmGrid').onchange=e=>{const tr=e.target.closest('tr[data-i]');if(!tr)return;const p=S.prm[+tr.dataset.i],k=e.target.dataset.k;
+  if(k==='role'){p.role=e.target.value;renderPerm();}
+  else if(k==='active')p.active=e.target.value==='1';
+  else if(k==='all'){p.all=e.target.checked;renderPerm();}
+  else if(k==='rg'){const v=e.target.value;p.regions=e.target.checked?[...new Set([...p.regions,v])]:p.regions.filter(x=>x!==v);}};
+$('#prmGrid').oninput=e=>{const tr=e.target.closest('tr[data-i]');if(!tr)return;const p=S.prm[+tr.dataset.i],k=e.target.dataset.k;
+  if(k==='email'||k==='note')p[k]=e.target.value;};
+$('#prmGrid').onclick=e=>{const b=e.target.closest('[data-a="del"]');if(b){S.prm.splice(+b.closest('tr').dataset.i,1);renderPerm();}};
+$('#prmAdd').onclick=()=>{S.prm.push({email:'',role:'Chỉ xem',all:false,regions:[],active:true,note:''});renderPerm();};
+$('#prmPaste').onclick=()=>{
+  const body=document.createElement('div');
+  body.innerHTML=`<p class="muted small" style="margin-top:0">Cột: <b>Email, Vai trò</b> (Admin / Nhập liệu / Chỉ xem), <b>Khu vực</b> (nhiều khu vực ngăn cách bằng <b>;</b> hoặc <b>*</b> = tất cả), <b>Trạng thái</b> (Hoạt động/Khóa), Ghi chú. Email đã có thì cập nhật, chưa có thì thêm. Tên khu vực phải khớp chính xác danh mục.</p>
+  <textarea rows="10" placeholder="a@congty.vn,Nhập liệu,Miền Bắc;Miền Nam,Hoạt động,Trưởng nhóm&#10;b@congty.vn,Chỉ xem,*,Hoạt động,"></textarea>`;
+  openModal({title:'Dán CSV phân quyền',body,wide:true,buttons:[{label:'Hủy'},{label:'Áp dụng',cls:'primary',onClick:()=>{
+    let m=parseDelimited($('textarea',body).value).filter(r=>r.some(c=>String(c).trim()));
+    if(m.length&&String(m[0][0]).trim().toLowerCase()==='email')m=m.slice(1);
+    if(!m.length)throw new Error('Không có dòng dữ liệu.');
+    m.forEach(r=>{const email=String(r[0]||'').trim().toLowerCase();if(!email)return;
+      let p=S.prm.find(x=>x.email.trim().toLowerCase()===email);if(!p){p={email,role:'Chỉ xem',all:false,regions:[],active:true,note:''};S.prm.push(p);}
+      const role=String(r[1]||'').trim();if(ROLES.includes(role))p.role=role;
+      const rg=String(r[2]||'').trim();if(rg==='*'){p.all=true;p.regions=[];}else if(rg){p.all=false;p.regions=cleanList(rg.split(';'));}
+      if(r[3]!==undefined&&String(r[3]).trim()!=='')p.active=String(r[3]).trim()!=='Khóa';
+      if(r[4]!==undefined)p.note=String(r[4]);});
+    renderPerm();toast('Đã áp dụng. Nhớ bấm "Lưu vào hệ thống".','s');}}]});
+};
+$('#prmSave').onclick=async()=>{
+  try{const r=await api('savePermissions',S.token,S.prm);S.prm=r.permissions;renderPerm();toast('Đã lưu phân quyền vào hệ thống','s');}
+  catch(e){openModal({title:'Không lưu được',body:`<div class="errbox" style="margin:0">${esc(e.message)}</div>`});}
+};
+
+/* ============ KHỞI ĐỘNG ============ */
+(async function init(){
+  let sess=null;try{sess=JSON.parse(lsGet('qp_sess')||'null');}catch(e){}
+  if(sess&&sess.t&&sess.exp>Date.now()){S.token=sess.t;try{await loadApp();return;}catch(e){}}
+  showLogin();
+})();
+</script>
+</body>
+</html>
