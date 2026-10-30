@@ -41,7 +41,12 @@ textarea{width:100%;font-family:Consolas,monospace;font-size:13px}
 table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
 table.grid th,table.grid td{padding:7px 10px;border-bottom:1px solid #edf0f6;border-right:1px solid #f1f3f8;white-space:nowrap;background:#fff}
 table.grid th{position:sticky;top:0;background:#f0f4fb;z-index:2;text-align:left;cursor:pointer;user-select:none}
-table.grid tr:hover td{background:#f7faff}
+table.grid tbody tr:nth-child(even) td{background:#f1f5fb}
+table.grid tbody tr:hover td{background:#dfeafd}
+table.grid .stk{position:sticky;left:var(--actw,0px);z-index:2;box-shadow:2px 0 0 var(--bd)}
+table.grid th.stk{z-index:4}
+table.grid tfoot td{position:sticky;bottom:0;z-index:2;background:#e3ebf9;font-weight:700;border-top:2px solid var(--pri);border-bottom:none}
+table.grid tfoot td.act,table.grid tfoot td.stk{z-index:5}
 table.grid td.act,table.grid th.act{position:sticky;left:0;z-index:3;cursor:default}
 td.num{text-align:right;font-variant-numeric:tabular-nums}
 .cfgt td{vertical-align:middle;white-space:normal}.cfgt input[type=text],.cfgt select{width:100%}
@@ -317,6 +322,7 @@ $('#tabs').onclick=e=>{const b=e.target.closest('button[data-tab]');if(b)switchT
 
 /* ============ TAB HỒ SƠ ============ */
 const colOn=f=>S.cols[f.name]!==undefined?S.cols[f.name]:f.visible;
+const NAME_COL='Họ Tên';
 const FILTERS=['Khu Vực','Pháp Nhân Chính','Đơn Vị Phòng'];
 const SORT_CHAIN=['Khu Vực','Pháp Nhân Chính','Đơn Vị Phòng','Ngày Vào Làm'];
 function renderRegionFilter(){
@@ -348,12 +354,19 @@ function renderRecords(){
   const pages=Math.max(1,Math.ceil(rows.length/S.size));if(S.page>pages)S.page=pages;
   const slice=rows.slice((S.page-1)*S.size,S.page*S.size);
   const arrow=f=>S.sort&&S.sort.name===f.name?(S.sort.dir>0?' ▲':' ▼'):'';
-  $('#grid').innerHTML='<thead><tr>'+(canEdit()?'<th class="act">Thao tác</th>':'')+
-    cols.map(f=>`<th data-sort="${esc(f.name)}">${esc(f.name)}${arrow(f)}</th>`).join('')+'</tr></thead><tbody>'+
-    (slice.length?slice.map((r,i)=>'<tr>'+(canEdit()?`<td class="act"><button class="btn sm" data-edit="${S.records.indexOf(r)}">Sửa</button> <button class="btn sm danger" data-del="${S.records.indexOf(r)}">Xóa</button></td>`:'')+
-      cols.map(f=>`<td class="${f.type==='number'?'num':''}">${cellHtml(f,r[f.name])}</td>`).join('')+'</tr>').join('')
-      :`<tr><td colspan="${cols.length+1}" class="muted" style="text-align:center;padding:30px">Chưa có hồ sơ nào</td></tr>`)+'</tbody>';
-  $('#cnt').textContent=`Hiển thị ${slice.length} / ${rows.length} hồ sơ (tổng ${S.records.length})`;
+  const stk=f=>f.name===NAME_COL?' stk':'';
+  const sums={};cols.forEach(f=>{if(f.type==='number')sums[f.name]=rows.reduce((s,r)=>s+(Number(r[f.name])||0),0);});
+  const hasAct=canEdit(), firstLabel=hasAct?-1:0;
+  const label=`Tổng cộng (${rows.length} hồ sơ)`;
+  $('#grid').innerHTML='<thead><tr>'+(hasAct?'<th class="act">Thao tác</th>':'')+
+    cols.map(f=>`<th class="${stk(f)}" data-sort="${esc(f.name)}">${esc(f.name)}${arrow(f)}</th>`).join('')+'</tr></thead><tbody>'+
+    (slice.length?slice.map((r,i)=>'<tr>'+(hasAct?`<td class="act"><button class="btn sm" data-edit="${S.records.indexOf(r)}">Sửa</button> <button class="btn sm danger" data-del="${S.records.indexOf(r)}">Xóa</button></td>`:'')+
+      cols.map(f=>`<td class="${f.type==='number'?'num':''}${stk(f)}">${cellHtml(f,r[f.name])}</td>`).join('')+'</tr>').join('')
+      :`<tr><td colspan="${cols.length+1}" class="muted" style="text-align:center;padding:30px">Chưa có hồ sơ nào</td></tr>`)+'</tbody>'+
+    (rows.length?'<tfoot><tr>'+(hasAct?`<td class="act">${label}</td>`:'')+
+      cols.map((f,i)=>`<td class="${f.type==='number'?'num':''}${stk(f)}">${f.type==='number'?fmtNum(sums[f.name]):(i===firstLabel?label:'')}</td>`).join('')+'</tr></tfoot>':'');
+  const actTh=$('#grid th.act');$('#grid').style.setProperty('--actw',(actTh?actTh.offsetWidth:0)+'px');
+  $('#cnt').textContent=`Hiển thị ${slice.length} / ${rows.length} hồ sơ (tổng ${S.records.length}). Dòng Tổng cộng tính trên toàn bộ ${rows.length} hồ sơ đang lọc.`;
   $('#pInfo').textContent=`Trang ${S.page}/${pages}`;$('#pPrev').disabled=S.page<=1;$('#pNext').disabled=S.page>=pages;
   renderColPanel();
 }
