@@ -121,7 +121,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
     <div class="tab" id="tab-records">
       <div class="row" style="margin-bottom:10px">
         <input id="q" placeholder="Tìm kiếm (mã, họ tên, đơn vị...)" style="min-width:240px">
-        <select id="fRegion"></select>
+        <span id="filters" class="row"></span>
         <div class="grow"></div>
         <div class="dd">
           <button class="btn" id="btnCols">Hiện / ẩn cột ▾</button>
@@ -203,7 +203,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 const CODE='Mã Nhân Viên', REGION='Khu Vực';
 const TYPES={text:'Văn bản',list:'Danh mục',number:'Số',date:'Ngày'};
 const ROLES=['Admin','Nhập liệu','Chỉ xem'];
-const S={token:null,user:null,config:[],records:[],q:'',region:'',page:1,size:50,sort:null,cols:{},cfg:null,prm:null,regions:[],imp:null};
+const S={token:null,user:null,config:[],records:[],q:'',flt:{},page:1,size:50,sort:null,cols:{},cfg:null,prm:null,regions:[],imp:null};
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtNum=n=>(n===''||n==null)?'':String(n).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
@@ -317,19 +317,30 @@ $('#tabs').onclick=e=>{const b=e.target.closest('button[data-tab]');if(b)switchT
 
 /* ============ TAB HỒ SƠ ============ */
 const colOn=f=>S.cols[f.name]!==undefined?S.cols[f.name]:f.visible;
+const FILTERS=['Khu Vực','Pháp Nhân Chính','Đơn Vị Phòng'];
+const SORT_CHAIN=['Khu Vực','Pháp Nhân Chính','Đơn Vị Phòng','Ngày Vào Làm'];
 function renderRegionFilter(){
-  const regs=[...new Set(S.records.map(r=>r[REGION]))].sort();
-  $('#fRegion').innerHTML='<option value="">Tất cả khu vực</option>'+regs.map(r=>`<option>${esc(r)}</option>`).join('');
-  $('#fRegion').value=regs.includes(S.region)?S.region:'';S.region=$('#fRegion').value;
-  $('#fRegion').hidden=regs.length<2;
+  const box=$('#filters');box.innerHTML='';
+  FILTERS.forEach(n=>{const f=S.config.find(x=>x.name===n);if(!f)return;
+    const have=new Set(S.records.map(r=>r[n]).filter(v=>v!==''));
+    const vals=[...f.options.filter(o=>have.has(o)),...[...have].filter(v=>!f.options.includes(v)).sort()];
+    if(S.flt[n]&&!have.has(S.flt[n]))delete S.flt[n];
+    const sel=document.createElement('select');sel.title='Lọc theo '+n;
+    sel.innerHTML=`<option value="">${esc(n)}: tất cả</option>`+vals.map(v=>`<option ${v===S.flt[n]?'selected':''}>${esc(v)}</option>`).join('');
+    sel.onchange=()=>{if(sel.value)S.flt[n]=sel.value;else delete S.flt[n];S.page=1;renderRecords();};
+    box.appendChild(sel);});
 }
+function sortKey(f,r){const v=r[f.name];if(f.type==='number')return v===''?-1:v;
+  if(f.type==='date'){const m=/^(\d\d)\/(\d\d)\/(\d{4})$/.exec(v);return m?m[3]+m[2]+m[1]:'';}return String(v);}
+function cmpBy(f,d){return (a,b)=>{const x=sortKey(f,a),y=sortKey(f,b);return (typeof x==='number'?x-y:String(x).localeCompare(String(y),'vi'))*d;};}
 function filtered(){
   const q=S.q.trim().toLowerCase();
-  let rows=S.records.filter(r=>(!S.region||r[REGION]===S.region)&&(!q||S.config.some(f=>String(r[f.name]).toLowerCase().includes(q))));
-  if(S.sort){const f=S.config.find(x=>x.name===S.sort.name),d=S.sort.dir;
-    const key=r=>{const v=r[f.name];if(f.type==='number')return v===''?-1:v;if(f.type==='date'){const m=/^(\d\d)\/(\d\d)\/(\d{4})$/.exec(v);return m?m[3]+m[2]+m[1]:'';}return String(v);};
-    rows=rows.slice().sort((a,b)=>{const x=key(a),y=key(b);return (typeof x==='number'?x-y:String(x).localeCompare(String(y),'vi'))*d;});}
-  return rows;
+  let rows=S.records.filter(r=>FILTERS.every(n=>!S.flt[n]||r[n]===S.flt[n])&&(!q||S.config.some(f=>String(r[f.name]).toLowerCase().includes(q))));
+  // Ưu tiên: cột người dùng bấm (nếu có) -> Khu vực -> Pháp nhân chính -> Đơn vị phòng -> Ngày vào làm
+  const chain=[];
+  if(S.sort){const f=S.config.find(x=>x.name===S.sort.name);if(f)chain.push(cmpBy(f,S.sort.dir));}
+  SORT_CHAIN.forEach(n=>{const f=S.config.find(x=>x.name===n);if(f)chain.push(cmpBy(f,1));});
+  return rows.slice().sort((a,b)=>{for(const c of chain){const r=c(a,b);if(r)return r;}return 0;});
 }
 function cellHtml(f,v){return f.type==='number'?fmtNum(v):esc(v);}
 function renderRecords(){
@@ -347,7 +358,6 @@ function renderRecords(){
   renderColPanel();
 }
 $('#q').oninput=e=>{S.q=e.target.value;S.page=1;renderRecords();};
-$('#fRegion').onchange=e=>{S.region=e.target.value;S.page=1;renderRecords();};
 $('#pPrev').onclick=()=>{S.page--;renderRecords();};$('#pNext').onclick=()=>{S.page++;renderRecords();};
 $('#grid').onclick=e=>{
   const th=e.target.closest('th[data-sort]');
