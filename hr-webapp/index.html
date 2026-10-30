@@ -103,15 +103,21 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 .ks{display:flex;justify-content:space-around;gap:6px}
 .ks div{display:flex;flex-direction:column;align-items:center}
 .ks b{font-size:20px;color:#111}.ks span{font-size:12.5px;font-weight:600;color:#444}
-.dchart{background:#fff;border-radius:4px;box-shadow:0 3px 10px rgba(25,65,75,.18);padding:10px 10px 8px;min-height:318px}
-.dchart h4{margin:0 0 4px;font-size:14px;color:#19414b}
-.lg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;margin-bottom:2px}
+.dgrid .kpi{margin-bottom:0}.dgrid .pill{margin-bottom:10px}
+.dcharts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:18px;align-items:start}
+@media(max-width:1150px){.dcharts{grid-template-columns:1fr}}
+.dchart{background:#fff;border-radius:6px;box-shadow:0 3px 10px rgba(25,65,75,.18);padding:12px 14px 10px;border-top:4px solid var(--c,#287e8f)}
+.dchart .sv{overflow-x:auto}.dchart .sv svg{min-width:560px}
+.dchart h4{margin:0 0 6px;font-size:16px;color:#19414b}
+.lg{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin-bottom:4px}
 .lg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}
 .dchart svg{width:100%;height:auto;display:block}
 .dchart svg text{font-family:inherit}
+.ax{font-size:11.5px;fill:#6b7385}.ax.e{text-anchor:end}
+.halo{paint-order:stroke;stroke:#fff;stroke-width:3.5px;stroke-linejoin:round}
 .vl{font-size:12.5px;font-weight:700;text-anchor:middle;fill:#19414b}.vl.w{fill:#fff}.vl.l{text-anchor:start}
-.cl{font-size:11.5px;text-anchor:middle;fill:#333}.cl.e{text-anchor:end}
-.dempty{padding:70px 0;text-align:center;color:var(--mu)}
+.cl{font-size:12px;text-anchor:middle;fill:#333}.cl.e{text-anchor:end}
+.dempty{padding:60px 0;text-align:center;color:var(--mu)}
 @media(max-width:640px){.top,.tabs,.page{padding-left:10px;padding-right:10px}}
 </style>
 </head>
@@ -162,6 +168,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
       <div class="dbar" id="dBookmarks"></div>
       <div class="dbar" id="dParams"></div>
       <div class="dgrid" id="dGrid"></div>
+      <div class="dcharts" id="dCharts"></div>
     </div>
 
     <!-- TAB HỒ SƠ -->
@@ -679,12 +686,12 @@ $('#prmSave').onclick=async()=>{
 const PAL=['#287e8f','#16cbb8','#f6b53d','#f08a5a','#03635f','#b36743','#19414b','#7b5b20'];
 const PILL=['#03635f','#b36743','#19414b','#7b5b20'];
 // "Field parameter": D.dim / D.dim2 (trường phân tích) và D.measure (chỉ số) do người dùng chọn
-const D={dim:'Khu Vực',measure:'#count',agg:'sum',dim2:'Phân Loại',flt:{}};
+const D={dim:'Khu Vực',measure:'#count',agg:'sum',dim2:'Đơn Vị Phòng',flt:{}};
 const DASH_PRESETS=[
-  {name:'Tổng quan',s:{dim:'Khu Vực',measure:'#count',agg:'sum',dim2:'Phân Loại',flt:{}}},
+  {name:'Tổng quan',s:{dim:'Khu Vực',measure:'#count',agg:'sum',dim2:'Đơn Vị Phòng',flt:{}}},
   {name:'Chi phí thu nhập',s:{dim:'Pháp Nhân Chính',measure:'Tổng thu nhập',agg:'sum',dim2:'Đơn Vị Phòng',flt:{}}},
-  {name:'Thu nhập bình quân',s:{dim:'Chức Vụ Chính',measure:'Tổng thu nhập',agg:'avg',dim2:'Phân Loại',flt:{}}},
-  {name:'Cơ cấu đơn vị',s:{dim:'Đơn Vị Phòng',measure:'#count',agg:'sum',dim2:'Giới Tính',flt:{}}}
+  {name:'Thu nhập bình quân',s:{dim:'Chức Vụ Chính',measure:'Tổng thu nhập',agg:'avg',dim2:'Đơn Vị Phòng',flt:{}}},
+  {name:'Cơ cấu phân loại',s:{dim:'Phân Loại',measure:'#count',agg:'sum',dim2:'Đơn Vị Phòng',flt:{}}}
 ];
 let bmCustom=[];
 const bmKey=()=>'qp_bm_'+S.user.email;
@@ -714,54 +721,44 @@ function topN(items,n){ // gộp phần còn lại thành "Khác"
 }
 
 /* ---- biểu đồ SVG ---- */
-function svgStack(cats,series,fmt){
-  const W=360,H=250,pl=10,pr=10,pt=26,pb=40,step=(W-pl-pr)/cats.length,bw=Math.min(54,step*0.6);
-  const totals=cats.map((_,i)=>series.reduce((s,x)=>s+x.vals[i],0)),max=Math.max(1,...totals);
+function niceScale(v,nT,minStep){ // trục chia nT khoảng đều, bước "tròn"
+  const rough=Math.max(v,1e-9)/nT,p=Math.pow(10,Math.floor(Math.log10(rough))),f=rough/p;
+  let step=(f<=1?1:f<=2?2:f<=5?5:10)*p;if(minStep&&step<minStep)step=minStep;
+  return {max:step*nT,step};
+}
+/* Biểu đồ kết hợp: cột chồng (trục trái) + đường (trục phải) */
+function svgCombo(cats,series,line,fmtB,fmtL,intB){
+  const n=cats.length,long=n>6||cats.some(c=>lab(c).length>11);
+  const pl=54,pr=line?66:16,pt=34,pb=long?104:46,slot=long?48:74;
+  const W=Math.max(640,pl+pr+n*slot),H=380,ph=H-pt-pb,step=(W-pl-pr)/n,bw=Math.min(64,step*0.62);
+  const totals=cats.map((_,i)=>series.reduce((s,x)=>s+x.vals[i],0));
+  const sb=niceScale(Math.max(...totals,1),4,intB?1:0),sl=line?niceScale(Math.max(...line.vals,1),4,0):null;
   let g='';
-  cats.forEach((c,i)=>{const cx=pl+step*i+step/2;let y=H-pb;
-    series.forEach(s=>{const v=s.vals[i];if(!v)return;const h=v/max*(H-pb-pt);y-=h;
-      g+=`<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${h}" fill="${s.color}"><title>${esc(lab(c))} · ${esc(s.name)}: ${fmt(v)}</title></rect>`;
-      if(h>15)g+=`<text x="${cx}" y="${y+h/2+4}" class="vl w">${fmt(v)}</text>`;});
-    g+=`<text x="${cx}" y="${y-6}" class="vl">${fmt(totals[i])}</text>`;
-    g+=`<text x="${cx}" y="${H-pb+16}" class="cl">${esc(cut(lab(c),Math.max(6,Math.floor(step/6.2))))}<title>${esc(lab(c))}</title></text>`;});
+  for(let i=0;i<=4;i++){const y=pt+ph-ph*i/4;
+    g+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="#e3e8ef"/><text x="${pl-7}" y="${y+4}" class="ax e">${fmtB(sb.step*i)}</text>`;
+    if(line)g+=`<text x="${W-pr+7}" y="${y+4}" class="ax">${fmtL(sl.step*i)}</text>`;}
+  cats.forEach((c,i)=>{const cx=pl+step*i+step/2;let y=pt+ph;
+    series.forEach(s=>{const v=s.vals[i];if(!v)return;const hh=v/sb.max*ph;y-=hh;
+      g+=`<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${hh}" fill="${s.color}"><title>${esc(lab(c))} · ${esc(s.name)}: ${fmtB(v)}</title></rect>`;
+      if(hh>18)g+=`<text x="${cx}" y="${y+hh/2+4}" class="vl w">${fmtB(v)}</text>`;});
+    g+=long?`<text transform="translate(${cx+5},${pt+ph+14}) rotate(-35)" class="cl e">${esc(cut(lab(c),24))}<title>${esc(lab(c))}</title></text>`
+           :`<text x="${cx}" y="${pt+ph+18}" class="cl">${esc(cut(lab(c),12))}<title>${esc(lab(c))}</title></text>`;});
+  if(line){
+    const pts=line.vals.map((v,i)=>[pl+step*i+step/2,pt+ph-v/sl.max*ph]);
+    g+=`<polyline points="${pts.map(q=>q.join(',')).join(' ')}" fill="none" stroke="#f08a5a" stroke-width="3" stroke-linejoin="round"/>`;
+    pts.forEach((q,i)=>{g+=`<circle cx="${q[0]}" cy="${q[1]}" r="4.5" fill="#fff" stroke="#f08a5a" stroke-width="2.5"><title>${esc(lab(cats[i]))} · ${esc(line.name)}: ${fmtL(line.vals[i])}</title></circle>`+
+      `<text x="${q[0]}" y="${q[1]-11}" class="vl halo" style="fill:#b3501f">${fmtL(line.vals[i])}</text>`;});}
   return `<svg viewBox="0 0 ${W} ${H}">${g}</svg>`;
 }
-function svgHBar(items,fmt,color){
-  const W=360,rh=28,x0=118,mw=W-x0-56,H=items.length*rh+10,max=Math.max(1,...items.map(i=>i.val));
-  const g=items.map((it,i)=>{const y=5+i*rh,w=it.val>0?Math.max(2,it.val/max*mw):0;
-    return `<text x="${x0-6}" y="${y+17}" class="cl e">${esc(cut(lab(it.label),18))}<title>${esc(lab(it.label))}</title></text>`+
-      `<rect x="${x0}" y="${y+3}" width="${w}" height="19" rx="2" fill="${color}"><title>${esc(lab(it.label))}: ${fmt(it.val)}</title></rect>`+
-      `<text x="${x0+w+5}" y="${y+17}" class="vl l">${fmt(it.val)}</text>`;}).join('');
-  return `<svg viewBox="0 0 ${W} ${H}">${g}</svg>`;
-}
-function svgArea(labels,vals){
-  const W=360,H=250,pl=20,pr=20,pt=30,pb=36,n=vals.length,max=Math.max(1,...vals),step=(W-pl-pr)/(n-1);
-  const X=i=>pl+step*i,Y=v=>H-pb-v/max*(H-pb-pt);
-  const pts=vals.map((v,i)=>[X(i),Y(v)]);
-  let g=`<polygon points="${X(0)},${H-pb} ${pts.map(p=>p.join(',')).join(' ')} ${X(n-1)},${H-pb}" fill="#16cbb8" fill-opacity=".38"/>`+
-    `<polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="#287e8f" stroke-width="2.5" stroke-linejoin="round"/>`;
-  pts.forEach((p,i)=>{g+=`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#287e8f"><title>${esc(labels[i])}: ${fmtCount(vals[i])}</title></circle>`+
-    `<text x="${p[0]}" y="${p[1]-8}" class="vl">${fmtCount(vals[i])}</text>`+
-    `<text x="${p[0]}" y="${H-pb+16}" class="cl" style="font-size:9px">${esc(labels[i])}</text>`;});
-  return `<svg viewBox="0 0 ${W} ${H}">${g}</svg>`;
-}
-function arcPath(cx,cy,R,r,a0,a1){
-  if(a1-a0>=Math.PI*2)a1=a0+Math.PI*2-0.0001;
-  const p=(rad,a)=>[cx+rad*Math.cos(a),cy+rad*Math.sin(a)],lg=a1-a0>Math.PI?1:0;
-  const [x0,y0]=p(R,a0),[x1,y1]=p(R,a1),[x2,y2]=p(r,a1),[x3,y3]=p(r,a0);
-  return `M${x0} ${y0}A${R} ${R} 0 ${lg} 1 ${x1} ${y1}L${x2} ${y2}A${r} ${r} 0 ${lg} 0 ${x3} ${y3}Z`;
-}
-function svgDonut(items,fmt){
-  const W=360,H=240,cx=112,cy=118,R=98,r=54,tot=items.reduce((s,i)=>s+i.val,0)||1;
-  let a=-Math.PI/2,g='';
-  items.forEach((it,i)=>{const da=it.val/tot*Math.PI*2,col=PAL[i%PAL.length];
-    g+=`<path d="${arcPath(cx,cy,R,r,a,a+da)}" fill="${col}" stroke="#fff" stroke-width="1.5"><title>${esc(lab(it.label))}: ${fmt(it.val)} (${Math.round(it.val/tot*100)}%)</title></path>`;
-    if(it.val/tot>=0.07){const m=a+da/2,rr=(R+r)/2;g+=`<text x="${cx+rr*Math.cos(m)}" y="${cy+rr*Math.sin(m)+4}" class="vl w">${fmt(it.val)}</text>`;}
-    const ly=22+i*24;
-    g+=`<circle cx="232" cy="${ly}" r="5" fill="${col}"/><text x="243" y="${ly+4}" class="cl e" style="text-anchor:start">${esc(cut(lab(it.label),14))}<title>${esc(lab(it.label))}</title></text>`+
-       `<text x="${W-4}" y="${ly+4}" class="vl" style="text-anchor:end">${Math.round(it.val/tot*100)}%</text>`;
-    a+=da;});
-  g+=`<text x="${cx}" y="${cy+2}" class="vl" style="font-size:16px">${fmt(tot)}</text><text x="${cx}" y="${cy+17}" class="cl" style="font-size:10px">Tổng</text>`;
+/* Cột ngang: hiển thị ĐỦ mọi nhóm, chiều cao tự giãn theo số nhóm */
+function svgHBar(items,fmt,color,pct){
+  const W=640,rh=30,maxLen=Math.max(1,...items.map(i=>Math.min(lab(i.label).length,34)));
+  const x0=Math.min(290,Math.max(110,maxLen*7+16)),mw=W-x0-(pct?120:80),H=items.length*rh+12,max=Math.max(1,...items.map(i=>i.val));
+  const tot=items.reduce((s,i)=>s+i.val,0)||1;
+  const g=items.map((it,i)=>{const y=6+i*rh,w=it.val>0?Math.max(2,it.val/max*mw):0;
+    return `<text x="${x0-8}" y="${y+19}" class="cl e">${esc(cut(lab(it.label),34))}<title>${esc(lab(it.label))}</title></text>`+
+      `<rect x="${x0}" y="${y+3}" width="${w}" height="22" rx="2" fill="${color}"><title>${esc(lab(it.label))}: ${fmt(it.val)}${pct?' ('+Math.round(it.val/tot*100)+'%)':''}</title></rect>`+
+      `<text x="${x0+w+6}" y="${y+19}" class="vl l">${fmt(it.val)}${pct?` <tspan style="font-weight:400;fill:#6b7385">· ${Math.round(it.val/tot*100)}%</tspan>`:''}</text>`;}).join('');
   return `<svg viewBox="0 0 ${W} ${H}">${g}</svg>`;
 }
 const ICON={
@@ -771,7 +768,7 @@ const ICON={
   pie:c=>`<svg viewBox="0 0 36 32"><g fill="${c}"><path d="M16 3a13 13 0 1 0 13 13H16z"/><path d="M19 0a13 13 0 0 1 13 13H19z" fill-opacity=".6"/></g></svg>`
 };
 const kpiHtml=(icon,main,label,subs,tip)=>`<div class="kpi">${icon}<div class="kn" title="${esc(tip||'')}">${main}</div><div class="kl">${label}</div><div class="ks">${subs.map(s=>`<div><b>${s[0]}</b><span>${esc(s[1])}</span></div>`).join('')}</div></div>`;
-const legendHtml=ser=>'<div class="lg">'+ser.map(s=>`<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join('')+'</div>';
+const legendHtml=ser=>'<div class="lg">'+ser.map(s=>`<span><i style="background:${s.color};${s.line?'border-radius:2px;height:4px;width:16px;vertical-align:middle':''}"></i>${esc(s.name)}</span>`).join('')+'</div>';
 
 function renderDash(){
   if(!S.user)return;
@@ -806,58 +803,62 @@ function renderDash(){
   const cnt=(rs,pred)=>rs.filter(pred).length;
   const empty='<div class="dempty">Chưa có dữ liệu</div>';
 
-  // Cột 1: Nhân sự
+  const TT='Tổng thu nhập',hasTT=numF.some(f=>f.name===TT),hasLuong=numF.some(f=>f.name==='Mức lương chính');
+  const isCnt=D.measure==='#count';
+  const aggv=(g,n)=>D.agg==='avg'?(g.length?sum(g,n)/g.length:0):sum(g,n);
+  const mLabel=isCnt?'Số nhân sự':(D.agg==='avg'?'Bình quân ':(/^Tổng/.test(D.measure)?'':'Tổng '))+D.measure;
+  // Chỉ số dạng đường/thanh thứ hai: theo tham số; nếu đang chọn "Số nhân sự" thì dùng bình quân Tổng thu nhập
+  const M=!isCnt?{name:mLabel,f:g=>aggv(g,D.measure)}:(hasTT?{name:'Bình quân Tổng thu nhập/người',f:g=>g.length?sum(g,TT)/g.length:0}:null);
+
+  // KPI
   const hasG=S.config.some(f=>f.name==='Giới Tính');
   const nu=cnt(rows,r=>r['Giới Tính']==='Nữ'),nam=cnt(rows,r=>r['Giới Tính']==='Nam');
   const k1=kpiHtml(ICON.people(PILL[0]),fmtNum(rows.length),'Tổng nhân sự',hasG?[[fmtNum(nu),'Nữ'],[fmtNum(nam),'Nam']]:[[fmtNum(groupKeys(D.dim,rows).length),D.dim]]);
-  let c1=empty,lg1='';
-  if(rows.length&&D.dim){
-    const keys=groupKeys(D.dim,rows);let cats=keys;
-    const gv=hasG?groupKeys('Giới Tính',rows):['Nhân sự'];
-    let series=gv.map((g,i)=>({name:lab(g),color:g==='Nữ'?PAL[1]:g==='Nam'?PAL[0]:PAL[(i+2)%PAL.length],vals:keys.map(k=>cnt(rows,r=>r[D.dim]===k&&(!hasG||r['Giới Tính']===g)))}));
-    if(cats.length>8){ // giữ 7 nhóm lớn nhất + Khác
-      const tot=cats.map((_,i)=>series.reduce((s,x)=>s+x.vals[i],0)),ord=tot.map((t,i)=>i).sort((a,b)=>tot[b]-tot[a]),keep=ord.slice(0,7).sort((a,b)=>a-b),rest=ord.slice(7);
-      series=series.map(s=>({...s,vals:keep.map(i=>s.vals[i]).concat([rest.reduce((t,i)=>t+s.vals[i],0)])}));cats=keep.map(i=>cats[i]).concat(['Khác']);}
-    c1=svgStack(cats,series,fmtCount);lg1=legendHtml(series);
-  }
-  // Cột 2: Tuyển mới
   const hd=r=>pd(r['Ngày Vào Làm']);
   const start12=new Date(yr,mo-11,1),inRange=(r,a)=>{const d=hd(r);return d&&d>=a&&d<=now;};
   const hires12=cnt(rows,r=>inRange(r,start12)),hiresYr=cnt(rows,r=>inRange(r,new Date(yr,0,1))),hiresMo=cnt(rows,r=>inRange(r,new Date(yr,mo,1)));
   const k2=kpiHtml(ICON.hire(PILL[1]),fmtNum(hires12),'Vào làm 12 tháng gần nhất',[[fmtNum(hiresYr),'Năm '+yr],[fmtNum(hiresMo),'Tháng '+(mo+1)]]);
-  const ml=[],mv=[];
-  for(let i=11;i>=0;i--){const d=new Date(yr,mo-i,1);
-    ml.push('T'+(d.getMonth()+1)+(d.getMonth()===0||i===11?'/'+String(d.getFullYear()).slice(2):''));
-    mv.push(cnt(rows,r=>{const x=hd(r);return x&&x.getFullYear()===d.getFullYear()&&x.getMonth()===d.getMonth()&&x<=now;}));}
-  const c2=rows.length?svgArea(ml,mv):empty;
-  // Cột 3: Thu nhập
-  const TT='Tổng thu nhập',hasTT=numF.some(f=>f.name===TT),hasLuong=numF.some(f=>f.name==='Mức lương chính');
   const totTT=hasTT?sum(rows,TT):0;
   const k3=kpiHtml(ICON.coin(PILL[2]),hasTT?fmtMoney(totTT):'—',TT,[[rows.length&&hasTT?fmtMoney(totTT/rows.length):'—','Bình quân/người'],[hasLuong?fmtMoney(sum(rows,'Mức lương chính')):'—','Lương chính']],hasTT?fmtNum(totTT)+' đ':'');
-  const isCnt=D.measure==='#count',fmtM=isCnt?fmtCount:fmtMoney;
-  const mLabel=isCnt?'Số nhân sự':(D.agg==='avg'?'Bình quân ':(/^Tổng/.test(D.measure)?'':'Tổng '))+D.measure;
-  let c3=empty;
-  if(rows.length&&D.dim){
-    let items=groupKeys(D.dim,rows).map(k=>{const g=rows.filter(r=>r[D.dim]===k);
-      const v=isCnt?g.length:(D.agg==='avg'?sum(g,D.measure)/g.length:sum(g,D.measure));return {label:k,val:v};}).sort((a,b)=>b.val-a.val);
-    items=items.slice(0,8);c3=svgHBar(items,fmtM,PAL[0]);
-  }
-  // Cột 4: Cơ cấu
   const ages=rows.map(r=>pd(r['Ngày Sinh'])).filter(Boolean).map(d=>(now-d)/31557600000);
   const tenure=rows.map(r=>hd(r)).filter(d=>d&&d<=now).map(d=>(now-d)/31557600000);
   const avg=a=>a.length?vn((a.reduce((s,x)=>s+x,0)/a.length).toFixed(1)):'—';
   const k4=kpiHtml(ICON.pie(PILL[3]),avg(tenure),'Thâm niên TB (năm)',[[avg(ages),'Tuổi TB'],[fmtNum(groupKeys('Đơn Vị Phòng',rows).filter(v=>v!=='').length),'Số đơn vị']]);
-  let c4=empty;
-  if(rows.length&&D.dim2){
-    const items=topN(groupKeys(D.dim2,rows).map(k=>({label:k,val:cnt(rows,r=>r[D.dim2]===k)})).sort((a,b)=>b.val-a.val),7);
-    c4=svgDonut(items,fmtCount);
+  const pillCol=(i,t,k)=>`<section><div class="pill" style="--c:${PILL[i]}">${t}</div>${k}</section>`;
+  $('#dGrid').innerHTML=pillCol(0,'Nhân sự',k1)+pillCol(1,'Tuyển mới',k2)+pillCol(2,'Thu nhập',k3)+pillCol(3,'Cơ cấu',k4);
+
+  // Biểu đồ
+  const card=(c,title,lg,chart)=>`<div class="dchart" style="--c:${c}"><h4>${esc(title)}</h4>${lg||''}<div class="sv">${chart}</div></div>`;
+  // A: nhân sự (cột chồng theo giới tính) + chỉ số (đường) theo trường phân tích
+  let cA=empty,lgA='';
+  if(rows.length&&D.dim){
+    const keys=groupKeys(D.dim,rows),gv=hasG?groupKeys('Giới Tính',rows):['Nhân sự'];
+    const series=gv.map((g,i)=>({name:lab(g),color:g==='Nữ'?PAL[1]:g==='Nam'?PAL[0]:PAL[(i+2)%PAL.length],vals:keys.map(k=>cnt(rows,r=>r[D.dim]===k&&(!hasG||r['Giới Tính']===g)))}));
+    const line=M?{name:M.name,vals:keys.map(k=>M.f(rows.filter(r=>r[D.dim]===k)))}:null;
+    cA=svgCombo(keys,series,line,fmtCount,fmtMoney,true);
+    lgA=legendHtml(series.concat(line?[{name:M.name+' (trục phải)',color:'#f08a5a',line:true}]:[]));
   }
-  const col=(i,title,k,ct,chart,lg)=>`<section><div class="pill" style="--c:${PILL[i]}">${title}</div>${k}<div class="dchart"><h4>${esc(ct)}</h4>${lg||''}${chart}</div></section>`;
-  $('#dGrid').innerHTML=
-    col(0,'Nhân sự',k1,'Nhân sự theo '+D.dim+(hasG?' và giới tính':''),c1,lg1)+
-    col(1,'Tuyển mới',k2,'Vào làm theo tháng (12 tháng gần nhất)',c2)+
-    col(2,'Thu nhập',k3,mLabel+' theo '+D.dim,c3)+
-    col(3,'Cơ cấu',k4,'Cơ cấu nhân sự theo '+D.dim2,c4);
+  // B: vào làm theo tháng (cột) + nhân sự lũy kế (đường)
+  const ml=[],mv=[],mc=[];
+  for(let i=11;i>=0;i--){const d=new Date(yr,mo-i,1),end=new Date(Math.min(new Date(d.getFullYear(),d.getMonth()+1,0,23,59,59),now));
+    ml.push('T'+(d.getMonth()+1)+'/'+String(d.getFullYear()).slice(2));
+    mv.push(cnt(rows,r=>{const x=hd(r);return x&&x.getFullYear()===d.getFullYear()&&x.getMonth()===d.getMonth()&&x<=now;}));
+    mc.push(cnt(rows,r=>{const x=hd(r);return x&&x<=end;}));}
+  const cB=rows.length?svgCombo(ml,[{name:'Vào làm trong tháng',color:PAL[1],vals:mv}],{name:'Nhân sự lũy kế (tính đến cuối tháng)',vals:mc},fmtCount,fmtCount,true):empty;
+  const lgB=legendHtml([{name:'Vào làm trong tháng',color:PAL[1]},{name:'Nhân sự lũy kế (trục phải)',color:'#f08a5a',line:true}]);
+  // C, D: toàn bộ các nhóm của trường "Cơ cấu theo" (vd: đủ mọi đơn vị phòng)
+  let cC=empty,cD=empty;
+  if(rows.length&&D.dim2){
+    const keys=groupKeys(D.dim2,rows);
+    cC=svgHBar(keys.map(k=>({label:k,val:cnt(rows,r=>r[D.dim2]===k)})).sort((a,b)=>b.val-a.val),fmtCount,PAL[0],true);
+    if(M)cD=svgHBar(keys.map(k=>({label:k,val:M.f(rows.filter(r=>r[D.dim2]===k))})).sort((a,b)=>b.val-a.val),fmtMoney,PAL[3],false);
+  }
+  const t1='Nhân sự'+(hasG?' (theo giới tính)':'')+(M?' và '+M.name:'')+' theo '+D.dim;
+  $('#dCharts').innerHTML=
+    card(PILL[0],t1,lgA,cA)+
+    card(PILL[1],'Vào làm theo tháng và nhân sự lũy kế (12 tháng gần nhất)',lgB,cB)+
+    card(PILL[2],'Cơ cấu nhân sự theo '+D.dim2+' ('+groupKeys(D.dim2,rows).length+' nhóm)','',cC)+
+    (M?card(PILL[3],M.name+' theo '+D.dim2,'',cD):'');
 }
 $('#dBookmarks').onclick=e=>{
   const del=e.target.closest('[data-bmdel]');
