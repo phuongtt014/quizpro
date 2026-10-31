@@ -189,5 +189,56 @@ var Workflow = (function () {
     Audit.log(user, 'HUY_PHIEU', 'PHIEU', p.ma_phieu, {});
   }
 
-  return { steps: steps, create: create, act: act, cancel: cancel, authority: authority, approvers: approvers, parse: parse };
+  /**
+   * Mở lại phiếu ĐÃ DUYỆT để sửa (chỉ quản trị viên, bắt buộc ghi lý do). Khai báo: dòng về Nháp; Quyết toán kỳ: kết quả về Tạm tính
+   * và gỡ mốc "Thu nhập hiện tại" do chính phiếu này sinh ra. Phiếu chuyển "Đã mở lại"; gửi duyệt lại sẽ tạo phiếu mới.
+   */
+  function reopen(user, id, note) {
+    if (!user.isAdmin) throw new AppError('FORBIDDEN', 'Chỉ quản trị viên được mở lại phiếu đã duyệt');
+    note = String(note || '').trim();
+    if (!note) throw new AppError('BAD_REQUEST', 'Bắt buộc ghi lý do mở lại');
+    var p = Db.get('PHIEU', id);
+    if (!p) throw new AppError('NOT_FOUND', 'Không tìm thấy phiếu');
+    if (p.trang_thai !== 'Đã duyệt') throw new AppError('STATE', 'Chỉ mở lại được phiếu ở trạng thái Đã duyệt');
+    var info = '';
+    if (p.loai_phieu === 'Khai báo') {
+      var lines = Db.filter('KHAI_BAO', function (r) { return r.phieu_ma === p.ma_phieu; });
+      var who = {};
+      lines.forEach(function (r) { who[r.ma_nv] = true; });
+      var fixed = Db.filter('QUYET_TOAN', function (r) { return r.ky_ma === p.ky_ma && who[r.ma_nv] && r.trang_thai !== 'Tạm tính'; })
+        .concat(Db.filter('THU_NHAP_MOI', function (r) { return r.ky_ma === p.ky_ma && who[r.ma_nv] && r.trang_thai !== 'Tạm tính'; }));
+      if (fixed.length) throw new AppError('STATE', 'Kỳ ' + p.ky_ma + ' đã gửi chốt quyết toán cho ' + Object.keys(fixed.reduce(function (m, r) { m[r.ma_nv] = 1; return m; }, {})).length +
+        ' người trong phiếu này. Hãy mở lại phiếu "Quyết toán kỳ" của kỳ đó trước.');
+      setLines('KHAI_BAO', p.ma_phieu, 'Đã duyệt', 'Nháp', true);
+      info = lines.length + ' dòng khai báo về Nháp';
+    } else if (p.loai_phieu === 'Quyết toán kỳ') {
+      var ky = Db.find('KY_LUONG', function (k) { return k.ma === p.ky_ma; });
+      if (ky) {
+        var later = Db.all('KY_LUONG').filter(function (k) { return k.den_ngay > ky.den_ngay; }).map(function (k) { return k.ma; });
+        var blocked = Db.filter('THU_NHAP_MOI', function (r) { return later.indexOf(r.ky_ma) >= 0 && r.trang_thai !== 'Tạm tính'; });
+        if (ky.loai === 'Điều chỉnh' && blocked.length) throw new AppError('STATE', 'Đã có kết quả chờ chốt/đã chốt ở kỳ sau (' + blocked[0].ky_ma + ') dựa trên mốc của đợt này. Mở lại kỳ sau trước.');
+      }
+      setLines('QUYET_TOAN', p.ma_phieu, 'Đã chốt', 'Tạm tính', true);
+      setLines('THU_NHAP_MOI', p.ma_phieu, 'Đã chốt', 'Tạm tính', true);
+      var tag = '(' + p.ma_phieu + ')', removed = Db.filter('THU_NHAP_NEN', function (r) { return String(r.ghi_chu).indexOf(tag) >= 0; });
+      var ups = [];
+      removed.forEach(function (m) {
+        Db.filter('THU_NHAP_NEN', function (h) { return h.ma_nv === m.ma_nv && h.hieu_luc_den === Util.addDays(m.hieu_luc_tu, -1); })
+          .forEach(function (h) { ups.push({ id: h.id, patch: { hieu_luc_den: m.hieu_luc_den } }); });
+      });
+      Db.updateMany('THU_NHAP_NEN', ups, 'system');
+      Db.removeMany('THU_NHAP_NEN', removed.map(function (m) { return m.id; }));
+      info = 'kết quả về Tạm tính' + (removed.length ? ', gỡ ' + removed.length + ' mốc Thu nhập hiện tại' : '');
+    } else throw new AppError('BAD_REQUEST', 'Loại phiếu này không hỗ trợ mở lại');
+    var to = [p.nguoi_tao];
+    Db.filter('PHIEU_LOG', function (l) { return l.ma_phieu === p.ma_phieu && l.hanh_dong.indexOf('Duyệt') === 0; }).forEach(function (l) { to.push(l.email); });
+    log(p, p.buoc_hien_tai, 'Mở lại', user.email, note);
+    setStatus(p, 'Đã mở lại');
+    Audit.log(user, 'MO_LAI_PHIEU', 'PHIEU', p.ma_phieu, { ly_do: note, ket_qua: info });
+    Notify.queue({ to: Util.uniq(to).filter(function (e) { return e !== user.email; }), title: 'Phiếu đã được mở lại để sửa: ' + p.tieu_de,
+      body: p.ma_phieu + ': ' + note, link: 'phieu', type: 'Phiếu duyệt' });
+    return info;
+  }
+
+  return { reopen: reopen, steps: steps, create: create, act: act, cancel: cancel, authority: authority, approvers: approvers, parse: parse };
 })();

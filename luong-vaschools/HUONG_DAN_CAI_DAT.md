@@ -89,6 +89,12 @@ Dán lại `Code.gs` / `Index.html` mới → **Triển khai → Quản lý tri�
 - Mã tính theo **buổi** (vd QD09 = 0,2 tiết/buổi): chọn đơn vị **Buổi** và nhập **số buổi**; hệ thống nhân với số tiết/buổi của bảng.
 - Nhập CSV có thêm cột *Mã quy đổi trách nhiệm* (không bắt buộc; mẫu cũ không có cột này vẫn nhập được).
 
+## Mở lại phiếu đã duyệt để sửa (chỉ quản trị viên)
+- *Phiếu duyệt* → mở phiếu có trạng thái **Đã duyệt** (loại *Khai báo* hoặc *Quyết toán kỳ*) → ghi **lý do** vào ô ghi chú → **Mở lại để sửa**. Có nhật ký và thông báo cho người tạo, người đã duyệt.
+- **Quyết toán kỳ:** kết quả về *Tạm tính*; nếu là kỳ Điều chỉnh, các mốc "Thu nhập hiện tại" do phiếu đó tạo ra được gỡ (trả lại hiệu lực cũ). Bị chặn nếu kỳ sau đã có kết quả chờ chốt/đã chốt.
+- **Khai báo:** dòng về *Nháp*. Bị chặn nếu kỳ đã gửi chốt quyết toán cho những người trong phiếu: mở lại phiếu Quyết toán trước.
+- Thứ tự sửa đúng: mở lại quyết toán → mở lại khai báo → sửa → gửi duyệt khai báo (phiếu mới) → Tính toán → gửi chốt (phiếu mới). Phiếu cũ giữ lịch sử với trạng thái *Đã mở lại*.
+
 ## Lưu ý
 - **Tốc độ:** ứng dụng dùng bộ nhớ đệm. Nếu có ai **sửa trực tiếp trong file Google Sheet CSDL** (không khuyến khích), bấm nút **⟳ Làm mới dữ liệu** ở thanh trên cùng (cần quyền *Sửa thiết lập*), nếu không dữ liệu có thể chưa cập nhật tới 10 phút.
 - **Không chia sẻ file Google Sheet CSDL** cho người dùng. Họ chỉ cần URL web app.

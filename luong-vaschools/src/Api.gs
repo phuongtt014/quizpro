@@ -642,13 +642,20 @@ var Api = (function () {
       var logs = Db.filter('PHIEU_LOG', function (l) { return l.ma_phieu === ph.ma_phieu; })
         .map(function (l) { return { buoc: l.buoc, hanh_dong: l.hanh_dong, email: l.email, ghi_chu: l.ghi_chu, ts: l.ts }; });
       return { phieu: phieuRow(ph, user), steps: chain, log: logs, items: phieuItems(ph),
-        can_act: !!au.ok, act_mode: au.ok ? au.mode : '', can_cancel: ph.trang_thai === 'Đang duyệt' && (ph.nguoi_tao === user.email || user.isAdmin) };
+        can_act: !!au.ok, act_mode: au.ok ? au.mode : '', can_cancel: ph.trang_thai === 'Đang duyệt' && (ph.nguoi_tao === user.email || user.isAdmin),
+        can_reopen: ph.trang_thai === 'Đã duyệt' && !!user.isAdmin && (ph.loai_phieu === 'Khai báo' || ph.loai_phieu === 'Quyết toán kỳ') };
     },
 
     'phieu.act': function (p, user) {
       var out;
       Db.tx(function () { out = phieuRow(Workflow.act(user, p.id, p.action, p.note || ''), user); });
       return out;
+    },
+
+    'phieu.reopen': function (p, user) {
+      var out;
+      Db.tx(function () { out = Workflow.reopen(user, p.id, p.note); });
+      return { info: out };
     },
 
     'phieu.cancel': function (p, user) {

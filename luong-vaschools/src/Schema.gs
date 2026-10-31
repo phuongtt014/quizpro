@@ -572,7 +572,7 @@ var SCHEMA = (function () {
     cols: [
       col_('ma_phieu', 'Mã phiếu'), col_('loai_phieu', 'Loại', 'enum', { values: LOAI_PHIEU }), col_('tieu_de', 'Tiêu đề'),
       col_('chi_nhanh_ma', 'Chi nhánh'), col_('truong_ma', 'Trường'), col_('ky_ma', 'Kỳ'), col_('nguoi_tao', 'Người tạo'),
-      col_('trang_thai', 'Trạng thái', 'enum', { values: ['Đang duyệt', 'Đã duyệt', 'Trả lại', 'Đã hủy'] }),
+      col_('trang_thai', 'Trạng thái', 'enum', { values: ['Đang duyệt', 'Đã duyệt', 'Trả lại', 'Đã hủy', 'Đã mở lại'] }),
       col_('buoc_hien_tai', 'Bước hiện tại', 'int'), col_('so_buoc', 'Số bước', 'int'),
       col_('quy_trinh', 'Quy trình', 'longtext'), col_('noi_dung', 'Nội dung', 'longtext')
     ]

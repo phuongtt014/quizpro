@@ -1123,7 +1123,7 @@
     draw();
   }
 
-  var STATUS_CLS = { 'Đang duyệt': 'warn', 'Đã duyệt': 'ok', 'Trả lại': 'bad', 'Đã hủy': '' };
+  var STATUS_CLS = { 'Đang duyệt': 'warn', 'Đã duyệt': 'ok', 'Trả lại': 'bad', 'Đã hủy': '', 'Đã mở lại': 'warn' };
 
   function openPhieu(id, onDone) {
     api('phieu.get', { id: id }).then(function (d) {
@@ -1159,6 +1159,16 @@
         if (d.act_mode === 'uy_quyen') md.m.appendChild(el('div', { class: 'alert warn', text: 'Bạn đang duyệt theo ủy quyền.' }));
         acts.push(el('button', { class: 'btn dng', text: 'Trả lại', onclick: function () { act('Trả lại'); } }));
         acts.push(el('button', { class: 'btn pri', text: p.buoc >= p.so_buoc ? 'Phê duyệt cuối' : 'Duyệt', onclick: function () { act('Duyệt'); } }));
+      }
+      if (d.can_reopen) {
+        md.m.appendChild(note);
+        md.m.appendChild(el('div', { class: 'alert warn', text: 'Quản trị viên có thể mở lại phiếu đã duyệt để sửa dữ liệu (bắt buộc ghi lý do ở ô ghi chú, có nhật ký và thông báo cho người liên quan). Sau khi sửa, gửi duyệt lại bằng phiếu mới.' }));
+        acts.unshift(el('button', { class: 'btn dng', text: 'Mở lại để sửa', onclick: function () {
+          if (!note.value.trim()) { clear(errHost).appendChild(errBox({ error: 'Hãy ghi lý do mở lại vào ô ghi chú' })); return; }
+          if (!confirm('Mở lại phiếu này để sửa?')) return;
+          api('phieu.reopen', { id: id, note: note.value }).then(function (r) { md.close(); toast('Đã mở lại: ' + r.info); onDone(); })
+            .catch(function (e) { clear(errHost).appendChild(errBox(e)); });
+        } }));
       }
       if (d.can_cancel) acts.unshift(el('button', { class: 'btn', text: 'Hủy phiếu', onclick: function () {
         if (!confirm('Hủy phiếu này?')) return;

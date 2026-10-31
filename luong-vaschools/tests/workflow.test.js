@@ -229,3 +229,53 @@ test('Khai báo trách nhiệm theo mã quy đổi của đề án: kiểm tra �
   assert.strictEqual(d.data.lines.filter(l => l.qd_ma === 'QD09')[0].tiet, 8);
   assert.strictEqual(e.api('quydoi.list', { ky_ma: KY }).data.rows.length, 10);
 });
+
+test('Mở lại phiếu đã duyệt (chỉ admin, bắt buộc lý do): quyết toán rồi khai báo', () => {
+  const { e } = world();
+  e.as('gv.hcm@vaschools.edu.vn');
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: line() }).ok);
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: line({ loai: 'Trách nhiệm', noi_dung: 'GVCN', so_luong: '4' }) }).ok);
+  assert.ok(e.api('khaibao.submit', { ky_ma: KY, truong_ma: 'HCM_THPT' }).ok);
+  const kb = e.api('phieu.list', { tab: 'cua_toi' }).data.rows.find(x => x.loai === 'Khai báo').id;
+  approveAll(e, kb, ['ht.hcm', 'nhansu', 'tgd']);
+  e.as('tro.ly@vaschools.edu.vn');
+  assert.ok(e.api('calc.run', { ky_ma: KY, truong_ma: 'HCM_THPT' }).ok);
+  assert.ok(e.api('quyettoan.submit', { ky_ma: KY, truong_ma: 'HCM_THPT' }).ok);
+  const qt = e.api('phieu.list', { tab: 'cua_toi' }).data.rows.find(x => x.loai === 'Quyết toán kỳ').id;
+  approveAll(e, qt, ['ht.hcm', 'nhansu', 'tgd']);
+  // không phải admin: bị chặn
+  assert.strictEqual(e.api('phieu.reopen', { id: kb, note: 'x' }).code, 'FORBIDDEN');
+  e.as('admin@vaschools.edu.vn');
+  assert.strictEqual(e.api('phieu.get', { id: qt }).data.can_reopen, true);
+  assert.strictEqual(e.api('phieu.reopen', { id: qt, note: '' }).ok, false); // thiếu lý do
+  // khai báo không mở lại được khi quyết toán đã chốt
+  assert.strictEqual(e.api('phieu.reopen', { id: kb, note: 'sai tiết' }).code, 'STATE');
+  assert.ok(e.api('phieu.reopen', { id: qt, note: 'Sai số tiết' }).ok);
+  assert.strictEqual(j(e.run('Db.all("THU_NHAP_MOI").map(function(x){return x.trang_thai;})')).join(), 'Tạm tính');
+  assert.ok(e.api('phieu.reopen', { id: kb, note: 'Sai số tiết' }).ok);
+  const lines = e.api('list', { table: 'KHAI_BAO', filter: { ky_ma: KY } }).data.rows;
+  assert.deepStrictEqual(j(lines.map(l => [l.trang_thai, l.phieu_ma])), [['Nháp', ''], ['Nháp', '']]);
+  assert.strictEqual(e.api('phieu.get', { id: kb }).data.phieu.trang_thai, 'Đã mở lại');
+  assert.strictEqual(e.api('phieu.reopen', { id: kb, note: 'lần 2' }).ok, false); // không mở lại hai lần
+  // sửa được và gửi duyệt lại
+  e.as('gv.hcm@vaschools.edu.vn');
+  assert.ok(e.api('save', { table: 'KHAI_BAO', id: lines[0].id, row: line({ so_luong: '20' }) }).ok);
+});
+
+test('Mở lại phiếu chốt kỳ Điều chỉnh: gỡ mốc Thu nhập hiện tại do phiếu sinh ra', () => {
+  const { e } = world();
+  const before = j(e.run('Db.all("THU_NHAP_NEN").length'));
+  e.as('admin@vaschools.edu.vn');
+  const ky = { ma: '2026-2027-DC1', nam_hoc_ma: '2026-2027', hoc_ky: 'DC1', loai: 'Điều chỉnh', tu_ngay: '01/03/2027', den_ngay: '01/03/2027', so_tuan: '0' };
+  assert.ok(e.api('save', { table: 'KY_LUONG', row: ky }).ok);
+  e.as('tro.ly@vaschools.edu.vn');
+  assert.ok(e.api('calc.run', { ky_ma: ky.ma }).ok);
+  assert.ok(e.api('quyettoan.submit', { ky_ma: ky.ma, truong_ma: 'HCM_THPT' }).ok);
+  const pid = e.api('phieu.list', { tab: 'cua_toi' }).data.rows.find(x => x.loai === 'Quyết toán kỳ').id;
+  approveAll(e, pid, ['ht.hcm', 'nhansu', 'tgd']);
+  assert.ok(j(e.run('Db.all("THU_NHAP_NEN").length')) > before);
+  e.as('admin@vaschools.edu.vn');
+  assert.ok(e.api('phieu.reopen', { id: pid, note: 'Nhập sai' }).ok);
+  assert.strictEqual(j(e.run('Db.all("THU_NHAP_NEN").length')), before);
+  assert.strictEqual(j(e.run('Db.all("THU_NHAP_NEN").filter(function(x){return x.ma_nv==="NV001";})[0].hieu_luc_den')), '');
+});
