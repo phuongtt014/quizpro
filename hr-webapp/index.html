@@ -38,7 +38,10 @@ textarea{width:100%;font-family:Consolas,monospace;font-size:13px}
 .page{padding:0 18px 30px}.page>.tab{background:#fff;border:1px solid var(--bd);border-radius:0 10px 10px 10px;padding:16px}
 /* table */
 .tw{overflow:auto;max-height:66vh;border:1px solid var(--bd);border-radius:8px}
-#tab-records .tw{max-height:calc(100vh - 285px);min-height:380px}
+#tab-records:not([hidden]){display:flex;flex-direction:column;height:calc(100vh - 128px);min-height:480px}
+#tab-records .tw{flex:1 1 auto;min-height:200px;max-height:none}
+.rng{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--mu)}
+.rng input{width:68px;padding:5px 6px}
 table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
 table.grid th,table.grid td{padding:7px 10px;border-bottom:1px solid #edf0f6;border-right:1px solid #f1f3f8;white-space:nowrap;background:#fff}
 table.grid th{position:sticky;top:0;background:#f0f4fb;z-index:2;text-align:left;cursor:pointer;user-select:none}
@@ -177,6 +180,9 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
       <div class="row" style="margin-bottom:10px">
         <input id="q" placeholder="Tìm kiếm (mã, họ tên, đơn vị...)" style="min-width:240px">
         <span id="filters" class="row"></span>
+        <span class="rng" title="Lọc theo khoảng tuổi">Tuổi <input id="rAgeMin" type="number" min="0" step="1" placeholder="từ"> – <input id="rAgeMax" type="number" min="0" step="1" placeholder="đến"></span>
+        <span class="rng" title="Lọc theo số năm làm việc">Số năm làm việc <input id="rSvMin" type="number" min="0" step="0.5" placeholder="từ"> – <input id="rSvMax" type="number" min="0" step="0.5" placeholder="đến"></span>
+        <button class="btn sm" id="btnClr">Xóa lọc</button>
         <div class="grow"></div>
         <div class="dd">
           <button class="btn" id="btnCols">Hiện / ẩn cột ▾</button>
@@ -419,9 +425,12 @@ function renderRegionFilter(){
 function sortKey(f,r){const v=r[f.name];if(f.type==='number'||f.type==='calc')return v===''?-1:v;
   if(f.type==='date'){const m=/^(\d\d)\/(\d\d)\/(\d{4})$/.exec(v);return m?m[3]+m[2]+m[1]:'';}return String(v);}
 function cmpBy(f,d){return (a,b)=>{const x=sortKey(f,a),y=sortKey(f,b);return (typeof x==='number'?x-y:String(x).localeCompare(String(y),'vi'))*d;};}
+const RANGES=[['Tuổi','rAge'],['Số Năm Làm Việc','rSv']];
 function filtered(){
   const q=S.q.trim().toLowerCase();
-  let rows=S.records.filter(r=>FILTERS.every(n=>!S.flt[n]||r[n]===S.flt[n])&&(!q||viewCols().some(f=>String(r[f.name]).toLowerCase().includes(q))));
+  const rg=RANGES.map(([n,id])=>{const lo=$('#'+id+'Min').value,hi=$('#'+id+'Max').value;return {n,lo:lo===''?null:Number(lo),hi:hi===''?null:Number(hi)};}).filter(x=>x.lo!==null||x.hi!==null);
+  const inRng=r=>rg.every(x=>{const v=r[x.n];return v!==''&&(x.lo===null||v>=x.lo)&&(x.hi===null||v<=x.hi);});
+  let rows=S.records.filter(r=>FILTERS.every(n=>!S.flt[n]||r[n]===S.flt[n])&&inRng(r)&&(!q||viewCols().some(f=>String(r[f.name]).toLowerCase().includes(q))));
   // Ưu tiên: cột người dùng bấm (nếu có) -> Khu vực -> Pháp nhân chính -> Đơn vị phòng -> Ngày vào làm
   const chain=[];
   if(S.sort){const f=viewCols().find(x=>x.name===S.sort.name);if(f)chain.push(cmpBy(f,S.sort.dir));}
@@ -451,6 +460,8 @@ function renderRecords(){
   if(!$('#tab-dash').hidden)renderDash();
 }
 $('#q').oninput=e=>{S.q=e.target.value;S.page=1;renderRecords();};
+RANGES.forEach(([n,id])=>['Min','Max'].forEach(k=>$('#'+id+k).oninput=()=>{S.page=1;renderRecords();}));
+$('#btnClr').onclick=()=>{S.q='';S.flt={};$('#q').value='';RANGES.forEach(([n,id])=>{$('#'+id+'Min').value='';$('#'+id+'Max').value='';});S.page=1;renderRegionFilter();renderRecords();};
 $('#pPrev').onclick=()=>{S.page--;renderRecords();};$('#pNext').onclick=()=>{S.page++;renderRecords();};
 $('#grid').onclick=e=>{
   const th=e.target.closest('th[data-sort]');
