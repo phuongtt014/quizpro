@@ -38,6 +38,7 @@ textarea{width:100%;font-family:Consolas,monospace;font-size:13px}
 .page{padding:0 18px 30px}.page>.tab{background:#fff;border:1px solid var(--bd);border-radius:0 10px 10px 10px;padding:16px}
 /* table */
 .tw{overflow:auto;max-height:66vh;border:1px solid var(--bd);border-radius:8px}
+#tab-records .tw{max-height:calc(100vh - 285px);min-height:380px}
 table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
 table.grid th,table.grid td{padding:7px 10px;border-bottom:1px solid #edf0f6;border-right:1px solid #f1f3f8;white-space:nowrap;background:#fff}
 table.grid th{position:sticky;top:0;background:#f0f4fb;z-index:2;text-align:left;cursor:pointer;user-select:none}
@@ -217,6 +218,20 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
         </div>
         <div id="impReport"></div>
       </div>
+      <div class="card" id="fldCard">
+        <h2>Nhập / cập nhật hàng loạt chỉ 1 trường</h2>
+        <p class="muted small" style="margin-top:0">Cập nhật một trường cho nhân sự <b>đã có</b>, nhận diện bằng <b>Mã Nhân Viên</b>. File chỉ cần 2 cột: <b>Mã Nhân Viên</b> và <b>tên trường</b>. Giá trị được kiểm tra theo đúng quy định của trường (phân biệt hoa/thường, khoảng trắng); dòng lỗi không được cập nhật. Ô để trống sẽ xóa giá trị (nếu trường không bắt buộc).</p>
+        <div class="row">
+          <select id="fldSel"></select>
+          <button class="btn" id="fldTplX">Tải file mẫu (.xlsx, kèm giá trị hiện tại)</button>
+          <button class="btn" id="fldTplC">Tải file mẫu (.csv)</button>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <input type="file" id="fldFile" accept=".xlsx,.xls,.csv,.txt">
+          <button class="btn primary" id="btnFld" disabled>Cập nhật vào hệ thống</button>
+        </div>
+        <div id="fldReport"></div>
+      </div>
     </div>
 
     <!-- TAB THIẾT LẬP TRƯỜNG -->
@@ -352,13 +367,13 @@ $('#btnLogout').onclick=async()=>{try{await api('logout',S.token);}catch(e){}log
 /* ============ KHỞI TẠO ============ */
 async function loadApp(){
   const r=await api('bootstrap',S.token);
-  S.user=r.user;S.config=r.config;S.records=r.records;
+  S.user=r.user;S.config=r.config;S.records=r.records.map(decorate);
   const saved=lsGet('qp_cols_'+S.user.email);try{S.cols=saved?JSON.parse(saved):{};}catch(e){S.cols={};}
   $('#login').hidden=true;$('#main').hidden=false;
   $('#whoEmail').textContent=S.user.email;$('#whoRole').textContent=S.user.role;
   $('#whoReg').textContent=S.user.all?'Tất cả khu vực':'Khu vực: '+S.user.regions.join(', ');
   $$('#tabs [data-admin]').forEach(b=>b.hidden=!isAdmin());
-  $('#impCard').hidden=!canEdit();$('#btnAdd').hidden=!canEdit();
+  $('#impCard').hidden=!canEdit();$('#fldCard').hidden=!canEdit();fillFieldSel();$('#btnAdd').hidden=!canEdit();
   loadBm();switchTab('dash');renderRegionFilter();renderRecords();
 }
 function switchTab(t){
@@ -371,6 +386,21 @@ function switchTab(t){
 $('#tabs').onclick=e=>{const b=e.target.closest('button[data-tab]');if(b)switchTab(b.dataset.tab);};
 
 /* ============ TAB HỒ SƠ ============ */
+/* Trường tự tính (không lưu Sheet): Tuổi, Số năm làm việc – tính đến ngày hiện tại */
+const VIRT=[{name:'Tuổi',type:'calc',after:'Ngày Sinh',visible:true},{name:'Số Năm Làm Việc',type:'calc',after:'Ngày Vào Làm',visible:true}];
+function viewCols(){
+  const out=[];S.config.forEach(f=>{out.push(f);VIRT.filter(v=>v.after===f.name).forEach(v=>out.push(v));});
+  VIRT.forEach(v=>{if(!out.includes(v))out.push(v);});return out;
+}
+function monthsBetween(a,b){return (b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth())-(b.getDate()<a.getDate()?1:0);}
+function decorate(r){
+  const now=new Date(),bd=parsePd(r['Ngày Sinh']),hd=parsePd(r['Ngày Vào Làm']);
+  r['Tuổi']=bd&&bd<=now?Math.floor(monthsBetween(bd,now)/12):'';
+  r['Số Năm Làm Việc']=hd&&hd<=now?Math.round(monthsBetween(hd,now)/12*10)/10:'';
+  return r;
+}
+function parsePd(s){const m=/^(\d\d)\/(\d\d)\/(\d{4})$/.exec(s||'');return m?new Date(+m[3],+m[2]-1,+m[1]):null;}
+const isNumCol=f=>f.type==='number'||f.type==='calc';
 const colOn=f=>S.cols[f.name]!==undefined?S.cols[f.name]:f.visible;
 const NAME_COL='Họ Tên';
 const FILTERS=['Khu Vực','Pháp Nhân Chính','Đơn Vị Phòng'];
@@ -386,34 +416,35 @@ function renderRegionFilter(){
     sel.onchange=()=>{if(sel.value)S.flt[n]=sel.value;else delete S.flt[n];S.page=1;renderRecords();};
     box.appendChild(sel);});
 }
-function sortKey(f,r){const v=r[f.name];if(f.type==='number')return v===''?-1:v;
+function sortKey(f,r){const v=r[f.name];if(f.type==='number'||f.type==='calc')return v===''?-1:v;
   if(f.type==='date'){const m=/^(\d\d)\/(\d\d)\/(\d{4})$/.exec(v);return m?m[3]+m[2]+m[1]:'';}return String(v);}
 function cmpBy(f,d){return (a,b)=>{const x=sortKey(f,a),y=sortKey(f,b);return (typeof x==='number'?x-y:String(x).localeCompare(String(y),'vi'))*d;};}
 function filtered(){
   const q=S.q.trim().toLowerCase();
-  let rows=S.records.filter(r=>FILTERS.every(n=>!S.flt[n]||r[n]===S.flt[n])&&(!q||S.config.some(f=>String(r[f.name]).toLowerCase().includes(q))));
+  let rows=S.records.filter(r=>FILTERS.every(n=>!S.flt[n]||r[n]===S.flt[n])&&(!q||viewCols().some(f=>String(r[f.name]).toLowerCase().includes(q))));
   // Ưu tiên: cột người dùng bấm (nếu có) -> Khu vực -> Pháp nhân chính -> Đơn vị phòng -> Ngày vào làm
   const chain=[];
-  if(S.sort){const f=S.config.find(x=>x.name===S.sort.name);if(f)chain.push(cmpBy(f,S.sort.dir));}
+  if(S.sort){const f=viewCols().find(x=>x.name===S.sort.name);if(f)chain.push(cmpBy(f,S.sort.dir));}
   SORT_CHAIN.forEach(n=>{const f=S.config.find(x=>x.name===n);if(f)chain.push(cmpBy(f,1));});
   return rows.slice().sort((a,b)=>{for(const c of chain){const r=c(a,b);if(r)return r;}return 0;});
 }
-function cellHtml(f,v){return f.type==='number'?fmtNum(v):esc(v);}
+function cellHtml(f,v){return f.type==='number'?fmtNum(v):f.type==='calc'?(v===''?'':String(v).replace('.',',')):esc(v);}
 function renderRecords(){
-  const cols=S.config.filter(colOn), rows=filtered();
+  const cols=viewCols().filter(colOn), rows=filtered();
   const pages=Math.max(1,Math.ceil(rows.length/S.size));if(S.page>pages)S.page=pages;
   const slice=rows.slice((S.page-1)*S.size,S.page*S.size);
   const arrow=f=>S.sort&&S.sort.name===f.name?(S.sort.dir>0?' ▲':' ▼'):'';
   const stk=f=>f.name===NAME_COL?' stk':'';
-  const sums={};cols.forEach(f=>{if(f.type==='number')sums[f.name]=rows.reduce((s,r)=>s+(Number(r[f.name])||0),0);});
+  const sums={};cols.forEach(f=>{if(f.type==='number')sums[f.name]=rows.reduce((s,r)=>s+(Number(r[f.name])||0),0);
+    else if(f.type==='calc'){const a=rows.map(r=>r[f.name]).filter(v=>v!=='');sums[f.name]=a.length?Math.round(a.reduce((s,x)=>s+x,0)/a.length*10)/10:'';}});
   const hasAct=canEdit();
   const label=`Tổng cộng (${rows.length} hồ sơ)`;
-  const rowOf=r=>cols.map(f=>`<td class="${f.type==='number'?'num':''}${stk(f)}">${cellHtml(f,r[f.name])}</td>`).join('')+
+  const rowOf=r=>cols.map(f=>`<td class="${isNumCol(f)?'num':''}${stk(f)}">${cellHtml(f,r[f.name])}</td>`).join('')+
     (hasAct?`<td class="act"><button class="btn sm" data-edit="${S.records.indexOf(r)}">Sửa</button> <button class="btn sm danger" data-del="${S.records.indexOf(r)}">Xóa</button></td>`:'');
   $('#grid').innerHTML='<thead><tr>'+cols.map(f=>`<th class="${stk(f)}" data-sort="${esc(f.name)}">${esc(f.name)}${arrow(f)}</th>`).join('')+(hasAct?'<th class="act">Thao tác</th>':'')+'</tr></thead><tbody>'+
     (slice.length?slice.map(r=>'<tr>'+rowOf(r)+'</tr>').join('')
       :`<tr><td colspan="${cols.length+1}" class="muted" style="text-align:center;padding:30px">Chưa có hồ sơ nào</td></tr>`)+'</tbody>'+
-    (rows.length?'<tfoot><tr>'+cols.map((f,i)=>`<td class="${f.type==='number'?'num':''}${stk(f)}">${f.type==='number'?fmtNum(sums[f.name]):(i===0?label:'')}</td>`).join('')+(hasAct?'<td class="act"></td>':'')+'</tr></tfoot>':'');
+    (rows.length?'<tfoot><tr>'+cols.map((f,i)=>`<td class="${isNumCol(f)?'num':''}${stk(f)}" ${f.type==='calc'?'title="Trung bình"':''}>${f.type==='number'?fmtNum(sums[f.name]):f.type==='calc'?(sums[f.name]===''?'':'TB '+String(sums[f.name]).replace('.',',')):(i===0?label:'')}</td>`).join('')+(hasAct?'<td class="act"></td>':'')+'</tr></tfoot>':'');
   $('#cnt').textContent=`Hiển thị ${slice.length} / ${rows.length} hồ sơ (tổng ${S.records.length}). Dòng Tổng cộng tính trên toàn bộ ${rows.length} hồ sơ đang lọc.`;
   $('#pInfo').textContent=`Trang ${S.page}/${pages}`;$('#pPrev').disabled=S.page<=1;$('#pNext').disabled=S.page>=pages;
   renderColPanel();
@@ -433,12 +464,12 @@ $('#btnAdd').onclick=()=>openRecordForm(null);
 /* hiện/ẩn cột */
 function renderColPanel(){
   $('#colPanel').innerHTML=`<div class="row" style="margin-bottom:6px"><button class="btn sm" data-c="def">Mặc định</button><button class="btn sm" data-c="all">Hiện tất cả</button><button class="btn sm" data-c="none">Ẩn tất cả</button></div>`+
-    S.config.map(f=>`<label><input type="checkbox" data-col="${esc(f.name)}" ${colOn(f)?'checked':''}> ${esc(f.name)}</label>`).join('');
+    viewCols().map(f=>`<label><input type="checkbox" data-col="${esc(f.name)}" ${colOn(f)?'checked':''}> ${esc(f.name)}</label>`).join('');
 }
 function saveCols(){lsSet('qp_cols_'+S.user.email,JSON.stringify(S.cols));renderRecords();}
 $('#btnCols').onclick=e=>{e.stopPropagation();$('#colPanel').hidden=!$('#colPanel').hidden;};
 $('#colPanel').onclick=e=>{e.stopPropagation();
-  const c=e.target.closest('[data-c]');if(c){if(c.dataset.c==='def')S.cols={};else S.config.forEach(f=>S.cols[f.name]=c.dataset.c==='all');saveCols();$('#colPanel').hidden=false;}};
+  const c=e.target.closest('[data-c]');if(c){if(c.dataset.c==='def')S.cols={};else viewCols().forEach(f=>S.cols[f.name]=c.dataset.c==='all');saveCols();$('#colPanel').hidden=false;}};
 $('#colPanel').onchange=e=>{const n=e.target.dataset.col;if(n!==undefined){S.cols[n]=e.target.checked;lsSet('qp_cols_'+S.user.email,JSON.stringify(S.cols));
   const sc=$('#colPanel').scrollTop;renderRecords();$('#colPanel').hidden=false;$('#colPanel').scrollTop=sc;}};
 document.addEventListener('click',()=>{$('#colPanel').hidden=true;});
@@ -471,7 +502,7 @@ function openRecordForm(rec){
         if(f.type==='number')v=v.replace(/\D/g,'');else if(f.type!=='list')v=v.trim();
         out[f.name]=f.type==='number'&&v!==''?Number(v):v;});
       const r=await api('saveRecord',S.token,out,rec?rec[CODE]:null);
-      if(rec)S.records[S.records.indexOf(rec)]=r.record;else S.records.unshift(r.record);
+      const nr=decorate(r.record);if(rec)S.records[S.records.indexOf(rec)]=nr;else S.records.unshift(nr);
       renderRegionFilter();renderRecords();toast('Đã lưu hồ sơ '+r.record[CODE],'s');}}
   ]});
 }
@@ -483,8 +514,8 @@ async function deleteRec(rec){
 
 /* ============ NHẬP / XUẤT ============ */
 function exportMatrix(recs){
-  const head=S.config.map(f=>f.name);
-  return [head].concat(recs.map(r=>S.config.map(f=>r[f.name])));
+  const vc=viewCols(),head=vc.map(f=>f.name);
+  return [head].concat(recs.map(r=>vc.map(f=>r[f.name])));
 }
 function expRecs(){return $('#expFiltered').checked?filtered():S.records;}
 function listSheet(){
@@ -495,7 +526,7 @@ function listSheet(){
 function writeXlsx(aoa,name,withLists){
   const ws=XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols']=aoa[0].map(h=>({wch:Math.max(12,String(h).length+2)}));
-  S.config.forEach((f,c)=>{if(f.type==='number')for(let r=1;r<aoa.length;r++){const a=XLSX.utils.encode_cell({r,c});if(ws[a]&&ws[a].t==='n')ws[a].z='#,##0';}});
+  aoa[0].forEach((hn,c)=>{const f=S.config.find(x=>x.name===hn);if(f&&f.type==='number')for(let r=1;r<aoa.length;r++){const a=XLSX.utils.encode_cell({r,c});if(ws[a]&&ws[a].t==='n')ws[a].z='#,##0';}});
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'NhanSu');
   if(withLists){const w2=XLSX.utils.aoa_to_sheet(listSheet());XLSX.utils.book_append_sheet(wb,w2,'DanhMucHopLe');}
   const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
@@ -533,17 +564,17 @@ async function checkImport(){
     S.imp.report=r;renderReport(r,false);$('#btnImport').disabled=r.valid===0;
   }catch(e){S.imp.report=null;$('#btnImport').disabled=true;$('#impReport').innerHTML=`<div class="errbox">${esc(e.message)}</div>`;}
 }
-function renderReport(r,done){
+function renderReport(r,done,box){box=box||'#impReport';const fld=r.kind==='field';
   const errRows=r.errors.map(e=>`<tr><td>${e.row}</td><td>${esc(e.code)}</td><td>${esc(e.name)}</td><td><ul>${e.errors.map(m=>`<li>${esc(m)}</li>`).join('')}</ul></td></tr>`).join('');
-  $('#impReport').innerHTML=`<div style="margin-top:12px">
-    <span class="stat b">Tổng: ${r.total} dòng</span><span class="stat g">${done?'Đã nhập':'Hợp lệ'}: ${done?r.inserted:r.valid}</span><span class="stat r">Lỗi (không nhập): ${r.invalid}</span>
+  $(box).innerHTML=`<div style="margin-top:12px">
+    <span class="stat b">Tổng: ${r.total} dòng</span><span class="stat g">${done?(fld?'Đã cập nhật':'Đã nhập'):'Hợp lệ'}: ${done?r.inserted:r.valid}</span><span class="stat r">Lỗi (không ${fld?'cập nhật':'nhập'}): ${r.invalid}</span>
     ${done&&r.mode==='replace'?`<span class="stat b">Đã thay thế ${r.removed} hồ sơ cũ</span>`:''}</div>
     ${r.unknown&&r.unknown.length?`<div class="wabox">Cột không nhận diện, đã bỏ qua: ${esc(r.unknown.join(', '))}</div>`:''}
     ${!done&&r.mode==='replace'?`<div class="wabox">Chế độ thay thế: sẽ <b>xóa ${r.willRemove} hồ sơ hiện có</b> trong phạm vi quyền của bạn, rồi nhập ${r.valid} dòng hợp lệ.</div>`:''}
-    ${r.invalid?`<div class="row" style="margin:8px 0"><b>Chi tiết dòng lỗi</b><div class="grow"></div><button class="btn sm" id="btnErrCsv">Tải danh sách lỗi (CSV)</button></div>
+    ${r.invalid?`<div class="row" style="margin:8px 0"><b>Chi tiết dòng lỗi</b><div class="grow"></div><button class="btn sm errcsv">Tải danh sách lỗi (CSV)</button></div>
     <div class="tw" style="max-height:340px"><table class="grid errlist"><thead><tr><th>Dòng trong file</th><th>Mã NV</th><th>Họ tên</th><th>Lỗi</th></tr></thead><tbody>${errRows}</tbody></table></div>
     ${r.errors.length<r.invalid?`<p class="small muted">Chỉ hiển thị ${r.errors.length} dòng lỗi đầu tiên.</p>`:''}`:''}`;
-  const b=$('#btnErrCsv');if(b)b.onclick=()=>download(new Blob([toCsv([['Dòng trong file','Mã NV','Họ tên','Lỗi']].concat(r.errors.map(e=>[e.row,e.code,e.name,e.errors.join(' | ')])))],{type:'text/csv;charset=utf-8'}),`LoiNhapLieu_${stamp()}.csv`);
+  const b=$('.errcsv',$(box));if(b)b.onclick=()=>download(new Blob([toCsv([['Dòng trong file','Mã NV','Họ tên','Lỗi']].concat(r.errors.map(e=>[e.row,e.code,e.name,e.errors.join(' | ')])))],{type:'text/csv;charset=utf-8'}),`LoiNhapLieu_${stamp()}.csv`);
 }
 $('#impFile').onchange=async e=>{
   const f=e.target.files[0];S.imp=null;$('#btnImport').disabled=true;$('#impReport').innerHTML='';if(!f)return;
@@ -557,8 +588,42 @@ $('#btnImport').onclick=async()=>{
   try{
     const r=await api('importRecords',S.token,{headers:S.imp.headers,rows:S.imp.rows,mode:impMode(),dryRun:false});
     renderReport(r,true);$('#btnImport').disabled=true;S.imp=null;$('#impFile').value='';
-    S.records=(await api('getRecords',S.token)).records;renderRegionFilter();renderRecords();
+    S.records=(await api('getRecords',S.token)).records.map(decorate);renderRegionFilter();renderRecords();
     toast(`Đã nhập ${r.inserted} hồ sơ`+(r.invalid?`, bỏ qua ${r.invalid} dòng lỗi`:''),r.invalid?'':'s');
+  }catch(e){toast(e.message,'e');}
+};
+
+
+/* ---- Nhập chỉ 1 trường ---- */
+function fillFieldSel(){
+  const cur=$('#fldSel').value;
+  $('#fldSel').innerHTML=S.config.filter(f=>f.name!==CODE).map(f=>`<option value="${esc(f.name)}">Trường: ${esc(f.name)}</option>`).join('');
+  if(S.config.some(f=>f.name===cur))$('#fldSel').value=cur;
+}
+let FIMP=null;
+function fldTplData(){const n=$('#fldSel').value;return {n,aoa:[[CODE,n]].concat(S.records.map(r=>[r[CODE],r[n]]))};}
+$('#fldTplX').onclick=()=>{const t=fldTplData();writeXlsx(t.aoa,`Mau_${t.n}.xlsx`,false);};
+$('#fldTplC').onclick=()=>{const t=fldTplData();download(new Blob([toCsv(t.aoa)],{type:'text/csv;charset=utf-8'}),`Mau_${t.n}.csv`);};
+async function checkField(){
+  if(!FIMP)return;
+  try{const r=await api('importField',S.token,{headers:FIMP.headers,rows:FIMP.rows,field:$('#fldSel').value,dryRun:true});
+    FIMP.report=r;renderReport(r,false,'#fldReport');$('#btnFld').disabled=r.valid===0;}
+  catch(e){FIMP.report=null;$('#btnFld').disabled=true;$('#fldReport').innerHTML=`<div class="errbox">${esc(e.message)}</div>`;}
+}
+$('#fldSel').onchange=checkField;
+$('#fldFile').onchange=async e=>{
+  const f=e.target.files[0];FIMP=null;$('#btnFld').disabled=true;$('#fldReport').innerHTML='';if(!f)return;
+  try{busy(true);FIMP=await readFile(f);}catch(err){toast(err.message,'e');return;}finally{busy(false);}
+  await checkField();
+};
+$('#btnFld').onclick=async()=>{
+  if(!FIMP||!FIMP.report)return;const fn=$('#fldSel').value;
+  if(!await confirmBox('Cập nhật hàng loạt',`Cập nhật trường <b>${esc(fn)}</b> cho <b>${FIMP.report.valid}</b> nhân sự (ghi đè giá trị cũ). ${FIMP.report.invalid?`${FIMP.report.invalid} dòng lỗi sẽ bị bỏ qua. `:''}Tiếp tục?`,'Cập nhật'))return;
+  try{
+    const r=await api('importField',S.token,{headers:FIMP.headers,rows:FIMP.rows,field:fn,dryRun:false});
+    renderReport(r,true,'#fldReport');$('#btnFld').disabled=true;FIMP=null;$('#fldFile').value='';
+    S.records=(await api('getRecords',S.token)).records.map(decorate);renderRegionFilter();renderRecords();
+    toast(`Đã cập nhật trường "${fn}" cho ${r.updated} nhân sự`+(r.invalid?`, bỏ qua ${r.invalid} dòng lỗi`:''),r.invalid?'':'s');
   }catch(e){toast(e.message,'e');}
 };
 
@@ -628,7 +693,7 @@ $('#cfgPasteCfg').onclick=()=>{
     renderConfig();toast(`Cập nhật ${up} trường, thêm ${add} trường. Nhớ bấm "Lưu vào hệ thống".`,'s');}}]});
 };
 $('#cfgSave').onclick=async()=>{
-  try{const r=await api('saveConfig',S.token,S.cfg);S.config=r.config;S.cfg=JSON.parse(JSON.stringify(r.config));
+  try{const r=await api('saveConfig',S.token,S.cfg);S.config=r.config;S.cfg=JSON.parse(JSON.stringify(r.config));fillFieldSel();
     renderConfig();renderRecords();toast('Đã lưu thiết lập trường vào hệ thống','s');}
   catch(e){openModal({title:'Không lưu được',body:`<div class="errbox" style="margin:0">${esc(e.message)}</div>`});}
 };

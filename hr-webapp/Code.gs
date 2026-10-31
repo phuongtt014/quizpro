@@ -30,6 +30,8 @@ var APP = {
 var CODE = 'Mã Nhân Viên';
 var REGION = 'Khu Vực';
 var ROLES = ['Admin', 'Nhập liệu', 'Chỉ xem'];
+/** Cột tự tính trên giao diện (Tuổi, Số năm làm việc): không lưu vào Sheet, bỏ qua khi import. */
+var VIRTUAL = ['Tuổi', 'Số Năm Làm Việc'];
 var TYPE_LABEL = { text: 'Văn bản', list: 'Danh mục', number: 'Số', date: 'Ngày' };
 
 /** Danh sách trường mặc định: [tên, kiểu, bắt buộc, danh mục]. Khu Vực là trường hệ thống dùng để phân quyền. */
@@ -590,7 +592,7 @@ function importRecords(token, payload) {
     var colOf = {}, unknown = [], dupHead = [];
     headers.forEach(function (h, i) {
       if (h === '') return;
-      if (!byName[h]) { unknown.push(h); return; }
+      if (!byName[h]) { if (VIRTUAL.indexOf(h) < 0) unknown.push(h); return; }
       if (colOf[h] !== undefined) dupHead.push(h); else colOf[h] = i;
     });
     var autoRegion = !u.all && u.regions.length === 1 ? u.regions[0] : null;
@@ -678,6 +680,66 @@ function importRecords(token, payload) {
   });
 }
 
+
+/**
+ * Nhập hàng loạt CHỈ 1 TRƯỜNG cho nhân sự đã có.
+ * payload = { headers, rows: [{n, v}], field: tên trường, dryRun }
+ * File cần cột "Mã Nhân Viên" + cột của trường đó. Dòng lỗi không được cập nhật.
+ */
+function importField(token, payload) {
+  return run_(token, ['Admin', 'Nhập liệu'], function (u) {
+    var cfg = readConfig_();
+    var f = cfg.filter(function (x) { return x.name === payload.field; })[0];
+    if (!f || f.name === CODE) return { ok: false, error: 'Trường cần cập nhật không hợp lệ.' };
+    var headers = (payload.headers || []).map(function (h) { return h == null ? '' : String(h); });
+    var rows = payload.rows || [];
+    var dry = !!payload.dryRun;
+    if (rows.length > APP.MAX_IMPORT_ROWS) return { ok: false, error: 'File quá lớn: tối đa ' + APP.MAX_IMPORT_ROWS + ' dòng mỗi lần nhập.' };
+    var ci = headers.indexOf(CODE), fi = headers.indexOf(f.name);
+    if (ci < 0 || fi < 0) {
+      return { ok: false, error: 'File phải có cột "' + CODE + '" và cột "' + f.name + '" (tên cột khớp chính xác, kể cả hoa/thường và khoảng trắng).' };
+    }
+    var work = function () {
+      var byCode = {};
+      readAll_(cfg).forEach(function (r) { byCode[r[CODE]] = r; });
+      var seen = {}, good = [], errs = [];
+      rows.forEach(function (r) {
+        var raw = r.v[ci], code = raw == null ? '' : String(raw), msgs = [];
+        var rec = byCode[code];
+        if (code === '') msgs.push(CODE + ': bắt buộc nhập.');
+        else if (seen[code] !== undefined) msgs.push(CODE + ': trùng với dòng ' + seen[code] + ' trong file.');
+        else {
+          seen[code] = r.n;
+          if (!rec || !canRegion_(u, rec[REGION])) msgs.push(CODE + ': "' + show_(code) + '" không tồn tại hoặc không thuộc phạm vi quyền của bạn.');
+        }
+        var obj = {};
+        obj[f.name] = r.v[fi];
+        var res = validate_(obj, [f]);
+        msgs = msgs.concat(res.errors);
+        if (!msgs.length && f.name === REGION && !canRegion_(u, res.clean[REGION])) msgs.push(REGION + ': "' + res.clean[REGION] + '" không thuộc phạm vi quyền của bạn.');
+        if (msgs.length) errs.push({ row: r.n, code: code, name: rec ? rec['Họ Tên'] || '' : '', errors: msgs });
+        else good.push({ row: rec.__row, value: res.clean[f.name] });
+      });
+      var out = { ok: true, kind: 'field', dryRun: dry, field: f.name, total: rows.length, valid: good.length, invalid: errs.length, errors: errs.slice(0, 2000), unknown: [] };
+      if (dry || !good.length) { out.updated = 0; out.inserted = 0; return out; }
+      var sh = ensureDataSheet_(cfg, false);
+      var head = headRow_(sh), n = sh.getLastRow() - 1;
+      var col = head.indexOf(f.name) + 1, cb = head.indexOf(APP.META_BY) + 1, ca = head.indexOf(APP.META_AT) + 1;
+      var rg = sh.getRange(2, col, n, 1), vals = rg.getValues();
+      var by = sh.getRange(2, cb, n, 1).getValues(), at = sh.getRange(2, ca, n, 1).getValues(), ts = nowStr_();
+      good.forEach(function (x) { var i = x.row - 2; vals[i][0] = x.value; by[i][0] = u.email; at[i][0] = ts; });
+      rg.setNumberFormat(f.type === 'number' ? '#,##0' : '@');
+      rg.setValues(vals);
+      sh.getRange(2, cb, n, 1).setValues(by);
+      sh.getRange(2, ca, n, 1).setValues(at);
+      out.updated = good.length;
+      out.inserted = good.length;
+      return out;
+    };
+    return dry ? work() : withLock_(work);
+  });
+}
+
 /* =====================================================================
  * 6. API THIẾT LẬP TRƯỜNG + PHÂN QUYỀN (chỉ Admin)
  * ===================================================================== */
@@ -691,7 +753,7 @@ function saveConfig(token, fields) {
       var tag = 'Dòng ' + (i + 1) + ': ';
       if (!name || name !== name.trim()) { errs.push(tag + 'tên trường trống hoặc có khoảng trắng thừa.'); return; }
       if (name.length > 80 || /[\r\n]/.test(name)) { errs.push(tag + 'tên trường không hợp lệ.'); return; }
-      if (name === APP.META_BY || name === APP.META_AT) { errs.push(tag + 'tên trường bị trùng tên hệ thống.'); return; }
+      if (name === APP.META_BY || name === APP.META_AT || VIRTUAL.indexOf(name) >= 0) { errs.push(tag + 'tên trường bị trùng tên hệ thống.'); return; }
       if (seen[name]) { errs.push(tag + 'trùng tên trường "' + name + '".'); return; }
       seen[name] = true;
       var type = TYPE_LABEL[f.type] ? f.type : 'text';
