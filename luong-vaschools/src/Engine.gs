@@ -12,11 +12,34 @@ var Engine = (function () {
     return Math.round((Date.UTC(+b[0], +b[1] - 1, +b[2]) - Date.UTC(+a[0], +a[1] - 1, +a[2])) / 86400000) + 1;
   }
 
-  /** Định mức quy định cả kỳ theo đối tượng tính lương: số tuần quy định × tiết/tuần của đề án (đối tượng khác: 0). */
-  function quotaDefault(doiTuong, soTuan, param) {
-    if (doiTuong === 'GV Tiểu học nhiều môn') return num(soTuan) * num(param.dinh_muc_tieu_hoc);
-    if (doiTuong === 'GV còn lại') return num(soTuan) * num(param.dinh_muc_khac);
+  function perTuan(doiTuong, param) {
+    if (doiTuong === 'GV Tiểu học nhiều môn') return num(param.dinh_muc_tieu_hoc);
+    if (doiTuong === 'GV còn lại') return num(param.dinh_muc_khac);
     return 0;
+  }
+
+  /**
+   * Số ngày nhân sự có khai báo: hợp (không cộng trùng) các khoảng từ ngày – đến ngày của dòng Thực dạy; nếu không có dòng Thực dạy
+   * thì dùng dòng Trách nhiệm. Khoảng nghỉ giữa các dòng (nghỉ việc, nghỉ thai sản…) tự động không tính.
+   */
+  function coveredDays(decls) {
+    var pick = function (loai) { return decls.filter(function (d) { return d.loai === loai; }); };
+    var use = pick('Thực dạy'); if (!use.length) use = pick('Trách nhiệm');
+    var iv = use.map(function (d) { return [d.tu_ngay, d.den_ngay]; }).sort(function (a, b) { return a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0); });
+    var days = 0, cs = null, ce = null;
+    iv.forEach(function (x) {
+      if (cs === null) { cs = x[0]; ce = x[1]; }
+      else if (x[0] <= ce || daysInclusive(ce, x[0]) <= 2) { if (x[1] > ce) ce = x[1]; } // chồng hoặc liền kề thì gộp
+      else { days += daysInclusive(cs, ce); cs = x[0]; ce = x[1]; }
+    });
+    if (cs !== null) days += daysInclusive(cs, ce);
+    return { days: days, tu: iv.length ? iv[0][0] : '', den: iv.length ? iv.reduce(function (m, x) { return x[1] > m ? x[1] : m; }, iv[0][1]) : '' };
+  }
+
+  /** Định mức quy định = số tuần có khai báo (tổng ngày / 7) × tiết/tuần theo đối tượng tính lương. */
+  function quotaFromDecls(decls, doiTuong, param) {
+    var c = coveredDays(decls), per = perTuan(doiTuong, param);
+    return { days: c.days, weeks: c.days / 7, per_tuan: per, tiet: per * c.days / 7, tu: c.tu, den: c.den };
   }
 
   /** Quy đổi một dòng khai báo ra tổng số tiết tuyệt đối (PRD 2.1; môn đặc thù nhân hệ số quy đổi). */
@@ -48,7 +71,7 @@ var Engine = (function () {
       var t = tietOf(d, p);
       if (d.loai === 'Thực dạy') th += t; else if (d.loai === 'Trách nhiệm') tn += t; else dm += t;
     });
-    var dmQd = quotaDefault(input.doiTuong, input.soTuan, p);
+    var dmQd = quotaFromDecls(input.decls, input.doiTuong, p).tiet;
     if (dm === 0) dm = dmQd;
     var hs = input.hsTiet;
     if (hs === null || hs === undefined || hs === '' || hs === 0) { hs = 1; notes.push('Ngạch không có HS tiết, tạm dùng 1,0'); }
@@ -140,5 +163,5 @@ var Engine = (function () {
     };
   }
 
-  return { quotaDefault: quotaDefault, daysInclusive: daysInclusive, tietOf: tietOf, allocate: allocate, settle: settle, income: income, capRate: capRate, capRateInfo: capRateInfo };
+  return { quotaFromDecls: quotaFromDecls, coveredDays: coveredDays, daysInclusive: daysInclusive, tietOf: tietOf, allocate: allocate, settle: settle, income: income, capRate: capRate, capRateInfo: capRateInfo };
 })();

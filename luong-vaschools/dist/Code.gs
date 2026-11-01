@@ -656,7 +656,7 @@ var SCHEMA = (function () {
       col_('noi_dung', 'Nội dung (môn/lớp/chức trách)', 'text', { req: true }),
       col_('so_luong', 'Số lượng', 'num', { req: true, min: 0, hint: 'có mã quy đổi: số tiết theo bảng (không vượt); đơn vị Buổi: số buổi' }),
       col_('don_vi', 'Đơn vị', 'enum', { values: ['Tiết/Tuần', 'Tiết/Tháng', 'Tiết/Ngày', 'Buổi', 'Tiết/Kỳ'], req: true, hint: 'Tiết/Kỳ = tổng số tiết cả kỳ (dùng cho Định mức)' }),
-      col_('ly_do', 'Lý do (bắt buộc khi định mức khác quy định)', 'text'),
+      col_('ly_do', 'Lý do (bắt buộc với dòng Định mức)', 'text'),
       col_('dac_thu', 'Môn đặc thù (1 tiết = 1,5)', 'enum', { values: YN, def: 'Không' }),
       col_('tu_ngay', 'Từ ngày', 'date', { req: true }),
       col_('den_ngay', 'Đến ngày', 'date', { req: true }),
@@ -667,13 +667,7 @@ var SCHEMA = (function () {
     check: function (r) {
       if (r.den_ngay < r.tu_ngay) return 'Đến ngày phải ≥ Từ ngày';
       if (r.dac_thu === 'Có' && r.loai !== 'Thực dạy') return 'Chỉ môn Thực dạy mới đánh dấu đặc thù';
-      if (r.loai === 'Định mức') {
-        var kyd = Db.find('KY_LUONG', function (k) { return k.ma === r.ky_ma; });
-        if (kyd) {
-          var qd0 = Policy.quota(kyd, r.ma_nv), tiet = Engine.tietOf(r, qd0.param);
-          if (Math.abs(tiet - qd0.tiet) > 0.01 && !r.ly_do) return 'Định mức ' + Math.round(tiet * 100) / 100 + ' tiết khác định mức quy định ' + qd0.tiet + ' tiết (' + (qd0.doi_tuong || 'chưa có đối tượng') + '): hãy nhập Lý do';
-        }
-      }
+      if (r.loai === 'Định mức' && !r.ly_do) return 'Định mức nhập tay thay cho định mức tự tính: hãy nhập Lý do (nếu không cần sửa, bỏ dòng Định mức này)';
       if (r.don_vi === 'Buổi' && !r.qd_ma) return 'Đơn vị "Buổi" chỉ dùng với mã quy đổi trách nhiệm (vd QD09)';
       if (r.qd_ma) {
         if (r.loai !== 'Trách nhiệm') return 'Mã quy đổi chỉ dùng cho loại Trách nhiệm';
@@ -1612,12 +1606,15 @@ var Notify = {
  * phiên bản mới -> lịch sử cũ giữ nguyên, các kỳ lương cũ vẫn tham chiếu đúng phiên bản của nó.
  */
 var Policy = {
-  /** Định mức quy định của một người trong kỳ (theo đối tượng ở dòng quá trình ngạch bậc đang hiệu lực cuối kỳ): { doi_tuong, per_tuan, so_tuan, tiet }. */
+  /**
+   * Định mức quy định của một người trong kỳ, tính từ chính các dòng khai báo của họ (từ ngày – đến ngày → số tuần) và đối tượng tính lương
+   * ở dòng quá trình ngạch bậc hiệu lực cuối kỳ: { doi_tuong, per_tuan, so_tuan (tuần có khai báo), tiet, tu, den, param }.
+   */
   quota: function (ky, maNv) {
     var q = Staff.at('QUA_TRINH_NGACH', maNv, ky.den_ngay), dean = Policy.effective(ky.den_ngay), param = dean ? Policy.bundle(dean.ma).param : {};
-    var dt = q ? q.doi_tuong : '';
-    return { doi_tuong: dt, so_tuan: ky.so_tuan, per_tuan: dt === 'GV Tiểu học nhiều môn' ? Number(param.dinh_muc_tieu_hoc) || 0 : (dt === 'GV còn lại' ? Number(param.dinh_muc_khac) || 0 : 0),
-      tiet: Engine.quotaDefault(dt, ky.so_tuan, param), param: param };
+    var decls = Db.filter('KHAI_BAO', function (r) { return r.ky_ma === ky.ma && r.ma_nv === maNv && (r.loai === 'Thực dạy' || r.loai === 'Trách nhiệm'); });
+    var x = Engine.quotaFromDecls(decls, q ? q.doi_tuong : '', param);
+    return { doi_tuong: q ? q.doi_tuong : '', per_tuan: x.per_tuan, so_tuan: Math.round(x.weeks * 100) / 100, ngay: x.days, tiet: Math.round(x.tiet * 100) / 100, tu: x.tu, den: x.den, param: param };
   },
 
   childTables: function () {
@@ -1821,11 +1818,34 @@ var Engine = (function () {
     return Math.round((Date.UTC(+b[0], +b[1] - 1, +b[2]) - Date.UTC(+a[0], +a[1] - 1, +a[2])) / 86400000) + 1;
   }
 
-  /** Định mức quy định cả kỳ theo đối tượng tính lương: số tuần quy định × tiết/tuần của đề án (đối tượng khác: 0). */
-  function quotaDefault(doiTuong, soTuan, param) {
-    if (doiTuong === 'GV Tiểu học nhiều môn') return num(soTuan) * num(param.dinh_muc_tieu_hoc);
-    if (doiTuong === 'GV còn lại') return num(soTuan) * num(param.dinh_muc_khac);
+  function perTuan(doiTuong, param) {
+    if (doiTuong === 'GV Tiểu học nhiều môn') return num(param.dinh_muc_tieu_hoc);
+    if (doiTuong === 'GV còn lại') return num(param.dinh_muc_khac);
     return 0;
+  }
+
+  /**
+   * Số ngày nhân sự có khai báo: hợp (không cộng trùng) các khoảng từ ngày – đến ngày của dòng Thực dạy; nếu không có dòng Thực dạy
+   * thì dùng dòng Trách nhiệm. Khoảng nghỉ giữa các dòng (nghỉ việc, nghỉ thai sản…) tự động không tính.
+   */
+  function coveredDays(decls) {
+    var pick = function (loai) { return decls.filter(function (d) { return d.loai === loai; }); };
+    var use = pick('Thực dạy'); if (!use.length) use = pick('Trách nhiệm');
+    var iv = use.map(function (d) { return [d.tu_ngay, d.den_ngay]; }).sort(function (a, b) { return a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0); });
+    var days = 0, cs = null, ce = null;
+    iv.forEach(function (x) {
+      if (cs === null) { cs = x[0]; ce = x[1]; }
+      else if (x[0] <= ce || daysInclusive(ce, x[0]) <= 2) { if (x[1] > ce) ce = x[1]; } // chồng hoặc liền kề thì gộp
+      else { days += daysInclusive(cs, ce); cs = x[0]; ce = x[1]; }
+    });
+    if (cs !== null) days += daysInclusive(cs, ce);
+    return { days: days, tu: iv.length ? iv[0][0] : '', den: iv.length ? iv.reduce(function (m, x) { return x[1] > m ? x[1] : m; }, iv[0][1]) : '' };
+  }
+
+  /** Định mức quy định = số tuần có khai báo (tổng ngày / 7) × tiết/tuần theo đối tượng tính lương. */
+  function quotaFromDecls(decls, doiTuong, param) {
+    var c = coveredDays(decls), per = perTuan(doiTuong, param);
+    return { days: c.days, weeks: c.days / 7, per_tuan: per, tiet: per * c.days / 7, tu: c.tu, den: c.den };
   }
 
   /** Quy đổi một dòng khai báo ra tổng số tiết tuyệt đối (PRD 2.1; môn đặc thù nhân hệ số quy đổi). */
@@ -1857,7 +1877,7 @@ var Engine = (function () {
       var t = tietOf(d, p);
       if (d.loai === 'Thực dạy') th += t; else if (d.loai === 'Trách nhiệm') tn += t; else dm += t;
     });
-    var dmQd = quotaDefault(input.doiTuong, input.soTuan, p);
+    var dmQd = quotaFromDecls(input.decls, input.doiTuong, p).tiet;
     if (dm === 0) dm = dmQd;
     var hs = input.hsTiet;
     if (hs === null || hs === undefined || hs === '' || hs === 0) { hs = 1; notes.push('Ngạch không có HS tiết, tạm dùng 1,0'); }
@@ -1949,7 +1969,7 @@ var Engine = (function () {
     };
   }
 
-  return { quotaDefault: quotaDefault, daysInclusive: daysInclusive, tietOf: tietOf, allocate: allocate, settle: settle, income: income, capRate: capRate, capRateInfo: capRateInfo };
+  return { quotaFromDecls: quotaFromDecls, coveredDays: coveredDays, daysInclusive: daysInclusive, tietOf: tietOf, allocate: allocate, settle: settle, income: income, capRate: capRate, capRateInfo: capRateInfo };
 })();
 
 
@@ -3485,7 +3505,7 @@ var Api = (function () {
       return { unread: Notify.unread(user.email) };
     },
 
-    /** Định mức quy định của một người trong kỳ, để form Khai báo tự điền. */
+    /** Định mức tự tính của một người trong kỳ (từ các dòng khai báo của họ), để form Khai báo điền sẵn khi cần sửa tay. */
     'dinhmuc.macdinh': function (p, user) {
       Auth.require(user, 'declare.view');
       var ky = findKy(p.ky_ma, false), s = Db.find('NHAN_SU', function (x) { return x.ma_nv === p.ma_nv; });
@@ -3493,31 +3513,7 @@ var Api = (function () {
       var u = Staff.units(ky.den_ngay)[s.ma_nv] || {};
       if (!Auth.canRow(user, 'declare.view', { cn: s.chi_nhanh_ma, tr: u.truong_ma || '', nv: s.ma_nv })) throw new AppError('FORBIDDEN', 'Nhân sự nằm ngoài phạm vi của bạn');
       var q = Policy.quota(ky, s.ma_nv);
-      return { doi_tuong: q.doi_tuong, so_tuan: q.so_tuan, per_tuan: q.per_tuan, tiet: q.tiet, tu_ngay: Util.displayDate(ky.tu_ngay), den_ngay: Util.displayDate(ky.den_ngay) };
-    },
-
-    /** Tạo dòng Định mức quy định (Nháp) cho mọi nhân sự của trường chưa có dòng Định mức trong kỳ. */
-    'dinhmuc.tao': function (p, user) {
-      Auth.require(user, 'declare.edit');
-      var out;
-      Db.tx(function () {
-        var ky = findKy(p.ky_ma, true), tr = findTruong(p.truong_ma);
-        if (ky.loai === 'Điều chỉnh') throw new AppError('BAD_REQUEST', 'Đợt điều chỉnh không có khai báo');
-        var have = {};
-        Db.filter('KHAI_BAO', function (r) { return r.ky_ma === ky.ma && r.loai === 'Định mức'; }).forEach(function (r) { have[r.ma_nv] = true; });
-        var ins = [], skipped = 0;
-        truongStaff(user, ky, tr, 'declare.edit').forEach(function (s) {
-          if (have[s.ma_nv]) { skipped++; return; }
-          var q = Policy.quota(ky, s.ma_nv);
-          if (!(q.tiet > 0)) { skipped++; return; }
-          ins.push({ ky_ma: ky.ma, ma_nv: s.ma_nv, loai: 'Định mức', qd_ma: '', noi_dung: 'Định mức quy định (' + q.doi_tuong + ')', so_luong: q.tiet, don_vi: 'Tiết/Kỳ',
-            ly_do: '', dac_thu: 'Không', tu_ngay: ky.tu_ngay, den_ngay: ky.den_ngay, trang_thai: 'Nháp', phieu_ma: '' });
-        });
-        Db.insertMany('KHAI_BAO', ins, user.email);
-        Audit.log(user, 'TAO_DINH_MUC', 'KHAI_BAO', ky.ma, { truong: tr.ma, tao: ins.length, bo_qua: skipped });
-        out = { created: ins.length, skipped: skipped };
-      });
-      return out;
+      return { doi_tuong: q.doi_tuong, so_tuan: q.so_tuan, ngay: q.ngay, per_tuan: q.per_tuan, tiet: q.tiet, tu_ngay: Util.displayDate(q.tu || ky.tu_ngay), den_ngay: Util.displayDate(q.den || ky.den_ngay) };
     },
 
     /** Xem trước tổng hợp theo người của một trường (không lưu). Số tiền chỉ hiện cho người có quyền money.view. */

@@ -4,12 +4,15 @@
  * phiên bản mới -> lịch sử cũ giữ nguyên, các kỳ lương cũ vẫn tham chiếu đúng phiên bản của nó.
  */
 var Policy = {
-  /** Định mức quy định của một người trong kỳ (theo đối tượng ở dòng quá trình ngạch bậc đang hiệu lực cuối kỳ): { doi_tuong, per_tuan, so_tuan, tiet }. */
+  /**
+   * Định mức quy định của một người trong kỳ, tính từ chính các dòng khai báo của họ (từ ngày – đến ngày → số tuần) và đối tượng tính lương
+   * ở dòng quá trình ngạch bậc hiệu lực cuối kỳ: { doi_tuong, per_tuan, so_tuan (tuần có khai báo), tiet, tu, den, param }.
+   */
   quota: function (ky, maNv) {
     var q = Staff.at('QUA_TRINH_NGACH', maNv, ky.den_ngay), dean = Policy.effective(ky.den_ngay), param = dean ? Policy.bundle(dean.ma).param : {};
-    var dt = q ? q.doi_tuong : '';
-    return { doi_tuong: dt, so_tuan: ky.so_tuan, per_tuan: dt === 'GV Tiểu học nhiều môn' ? Number(param.dinh_muc_tieu_hoc) || 0 : (dt === 'GV còn lại' ? Number(param.dinh_muc_khac) || 0 : 0),
-      tiet: Engine.quotaDefault(dt, ky.so_tuan, param), param: param };
+    var decls = Db.filter('KHAI_BAO', function (r) { return r.ky_ma === ky.ma && r.ma_nv === maNv && (r.loai === 'Thực dạy' || r.loai === 'Trách nhiệm'); });
+    var x = Engine.quotaFromDecls(decls, q ? q.doi_tuong : '', param);
+    return { doi_tuong: q ? q.doi_tuong : '', per_tuan: x.per_tuan, so_tuan: Math.round(x.weeks * 100) / 100, ngay: x.days, tiet: Math.round(x.tiet * 100) / 100, tu: x.tu, den: x.den, param: param };
   },
 
   childTables: function () {

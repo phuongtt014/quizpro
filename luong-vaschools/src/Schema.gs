@@ -430,7 +430,7 @@ var SCHEMA = (function () {
       col_('noi_dung', 'Nội dung (môn/lớp/chức trách)', 'text', { req: true }),
       col_('so_luong', 'Số lượng', 'num', { req: true, min: 0, hint: 'có mã quy đổi: số tiết theo bảng (không vượt); đơn vị Buổi: số buổi' }),
       col_('don_vi', 'Đơn vị', 'enum', { values: ['Tiết/Tuần', 'Tiết/Tháng', 'Tiết/Ngày', 'Buổi', 'Tiết/Kỳ'], req: true, hint: 'Tiết/Kỳ = tổng số tiết cả kỳ (dùng cho Định mức)' }),
-      col_('ly_do', 'Lý do (bắt buộc khi định mức khác quy định)', 'text'),
+      col_('ly_do', 'Lý do (bắt buộc với dòng Định mức)', 'text'),
       col_('dac_thu', 'Môn đặc thù (1 tiết = 1,5)', 'enum', { values: YN, def: 'Không' }),
       col_('tu_ngay', 'Từ ngày', 'date', { req: true }),
       col_('den_ngay', 'Đến ngày', 'date', { req: true }),
@@ -441,13 +441,7 @@ var SCHEMA = (function () {
     check: function (r) {
       if (r.den_ngay < r.tu_ngay) return 'Đến ngày phải ≥ Từ ngày';
       if (r.dac_thu === 'Có' && r.loai !== 'Thực dạy') return 'Chỉ môn Thực dạy mới đánh dấu đặc thù';
-      if (r.loai === 'Định mức') {
-        var kyd = Db.find('KY_LUONG', function (k) { return k.ma === r.ky_ma; });
-        if (kyd) {
-          var qd0 = Policy.quota(kyd, r.ma_nv), tiet = Engine.tietOf(r, qd0.param);
-          if (Math.abs(tiet - qd0.tiet) > 0.01 && !r.ly_do) return 'Định mức ' + Math.round(tiet * 100) / 100 + ' tiết khác định mức quy định ' + qd0.tiet + ' tiết (' + (qd0.doi_tuong || 'chưa có đối tượng') + '): hãy nhập Lý do';
-        }
-      }
+      if (r.loai === 'Định mức' && !r.ly_do) return 'Định mức nhập tay thay cho định mức tự tính: hãy nhập Lý do (nếu không cần sửa, bỏ dòng Định mức này)';
       if (r.don_vi === 'Buổi' && !r.qd_ma) return 'Đơn vị "Buổi" chỉ dùng với mã quy đổi trách nhiệm (vd QD09)';
       if (r.qd_ma) {
         if (r.loai !== 'Trách nhiệm') return 'Mã quy đổi chỉ dùng cho loại Trách nhiệm';

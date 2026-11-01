@@ -553,7 +553,7 @@ var Api = (function () {
       return { unread: Notify.unread(user.email) };
     },
 
-    /** Định mức quy định của một người trong kỳ, để form Khai báo tự điền. */
+    /** Định mức tự tính của một người trong kỳ (từ các dòng khai báo của họ), để form Khai báo điền sẵn khi cần sửa tay. */
     'dinhmuc.macdinh': function (p, user) {
       Auth.require(user, 'declare.view');
       var ky = findKy(p.ky_ma, false), s = Db.find('NHAN_SU', function (x) { return x.ma_nv === p.ma_nv; });
@@ -561,31 +561,7 @@ var Api = (function () {
       var u = Staff.units(ky.den_ngay)[s.ma_nv] || {};
       if (!Auth.canRow(user, 'declare.view', { cn: s.chi_nhanh_ma, tr: u.truong_ma || '', nv: s.ma_nv })) throw new AppError('FORBIDDEN', 'Nhân sự nằm ngoài phạm vi của bạn');
       var q = Policy.quota(ky, s.ma_nv);
-      return { doi_tuong: q.doi_tuong, so_tuan: q.so_tuan, per_tuan: q.per_tuan, tiet: q.tiet, tu_ngay: Util.displayDate(ky.tu_ngay), den_ngay: Util.displayDate(ky.den_ngay) };
-    },
-
-    /** Tạo dòng Định mức quy định (Nháp) cho mọi nhân sự của trường chưa có dòng Định mức trong kỳ. */
-    'dinhmuc.tao': function (p, user) {
-      Auth.require(user, 'declare.edit');
-      var out;
-      Db.tx(function () {
-        var ky = findKy(p.ky_ma, true), tr = findTruong(p.truong_ma);
-        if (ky.loai === 'Điều chỉnh') throw new AppError('BAD_REQUEST', 'Đợt điều chỉnh không có khai báo');
-        var have = {};
-        Db.filter('KHAI_BAO', function (r) { return r.ky_ma === ky.ma && r.loai === 'Định mức'; }).forEach(function (r) { have[r.ma_nv] = true; });
-        var ins = [], skipped = 0;
-        truongStaff(user, ky, tr, 'declare.edit').forEach(function (s) {
-          if (have[s.ma_nv]) { skipped++; return; }
-          var q = Policy.quota(ky, s.ma_nv);
-          if (!(q.tiet > 0)) { skipped++; return; }
-          ins.push({ ky_ma: ky.ma, ma_nv: s.ma_nv, loai: 'Định mức', qd_ma: '', noi_dung: 'Định mức quy định (' + q.doi_tuong + ')', so_luong: q.tiet, don_vi: 'Tiết/Kỳ',
-            ly_do: '', dac_thu: 'Không', tu_ngay: ky.tu_ngay, den_ngay: ky.den_ngay, trang_thai: 'Nháp', phieu_ma: '' });
-        });
-        Db.insertMany('KHAI_BAO', ins, user.email);
-        Audit.log(user, 'TAO_DINH_MUC', 'KHAI_BAO', ky.ma, { truong: tr.ma, tao: ins.length, bo_qua: skipped });
-        out = { created: ins.length, skipped: skipped };
-      });
-      return out;
+      return { doi_tuong: q.doi_tuong, so_tuan: q.so_tuan, ngay: q.ngay, per_tuan: q.per_tuan, tiet: q.tiet, tu_ngay: Util.displayDate(q.tu || ky.tu_ngay), den_ngay: Util.displayDate(q.den || ky.den_ngay) };
     },
 
     /** Xem trước tổng hợp theo người của một trường (không lưu). Số tiền chỉ hiện cho người có quyền money.view. */
