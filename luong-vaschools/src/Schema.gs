@@ -35,7 +35,8 @@ var PERMS = [
   { k: 'phieu.view', l: 'Xem mọi phiếu trong phạm vi' },
   { k: 'workflow.manage', l: 'Cấu hình quy trình duyệt & ủy quyền' },
   { k: 'calc.run', l: 'Chạy quyết toán phụ trội & thu nhập mới' },
-  { k: 'calc.view', l: 'Xem kết quả quyết toán & thu nhập mới' }
+  { k: 'calc.view', l: 'Xem kết quả quyết toán & thu nhập mới (cũ, giữ để tương thích)' },
+  { k: 'money.view', l: 'Xem số tiền phụ trội & thu nhập mới từng người' }
 ];
 
 var LOAI_PHIEU = ['Khai báo', 'Đề xuất ngạch', 'Quyết toán kỳ', 'Khác'];
@@ -136,43 +137,6 @@ var SCHEMA = (function () {
       if (r.ky_phu_troi) return 'Chỉ đợt điều chỉnh mới chọn "Kỳ lấy phụ trội"';
       if (r.so_tuan < 1) return 'Học kỳ cần nhập Số tuần quy định (≥ 1)';
       return r.den_ngay <= r.tu_ngay ? 'Đến ngày phải sau Từ ngày' : null;
-    }
-  };
-
-  S.DINH_MUC_TUAN = {
-    label: 'Điều chỉnh định mức theo tuần (nghỉ lễ…)', group: 'setup', key: ['ky_ma', 'truong_ma', 'doi_tuong', 'tu_ngay'],
-    perm: { r: 'setup.view', w: 'setup.edit' },
-    cols: [
-      col_('ky_ma', 'Kỳ', 'ref', { ref: 'KY_LUONG.ma', req: true }),
-      col_('truong_ma', 'Trường', 'ref', { ref: 'TRUONG.ma', hint: 'để trống = áp dụng cho mọi trường chưa có dòng riêng' }),
-      col_('doi_tuong', 'Đối tượng tính lương', 'enum', { values: ['GV Tiểu học nhiều môn', 'GV còn lại'], req: true }),
-      col_('tu_ngay', 'Từ ngày', 'date', { req: true }),
-      col_('den_ngay', 'Đến ngày', 'date', { req: true }),
-      col_('dinh_muc_tuan', 'Định mức trong giai đoạn (tiết/tuần)', 'num', { req: true, min: 0, hint: 'thay cho định mức mặc định của đề án trong khoảng ngày này' }),
-      col_('ly_do', 'Lý do', 'text')
-    ],
-    check: function (r) {
-      if (r.den_ngay < r.tu_ngay) return 'Đến ngày phải ≥ Từ ngày';
-      var ky = Db.find('KY_LUONG', function (k) { return k.ma === r.ky_ma; });
-      if (ky && ky.loai === 'Điều chỉnh') return 'Chỉ áp dụng cho kỳ Học kỳ';
-      if (ky && (r.tu_ngay < ky.tu_ngay || r.den_ngay > ky.den_ngay)) return 'Thời gian phải nằm trong kỳ ' + ky.ma + ' (' + Util.displayDate(ky.tu_ngay) + ' – ' + Util.displayDate(ky.den_ngay) + ')';
-      return null;
-    },
-    // Cùng (kỳ, trường, đối tượng) các khoảng ngày không được chồng nhau.
-    checkSet: function (rows, existing, updated, push) {
-      var groups = {}, key = function (r) { return r.ky_ma + '|' + r.truong_ma + '|' + r.doi_tuong; };
-      existing.forEach(function (r) { if (!updated[r.id]) (groups[key(r)] = groups[key(r)] || []).push({ r: r, own: false }); });
-      rows.forEach(function (r) { (groups[key(r)] = groups[key(r)] || []).push({ r: r, own: true }); });
-      Object.keys(groups).forEach(function (g) {
-        var l = groups[g].sort(function (a, b) { return a.r.tu_ngay < b.r.tu_ngay ? -1 : 1; });
-        for (var i = 0; i < l.length; i++) for (var j = i + 1; j < l.length; j++) {
-          if (l[j].r.tu_ngay > l[i].r.den_ngay) break;
-          [[l[i], l[j]], [l[j], l[i]]].forEach(function (p) {
-            if (p[0].own) push(p[0].r.__n, 'tu_ngay', p[0].r.tu_ngay, 'Khoảng ngày chồng với ' + (p[1].own ? 'dòng ' + p[1].r.__n + ' trong file' : 'dòng đã có') +
-              ' (' + Util.displayDate(p[1].r.tu_ngay) + ' – ' + Util.displayDate(p[1].r.den_ngay) + ')');
-          });
-        }
-      });
     }
   };
 
@@ -465,7 +429,8 @@ var SCHEMA = (function () {
       col_('qd_ma', 'Mã quy đổi trách nhiệm', 'text', { pattern: '^QD\\d{2}$', hint: 'QD01… theo bảng quy đổi của đề án (chỉ cho loại Trách nhiệm)' }),
       col_('noi_dung', 'Nội dung (môn/lớp/chức trách)', 'text', { req: true }),
       col_('so_luong', 'Số lượng', 'num', { req: true, min: 0, hint: 'có mã quy đổi: số tiết theo bảng (không vượt); đơn vị Buổi: số buổi' }),
-      col_('don_vi', 'Đơn vị', 'enum', { values: ['Tiết/Tuần', 'Tiết/Tháng', 'Tiết/Ngày', 'Buổi'], req: true }),
+      col_('don_vi', 'Đơn vị', 'enum', { values: ['Tiết/Tuần', 'Tiết/Tháng', 'Tiết/Ngày', 'Buổi', 'Tiết/Kỳ'], req: true, hint: 'Tiết/Kỳ = tổng số tiết cả kỳ (dùng cho Định mức)' }),
+      col_('ly_do', 'Lý do (bắt buộc khi định mức khác quy định)', 'text'),
       col_('dac_thu', 'Môn đặc thù (1 tiết = 1,5)', 'enum', { values: YN, def: 'Không' }),
       col_('tu_ngay', 'Từ ngày', 'date', { req: true }),
       col_('den_ngay', 'Đến ngày', 'date', { req: true }),
@@ -476,6 +441,13 @@ var SCHEMA = (function () {
     check: function (r) {
       if (r.den_ngay < r.tu_ngay) return 'Đến ngày phải ≥ Từ ngày';
       if (r.dac_thu === 'Có' && r.loai !== 'Thực dạy') return 'Chỉ môn Thực dạy mới đánh dấu đặc thù';
+      if (r.loai === 'Định mức') {
+        var kyd = Db.find('KY_LUONG', function (k) { return k.ma === r.ky_ma; });
+        if (kyd) {
+          var qd0 = Policy.quota(kyd, r.ma_nv), tiet = Engine.tietOf(r, qd0.param);
+          if (Math.abs(tiet - qd0.tiet) > 0.01 && !r.ly_do) return 'Định mức ' + Math.round(tiet * 100) / 100 + ' tiết khác định mức quy định ' + qd0.tiet + ' tiết (' + (qd0.doi_tuong || 'chưa có đối tượng') + '): hãy nhập Lý do';
+        }
+      }
       if (r.don_vi === 'Buổi' && !r.qd_ma) return 'Đơn vị "Buổi" chỉ dùng với mã quy đổi trách nhiệm (vd QD09)';
       if (r.qd_ma) {
         if (r.loai !== 'Trách nhiệm') return 'Mã quy đổi chỉ dùng cho loại Trách nhiệm';
@@ -509,9 +481,9 @@ var SCHEMA = (function () {
 
   S.QUYET_TOAN = {
     label: 'Phụ trội từng người', group: 'calc', scope: 'staff', readonly: true, key: ['ky_ma', 'ma_nv'],
-    perm: { r: 'calc.view', w: 'calc.run' },
+    perm: { r: 'money.view', w: 'calc.run' },
     cols: resultCols().concat([
-      col_('thuc_day', 'Thực dạy (tiết)', 'num'), col_('trach_nhiem', 'Trách nhiệm (tiết)', 'num'), col_('dinh_muc', 'Định mức (tiết)', 'num'),
+      col_('thuc_day', 'Thực dạy (tiết)', 'num'), col_('trach_nhiem', 'Trách nhiệm (tiết)', 'num'), col_('dinh_muc', 'Định mức (tiết)', 'num'), col_('dm_quy_dinh', 'Định mức quy định (tiết)', 'num'), col_('ly_do_dm', 'Lý do sửa định mức'),
       col_('tong_pt', 'Tổng phụ trội', 'num'), col_('pt_trach_nhiem', 'PT trách nhiệm', 'num'), col_('pt_giang_day', 'PT giảng dạy', 'num'),
       col_('hs_tiet', 'HS tiết', 'num'), col_('ltb', 'LTB', 'money'), col_('tien_pt', 'Tiền phụ trội', 'money')
     ]).concat(tail())
@@ -519,7 +491,7 @@ var SCHEMA = (function () {
 
   S.THU_NHAP_MOI = {
     label: 'Thu nhập từng người', group: 'calc', scope: 'staff', readonly: true, key: ['ky_ma', 'ma_nv'],
-    perm: { r: 'calc.view', w: 'calc.run' },
+    perm: { r: 'money.view', w: 'calc.run' },
     cols: resultCols().concat([
       col_('ngay_vao_lam', 'Ngày vào làm', 'date'), col_('ngach_ma', 'Ngạch'), col_('ngach_ten', 'Tên ngạch'), col_('tham_nien', 'Thâm niên (năm)', 'int'),
       col_('hs_cd', 'HS chức danh', 'num'), col_('hs_tn', 'HS thâm niên', 'num'), col_('hs_vk', 'HS vượt khung', 'num'),
@@ -617,7 +589,6 @@ var SCHEMA = (function () {
     'USER_ROLES.pham_vi': 'Toàn hệ thống',
     'WORKFLOW_STEP.thu_tu': '1', 'WORKFLOW_STEP.ten_buoc': 'Hiệu trưởng xét duyệt', 'WORKFLOW_STEP.hanh_dong': 'Xét duyệt', 'WORKFLOW_STEP.vai_tro': 'PRINCIPAL',
     'UY_QUYEN.hieu_luc_tu': '01/01/2026', 'UY_QUYEN.hieu_luc_den': '31/12/2026',
-    'DINH_MUC_TUAN.doi_tuong': 'GV còn lại', 'DINH_MUC_TUAN.dinh_muc_tuan': '6',
     'KHAI_BAO.noi_dung': 'Toán 10A1', 'KHAI_BAO.so_luong': '22', 'KHAI_BAO.tu_ngay': '07/09/2026', 'KHAI_BAO.den_ngay': '27/12/2026'
   };
   Object.keys(EX).forEach(function (k) {

@@ -279,3 +279,69 @@ test('Mở lại phiếu chốt kỳ Điều chỉnh: gỡ mốc Thu nhập hi�
   assert.strictEqual(j(e.run('Db.all("THU_NHAP_NEN").length')), before);
   assert.strictEqual(j(e.run('Db.all("THU_NHAP_NEN").filter(function(x){return x.ma_nv==="NV001";})[0].hieu_luc_den')), '');
 });
+
+test('Định mức quy định có sẵn trong Khai báo; sửa khác quy định phải có lý do', () => {
+  const { e } = world();
+  e.as('gv.hcm@vaschools.edu.vn');
+  const q = e.api('dinhmuc.macdinh', { ky_ma: KY, ma_nv: 'NV001' });
+  assert.deepStrictEqual(j([q.data.doi_tuong, q.data.per_tuan, q.data.so_tuan, q.data.tiet]), ['GV còn lại', 20, 16, 320]);
+  const dm = (o) => line(Object.assign({ loai: 'Định mức', noi_dung: 'Định mức', so_luong: '320', don_vi: 'Tiết/Kỳ', tu_ngay: '01/09/2026', den_ngay: '15/01/2027' }, o));
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: dm({}) }).ok); // đúng quy định: không cần lý do
+  const bad = e.api('save', { table: 'KHAI_BAO', row: dm({ noi_dung: 'Định mức 2', so_luong: '300' }) });
+  assert.strictEqual(bad.ok, false);
+  assert.match(JSON.stringify(bad), /Lý do/);
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: dm({ noi_dung: 'Định mức 2', so_luong: '300', ly_do: 'Nghỉ lễ 30/4' }) }).ok);
+  // tạo hàng loạt: người đã có dòng Định mức thì bỏ qua
+  const t = e.api('dinhmuc.tao', { ky_ma: KY, truong_ma: 'HCM_THPT' });
+  assert.deepStrictEqual(j([t.data.created, t.data.skipped]), [0, 1]);
+});
+
+test('Một phiếu Phụ trội kỳ: tính từ khai báo, Giáo vụ không thấy tiền, các cấp thấy tiết và tiền, duyệt xong chốt cả hai', () => {
+  const { e } = world();
+  e.as('gv.hcm@vaschools.edu.vn');
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: line() }).ok);
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: line({ loai: 'Trách nhiệm', noi_dung: 'GVCN', so_luong: '4' }) }).ok);
+  assert.strictEqual(e.api('dinhmuc.tao', { ky_ma: KY, truong_ma: 'HCM_THPT' }).data.created, 1);
+  const pv = e.api('phutroi.tonghop', { ky_ma: KY, truong_ma: 'HCM_THPT' }).data;
+  assert.strictEqual(pv.money, false);
+  assert.strictEqual(pv.rows[0].tien_pt, undefined);
+  assert.deepStrictEqual(j([pv.rows[0].thuc_day, pv.rows[0].trach_nhiem, pv.rows[0].dinh_muc, pv.rows[0].tong_pt]), [352, 64, 320, 96]);
+  const sub = e.api('phutroi.submit', { ky_ma: KY, truong_ma: 'HCM_THPT' });
+  assert.ok(sub.ok, JSON.stringify(sub));
+  const pid = e.api('phieu.list', { tab: 'cua_toi' }).data.rows[0].id;
+  const mine = e.api('phieu.get', { id: pid }).data.items;
+  assert.ok(mine.head.indexOf('Tiền phụ trội') < 0 && mine.head.indexOf('Tổng PT (tiết)') >= 0);
+  assert.strictEqual(j(e.run('Db.all("KHAI_BAO").filter(function(x){return x.trang_thai==="Chờ duyệt";}).length')), 3);
+  // Hiệu trưởng thấy cả tiền
+  e.as('ht.hcm@vaschools.edu.vn');
+  const ht = e.api('phieu.get', { id: pid }).data.items;
+  assert.ok(ht.head.indexOf('Tiền phụ trội') >= 0);
+  assert.strictEqual(ht.rows[ht.rows.length - 1][1], 'TỔNG');
+  approveAll(e, pid, ['ht.hcm', 'nhansu', 'tgd']);
+  assert.strictEqual(j(e.run('Db.all("KHAI_BAO").every(function(x){return x.trang_thai==="Đã duyệt";})')), true);
+  assert.deepStrictEqual(j(e.run('Db.all("QUYET_TOAN").map(function(x){return [x.trang_thai,x.nguon];})')), [['Đã chốt', 'Đã duyệt']]);
+  assert.strictEqual(j(e.run('Db.all("THU_NHAP_MOI")[0].trang_thai')), 'Đã chốt');
+  // Giáo vụ không đọc được bảng tiền
+  e.as('gv.hcm@vaschools.edu.vn');
+  assert.strictEqual(e.api('list', { table: 'QUYET_TOAN' }).code, 'FORBIDDEN');
+});
+
+test('Phiếu Phụ trội kỳ bị trả lại: khai báo về Nháp và kết quả về Tạm tính; mở lại sau khi duyệt đưa khai báo về Nháp', () => {
+  const { e } = world();
+  e.as('gv.hcm@vaschools.edu.vn');
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: line() }).ok);
+  assert.ok(e.api('phutroi.submit', { ky_ma: KY, truong_ma: 'HCM_THPT' }).ok);
+  const pid = e.api('phieu.list', { tab: 'cua_toi' }).data.rows[0].id;
+  e.as('ht.hcm@vaschools.edu.vn');
+  assert.ok(e.api('phieu.act', { id: pid, action: 'Trả lại', note: 'Sai số tiết' }).ok);
+  assert.strictEqual(j(e.run('Db.all("KHAI_BAO")[0].trang_thai')), 'Nháp');
+  assert.strictEqual(j(e.run('Db.all("QUYET_TOAN")[0].trang_thai')), 'Tạm tính');
+  e.as('gv.hcm@vaschools.edu.vn');
+  assert.ok(e.api('phutroi.submit', { ky_ma: KY, truong_ma: 'HCM_THPT' }).ok);
+  const pid2 = e.api('phieu.list', { tab: 'cua_toi' }).data.rows.find(x => x.trang_thai === 'Đang duyệt').id;
+  approveAll(e, pid2, ['ht.hcm', 'nhansu', 'tgd']);
+  e.as('admin@vaschools.edu.vn');
+  assert.ok(e.api('phieu.reopen', { id: pid2, note: 'Sai' }).ok);
+  assert.strictEqual(j(e.run('Db.all("KHAI_BAO")[0].trang_thai')), 'Nháp');
+  assert.strictEqual(j(e.run('Db.all("QUYET_TOAN")[0].trang_thai')), 'Tạm tính');
+});

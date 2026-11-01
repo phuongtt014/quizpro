@@ -261,7 +261,8 @@ var PERMS = [
   { k: 'phieu.view', l: 'Xem mọi phiếu trong phạm vi' },
   { k: 'workflow.manage', l: 'Cấu hình quy trình duyệt & ủy quyền' },
   { k: 'calc.run', l: 'Chạy quyết toán phụ trội & thu nhập mới' },
-  { k: 'calc.view', l: 'Xem kết quả quyết toán & thu nhập mới' }
+  { k: 'calc.view', l: 'Xem kết quả quyết toán & thu nhập mới (cũ, giữ để tương thích)' },
+  { k: 'money.view', l: 'Xem số tiền phụ trội & thu nhập mới từng người' }
 ];
 
 var LOAI_PHIEU = ['Khai báo', 'Đề xuất ngạch', 'Quyết toán kỳ', 'Khác'];
@@ -362,43 +363,6 @@ var SCHEMA = (function () {
       if (r.ky_phu_troi) return 'Chỉ đợt điều chỉnh mới chọn "Kỳ lấy phụ trội"';
       if (r.so_tuan < 1) return 'Học kỳ cần nhập Số tuần quy định (≥ 1)';
       return r.den_ngay <= r.tu_ngay ? 'Đến ngày phải sau Từ ngày' : null;
-    }
-  };
-
-  S.DINH_MUC_TUAN = {
-    label: 'Điều chỉnh định mức theo tuần (nghỉ lễ…)', group: 'setup', key: ['ky_ma', 'truong_ma', 'doi_tuong', 'tu_ngay'],
-    perm: { r: 'setup.view', w: 'setup.edit' },
-    cols: [
-      col_('ky_ma', 'Kỳ', 'ref', { ref: 'KY_LUONG.ma', req: true }),
-      col_('truong_ma', 'Trường', 'ref', { ref: 'TRUONG.ma', hint: 'để trống = áp dụng cho mọi trường chưa có dòng riêng' }),
-      col_('doi_tuong', 'Đối tượng tính lương', 'enum', { values: ['GV Tiểu học nhiều môn', 'GV còn lại'], req: true }),
-      col_('tu_ngay', 'Từ ngày', 'date', { req: true }),
-      col_('den_ngay', 'Đến ngày', 'date', { req: true }),
-      col_('dinh_muc_tuan', 'Định mức trong giai đoạn (tiết/tuần)', 'num', { req: true, min: 0, hint: 'thay cho định mức mặc định của đề án trong khoảng ngày này' }),
-      col_('ly_do', 'Lý do', 'text')
-    ],
-    check: function (r) {
-      if (r.den_ngay < r.tu_ngay) return 'Đến ngày phải ≥ Từ ngày';
-      var ky = Db.find('KY_LUONG', function (k) { return k.ma === r.ky_ma; });
-      if (ky && ky.loai === 'Điều chỉnh') return 'Chỉ áp dụng cho kỳ Học kỳ';
-      if (ky && (r.tu_ngay < ky.tu_ngay || r.den_ngay > ky.den_ngay)) return 'Thời gian phải nằm trong kỳ ' + ky.ma + ' (' + Util.displayDate(ky.tu_ngay) + ' – ' + Util.displayDate(ky.den_ngay) + ')';
-      return null;
-    },
-    // Cùng (kỳ, trường, đối tượng) các khoảng ngày không được chồng nhau.
-    checkSet: function (rows, existing, updated, push) {
-      var groups = {}, key = function (r) { return r.ky_ma + '|' + r.truong_ma + '|' + r.doi_tuong; };
-      existing.forEach(function (r) { if (!updated[r.id]) (groups[key(r)] = groups[key(r)] || []).push({ r: r, own: false }); });
-      rows.forEach(function (r) { (groups[key(r)] = groups[key(r)] || []).push({ r: r, own: true }); });
-      Object.keys(groups).forEach(function (g) {
-        var l = groups[g].sort(function (a, b) { return a.r.tu_ngay < b.r.tu_ngay ? -1 : 1; });
-        for (var i = 0; i < l.length; i++) for (var j = i + 1; j < l.length; j++) {
-          if (l[j].r.tu_ngay > l[i].r.den_ngay) break;
-          [[l[i], l[j]], [l[j], l[i]]].forEach(function (p) {
-            if (p[0].own) push(p[0].r.__n, 'tu_ngay', p[0].r.tu_ngay, 'Khoảng ngày chồng với ' + (p[1].own ? 'dòng ' + p[1].r.__n + ' trong file' : 'dòng đã có') +
-              ' (' + Util.displayDate(p[1].r.tu_ngay) + ' – ' + Util.displayDate(p[1].r.den_ngay) + ')');
-          });
-        }
-      });
     }
   };
 
@@ -691,7 +655,8 @@ var SCHEMA = (function () {
       col_('qd_ma', 'Mã quy đổi trách nhiệm', 'text', { pattern: '^QD\\d{2}$', hint: 'QD01… theo bảng quy đổi của đề án (chỉ cho loại Trách nhiệm)' }),
       col_('noi_dung', 'Nội dung (môn/lớp/chức trách)', 'text', { req: true }),
       col_('so_luong', 'Số lượng', 'num', { req: true, min: 0, hint: 'có mã quy đổi: số tiết theo bảng (không vượt); đơn vị Buổi: số buổi' }),
-      col_('don_vi', 'Đơn vị', 'enum', { values: ['Tiết/Tuần', 'Tiết/Tháng', 'Tiết/Ngày', 'Buổi'], req: true }),
+      col_('don_vi', 'Đơn vị', 'enum', { values: ['Tiết/Tuần', 'Tiết/Tháng', 'Tiết/Ngày', 'Buổi', 'Tiết/Kỳ'], req: true, hint: 'Tiết/Kỳ = tổng số tiết cả kỳ (dùng cho Định mức)' }),
+      col_('ly_do', 'Lý do (bắt buộc khi định mức khác quy định)', 'text'),
       col_('dac_thu', 'Môn đặc thù (1 tiết = 1,5)', 'enum', { values: YN, def: 'Không' }),
       col_('tu_ngay', 'Từ ngày', 'date', { req: true }),
       col_('den_ngay', 'Đến ngày', 'date', { req: true }),
@@ -702,6 +667,13 @@ var SCHEMA = (function () {
     check: function (r) {
       if (r.den_ngay < r.tu_ngay) return 'Đến ngày phải ≥ Từ ngày';
       if (r.dac_thu === 'Có' && r.loai !== 'Thực dạy') return 'Chỉ môn Thực dạy mới đánh dấu đặc thù';
+      if (r.loai === 'Định mức') {
+        var kyd = Db.find('KY_LUONG', function (k) { return k.ma === r.ky_ma; });
+        if (kyd) {
+          var qd0 = Policy.quota(kyd, r.ma_nv), tiet = Engine.tietOf(r, qd0.param);
+          if (Math.abs(tiet - qd0.tiet) > 0.01 && !r.ly_do) return 'Định mức ' + Math.round(tiet * 100) / 100 + ' tiết khác định mức quy định ' + qd0.tiet + ' tiết (' + (qd0.doi_tuong || 'chưa có đối tượng') + '): hãy nhập Lý do';
+        }
+      }
       if (r.don_vi === 'Buổi' && !r.qd_ma) return 'Đơn vị "Buổi" chỉ dùng với mã quy đổi trách nhiệm (vd QD09)';
       if (r.qd_ma) {
         if (r.loai !== 'Trách nhiệm') return 'Mã quy đổi chỉ dùng cho loại Trách nhiệm';
@@ -735,9 +707,9 @@ var SCHEMA = (function () {
 
   S.QUYET_TOAN = {
     label: 'Phụ trội từng người', group: 'calc', scope: 'staff', readonly: true, key: ['ky_ma', 'ma_nv'],
-    perm: { r: 'calc.view', w: 'calc.run' },
+    perm: { r: 'money.view', w: 'calc.run' },
     cols: resultCols().concat([
-      col_('thuc_day', 'Thực dạy (tiết)', 'num'), col_('trach_nhiem', 'Trách nhiệm (tiết)', 'num'), col_('dinh_muc', 'Định mức (tiết)', 'num'),
+      col_('thuc_day', 'Thực dạy (tiết)', 'num'), col_('trach_nhiem', 'Trách nhiệm (tiết)', 'num'), col_('dinh_muc', 'Định mức (tiết)', 'num'), col_('dm_quy_dinh', 'Định mức quy định (tiết)', 'num'), col_('ly_do_dm', 'Lý do sửa định mức'),
       col_('tong_pt', 'Tổng phụ trội', 'num'), col_('pt_trach_nhiem', 'PT trách nhiệm', 'num'), col_('pt_giang_day', 'PT giảng dạy', 'num'),
       col_('hs_tiet', 'HS tiết', 'num'), col_('ltb', 'LTB', 'money'), col_('tien_pt', 'Tiền phụ trội', 'money')
     ]).concat(tail())
@@ -745,7 +717,7 @@ var SCHEMA = (function () {
 
   S.THU_NHAP_MOI = {
     label: 'Thu nhập từng người', group: 'calc', scope: 'staff', readonly: true, key: ['ky_ma', 'ma_nv'],
-    perm: { r: 'calc.view', w: 'calc.run' },
+    perm: { r: 'money.view', w: 'calc.run' },
     cols: resultCols().concat([
       col_('ngay_vao_lam', 'Ngày vào làm', 'date'), col_('ngach_ma', 'Ngạch'), col_('ngach_ten', 'Tên ngạch'), col_('tham_nien', 'Thâm niên (năm)', 'int'),
       col_('hs_cd', 'HS chức danh', 'num'), col_('hs_tn', 'HS thâm niên', 'num'), col_('hs_vk', 'HS vượt khung', 'num'),
@@ -843,7 +815,6 @@ var SCHEMA = (function () {
     'USER_ROLES.pham_vi': 'Toàn hệ thống',
     'WORKFLOW_STEP.thu_tu': '1', 'WORKFLOW_STEP.ten_buoc': 'Hiệu trưởng xét duyệt', 'WORKFLOW_STEP.hanh_dong': 'Xét duyệt', 'WORKFLOW_STEP.vai_tro': 'PRINCIPAL',
     'UY_QUYEN.hieu_luc_tu': '01/01/2026', 'UY_QUYEN.hieu_luc_den': '31/12/2026',
-    'DINH_MUC_TUAN.doi_tuong': 'GV còn lại', 'DINH_MUC_TUAN.dinh_muc_tuan': '6',
     'KHAI_BAO.noi_dung': 'Toán 10A1', 'KHAI_BAO.so_luong': '22', 'KHAI_BAO.tu_ngay': '07/09/2026', 'KHAI_BAO.den_ngay': '27/12/2026'
   };
   Object.keys(EX).forEach(function (k) {
@@ -1641,6 +1612,14 @@ var Notify = {
  * phiên bản mới -> lịch sử cũ giữ nguyên, các kỳ lương cũ vẫn tham chiếu đúng phiên bản của nó.
  */
 var Policy = {
+  /** Định mức quy định của một người trong kỳ (theo đối tượng ở dòng quá trình ngạch bậc đang hiệu lực cuối kỳ): { doi_tuong, per_tuan, so_tuan, tiet }. */
+  quota: function (ky, maNv) {
+    var q = Staff.at('QUA_TRINH_NGACH', maNv, ky.den_ngay), dean = Policy.effective(ky.den_ngay), param = dean ? Policy.bundle(dean.ma).param : {};
+    var dt = q ? q.doi_tuong : '';
+    return { doi_tuong: dt, so_tuan: ky.so_tuan, per_tuan: dt === 'GV Tiểu học nhiều môn' ? Number(param.dinh_muc_tieu_hoc) || 0 : (dt === 'GV còn lại' ? Number(param.dinh_muc_khac) || 0 : 0),
+      tiet: Engine.quotaDefault(dt, ky.so_tuan, param), param: param };
+  },
+
   childTables: function () {
     return Object.keys(SCHEMA).filter(function (t) { return SCHEMA[t].ctx === 'de_an_ma'; });
   },
@@ -1842,32 +1821,18 @@ var Engine = (function () {
     return Math.round((Date.UTC(+b[0], +b[1] - 1, +b[2]) - Date.UTC(+a[0], +a[1] - 1, +a[2])) / 86400000) + 1;
   }
 
-  function isoPlus(iso, n) {
-    var a = iso.split('-'), d = new Date(Date.UTC(+a[0], +a[1] - 1, +a[2] + n));
-    return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2);
-  }
-
-  /**
-   * Số tiết định mức bị giảm do tuần nghỉ lễ... trong kỳ [tu, den]. base = định mức mặc định (tiết/tuần).
-   * own = dòng điều chỉnh riêng của trường, chung = dòng áp cho mọi trường (cùng đối tượng). Mỗi ngày: dòng riêng trước, rồi dòng chung, nếu không thì giữ mức mặc định.
-   * Giảm = Σ ngày (base − mức tuần ngày đó)/7, mức tuần lớn hơn base thì không làm tăng định mức.
-   */
-  function quotaCut(tu, den, own, chung, base) {
-    var cut = 0, n = daysInclusive(tu, den), at = function (rows, d) {
-      for (var i = 0; i < rows.length; i++) if (rows[i].tu_ngay <= d && d <= rows[i].den_ngay) return rows[i];
-      return null;
-    };
-    for (var i = 0; i < n; i++) {
-      var d = isoPlus(tu, i), r = at(own, d) || at(chung, d);
-      if (r && num(r.dinh_muc_tuan) < base) cut += (base - num(r.dinh_muc_tuan)) / 7;
-    }
-    return cut;
+  /** Định mức quy định cả kỳ theo đối tượng tính lương: số tuần quy định × tiết/tuần của đề án (đối tượng khác: 0). */
+  function quotaDefault(doiTuong, soTuan, param) {
+    if (doiTuong === 'GV Tiểu học nhiều môn') return num(soTuan) * num(param.dinh_muc_tieu_hoc);
+    if (doiTuong === 'GV còn lại') return num(soTuan) * num(param.dinh_muc_khac);
+    return 0;
   }
 
   /** Quy đổi một dòng khai báo ra tổng số tiết tuyệt đối (PRD 2.1; môn đặc thù nhân hệ số quy đổi). */
   function tietOf(d, param) {
     var days = daysInclusive(d.tu_ngay, d.den_ngay), so = num(d.so_luong), t;
-    if (d.don_vi === 'Buổi') t = so * num(d.qd_so_tiet);
+    if (d.don_vi === 'Tiết/Kỳ') t = so;
+    else if (d.don_vi === 'Buổi') t = so * num(d.qd_so_tiet);
     else if (d.don_vi === 'Tiết/Tuần') t = so * (days / 7);
     else if (d.don_vi === 'Tiết/Tháng') t = so * (days / 30);
     else t = so * days;
@@ -1892,21 +1857,15 @@ var Engine = (function () {
       var t = tietOf(d, p);
       if (d.loai === 'Thực dạy') th += t; else if (d.loai === 'Trách nhiệm') tn += t; else dm += t;
     });
-    if (dm === 0) {
-      if (input.doiTuong === 'GV Tiểu học nhiều môn') dm = input.soTuan * num(p.dinh_muc_tieu_hoc);
-      else if (input.doiTuong === 'GV còn lại') dm = input.soTuan * num(p.dinh_muc_khac);
-    }
-    if (dm > 0 && input.dmGiam) {
-      dm = Math.max(0, dm - input.dmGiam);
-      notes.push('Định mức đã giảm ' + round(input.dmGiam, 2) + ' tiết do điều chỉnh theo tuần');
-    }
+    var dmQd = quotaDefault(input.doiTuong, input.soTuan, p);
+    if (dm === 0) dm = dmQd;
     var hs = input.hsTiet;
     if (hs === null || hs === undefined || hs === '' || hs === 0) { hs = 1; notes.push('Ngạch không có HS tiết, tạm dùng 1,0'); }
     var a = allocate(th, tn, dm);
     var hsTN = num(p.he_so_tiet_trach_nhiem) || 1;
     var tien = a.ptTN * hsTN * input.ltb + a.ptGD * hs * input.ltb;
     return {
-      thuc_day: round(th, 4), trach_nhiem: round(tn, 4), dinh_muc: round(dm, 4), tong_pt: round(a.tong, 4),
+      thuc_day: round(th, 4), trach_nhiem: round(tn, 4), dinh_muc: round(dm, 4), dm_quy_dinh: round(dmQd, 4), tong_pt: round(a.tong, 4),
       pt_trach_nhiem: round(a.ptTN, 4), pt_giang_day: round(a.ptGD, 4), hs_tiet: hs, ltb: input.ltb,
       tien_pt: Math.round(tien), ghi_chu: notes.join('; ')
     };
@@ -1990,7 +1949,7 @@ var Engine = (function () {
     };
   }
 
-  return { quotaCut: quotaCut, daysInclusive: daysInclusive, tietOf: tietOf, allocate: allocate, settle: settle, income: income, capRate: capRate, capRateInfo: capRateInfo };
+  return { quotaDefault: quotaDefault, daysInclusive: daysInclusive, tietOf: tietOf, allocate: allocate, settle: settle, income: income, capRate: capRate, capRateInfo: capRateInfo };
 })();
 
 
@@ -2133,7 +2092,6 @@ var Calc = (function () {
     var declsBy = isAdj ? {} : groupBy(Db.filter('KHAI_BAO', function (d) {
       return d.ky_ma === kyMa && (gom === 'tat_ca' || d.trang_thai === 'Đã duyệt');
     }), 'ma_nv');
-    var dmTuan = isAdj ? [] : Db.filter('DINH_MUC_TUAN', function (r) { return r.ky_ma === kyMa; });
     var ngachBy = groupBy(Db.all('QUA_TRINH_NGACH'), 'ma_nv');
     var knBy = groupBy(Db.all('QUA_TRINH_KIEMNHIEM'), 'ma_nv');
     var tnBy = groupBy(Db.all('THU_NHAP_NEN'), 'ma_nv');
@@ -2186,14 +2144,11 @@ var Calc = (function () {
       var decls = (declsBy[s.ma_nv] || []).map(function (d) { return withQd(d, b.quyDoi); }), settle = { tien_pt: 0 }, nguon = 'Đã duyệt';
       if (decls.length) {
         if (decls.some(function (d) { return d.trang_thai !== 'Đã duyệt'; })) { nguon = 'Gồm dòng chưa duyệt'; unapproved++; }
-        var base = cur.doi_tuong === 'GV Tiểu học nhiều môn' ? +b.param.dinh_muc_tieu_hoc : (cur.doi_tuong === 'GV còn lại' ? +b.param.dinh_muc_khac : 0);
-        var adj = dmTuan.filter(function (r) { return r.doi_tuong === cur.doi_tuong; });
-        var dmGiam = base > 0 && adj.length ? Engine.quotaCut(ky.tu_ngay, ky.den_ngay,
-          adj.filter(function (r) { return r.truong_ma && r.truong_ma === cur.truong_ma; }), adj.filter(function (r) { return !r.truong_ma; }), base) : 0;
-        settle = Engine.settle({ decls: decls, doiTuong: cur.doi_tuong, soTuan: ky.so_tuan, dmGiam: dmGiam, param: b.param, ltb: lw.ltb, hsTiet: g.hs_tiet === '' ? null : g.hs_tiet });
+                settle = Engine.settle({ decls: decls, doiTuong: cur.doi_tuong, soTuan: ky.so_tuan, param: b.param, ltb: lw.ltb, hsTiet: g.hs_tiet === '' ? null : g.hs_tiet });
         var row = { ky_ma: kyMa, ma_nv: s.ma_nv, de_an_ma: dean.ma, nguon: nguon, trang_thai: 'Tạm tính', phieu_ma: '' };
         Object.keys(who).forEach(function (k) { row[k] = who[k]; });
         Object.keys(settle).forEach(function (k) { row[k] = settle[k]; });
+        row.ly_do_dm = decls.filter(function (d) { return d.loai === 'Định mức' && d.ly_do; }).map(function (d) { return d.ly_do; }).join('; ');
         qt.push(row);
       }
 
@@ -2284,7 +2239,7 @@ var Calc = (function () {
       nhan_su_tinh_duoc: sim.tm.length, canh_bao: sim.warnings.slice(0, 50), so_canh_bao: sim.warnings.length };
   }
 
-  return { run: run, simulate: simulate, holdYears: holdYears, baselineDate: baselineDate, promoteBaseline: promoteBaseline };
+  return { preview: function (user, kyMa, truongMa, gom) { return build(user, getKy(kyMa), truongMa, gom, null); }, run: run, simulate: simulate, holdYears: holdYears, baselineDate: baselineDate, promoteBaseline: promoteBaseline };
 })();
 
 
@@ -2295,9 +2250,9 @@ var Calc = (function () {
  */
 var Report = (function () {
   function scopedRows(user, table, kyMa) {
-    var sf = Auth.scopeFn(table), global = Auth.hasGlobal(user, 'calc.view');
+    var sf = Auth.scopeFn(table), global = Auth.hasGlobal(user, 'money.view');
     return Db.filter(table, function (r) {
-      return r.ky_ma === kyMa && (global || !sf || Auth.canRow(user, 'calc.view', sf(r)));
+      return r.ky_ma === kyMa && (global || !sf || Auth.canRow(user, 'money.view', sf(r)));
     });
   }
 
@@ -2360,10 +2315,10 @@ var Report = (function () {
   }
 
   function missingCount(user, ky, have) {
-    var global = Auth.hasGlobal(user, 'calc.view'), u = Staff.units(ky.den_ngay);
+    var global = Auth.hasGlobal(user, 'money.view'), u = Staff.units(ky.den_ngay);
     return Db.filter('NHAN_SU', function (s) {
       if (have[s.ma_nv] || s.ngay_vao_lam > ky.den_ngay || (s.ngay_nghi_viec && s.ngay_nghi_viec < ky.tu_ngay)) return false;
-      return global || Auth.canRow(user, 'calc.view', { cn: s.chi_nhanh_ma, tr: u[s.ma_nv] ? u[s.ma_nv].truong_ma : '', nv: s.ma_nv });
+      return global || Auth.canRow(user, 'money.view', { cn: s.chi_nhanh_ma, tr: u[s.ma_nv] ? u[s.ma_nv].truong_ma : '', nv: s.ma_nv });
     }).length;
   }
 
@@ -2413,7 +2368,7 @@ var Report = (function () {
     var s = Db.find('NHAN_SU', function (x) { return x.ma_nv === maNv; });
     if (!ky || !s) throw new AppError('NOT_FOUND', 'Không tìm thấy kỳ hoặc nhân sự');
     var un = Staff.units(ky.den_ngay)[s.ma_nv] || {};
-    if (!Auth.canRow(user, 'calc.view', { cn: s.chi_nhanh_ma, tr: un.truong_ma || '', nv: s.ma_nv })) throw new AppError('FORBIDDEN', 'Nhân sự nằm ngoài phạm vi của bạn');
+    if (!Auth.canRow(user, 'money.view', { cn: s.chi_nhanh_ma, tr: un.truong_ma || '', nv: s.ma_nv })) throw new AppError('FORBIDDEN', 'Nhân sự nằm ngoài phạm vi của bạn');
     var dean = Policy.effective(ky.den_ngay), bun = dean ? Policy.bundle(dean.ma) : null, param = bun ? bun.param : {};
     var lines = Db.filter('KHAI_BAO', function (d) { return d.ky_ma === kyMa && d.ma_nv === maNv; }).map(function (d) {
       return { loai: d.loai, noi_dung: d.noi_dung, so_luong: d.so_luong, don_vi: d.don_vi, dac_thu: d.dac_thu, tu: d.tu_ngay, den: d.den_ngay,
@@ -2426,7 +2381,7 @@ var Report = (function () {
 
   /** Dữ liệu biểu đồ trang Tổng quan: kỳ mới nhất có kết quả trong phạm vi người xem (null nếu chưa có hoặc không có quyền). */
   function dashboard(user) {
-    if (!Auth.can(user, 'calc.view')) return null;
+    if (!Auth.can(user, 'money.view')) return null;
     var kys = Db.all('KY_LUONG').slice().sort(function (a, b) { return a.den_ngay < b.den_ngay ? 1 : -1; });
     for (var i = 0; i < kys.length; i++) {
       var rows = scopedRows(user, 'THU_NHAP_MOI', kys[i].ma);
@@ -2564,12 +2519,18 @@ var Workflow = (function () {
     approve: function (p) {
       setLines('QUYET_TOAN', p.ma_phieu, 'Chờ chốt', 'Đã chốt');
       setLines('THU_NHAP_MOI', p.ma_phieu, 'Chờ chốt', 'Đã chốt');
+      // Phiếu gộp (từ phutroi.submit): các dòng khai báo cùng được duyệt, nguồn kết quả thành "Đã duyệt".
+      setLines('KHAI_BAO', p.ma_phieu, 'Chờ duyệt', 'Đã duyệt');
+      ['QUYET_TOAN', 'THU_NHAP_MOI'].forEach(function (t) {
+        Db.updateMany(t, Db.filter(t, function (x) { return x.phieu_ma === p.ma_phieu && x.nguon !== 'Đã duyệt'; }).map(function (x) { return { id: x.id, patch: { nguon: 'Đã duyệt' } }; }), 'system');
+      });
       var r = Calc.promoteBaseline(p);
       return r.created ? ' Đã tạo ' + r.created + ' mốc "Thu nhập hiện tại" hiệu lực từ ' + Util.displayDate(r.date) + ' làm cơ sở cho đợt sau' +
         (r.skipped.length ? ' (bỏ qua ' + r.skipped.length + ': ' + r.skipped.slice(0, 3).join('; ') + ')' : '') + '.' : '';
     },
     revert: function (p) {
       setLines('QUYET_TOAN', p.ma_phieu, 'Chờ chốt', 'Tạm tính', true); setLines('THU_NHAP_MOI', p.ma_phieu, 'Chờ chốt', 'Tạm tính', true);
+      setLines('KHAI_BAO', p.ma_phieu, 'Chờ duyệt', 'Nháp', true);
     }
   };
   APPLY['Đề xuất ngạch'] = {
@@ -2667,6 +2628,7 @@ var Workflow = (function () {
       }
       setLines('QUYET_TOAN', p.ma_phieu, 'Đã chốt', 'Tạm tính', true);
       setLines('THU_NHAP_MOI', p.ma_phieu, 'Đã chốt', 'Tạm tính', true);
+      setLines('KHAI_BAO', p.ma_phieu, 'Đã duyệt', 'Nháp', true); // phiếu gộp: dòng khai báo cũng về Nháp
       var tag = '(' + p.ma_phieu + ')', removed = Db.filter('THU_NHAP_NEN', function (r) { return String(r.ghi_chu).indexOf(tag) >= 0; });
       var ups = [];
       removed.forEach(function (m) {
@@ -2764,13 +2726,13 @@ var Seed = (function () {
 
   var ROLE_PERMS = {
     HR_DIRECTOR: ['setup.view', 'setup.edit', 'policy.view', 'policy.edit', 'staff.view', 'staff.edit', 'staff.import', 'salary.view', 'salary.edit', 'audit.view',
-      'declare.view', 'declare.edit', 'phieu.create', 'phieu.view', 'workflow.manage', 'calc.run', 'calc.view'],
-    CEO: ['setup.view', 'policy.view', 'policy.publish', 'staff.view', 'salary.view', 'audit.view', 'declare.view', 'phieu.view', 'calc.view'],
-    HDHT_CHAIR: ['setup.view', 'policy.view', 'policy.edit', 'staff.view', 'salary.view', 'declare.view', 'phieu.view', 'calc.view'],
-    HR_STAFF: ['setup.view', 'policy.view', 'staff.view', 'staff.edit', 'staff.import', 'declare.view', 'declare.edit', 'phieu.create', 'phieu.view', 'calc.run', 'calc.view'],
-    PRINCIPAL: ['setup.view', 'policy.view', 'staff.view', 'staff.edit', 'salary.view', 'declare.view', 'declare.edit', 'phieu.create', 'phieu.view', 'calc.view'],
+      'declare.view', 'declare.edit', 'phieu.create', 'phieu.view', 'workflow.manage', 'calc.run', 'calc.view', 'money.view'],
+    CEO: ['setup.view', 'policy.view', 'policy.publish', 'staff.view', 'salary.view', 'audit.view', 'declare.view', 'phieu.view', 'calc.view', 'money.view'],
+    HDHT_CHAIR: ['setup.view', 'policy.view', 'policy.edit', 'staff.view', 'salary.view', 'declare.view', 'phieu.view', 'calc.view', 'money.view'],
+    HR_STAFF: ['setup.view', 'policy.view', 'staff.view', 'staff.edit', 'staff.import', 'declare.view', 'declare.edit', 'phieu.create', 'phieu.view', 'calc.run', 'calc.view', 'money.view'],
+    PRINCIPAL: ['setup.view', 'policy.view', 'staff.view', 'staff.edit', 'salary.view', 'declare.view', 'declare.edit', 'phieu.create', 'phieu.view', 'calc.view', 'money.view'],
     PROPOSER: ['setup.view', 'policy.view', 'staff.view', 'declare.view', 'declare.edit', 'phieu.create', 'phieu.view', 'calc.view'],
-    EMPLOYEE: ['staff.view', 'salary.view', 'declare.view', 'calc.view']
+    EMPLOYEE: ['staff.view', 'salary.view', 'declare.view', 'calc.view', 'money.view']
   };
 
   var VUOT_KHUNG = { GV3: 1, PHT: 1, HT: 1 };
@@ -3130,7 +3092,7 @@ var Api = (function () {
     return m;
   }
 
-  function phieuItems(p) {
+  function phieuItems(p, user) {
     var names = staffName(), rows = [], head = [];
     if (p.loai_phieu === 'Khai báo') {
       head = ['Mã NV', 'Họ tên', 'Loại', 'Nội dung', 'Số lượng', 'Thời gian'];
@@ -3138,11 +3100,32 @@ var Api = (function () {
         return [r.ma_nv, names[r.ma_nv] || '', r.loai, r.noi_dung, r.so_luong + ' ' + r.don_vi + (r.dac_thu === 'Có' ? ' (đặc thù)' : ''), Util.displayDate(r.tu_ngay) + ' – ' + Util.displayDate(r.den_ngay)];
       });
     } else if (p.loai_phieu === 'Quyết toán kỳ') {
-      head = ['Mã NV', 'Họ tên', 'Thu nhập hiện tại', 'Mức chính thức', 'Ghi chú'];
-      var money = function (v) { return v === '' ? '' : Number(v).toLocaleString('vi-VN'); };
-      rows = Db.filter('THU_NHAP_MOI', function (r) { return r.phieu_ma === p.ma_phieu; }).map(function (r) {
-        return [r.ma_nv, names[r.ma_nv] || '', money(r.thu_nhap_hien_tai), money(r.chinh_thuc), r.ghi_chu];
-      });
+      var money = function (v) { return v === '' || v === undefined ? '' : Number(v).toLocaleString('vi-VN'); }, num = function (v) { return v === '' || v === undefined ? '' : String(Math.round(Number(v) * 100) / 100).replace('.', ','); };
+      var seeMoney = Auth.can(user, 'money.view');
+      var qts = {}, incs = Db.filter('THU_NHAP_MOI', function (r) { return r.phieu_ma === p.ma_phieu; });
+      Db.filter('QUYET_TOAN', function (r) { return r.phieu_ma === p.ma_phieu; }).forEach(function (r) { qts[r.ma_nv] = r; });
+      var order = incs.map(function (r) { return r.ma_nv; });
+      Object.keys(qts).forEach(function (k) { if (order.indexOf(k) < 0) order.push(k); });
+      var tm = {};
+      incs.forEach(function (r) { tm[r.ma_nv] = r; });
+      if (Object.keys(qts).length) {
+        head = ['Mã NV', 'Họ tên', 'Thực dạy (tiết)', 'Trách nhiệm (tiết)', 'Định mức (tiết)', 'Định mức quy định', 'Lý do sửa định mức', 'PT trách nhiệm (tiết)', 'PT giảng dạy (tiết)', 'Tổng PT (tiết)'];
+        if (seeMoney) head = head.concat(['Tiền phụ trội', 'Thu nhập hiện tại', 'Mức chính thức']);
+        var sum = 0;
+        rows = order.map(function (k) {
+          var q = qts[k] || {}, t = tm[k] || {}, row = [k, names[k] || '', num(q.thuc_day), num(q.trach_nhiem), num(q.dinh_muc), num(q.dm_quy_dinh), q.ly_do_dm || '',
+            num(q.pt_trach_nhiem), num(q.pt_giang_day), num(q.tong_pt)];
+          if (seeMoney) { sum += Number(q.tien_pt) || 0; row = row.concat([money(q.tien_pt), money(t.thu_nhap_hien_tai), money(t.chinh_thuc)]); }
+          return row;
+        });
+        if (seeMoney) { rows = rows.slice(0, 500); rows.push(['', 'TỔNG', '', '', '', '', '', '', '', '', money(sum), '', '']); return { head: head, rows: rows, total: order.length }; }
+      } else if (seeMoney) {
+        head = ['Mã NV', 'Họ tên', 'Thu nhập hiện tại', 'Mức chính thức', 'Ghi chú'];
+        rows = incs.map(function (r) { return [r.ma_nv, names[r.ma_nv] || '', money(r.thu_nhap_hien_tai), money(r.chinh_thuc), r.ghi_chu]; });
+      } else {
+        head = ['Mã NV', 'Họ tên'];
+        rows = incs.map(function (r) { return [r.ma_nv, names[r.ma_nv] || '']; });
+      }
     } else if (p.loai_phieu === 'Đề xuất ngạch') {
       var d = Workflow.parse(p.noi_dung, {}).row || {};
       head = ['Mã NV', 'Họ tên', 'Ngạch đề xuất', 'Trường', 'Đối tượng', 'Hiệu lực từ', 'Số quyết định', 'Lý do'];
@@ -3157,6 +3140,22 @@ var Api = (function () {
   function pendingFor(user) {
     return Db.filter('PHIEU', function (p) { return p.trang_thai === 'Đang duyệt'; })
       .filter(function (p) { var a = Workflow.authority(user, p); return a.ok && a.mode !== 'admin'; });
+  }
+
+  /** Bản sao user có quyền tính toán toàn hệ thống: chỉ dùng nội bộ sau khi đã kiểm tra quyền/phạm vi của người gọi (Giáo vụ không có calc.run). */
+  function elevated(user) {
+    var u = {};
+    Object.keys(user).forEach(function (k) { u[k] = user[k]; });
+    u.grants = (user.grants || []).concat([{ perm: 'calc.run', scope: 'Toàn hệ thống', code: '' }]);
+    return u;
+  }
+  /** Nhân sự của một trường trong kỳ (theo dòng quá trình ngạch bậc hiệu lực cuối kỳ) mà user có quyền perm. */
+  function truongStaff(user, ky, tr, perm) {
+    var out = [], units = Staff.units(ky.den_ngay);
+    Db.all('NHAN_SU').forEach(function (s) {
+      if (units[s.ma_nv] && units[s.ma_nv].truong_ma === tr.ma && Auth.canRow(user, perm, { cn: s.chi_nhanh_ma, tr: tr.ma, nv: s.ma_nv })) out.push(s);
+    });
+    return out;
   }
 
   function findKy(ma, needOpen) {
@@ -3486,6 +3485,91 @@ var Api = (function () {
       return { unread: Notify.unread(user.email) };
     },
 
+    /** Định mức quy định của một người trong kỳ, để form Khai báo tự điền. */
+    'dinhmuc.macdinh': function (p, user) {
+      Auth.require(user, 'declare.view');
+      var ky = findKy(p.ky_ma, false), s = Db.find('NHAN_SU', function (x) { return x.ma_nv === p.ma_nv; });
+      if (!s) throw new AppError('NOT_FOUND', 'Chọn nhân sự');
+      var u = Staff.units(ky.den_ngay)[s.ma_nv] || {};
+      if (!Auth.canRow(user, 'declare.view', { cn: s.chi_nhanh_ma, tr: u.truong_ma || '', nv: s.ma_nv })) throw new AppError('FORBIDDEN', 'Nhân sự nằm ngoài phạm vi của bạn');
+      var q = Policy.quota(ky, s.ma_nv);
+      return { doi_tuong: q.doi_tuong, so_tuan: q.so_tuan, per_tuan: q.per_tuan, tiet: q.tiet, tu_ngay: Util.displayDate(ky.tu_ngay), den_ngay: Util.displayDate(ky.den_ngay) };
+    },
+
+    /** Tạo dòng Định mức quy định (Nháp) cho mọi nhân sự của trường chưa có dòng Định mức trong kỳ. */
+    'dinhmuc.tao': function (p, user) {
+      Auth.require(user, 'declare.edit');
+      var out;
+      Db.tx(function () {
+        var ky = findKy(p.ky_ma, true), tr = findTruong(p.truong_ma);
+        if (ky.loai === 'Điều chỉnh') throw new AppError('BAD_REQUEST', 'Đợt điều chỉnh không có khai báo');
+        var have = {};
+        Db.filter('KHAI_BAO', function (r) { return r.ky_ma === ky.ma && r.loai === 'Định mức'; }).forEach(function (r) { have[r.ma_nv] = true; });
+        var ins = [], skipped = 0;
+        truongStaff(user, ky, tr, 'declare.edit').forEach(function (s) {
+          if (have[s.ma_nv]) { skipped++; return; }
+          var q = Policy.quota(ky, s.ma_nv);
+          if (!(q.tiet > 0)) { skipped++; return; }
+          ins.push({ ky_ma: ky.ma, ma_nv: s.ma_nv, loai: 'Định mức', qd_ma: '', noi_dung: 'Định mức quy định (' + q.doi_tuong + ')', so_luong: q.tiet, don_vi: 'Tiết/Kỳ',
+            ly_do: '', dac_thu: 'Không', tu_ngay: ky.tu_ngay, den_ngay: ky.den_ngay, trang_thai: 'Nháp', phieu_ma: '' });
+        });
+        Db.insertMany('KHAI_BAO', ins, user.email);
+        Audit.log(user, 'TAO_DINH_MUC', 'KHAI_BAO', ky.ma, { truong: tr.ma, tao: ins.length, bo_qua: skipped });
+        out = { created: ins.length, skipped: skipped };
+      });
+      return out;
+    },
+
+    /** Xem trước tổng hợp theo người của một trường (không lưu). Số tiền chỉ hiện cho người có quyền money.view. */
+    'phutroi.tonghop': function (p, user) {
+      Auth.require(user, 'declare.view');
+      var ky = findKy(p.ky_ma, false), tr = findTruong(p.truong_ma);
+      if (ky.loai === 'Điều chỉnh') throw new AppError('BAD_REQUEST', 'Đợt điều chỉnh không có khai báo');
+      if (!Auth.canRow(user, 'declare.view', { cn: tr.chi_nhanh_ma, tr: tr.ma })) throw new AppError('FORBIDDEN', 'Trường nằm ngoài phạm vi của bạn');
+      var money = Auth.can(user, 'money.view'), names = staffName(), r;
+      try { r = Calc.preview(elevated(user), ky.ma, tr.ma, 'tat_ca'); } catch (e) { if (e.code === 'EMPTY') return { rows: [], money: money, warnings: [], tong: { tien: 0 } }; throw e; }
+      var tong = { tien: 0, thuc_day: 0, trach_nhiem: 0, dinh_muc: 0, tong_pt: 0 };
+      var rows = r.qt.map(function (q) {
+        ['thuc_day', 'trach_nhiem', 'dinh_muc', 'tong_pt'].forEach(function (k) { tong[k] += Number(q[k]) || 0; });
+        tong.tien += Number(q.tien_pt) || 0;
+        var o = { ma_nv: q.ma_nv, ho_ten: names[q.ma_nv] || q.ho_ten, doi_tuong: q.doi_tuong, thuc_day: q.thuc_day, trach_nhiem: q.trach_nhiem, dinh_muc: q.dinh_muc,
+          dm_quy_dinh: q.dm_quy_dinh, dm_sua: Math.abs(q.dinh_muc - q.dm_quy_dinh) > 0.01, ly_do_dm: q.ly_do_dm, tong_pt: q.tong_pt,
+          pt_trach_nhiem: q.pt_trach_nhiem, pt_giang_day: q.pt_giang_day, nguon: q.nguon };
+        if (money) { o.tien_pt = q.tien_pt; o.hs_tiet = q.hs_tiet; o.ltb = q.ltb; }
+        return o;
+      });
+      if (!money) delete tong.tien;
+      return { rows: rows, money: money, warnings: r.warnings.slice(0, 50), tong: tong };
+    },
+
+    /** Gửi MỘT phiếu duyệt cho cả kỳ của trường: tính phụ trội từ khai báo, chụp kết quả để các cấp xem số tiết/số tiền. */
+    'phutroi.submit': function (p, user) {
+      Auth.require(user, 'phieu.create');
+      var out;
+      Db.tx(function () {
+        var ky = findKy(p.ky_ma, true), tr = findTruong(p.truong_ma);
+        if (ky.loai === 'Điều chỉnh') throw new AppError('BAD_REQUEST', 'Đợt điều chỉnh không có khai báo giảng dạy');
+        var staff = {};
+        truongStaff(user, ky, tr, 'declare.edit').forEach(function (s) { staff[s.ma_nv] = true; });
+        var lines = Db.filter('KHAI_BAO', function (r) { return r.ky_ma === ky.ma && r.trang_thai === 'Nháp' && staff[r.ma_nv]; });
+        if (!lines.length) throw new AppError('EMPTY', 'Không có dòng khai báo nào ở trạng thái Nháp của trường này trong kỳ ' + ky.ma);
+        var el = elevated(user), pre = Calc.preview(el, ky.ma, tr.ma, 'tat_ca');
+        if (pre.warnings.length) throw new AppError('CALC_WARN', 'Chưa tính được cho một số người, hãy sửa trước khi gửi: ' + pre.warnings.slice(0, 5).join(' | ') + (pre.warnings.length > 5 ? ' …(+' + (pre.warnings.length - 5) + ')' : ''));
+        Calc.run(el, ky.ma, tr.ma, 'tat_ca');
+        var mine = function (r) { return r.ky_ma === ky.ma && r.trang_thai === 'Tạm tính' && r.truong_ma === tr.ma; };
+        var inc = Db.filter('THU_NHAP_MOI', mine), qt = Db.filter('QUYET_TOAN', mine);
+        if (!inc.length) throw new AppError('EMPTY', 'Chưa tính được kết quả nào cho trường này');
+        var ph = Workflow.create(user, { loai: 'Quyết toán kỳ', tieu_de: 'Phụ trội & thu nhập kỳ ' + ky.ma + ' · ' + tr.ten + ' (' + inc.length + ' nhân sự, ' + lines.length + ' dòng khai báo)',
+          truong_ma: tr.ma, chi_nhanh_ma: tr.chi_nhanh_ma, ky_ma: ky.ma, payload: { nhan_su: inc.length, dong_khai_bao: lines.length, gop: true } });
+        Db.updateMany('KHAI_BAO', lines.map(function (l) { return { id: l.id, patch: { trang_thai: 'Chờ duyệt', phieu_ma: ph.ma_phieu } }; }), user.email);
+        var patch = function (r) { return { id: r.id, patch: { trang_thai: 'Chờ chốt', phieu_ma: ph.ma_phieu } }; };
+        Db.updateMany('THU_NHAP_MOI', inc.map(patch), user.email);
+        Db.updateMany('QUYET_TOAN', qt.map(patch), user.email);
+        out = { ma_phieu: ph.ma_phieu, nhan_su: inc.length, lines: lines.length };
+      });
+      return out;
+    },
+
     'khaibao.submit': function (p, user) {
       Auth.require(user, 'phieu.create');
       var out;
@@ -3554,17 +3638,17 @@ var Api = (function () {
     },
 
     tonghop: function (p, user) {
-      Auth.require(user, 'calc.view');
+      Auth.require(user, 'money.view');
       return Report.summary(user, p.ky_ma, p.group);
     },
 
     'tonghop.export': function (p, user) {
-      Auth.require(user, 'calc.view');
+      Auth.require(user, 'money.view');
       return Report.exportTable(user, p.ky_ma, p.bang);
     },
 
     'phutroi.chitiet': function (p, user) {
-      Auth.require(user, 'calc.view');
+      Auth.require(user, 'money.view');
       return Report.ptDetail(user, p.ky_ma, p.ma_nv);
     },
 
@@ -3611,7 +3695,7 @@ var Api = (function () {
       var au = Workflow.authority(user, ph), chain = Workflow.parse(ph.quy_trinh, []);
       var logs = Db.filter('PHIEU_LOG', function (l) { return l.ma_phieu === ph.ma_phieu; })
         .map(function (l) { return { buoc: l.buoc, hanh_dong: l.hanh_dong, email: l.email, ghi_chu: l.ghi_chu, ts: l.ts }; });
-      return { phieu: phieuRow(ph, user), steps: chain, log: logs, items: phieuItems(ph),
+      return { phieu: phieuRow(ph, user), steps: chain, log: logs, items: phieuItems(ph, user),
         can_act: !!au.ok, act_mode: au.ok ? au.mode : '', can_cancel: ph.trang_thai === 'Đang duyệt' && (ph.nguoi_tao === user.email || user.isAdmin),
         can_reopen: ph.trang_thai === 'Đã duyệt' && !!user.isAdmin && (ph.loai_phieu === 'Khai báo' || ph.loai_phieu === 'Quyết toán kỳ') };
     },

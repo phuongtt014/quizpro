@@ -4,6 +4,14 @@
  * phiên bản mới -> lịch sử cũ giữ nguyên, các kỳ lương cũ vẫn tham chiếu đúng phiên bản của nó.
  */
 var Policy = {
+  /** Định mức quy định của một người trong kỳ (theo đối tượng ở dòng quá trình ngạch bậc đang hiệu lực cuối kỳ): { doi_tuong, per_tuan, so_tuan, tiet }. */
+  quota: function (ky, maNv) {
+    var q = Staff.at('QUA_TRINH_NGACH', maNv, ky.den_ngay), dean = Policy.effective(ky.den_ngay), param = dean ? Policy.bundle(dean.ma).param : {};
+    var dt = q ? q.doi_tuong : '';
+    return { doi_tuong: dt, so_tuan: ky.so_tuan, per_tuan: dt === 'GV Tiểu học nhiều môn' ? Number(param.dinh_muc_tieu_hoc) || 0 : (dt === 'GV còn lại' ? Number(param.dinh_muc_khac) || 0 : 0),
+      tiet: Engine.quotaDefault(dt, ky.so_tuan, param), param: param };
+  },
+
   childTables: function () {
     return Object.keys(SCHEMA).filter(function (t) { return SCHEMA[t].ctx === 'de_an_ma'; });
   },

@@ -136,7 +136,12 @@ const html = read('Index.html').replace("<?!= include('Style') ?>", read('Style.
   ok('Giáo vụ nhập khai báo bằng form', true);
   await page.screenshot({ path: path.join(out, '7-khaibao.png') });
   await page.selectOption('.bar select >> nth=1', 'HCM_THPT');
-  await page.click('button:has-text("Gửi duyệt các dòng Nháp")');
+  // xem trước tổng hợp theo người (Giáo vụ không thấy cột tiền)
+  await page.click('button:has-text("Tổng hợp theo người")');
+  await page.waitForSelector('th:has-text("Tổng PT (tiết)")');
+  ok('Tổng hợp theo người cho Giáo vụ: có tiết, không có cột tiền', (await page.locator('th:has-text("Tiền phụ trội")').count()) === 0);
+  page.once('dialog', (d) => d.accept());
+  await page.click('button:has-text("Gửi duyệt phụ trội")');
   await page.waitForSelector('text=Phiếu duyệt');
   await page.waitForSelector('td:has-text("Đang duyệt")');
   ok('Gửi duyệt tạo phiếu, chuyển sang Phiếu duyệt', true);
@@ -148,7 +153,7 @@ const html = read('Index.html').replace("<?!= include('Style') ?>", read('Style.
   ok('Hiệu trưởng thấy phiếu chờ xử lý', true);
   await page.click('button.btn:text-is("Xử lý")');
   await page.waitForSelector('.modal h3:has-text("Quy trình")');
-  ok('Chi tiết phiếu có quy trình & nội dung', (await page.textContent('.modal')).includes('Toán 10') && (await page.textContent('.modal')).includes('Tổng Giám đốc phê duyệt'));
+  ok('Chi tiết phiếu có quy trình & nội dung', (await page.textContent('.modal')).includes('Tổng PT (tiết)') && (await page.textContent('.modal')).includes('Tiền phụ trội') && (await page.textContent('.modal')).includes('Tổng Giám đốc phê duyệt'));
   await page.screenshot({ path: path.join(out, '8-phieu.png') });
   await page.click('.modal >> button:has-text("Trả lại")');
   await page.waitForSelector('.modal .alert.bad');

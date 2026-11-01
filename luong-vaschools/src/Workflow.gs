@@ -117,12 +117,18 @@ var Workflow = (function () {
     approve: function (p) {
       setLines('QUYET_TOAN', p.ma_phieu, 'Chờ chốt', 'Đã chốt');
       setLines('THU_NHAP_MOI', p.ma_phieu, 'Chờ chốt', 'Đã chốt');
+      // Phiếu gộp (từ phutroi.submit): các dòng khai báo cùng được duyệt, nguồn kết quả thành "Đã duyệt".
+      setLines('KHAI_BAO', p.ma_phieu, 'Chờ duyệt', 'Đã duyệt');
+      ['QUYET_TOAN', 'THU_NHAP_MOI'].forEach(function (t) {
+        Db.updateMany(t, Db.filter(t, function (x) { return x.phieu_ma === p.ma_phieu && x.nguon !== 'Đã duyệt'; }).map(function (x) { return { id: x.id, patch: { nguon: 'Đã duyệt' } }; }), 'system');
+      });
       var r = Calc.promoteBaseline(p);
       return r.created ? ' Đã tạo ' + r.created + ' mốc "Thu nhập hiện tại" hiệu lực từ ' + Util.displayDate(r.date) + ' làm cơ sở cho đợt sau' +
         (r.skipped.length ? ' (bỏ qua ' + r.skipped.length + ': ' + r.skipped.slice(0, 3).join('; ') + ')' : '') + '.' : '';
     },
     revert: function (p) {
       setLines('QUYET_TOAN', p.ma_phieu, 'Chờ chốt', 'Tạm tính', true); setLines('THU_NHAP_MOI', p.ma_phieu, 'Chờ chốt', 'Tạm tính', true);
+      setLines('KHAI_BAO', p.ma_phieu, 'Chờ duyệt', 'Nháp', true);
     }
   };
   APPLY['Đề xuất ngạch'] = {
@@ -220,6 +226,7 @@ var Workflow = (function () {
       }
       setLines('QUYET_TOAN', p.ma_phieu, 'Đã chốt', 'Tạm tính', true);
       setLines('THU_NHAP_MOI', p.ma_phieu, 'Đã chốt', 'Tạm tính', true);
+      setLines('KHAI_BAO', p.ma_phieu, 'Đã duyệt', 'Nháp', true); // phiếu gộp: dòng khai báo cũng về Nháp
       var tag = '(' + p.ma_phieu + ')', removed = Db.filter('THU_NHAP_NEN', function (r) { return String(r.ghi_chu).indexOf(tag) >= 0; });
       var ups = [];
       removed.forEach(function (m) {

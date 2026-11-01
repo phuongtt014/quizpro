@@ -72,12 +72,6 @@ Dán lại `Code.gs` / `Index.html` mới → **Triển khai → Quản lý tri�
   Tiêu đề và giá trị **đúng định dạng mẫu nhập**: bấm **Sao chép** dán vào Excel/Google Sheets, hoặc **Tải file .csv**, rồi dán lại bằng *Nhập CSV* (chế độ *Thêm mới hoặc cập nhật theo khóa*).
 - Tab *Quá trình ngạch bậc* không còn cột Họ tên riêng: cột Mã nhân sự đã hiện kèm tên.
 
-## Định mức giảm theo tuần nghỉ lễ
-- *Thiết lập → Điều chỉnh định mức theo tuần*: mỗi dòng = (Kỳ, Trường, Đối tượng, Từ ngày – Đến ngày, Định mức tiết/tuần trong giai đoạn). Sau khi nâng cấp chạy **`setupEnsureSheets`** để tạo sheet mới.
-- **Trường để trống** = áp cho mọi trường; dòng có Trường riêng thay dòng chung trong khoảng ngày chồng nhau. Hai đối tượng (*GV Tiểu học nhiều môn*, *GV còn lại*) khai riêng.
-- Định mức kỳ = số tuần quy định × định mức mặc định − Σ (mặc định − mức giai đoạn) × số ngày/7. Ví dụ 27/04–03/05 (7 ngày) còn 6 tiết, mặc định 20 → giảm 14 tiết.
-- Chỉ áp dụng khi nhân sự không có dòng khai báo *Định mức* riêng (dòng khai báo luôn được ưu tiên). Tính lại ở *Thu nhập & phụ trội* để cập nhật.
-
 ## Quản trị viên tự duyệt phiếu do mình tạo
 - Mặc định **không ai** duyệt được phiếu do chính mình tạo (kể cả quản trị viên). Muốn chạy thử một mình: *Thiết lập → Cấu hình chung → + Thêm*, Khóa `admin_tu_duyet`, Giá trị `Có`.
   Khi đó quản trị viên được **duyệt thay** từng bước (bắt buộc ghi chú, có nhật ký). Khi vận hành thật nên xóa dòng này hoặc đổi thành `Không`.
@@ -94,6 +88,17 @@ Dán lại `Code.gs` / `Index.html` mới → **Triển khai → Quản lý tri�
 - **Quyết toán kỳ:** kết quả về *Tạm tính*; nếu là kỳ Điều chỉnh, các mốc "Thu nhập hiện tại" do phiếu đó tạo ra được gỡ (trả lại hiệu lực cũ). Bị chặn nếu kỳ sau đã có kết quả chờ chốt/đã chốt.
 - **Khai báo:** dòng về *Nháp*. Bị chặn nếu kỳ đã gửi chốt quyết toán cho những người trong phiếu: mở lại phiếu Quyết toán trước.
 - Thứ tự sửa đúng: mở lại quyết toán → mở lại khai báo → sửa → gửi duyệt khai báo (phiếu mới) → Tính toán → gửi chốt (phiếu mới). Phiếu cũ giữ lịch sử với trạng thái *Đã mở lại*.
+
+## Khai báo – định mức quy định – một phiếu Phụ trội kỳ (bản mới)
+- Dán lại 4 tệp, chạy **`setupEnsureSheets`** (thêm cột *Lý do* vào Khai báo, *Định mức quy định*/*Lý do sửa định mức* vào Phụ trội từng người, và quyền mới **`money.view`**
+  cho các vai trò mặc định, **trừ Giáo vụ / Người đề xuất**). Bảng *Điều chỉnh định mức theo tuần* đã bỏ (sheet `DINH_MUC_TUAN` nếu có thì xóa tay được).
+- **Định mức quy định** = số tuần quy định của kỳ × tiết/tuần theo **đối tượng tính lương** của nhân sự (GV còn lại / GV Tiểu học nhiều môn… lấy từ *Quá trình ngạch bậc*).
+  Trong Khai báo: nút **Tạo định mức quy định cho cả trường** điền sẵn dòng Định mức (đơn vị *Tiết/Kỳ*) cho nhân sự chưa có; trong form có nút **Điền định mức quy định** cho từng người.
+  Người nhập **được sửa** số này (vd trừ tuần nghỉ lễ), khi khác quy định **bắt buộc nhập Lý do**; chỗ sửa được tô màu ✎ trong bảng tổng hợp và hiện cho người duyệt.
+- Tab **Tổng hợp theo người (xem trước)** trong Khai báo: số tiết thực dạy, trách nhiệm, định mức, phụ trội trách nhiệm/giảng dạy cho từng người (tính cả dòng Nháp). **Giáo vụ không thấy số tiền.**
+- **Gửi duyệt phụ trội**: một phiếu duy nhất (không còn phiếu Khai báo riêng và phiếu Quyết toán riêng cho học kỳ). Hệ thống tính phụ trội, chụp kết quả và gửi lên các cấp;
+  Hiệu trưởng/Nhân sự/TGĐ (có quyền `money.view`) xem bảng tiết + tiền + tổng. Duyệt xong: dòng khai báo thành *Đã duyệt*, kết quả thành *Đã chốt*. Trả lại/Hủy: dòng về *Nháp*. Admin có thể **Mở lại** như trước.
+- Đợt *Điều chỉnh* không đổi (vẫn tính ở *Thu nhập & phụ trội* rồi gửi chốt).
 
 ## Lưu ý
 - **Tốc độ:** ứng dụng dùng bộ nhớ đệm. Nếu có ai **sửa trực tiếp trong file Google Sheet CSDL** (không khuyến khích), bấm nút **⟳ Làm mới dữ liệu** ở thanh trên cùng (cần quyền *Sửa thiết lập*), nếu không dữ liệu có thể chưa cập nhật tới 10 phút.

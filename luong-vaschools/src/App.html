@@ -35,7 +35,7 @@
 
   /** Các thao tác chỉ đọc: mọi thao tác khác (ghi) thành công thì bỏ toàn bộ đệm trình duyệt để không hiện dữ liệu cũ. */
   var READ_ONLY = { list: 1, tonghop: 1, 'tonghop.export': 1, 'phieu.list': 1, 'phieu.get': 1, batch: 1, boot: 1, me: 1, schema: 1, dashboard: 1,
-    'notify.list': 1, 'quydoi.list': 1, 'dean.check': 1, 'calc.simulate': 1, 'phutroi.chitiet': 1, 'roles.matrix': 1 };
+    'notify.list': 1, 'quydoi.list': 1, 'dinhmuc.macdinh': 1, 'phutroi.tonghop': 1, 'dean.check': 1, 'calc.simulate': 1, 'phutroi.chitiet': 1, 'roles.matrix': 1 };
   function api(name, payload) {
     return new Promise(function (resolve, reject) {
       google.script.run
@@ -269,6 +269,18 @@
         el('label', { class: c.req && c.def === undefined ? 'req' : '', text: c.l }), node || input
       ]));
     });
+    if (table === 'KHAI_BAO') {
+      var dmHint = el('div', { class: 'muted full', style: 'font-size:12px' });
+      form.appendChild(el('div', { class: 'full' }, [el('button', { class: 'btn', type: 'button', text: 'Điền định mức quy định', title: 'Điền sẵn định mức cả kỳ theo đối tượng tính lương của nhân sự đã chọn', onclick: function () {
+        var kyMa = row ? row.ky_ma : ((opts.defaults || {}).ky_ma || ''), nv = inputs.ma_nv.value;
+        if (!nv) { toast('Chọn nhân sự trước'); return; }
+        api('dinhmuc.macdinh', { ky_ma: kyMa, ma_nv: nv }).then(function (d) {
+          inputs.loai.value = 'Định mức'; inputs.noi_dung.value = 'Định mức quy định (' + (d.doi_tuong || 'chưa có đối tượng') + ')';
+          inputs.so_luong.value = String(d.tiet).replace('.', ','); inputs.don_vi.value = 'Tiết/Kỳ'; inputs.tu_ngay.value = d.tu_ngay; inputs.den_ngay.value = d.den_ngay;
+          dmHint.textContent = d.tiet ? 'Quy định: ' + d.so_tuan + ' tuần × ' + d.per_tuan + ' tiết/tuần (' + d.doi_tuong + ') = ' + d.tiet + ' tiết. Sửa khác số này thì phải ghi Lý do.' : 'Đối tượng "' + (d.doi_tuong || 'chưa xác định') + '" không có định mức quy định.';
+        }).catch(showErr);
+      } }), dmHint]));
+    }
     var autoClose = null, errHost = el('div');
     if (T.temporal && !row) {
       autoClose = el('input', { type: 'checkbox', checked: true, style: 'width:auto' });
@@ -589,7 +601,7 @@
 
   function pageSetup(host, sub) {
     host.appendChild(el('p', { class: 'muted', text: 'Dùng "Nhập CSV" để dán nhanh danh sách chi nhánh, trường, năm học… trực tiếp từ Excel/Google Sheets.' }));
-    tableTabs(host, ['CHI_NHANH', 'TRUONG', 'NAM_HOC', 'KY_LUONG', 'DINH_MUC_TUAN', 'TRUONG_HANG', 'NGACH_DM', 'SETTINGS'], sub, 'setup');
+    tableTabs(host, ['CHI_NHANH', 'TRUONG', 'NAM_HOC', 'KY_LUONG', 'TRUONG_HANG', 'NGACH_DM', 'SETTINGS'], sub, 'setup');
   }
 
   function pageStaff(host, sub) {
@@ -767,7 +779,7 @@
   }
 
   function pageDeclare(host) {
-    host.appendChild(el('p', { class: 'muted', text: 'Nhập số tiết thực dạy, tiết trách nhiệm và định mức theo từng nhân sự trong kỳ. Nhập xong bấm "Gửi duyệt" để đi qua quy trình duyệt; chỉ dòng "Đã duyệt" mới được tính quyết toán.' }));
+    host.appendChild(el('p', { class: 'muted', text: 'Nhập số tiết thực dạy, trách nhiệm và định mức của từng nhân sự trong kỳ. Định mức quy định (theo đối tượng tính lương) được điền sẵn, nếu sửa khác quy định phải ghi lý do. Nhập xong bấm "Gửi duyệt phụ trội": hệ thống tính số tiết phụ trội và gửi MỘT phiếu lên các cấp.' }));
     var kys = kyOptions();
     if (!kys.length) { host.appendChild(el('div', { class: 'alert warn', text: 'Chưa có kỳ quyết toán. Vào Thiết lập → Kỳ quyết toán để khai báo.' })); return; }
     var ky = select(kys, kys[kys.length - 1]), tr = select(truongOptions(), '', '— chọn trường —'), body = el('div');
@@ -775,19 +787,59 @@
       clear(body);
       var kind = kyKind(ky.value);
       if (kind === 'Điều chỉnh') { body.appendChild(el('div', { class: 'alert warn', text: 'Đợt điều chỉnh không có khai báo: thu nhập mới được tính trực tiếp từ ngạch bậc, hệ số và thu nhập hiện tại. Vào menu "Thu nhập & phụ trội".' })); return; }
-      TableView(body, 'KHAI_BAO', { filter: { ky_ma: ky.value }, defaults: { ky_ma: ky.value }, rowEditable: function (r) { return r.trang_thai === 'Nháp'; } });
+      Tabs(body, [
+        { key: 'lines', label: 'Dòng khai báo', render: function (b) {
+          TableView(b, 'KHAI_BAO', { filter: { ky_ma: ky.value }, defaults: { ky_ma: ky.value }, rowEditable: function (r) { return r.trang_thai === 'Nháp'; } });
+        } },
+        { key: 'sum', label: 'Tổng hợp theo người (xem trước)', render: function (b) { declSummary(b, ky.value, tr.value); } }
+      ]);
     }
     ky.addEventListener('change', draw);
-    var send = el('button', { class: 'btn pri', text: 'Gửi duyệt các dòng Nháp', onclick: function () {
+    tr.addEventListener('change', draw);
+    var dm = el('button', { class: 'btn', text: 'Tạo định mức quy định cho cả trường', title: 'Điền sẵn dòng Định mức theo đối tượng cho nhân sự chưa có', onclick: function () {
+      if (!tr.value) { toast('Chọn trường'); return; }
+      dm.disabled = true;
+      api('dinhmuc.tao', { ky_ma: ky.value, truong_ma: tr.value }).then(function (r) { dm.disabled = false; toast('Đã tạo ' + r.created + ' dòng định mức' + (r.skipped ? ' (bỏ qua ' + r.skipped + ' người đã có hoặc không có định mức)' : '')); draw(); })
+        .catch(function (e) { dm.disabled = false; modalMsg('Chưa tạo được', [errBox(e)]); });
+    } });
+    var send = el('button', { class: 'btn pri', text: 'Gửi duyệt phụ trội', onclick: function () {
       if (!tr.value) { toast('Chọn trường cần gửi duyệt'); return; }
+      if (!confirm('Gửi duyệt toàn bộ dòng khai báo Nháp của trường này? Hệ thống sẽ tính phụ trội và khóa các dòng này cho đến khi phiếu được duyệt hoặc trả lại.')) return;
       send.disabled = true;
-      api('khaibao.submit', { ky_ma: ky.value, truong_ma: tr.value }).then(function (r) {
-        toast('Đã gửi phiếu ' + r.ma_phieu + ' (' + r.lines + ' dòng)'); location.hash = '#phieu/cua_toi';
+      api('phutroi.submit', { ky_ma: ky.value, truong_ma: tr.value }).then(function (r) {
+        toast('Đã gửi phiếu ' + r.ma_phieu + ' (' + r.nhan_su + ' nhân sự, ' + r.lines + ' dòng)'); location.hash = '#phieu/cua_toi';
       }).catch(function (e) { send.disabled = false; modalMsg('Chưa gửi được', [errBox(e)]); });
     } });
-    host.appendChild(el('div', { class: 'bar' }, [el('b', { text: 'Kỳ' }), ky, tr, send]));
+    host.appendChild(el('div', { class: 'bar' }, [el('b', { text: 'Kỳ' }), ky, tr, dm, send]));
     host.appendChild(body);
     draw();
+  }
+
+  /** Bảng xem trước theo người: tiết thực dạy, trách nhiệm, định mức (tô màu khi sửa khác quy định), phụ trội; tiền chỉ hiện cho người có quyền. */
+  function declSummary(host, kyMa, truongMa) {
+    if (!truongMa) { host.appendChild(el('div', { class: 'alert warn', text: 'Chọn trường ở thanh phía trên để xem tổng hợp.' })); return; }
+    var box = el('div', null, [el('p', { class: 'muted', text: 'Đang tính…' })]);
+    host.appendChild(box);
+    api('phutroi.tonghop', { ky_ma: kyMa, truong_ma: truongMa }).then(function (d) {
+      clear(box);
+      if (!d.rows.length) { box.appendChild(el('p', { class: 'muted', text: 'Chưa có dòng khai báo nào để tính trong kỳ này.' })); return; }
+      var f = function (v) { return String(Math.round(Number(v) * 100) / 100).replace('.', ','); };
+      var heads = ['Mã NV', 'Họ tên', 'Đối tượng', 'Thực dạy', 'Trách nhiệm', 'Định mức', 'PT trách nhiệm', 'PT giảng dạy', 'Tổng PT (tiết)'];
+      if (d.money) heads.push('Tiền phụ trội');
+      var body = el('tbody');
+      d.rows.forEach(function (r) {
+        var cells = [r.ma_nv, r.ho_ten, r.doi_tuong, f(r.thuc_day), f(r.trach_nhiem), f(r.dinh_muc) + (r.dm_sua ? ' ✎' : ''), f(r.pt_trach_nhiem), f(r.pt_giang_day), f(r.tong_pt)];
+        if (d.money) cells.push(money(r.tien_pt));
+        body.appendChild(el('tr', { title: r.dm_sua ? 'Định mức khác quy định (' + f(r.dm_quy_dinh) + '). Lý do: ' + (r.ly_do_dm || '') : '' },
+          cells.map(function (v, i) { return el('td', { class: i >= 3 ? 'num' : 'wrap', style: i === 5 && r.dm_sua ? 'color:var(--warn);font-weight:600' : '', text: v }); })));
+      });
+      var tot = ['', 'TỔNG', '', f(d.tong.thuc_day), f(d.tong.trach_nhiem), f(d.tong.dinh_muc), '', '', f(d.tong.tong_pt)];
+      if (d.money) tot.push(money(d.tong.tien));
+      body.appendChild(el('tr', { style: 'font-weight:700;background:var(--head)' }, tot.map(function (v, i) { return el('td', { class: i >= 3 ? 'num' : '', text: v }); })));
+      box.appendChild(el('div', { class: 'tw' }, [el('table', null, [el('thead', null, [el('tr', null, heads.map(function (h) { return el('th', { text: h }); }))]), body])]));
+      box.appendChild(el('p', { class: 'muted', style: 'margin-top:8px', text: '✎ = định mức đã sửa khác quy định (rê chuột để xem lý do). Bảng tính cả dòng Nháp để bạn kiểm tra trước khi gửi duyệt.' + (d.money ? '' : ' Số tiền chỉ hiển thị cho người duyệt.') }));
+      if (d.warnings.length) box.appendChild(el('div', { class: 'alert warn' }, [el('b', { text: 'Chưa tính được cho một số người:' })].concat(d.warnings.slice(0, 10).map(function (w) { return el('div', { text: w }); }))));
+    }).catch(function (e) { clear(box); box.appendChild(errBox(e)); });
   }
 
   function money(v) { return v === '' || v === null || v === undefined ? '' : Number(v).toLocaleString('vi-VN'); }
