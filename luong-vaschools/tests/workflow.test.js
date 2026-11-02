@@ -280,36 +280,47 @@ test('Mở lại phiếu chốt kỳ Điều chỉnh: gỡ mốc Thu nhập hi�
   assert.strictEqual(j(e.run('Db.all("THU_NHAP_NEN").filter(function(x){return x.ma_nv==="NV001";})[0].hieu_luc_den')), '');
 });
 
-test('Định mức tự tính từ khoảng ngày đã khai báo (nghỉ giữa kỳ, trùng dòng, khoảng nghỉ); sửa tay phải có lý do', () => {
+test('Định mức nằm trên dòng Thực dạy (tiết/tuần): theo quy định nếu để trống, sửa khác quy định phải có lý do', () => {
   const { e } = world();
   e.as('gv.hcm@vaschools.edu.vn');
-  // chưa có khai báo: định mức 0
-  assert.strictEqual(e.api('dinhmuc.macdinh', { ky_ma: KY, ma_nv: 'NV001' }).data.tiet, 0);
-  // nghỉ việc giữa kỳ: dạy 07/09–25/10/2026 (49 ngày = 7 tuần), 2 môn trùng thời gian không cộng đôi
-  assert.ok(e.api('save', { table: 'KHAI_BAO', row: line({ noi_dung: 'Toán 10', so_luong: '12', tu_ngay: '07/09/2026', den_ngay: '25/10/2026' }) }).ok);
-  assert.ok(e.api('save', { table: 'KHAI_BAO', row: line({ noi_dung: 'Toán 11', so_luong: '10', tu_ngay: '07/09/2026', den_ngay: '25/10/2026' }) }).ok);
-  let q = e.api('dinhmuc.macdinh', { ky_ma: KY, ma_nv: 'NV001' }).data;
-  assert.deepStrictEqual(j([q.doi_tuong, q.per_tuan, q.so_tuan, q.tiet, q.tu_ngay, q.den_ngay]), ['GV còn lại', 20, 7, 140, '07/09/2026', '25/10/2026']);
-  // thêm đoạn sau khoảng nghỉ 2 tuần: 09/11–22/11 (14 ngày = 2 tuần) → tổng 9 tuần
-  assert.ok(e.api('save', { table: 'KHAI_BAO', row: line({ noi_dung: 'Toán 10 (dạy lại)', so_luong: '12', tu_ngay: '09/11/2026', den_ngay: '22/11/2026' }) }).ok);
-  q = e.api('dinhmuc.macdinh', { ky_ma: KY, ma_nv: 'NV001' }).data;
-  assert.deepStrictEqual(j([q.so_tuan, q.tiet]), [9, 180]);
-  // tính phụ trội: thực dạy 22×7 + 12×2 = 178; định mức 180 → chưa có phụ trội
+  const q = e.api('dinhmuc.macdinh', { ky_ma: KY, ma_nv: 'NV001' }).data;
+  assert.deepStrictEqual(j([q.doi_tuong, q.per_tuan]), ['GV còn lại', 20]);
+  const tl = (o) => line(Object.assign({ noi_dung: 'Toán 10' }, o));
+  // 3 giai đoạn liền nhau: 5 tuần × 16, 3 tuần × 22, 1 tuần × 9 (tuần nghỉ lễ, định mức 6)
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: tl({ so_luong: '16', tu_ngay: '07/09/2026', den_ngay: '11/10/2026' }) }).ok);
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: tl({ so_luong: '22', dinh_muc_tuan: '20', tu_ngay: '12/10/2026', den_ngay: '01/11/2026' }) }).ok); // bằng quy định: không cần lý do
+  const lo = (o) => tl(Object.assign({ so_luong: '9', tu_ngay: '02/11/2026', den_ngay: '08/11/2026' }, o));
+  const bad = e.api('save', { table: 'KHAI_BAO', row: lo({ dinh_muc_tuan: '6' }) });
+  assert.strictEqual(bad.ok, false);
+  assert.match(JSON.stringify(bad), /Lý do/);
+  assert.strictEqual(e.api('save', { table: 'KHAI_BAO', row: lo({ loai: 'Trách nhiệm', dinh_muc_tuan: '6', ly_do: 'x' }) }).ok, false); // chỉ dòng Thực dạy
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: lo({ dinh_muc_tuan: '6', ly_do: 'Nghỉ lễ 2/9: định mức 6 tiết/tuần' }) }).ok);
+  // thêm môn thứ hai trùng thời gian (để trống định mức): không cộng đôi, tuần nghỉ lễ vẫn lấy mức nhỏ nhất (6)
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: tl({ noi_dung: 'Toán 11', so_luong: '2', tu_ngay: '02/11/2026', den_ngay: '08/11/2026' }) }).ok);
+  e.as('tro.ly@vaschools.edu.vn');
+  assert.ok(e.api('calc.run', { ky_ma: KY, truong_ma: 'HCM_THPT', gom: 'tat_ca' }).ok);
+  const qt = e.api('list', { table: 'QUYET_TOAN', filter: { ky_ma: KY } }).data.rows[0];
+  // thực dạy 80 + 66 + 9 + 2 = 157; định mức 8 tuần × 20 + 1 tuần × 6 = 166 (quy định 180)
+  assert.deepStrictEqual(j([qt.thuc_day, qt.dinh_muc, qt.dm_quy_dinh, qt.ly_do_dm, qt.tong_pt]), [157, 166, 180, 'Nghỉ lễ 2/9: định mức 6 tiết/tuần', 0]);
+});
+
+test('Giáo viên nghỉ việc giữa kỳ: định mức tính theo thời gian có khai báo, không theo cả kỳ; dòng Định mức cũ vẫn ưu tiên', () => {
+  const { e } = world();
+  e.as('gv.hcm@vaschools.edu.vn');
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: line({ noi_dung: 'Toán 10', so_luong: '25', tu_ngay: '07/09/2026', den_ngay: '25/10/2026' }) }).ok); // 7 tuần
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: line({ noi_dung: 'Toán 11', so_luong: '2', tu_ngay: '07/09/2026', den_ngay: '25/10/2026' }) }).ok);
   e.as('tro.ly@vaschools.edu.vn');
   assert.ok(e.api('calc.run', { ky_ma: KY, truong_ma: 'HCM_THPT', gom: 'tat_ca' }).ok);
   let qt = e.api('list', { table: 'QUYET_TOAN', filter: { ky_ma: KY } }).data.rows[0];
-  assert.deepStrictEqual(j([qt.thuc_day, qt.dinh_muc, qt.dm_quy_dinh, qt.tong_pt]), [178, 180, 180, 0]);
-  // sửa tay: dòng Định mức bắt buộc có lý do
+  assert.deepStrictEqual(j([qt.thuc_day, qt.dinh_muc, qt.tong_pt]), [189, 140, 49]); // 27 × 7 ; 20 × 7
   e.as('gv.hcm@vaschools.edu.vn');
-  const dm = (o) => line(Object.assign({ loai: 'Định mức', noi_dung: 'Định mức', so_luong: '170', don_vi: 'Tiết/Kỳ', tu_ngay: '07/09/2026', den_ngay: '22/11/2026' }, o));
-  const bad = e.api('save', { table: 'KHAI_BAO', row: dm({}) });
-  assert.strictEqual(bad.ok, false);
-  assert.match(JSON.stringify(bad), /Lý do/);
-  assert.ok(e.api('save', { table: 'KHAI_BAO', row: dm({ ly_do: 'Nghỉ lễ 2/9' }) }).ok);
+  const old = line({ loai: 'Định mức', noi_dung: 'Định mức cũ', so_luong: '100', don_vi: 'Tiết/Kỳ', tu_ngay: '07/09/2026', den_ngay: '25/10/2026' });
+  assert.strictEqual(e.api('save', { table: 'KHAI_BAO', row: old }).ok, false); // dòng Định mức cũ cũng phải có lý do
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: Object.assign(old, { ly_do: 'Giảm tiết' }) }).ok);
   e.as('tro.ly@vaschools.edu.vn');
   assert.ok(e.api('calc.run', { ky_ma: KY, truong_ma: 'HCM_THPT', gom: 'tat_ca' }).ok);
   qt = e.api('list', { table: 'QUYET_TOAN', filter: { ky_ma: KY } }).data.rows[0];
-  assert.deepStrictEqual(j([qt.dinh_muc, qt.dm_quy_dinh, qt.ly_do_dm, qt.tong_pt]), [170, 180, 'Nghỉ lễ 2/9', 8]);
+  assert.deepStrictEqual(j([qt.dinh_muc, qt.dm_quy_dinh, qt.ly_do_dm]), [100, 140, 'Giảm tiết']);
 });
 
 test('Một phiếu Phụ trội kỳ: tính từ khai báo, Giáo vụ không thấy tiền, các cấp thấy tiết và tiền, duyệt xong chốt cả hai', () => {

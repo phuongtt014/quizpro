@@ -92,12 +92,12 @@ Dán lại `Code.gs` / `Index.html` mới → **Triển khai → Quản lý tri�
 ## Khai báo – định mức tự tính – một phiếu Phụ trội kỳ (bản mới)
 - Dán lại 4 tệp, chạy **`setupEnsureSheets`** (thêm cột *Lý do* vào Khai báo, *Định mức quy định*/*Lý do sửa định mức* vào Phụ trội từng người, và quyền mới **`money.view`**
   cho các vai trò mặc định, **trừ Giáo vụ / Người đề xuất**). Bảng *Điều chỉnh định mức theo tuần* đã bỏ (sheet `DINH_MUC_TUAN` nếu có thì xóa tay được).
-- **Định mức tự tính từ chính khai báo của từng người:** hệ thống lấy các khoảng *Từ ngày – Đến ngày* của dòng *Thực dạy* (không có thì dùng *Trách nhiệm*), gộp phần trùng nhau
-  (nhiều môn cùng thời gian không tính đôi) và bỏ các khoảng nghỉ giữa các dòng, rồi **số tuần = tổng số ngày ÷ 7**, **định mức = số tuần × tiết/tuần theo đối tượng tính lương**
-  (GV còn lại / GV Tiểu học nhiều môn… lấy từ *Quá trình ngạch bậc*). Nhờ vậy giáo viên nghỉ việc giữa kỳ hay vào muộn có định mức đúng theo thời gian làm việc, không cần thiết lập chung cho trường.
-  Số *Số tuần quy định* của kỳ không còn dùng để tính định mức.
-- Muốn định mức khác số tự tính (vd trừ tuần nghỉ lễ): thêm một dòng loại **Định mức** (đơn vị *Tiết/Kỳ*) cho người đó, **bắt buộc nhập Lý do**. Nút **Điền định mức tự tính** trong form hiện sẵn số tự tính để sửa.
-  Dòng Định mức thay hoàn toàn số tự tính; chỗ này được tô màu ✎ trong bảng tổng hợp và hiện cho người duyệt.
+- **Định mức nằm ngay trên dòng Thực dạy.** Mỗi dòng có ô **Số tiết định mức (tiết/tuần)** điền sẵn theo *Đối tượng tính lương* của nhân sự (GV còn lại 20, GV Tiểu học nhiều môn 24… lấy từ đề án).
+  Định mức của dòng = số tuần của dòng (từ ngày – đến ngày ÷ 7) × số tiết định mức. Muốn khác quy định (tuần nghỉ lễ, giảm tiết…) thì sửa số này và **bắt buộc nhập Lý do**; để trống hoặc bằng quy định thì không cần lý do.
+  Ví dụ: 16 tiết/tuần (02/03–05/04), 22 tiết/tuần (06/04–26/04), tuần nghỉ lễ 9 tiết/tuần với định mức 6 (27/04–03/05) → định mức = 8 × 20 + 1 × 6 = 166 tiết.
+- Nhiều môn cùng thời gian: định mức **không cộng đôi**; mỗi ngày lấy mức định mức **nhỏ nhất** trong các dòng có nhập, dòng để trống dùng mức quy định. Khoảng nghỉ giữa các dòng (nghỉ việc, thai sản) tự không tính định mức.
+  Giáo viên nghỉ việc giữa kỳ vì vậy có định mức đúng theo thời gian làm việc. *Số tuần quy định* của kỳ không dùng để tính định mức.
+- Nhập CSV có thêm cột **Số tiết định mức (tiết/tuần)** (không bắt buộc). Dòng loại *Định mức* của bản cũ vẫn hoạt động (thay hoàn toàn số tự tính, phải có lý do) nhưng không cần dùng nữa. Sau khi dán bản mới chạy **`setupEnsureSheets`** để thêm cột.
 - Tab **Tổng hợp theo người (xem trước)** trong Khai báo: số tiết thực dạy, trách nhiệm, định mức, phụ trội trách nhiệm/giảng dạy cho từng người (tính cả dòng Nháp). **Giáo vụ không thấy số tiền.**
 - **Gửi duyệt phụ trội**: một phiếu duy nhất (không còn phiếu Khai báo riêng và phiếu Quyết toán riêng cho học kỳ). Hệ thống tính phụ trội, chụp kết quả và gửi lên các cấp;
   Hiệu trưởng/Nhân sự/TGĐ (có quyền `money.view`) xem bảng tiết + tiền + tổng. Duyệt xong: dòng khai báo thành *Đã duyệt*, kết quả thành *Đã chốt*. Trả lại/Hủy: dòng về *Nháp*. Admin có thể **Mở lại** như trước.

@@ -192,7 +192,6 @@ var Calc = (function () {
         var row = { ky_ma: kyMa, ma_nv: s.ma_nv, de_an_ma: dean.ma, nguon: nguon, trang_thai: 'Tạm tính', phieu_ma: '' };
         Object.keys(who).forEach(function (k) { row[k] = who[k]; });
         Object.keys(settle).forEach(function (k) { row[k] = settle[k]; });
-        row.ly_do_dm = decls.filter(function (d) { return d.loai === 'Định mức' && d.ly_do; }).map(function (d) { return d.ly_do; }).join('; ');
         qt.push(row);
       }
 

@@ -429,8 +429,9 @@ var SCHEMA = (function () {
       col_('qd_ma', 'Mã quy đổi trách nhiệm', 'text', { pattern: '^QD\\d{2}$', hint: 'QD01… theo bảng quy đổi của đề án (chỉ cho loại Trách nhiệm)' }),
       col_('noi_dung', 'Nội dung (môn/lớp/chức trách)', 'text', { req: true }),
       col_('so_luong', 'Số lượng', 'num', { req: true, min: 0, hint: 'có mã quy đổi: số tiết theo bảng (không vượt); đơn vị Buổi: số buổi' }),
+      col_('dinh_muc_tuan', 'Số tiết định mức (tiết/tuần)', 'num', { min: 0, hint: 'chỉ dòng Thực dạy; để trống = theo quy định của đối tượng, nếu khác quy định phải nhập Lý do' }),
       col_('don_vi', 'Đơn vị', 'enum', { values: ['Tiết/Tuần', 'Tiết/Tháng', 'Tiết/Ngày', 'Buổi', 'Tiết/Kỳ'], req: true, hint: 'Tiết/Kỳ = tổng số tiết cả kỳ (dùng cho Định mức)' }),
-      col_('ly_do', 'Lý do (bắt buộc với dòng Định mức)', 'text'),
+      col_('ly_do', 'Lý do (khi định mức khác quy định)', 'text'),
       col_('dac_thu', 'Môn đặc thù (1 tiết = 1,5)', 'enum', { values: YN, def: 'Không' }),
       col_('tu_ngay', 'Từ ngày', 'date', { req: true }),
       col_('den_ngay', 'Đến ngày', 'date', { req: true }),
@@ -441,6 +442,12 @@ var SCHEMA = (function () {
     check: function (r) {
       if (r.den_ngay < r.tu_ngay) return 'Đến ngày phải ≥ Từ ngày';
       if (r.dac_thu === 'Có' && r.loai !== 'Thực dạy') return 'Chỉ môn Thực dạy mới đánh dấu đặc thù';
+      if (r.dinh_muc_tuan !== '' && r.dinh_muc_tuan !== undefined) {
+        if (r.loai !== 'Thực dạy') return 'Số tiết định mức chỉ nhập cho dòng Thực dạy';
+        var kyd = Db.find('KY_LUONG', function (k) { return k.ma === r.ky_ma; });
+        var pt = kyd ? Policy.perTuan(kyd, r.ma_nv) : null;
+        if (pt && Math.abs(r.dinh_muc_tuan - pt.per_tuan) > 0.001 && !r.ly_do) return 'Định mức ' + r.dinh_muc_tuan + ' tiết/tuần khác quy định ' + pt.per_tuan + ' tiết/tuần (' + (pt.doi_tuong || 'chưa có đối tượng') + '): hãy nhập Lý do';
+      }
       if (r.loai === 'Định mức' && !r.ly_do) return 'Định mức nhập tay thay cho định mức tự tính: hãy nhập Lý do (nếu không cần sửa, bỏ dòng Định mức này)';
       if (r.don_vi === 'Buổi' && !r.qd_ma) return 'Đơn vị "Buổi" chỉ dùng với mã quy đổi trách nhiệm (vd QD09)';
       if (r.qd_ma) {

@@ -346,7 +346,8 @@
     var items = list.map(function (o) { var t = labelOf(o); return { v: o.v, t: t, f: fold(o.v + ' ' + t) }; });
     function textOf(v) { for (var i = 0; i < items.length; i++) if (items[i].v === v) return items[i].t; return v; }
     function close() { pop.style.display = 'none'; act = -1; }
-    function choose(v) { code = v; box.value = v === '' ? '' : textOf(v); close(); }
+    var ctl;
+    function choose(v) { var ch = code !== v; code = v; box.value = v === '' ? '' : textOf(v); close(); if (ch && ctl.onchange) ctl.onchange(); }
     function paint() {
       clear(pop);
       shown.forEach(function (it, i) {
@@ -381,10 +382,11 @@
       } else if (e.key === 'Escape' && pop.style.display !== 'none') { e.stopPropagation(); close(); }
     });
     box.value = code === '' ? '' : textOf(code);
-    return { node: wrap, ctl: {
+    ctl = {
       get value() { return code; }, set value(v) { choose(v); },
-      get disabled() { return box.disabled; }, set disabled(d) { box.disabled = d; }
-    } };
+      get disabled() { return box.disabled; }, set disabled(d) { box.disabled = d; }, onchange: null
+    };
+    return { node: wrap, ctl: ctl };
   }
 
   /* ---------- form thêm/sửa ---------- */
@@ -440,16 +442,25 @@
       ]));
     });
     if (table === 'KHAI_BAO') {
-      var dmHint = el('div', { class: 'muted full', style: 'font-size:12px' });
-      form.appendChild(el('div', { class: 'full' }, [el('button', { class: 'btn', type: 'button', text: 'Điền định mức tự tính', title: 'Điền số tiết định mức tính từ các dòng khai báo đã có của nhân sự này, để sửa lại khi cần', onclick: function () {
-        var kyMa = row ? row.ky_ma : ((opts.defaults || {}).ky_ma || ''), nv = inputs.ma_nv.value;
-        if (!nv) { toast('Chọn nhân sự trước'); return; }
-        api('dinhmuc.macdinh', { ky_ma: kyMa, ma_nv: nv }).then(function (d) {
-          inputs.loai.value = 'Định mức'; inputs.noi_dung.value = 'Định mức (' + (d.doi_tuong || 'chưa có đối tượng') + ')';
-          inputs.so_luong.value = String(d.tiet).replace('.', ','); inputs.don_vi.value = 'Tiết/Kỳ'; inputs.tu_ngay.value = d.tu_ngay; inputs.den_ngay.value = d.den_ngay;
-          dmHint.textContent = d.tiet ? 'Tự tính: ' + d.ngay + ' ngày có khai báo = ' + String(d.so_tuan).replace('.', ',') + ' tuần × ' + d.per_tuan + ' tiết/tuần (' + d.doi_tuong + ') = ' + String(d.tiet).replace('.', ',') + ' tiết. Dòng Định mức thay cho số tự tính nên bắt buộc ghi Lý do.' : 'Chưa có dòng Thực dạy/Trách nhiệm của người này trong kỳ, hoặc đối tượng "' + (d.doi_tuong || 'chưa xác định') + '" không có định mức.';
-        }).catch(showErr);
-      } }), dmHint]));
+      // Số tiết định mức (tiết/tuần) của dòng Thực dạy được điền sẵn theo đối tượng tính lương của nhân sự; sửa khác thì phải nhập Lý do.
+      var dmIn = inputs.dinh_muc_tuan, dmHint = el('div', { class: 'muted', style: 'font-size:12px;margin-top:3px' }), dmTouched = !!(row && row.dinh_muc_tuan !== '' && row.dinh_muc_tuan !== undefined);
+      var kyOf = function () { return row ? row.ky_ma : ((opts.defaults || {}).ky_ma || ''); };
+      if (dmIn) {
+        dmIn.addEventListener('input', function () { dmTouched = true; });
+        dmIn.parentNode.appendChild(dmHint);
+        var fillDm = function () {
+          var nv = inputs.ma_nv.value;
+          if (!nv || inputs.loai.value !== 'Thực dạy') { dmHint.textContent = inputs.loai.value === 'Thực dạy' ? '' : 'Chỉ nhập cho dòng Thực dạy.'; return; }
+          api('dinhmuc.macdinh', { ky_ma: kyOf(), ma_nv: nv }).then(function (d) {
+            dmHint.textContent = d.per_tuan ? 'Quy định ' + d.per_tuan + ' tiết/tuần (' + d.doi_tuong + '). Sửa khác số này thì ghi Lý do.' : 'Đối tượng "' + (d.doi_tuong || 'chưa xác định') + '" không có định mức quy định.';
+            dmIn.placeholder = d.per_tuan ? 'quy định ' + d.per_tuan : '';
+            if (!dmTouched && d.per_tuan) dmIn.value = String(d.per_tuan);
+          }).catch(function () { /* bỏ qua: vẫn nhập tay được */ });
+        };
+        if (inputs.ma_nv.addEventListener) inputs.ma_nv.addEventListener('change', fillDm); else inputs.ma_nv.onchange = fillDm;
+        inputs.loai.addEventListener('change', function () { if (inputs.loai.value !== 'Thực dạy') { dmIn.value = ''; dmTouched = false; } fillDm(); });
+        if (inputs.ma_nv.value) fillDm();
+      }
     }
     var autoClose = null, errHost = el('div');
     if (T.temporal && !row) {
@@ -949,7 +960,7 @@
   }
 
   function pageDeclare(host) {
-    host.appendChild(el('p', { class: 'muted', text: 'Nhập số tiết thực dạy, trách nhiệm và định mức của từng nhân sự trong kỳ. Định mức tự tính từ khoảng ngày bạn khai báo (số tuần × tiết/tuần theo đối tượng tính lương); chỉ khi cần khác (vd nghỉ lễ) mới thêm dòng Định mức kèm lý do. Nhập xong bấm "Gửi duyệt phụ trội": hệ thống tính số tiết phụ trội và gửi MỘT phiếu lên các cấp.' }));
+    host.appendChild(el('p', { class: 'muted', text: 'Nhập số tiết thực dạy, trách nhiệm và định mức của từng nhân sự trong kỳ. Mỗi dòng Thực dạy có ô \"Số tiết định mức (tiết/tuần)\" điền sẵn theo đối tượng tính lương; tuần nghỉ lễ hay giảm tiết thì sửa số này và ghi lý do. Định mức = số tuần của dòng × số tiết định mức. Nhập xong bấm "Gửi duyệt phụ trội": hệ thống tính số tiết phụ trội và gửi MỘT phiếu lên các cấp.' }));
     var kys = kyOptions();
     if (!kys.length) { host.appendChild(el('div', { class: 'alert warn', text: 'Chưa có kỳ quyết toán. Vào Thiết lập → Kỳ quyết toán để khai báo.' })); return; }
     var ky = select(kys, kys[kys.length - 1]), tr = select(truongOptions(), '', '— chọn trường —'), body = el('div');

@@ -131,6 +131,8 @@ const html = read('Index.html').replace("<?!= include('Style') ?>", read('Style.
     const tag = await field.locator('input,select').first().evaluate((n) => n.tagName);
     if (tag === 'SELECT') await field.locator('select').selectOption(vals[k]); else await field.locator('input').fill(vals[k]);
   }
+  await page.waitForFunction(() => { const f = [...document.querySelectorAll('.form > div')].find(d => d.querySelector('label') && d.querySelector('label').textContent.startsWith('Số tiết định mức')); return f && f.querySelector('input').value === '20'; });
+  ok('Số tiết định mức điền sẵn theo đối tượng (20 tiết/tuần)', true);
   await page.click('.modal >> text=Lưu');
   await page.waitForSelector('td:has-text("Toán 10")');
   ok('Giáo vụ nhập khai báo bằng form', true);
