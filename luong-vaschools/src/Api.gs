@@ -183,7 +183,7 @@ var Api = (function () {
         rows = order.map(function (k) {
           var q = qts[k] || {}, t = tm[k] || {}, row = [k, names[k] || '', num(q.thuc_day), num(q.trach_nhiem), num(q.dinh_muc), num(q.dm_quy_dinh), q.ly_do_dm || '',
             num(q.pt_trach_nhiem), num(q.pt_giang_day), num(q.tong_pt)];
-          if (seeMoney) { sum += Number(q.tien_pt) || 0; row = row.concat([money(q.tien_pt), money(t.thu_nhap_hien_tai), money(t.chinh_thuc)]); }
+          if (seeMoney) { sum += Number(q.tien_pt) || 0; row = row.concat([money(q.tien_pt), money(t.thu_nhap_hien_tai), t.ngoai_dc === 'Có' ? 'Ngoài đợt điều chỉnh' : money(t.chinh_thuc)]); }
           return row;
         });
         if (seeMoney) { rows = rows.slice(0, 500); rows.push(['', 'TỔNG', '', '', '', '', '', '', '', '', money(sum), '', '']); return { head: head, rows: rows, total: order.length }; }

@@ -185,3 +185,37 @@ test('Xóa kỳ nhập sai: tự bỏ kết quả tạm tính, còn kết quả 
   assert.strictEqual(e.api('list', { table: 'THU_NHAP_MOI' }).data.total, 0);
   assert.strictEqual(e.api('list', { table: 'QUYET_TOAN' }).data.total, 0);
 });
+
+test('Nhân sự chỉ xếp ngạch để hưởng phụ trội (Áp dụng điều chỉnh thu nhập = Không): vẫn có phụ trội, không có thu nhập mới', () => {
+  const { e } = world();
+  assert.ok(e.api('save', { table: 'DEAN_THAMSO', ctx: { de_an_ma: 'DA01-2026' }, row: { chi_nhanh_ma: 'HN', lcb: '6000000', ltb: '100000' } }).ok);
+  declare(e, 'Đã duyệt');
+  const id = e.api('list', { table: 'QUA_TRINH_NGACH', filter: { ma_nv: 'NV001' } }).data.rows[0].id;
+  assert.ok(e.api('save', { table: 'QUA_TRINH_NGACH', id, row: { ma_nv: 'NV001', ngach_ma: 'GV2', truong_ma: 'HCM_THPT', doi_tuong: 'GV còn lại', ap_dung_dc: 'Không', hieu_luc_tu: '01/09/2019' } }).ok);
+  e.as('tro.ly@vaschools.edu.vn');
+  const run = e.api('calc.run', { ky_ma: KY, gom: 'tat_ca' });
+  assert.ok(run.ok, JSON.stringify(run));
+  const qt = e.api('list', { table: 'QUYET_TOAN', filter: { ky_ma: KY } }).data.rows[0];
+  assert.strictEqual(qt.tien_pt, 9920000); // phụ trội vẫn tính đầy đủ
+  const tm = e.api('list', { table: 'THU_NHAP_MOI', filter: { ky_ma: KY } }).data.rows;
+  const a = tm.find(x => x.ma_nv === 'NV001'), b = tm.find(x => x.ma_nv === 'NV002');
+  assert.deepStrictEqual(j([a.ngoai_dc, a.chinh_thuc, a.pa_moi, a.thu_nhap_hien_tai, a.tien_pt, a.chi_phi_thang]), ['Có', '', '', '', 9920000, Math.round(9920000 / 5)]);
+  assert.ok(b && b.chinh_thuc > 0); // người trong diện điều chỉnh vẫn tính bình thường
+  const s = e.api('tonghop', { ky_ma: KY, group: 'chi_nhanh' }).data;
+  const ngoai = s.groups.find(g => g.key === '~NGOAI');
+  assert.deepStrictEqual(j([ngoai.so_nv, ngoai.chinh_thuc, ngoai.chi_phi_thang]), [1, 0, Math.round(9920000 / 5)]);
+  assert.ok(s.total.chi_phi_thang >= ngoai.chi_phi_thang);
+});
+
+test('Kỳ Điều chỉnh bỏ qua nhân sự ngoài diện điều chỉnh và không tạo mốc Thu nhập hiện tại cho họ', () => {
+  const { e } = world();
+  assert.ok(e.api('save', { table: 'DEAN_THAMSO', ctx: { de_an_ma: 'DA01-2026' }, row: { chi_nhanh_ma: 'HN', lcb: '6000000', ltb: '100000' } }).ok);
+  const id = e.api('list', { table: 'QUA_TRINH_NGACH', filter: { ma_nv: 'NV001' } }).data.rows[0].id;
+  assert.ok(e.api('save', { table: 'QUA_TRINH_NGACH', id, row: { ma_nv: 'NV001', ngach_ma: 'GV2', truong_ma: 'HCM_THPT', doi_tuong: 'GV còn lại', ap_dung_dc: 'Không', hieu_luc_tu: '01/09/2019' } }).ok);
+  assert.ok(e.api('save', { table: 'KY_LUONG', row: { ma: '2026-2027-DC1', nam_hoc_ma: '2026-2027', hoc_ky: 'DC1', loai: 'Điều chỉnh', tu_ngay: '01/03/2027', den_ngay: '01/03/2027', so_tuan: '0' } }).ok);
+  e.as('tro.ly@vaschools.edu.vn');
+  const run = e.api('calc.run', { ky_ma: '2026-2027-DC1' });
+  assert.ok(run.ok, JSON.stringify(run));
+  assert.deepStrictEqual(j(e.api('list', { table: 'THU_NHAP_MOI', filter: { ky_ma: '2026-2027-DC1' } }).data.rows.map(x => x.ma_nv)), ['NV002']);
+  assert.strictEqual(e.api('tonghop', { ky_ma: '2026-2027-DC1' }).data.chua_tinh, 0);
+});

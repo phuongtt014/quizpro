@@ -103,6 +103,12 @@ Dán lại `Code.gs` / `Index.html` mới → **Triển khai → Quản lý tri�
   Hiệu trưởng/Nhân sự/TGĐ (có quyền `money.view`) xem bảng tiết + tiền + tổng. Duyệt xong: dòng khai báo thành *Đã duyệt*, kết quả thành *Đã chốt*. Trả lại/Hủy: dòng về *Nháp*. Admin có thể **Mở lại** như trước.
 - Đợt *Điều chỉnh* không đổi (vẫn tính ở *Thu nhập & phụ trội* rồi gửi chốt).
 
+## Nhân sự chỉ xếp ngạch để hưởng phụ trội (không thuộc đợt điều chỉnh thu nhập)
+- Sau khi dán bản mới chạy **`setupEnsureSheets`** (thêm cột). *Nhân sự → Quá trình ngạch bậc* có cột **Áp dụng điều chỉnh thu nhập** (Có/Không, mặc định **Có**; dòng cũ để trống hiểu là Có). Nhập CSV có thêm cột này (không bắt buộc).
+- Dòng đang hiệu lực đặt **Không** thì: **phụ trội vẫn khai báo, tính và duyệt đầy đủ**; không tính thu nhập mới, không áp trần, không có mức chính thức; **kỳ Điều chỉnh bỏ qua** họ và khi chốt không tạo mốc "Thu nhập hiện tại".
+- Báo cáo tổng hợp: phụ trội của họ vẫn cộng vào **Chi phí/tháng**, hiện ở nhóm riêng **"Ngoài đợt điều chỉnh (chỉ phụ trội)"**, không nằm trong quỹ lương và phần tăng. Phiếu duyệt ghi "Ngoài đợt điều chỉnh" ở cột Mức chính thức.
+- Muốn đưa họ vào diện điều chỉnh về sau: thêm dòng ngạch bậc mới (hiệu lực từ ngày đó) có cờ **Có**.
+
 ## Lưu ý
 - **Tốc độ:** ứng dụng dùng bộ nhớ đệm. Nếu có ai **sửa trực tiếp trong file Google Sheet CSDL** (không khuyến khích), bấm nút **⟳ Làm mới dữ liệu** ở thanh trên cùng (cần quyền *Sửa thiết lập*), nếu không dữ liệu có thể chưa cập nhật tới 10 phút.
 - **Không chia sẻ file Google Sheet CSDL** cho người dùng. Họ chỉ cần URL web app.

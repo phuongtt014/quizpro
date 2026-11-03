@@ -545,6 +545,7 @@ var SCHEMA = (function () {
     cols: [nvRef(), ngachRef(),
       col_('truong_ma', 'Trường', 'ref', { ref: 'TRUONG.ma', hint: 'trường làm việc trong giai đoạn này; để trống nếu thuộc khối văn phòng/HĐHT' }),
       col_('doi_tuong', 'Đối tượng tính lương', 'enum', { values: ['GV Tiểu học nhiều môn', 'GV còn lại', 'Quản lý', 'Nhân viên', 'HĐHT'], req: true }),
+      col_('ap_dung_dc', 'Áp dụng điều chỉnh thu nhập', 'enum', { values: YN, def: 'Có', hint: 'Không = chỉ xếp ngạch để hưởng phụ trội, không tính thu nhập mới/trần' }),
       temporalFrom(), temporalTo(), col_('so_quyet_dinh', 'Số quyết định', 'text'), col_('ly_do', 'Lý do', 'text')],
     // Thâm niên tính từ ngày vào làm đến NGÀY HIỆU LỰC BẮT ĐẦU của từng dòng nên nằm ở đây, không ở hồ sơ.
     computed: [{ k: 'tham_nien', l: 'Thâm niên tại ngày hiệu lực (năm)', after: 'hieu_luc_tu' }],
@@ -728,7 +729,7 @@ var SCHEMA = (function () {
       col_('pa_moi', 'Phương án mới', 'money'), col_('thu_nhap_hien_tai', 'Thu nhập hiện tại (tổng)', 'money'), col_('hien_tai_gvcn', 'Trong đó hỗ trợ GVCN', 'money'), col_('hien_tai_khac', 'Trong đó hỗ trợ khác', 'money'), col_('ty_le_tran', 'Trần tăng', 'pct'),
       col_('max_income', 'Mức tối đa', 'money'), col_('chinh_thuc', 'Mức chính thức', 'money'), col_('chenh_lech', 'Chênh lệch so với hiện tại', 'money'),
       col_('luong_nen', 'Lương làm mốc cho đợt sau', 'money'), col_('chi_phi_thang', 'Chi phí/tháng (lương + phụ trội BQ)', 'money'),
-      col_('tien_pt', 'Tiền phụ trội cả kỳ', 'money')
+      col_('tien_pt', 'Tiền phụ trội cả kỳ', 'money'), col_('ngoai_dc', 'Ngoài đợt điều chỉnh (chỉ phụ trội)', 'enum', { values: YN })
     ]).concat(tail())
   };
 
@@ -2176,6 +2177,9 @@ var Calc = (function () {
       if (!cur.doi_tuong) { warnings.push(tag + ': dòng quá trình ngạch bậc chưa có "Đối tượng tính lương"'); return; }
       var who = { ho_ten: s.ho_ten, chi_nhanh_ma: s.chi_nhanh_ma, truong_ma: cur.truong_ma, doi_tuong: cur.doi_tuong };
 
+      // Nhân sự chỉ xếp ngạch để hưởng phụ trội: không tính thu nhập mới/trần; đợt Điều chỉnh bỏ qua hẳn.
+      var ngoaiDC = cur.ap_dung_dc === 'Không';
+      if (ngoaiDC && isAdj) return;
       var decls = (declsBy[s.ma_nv] || []).map(function (d) { return withQd(d, b.quyDoi); }), settle = { tien_pt: 0 }, nguon = 'Đã duyệt';
       if (decls.length) {
         if (decls.some(function (d) { return d.trang_thai !== 'Đã duyệt'; })) { nguon = 'Gồm dòng chưa duyệt'; unapproved++; }
@@ -2186,6 +2190,17 @@ var Calc = (function () {
         qt.push(row);
       }
 
+      if (ngoaiDC) {
+        if (decls.length) {
+          var hoTro = ky.so_thang_chia > 0 ? Math.round(settle.tien_pt / ky.so_thang_chia) : 0;
+          var xrow = { ky_ma: kyMa, ma_nv: s.ma_nv, de_an_ma: dean.ma, ngay_vao_lam: s.ngay_vao_lam, ngach_ma: cur.ngach_ma, ngach_ten: ngachName[cur.ngach_ma] || cur.ngach_ma,
+            tham_nien: Util.fullYears(s.ngay_vao_lam, ky.den_ngay), nguon: nguon, trang_thai: 'Tạm tính', phieu_ma: '', ngoai_dc: 'Có',
+            ho_tro_pt: hoTro, chi_phi_thang: hoTro, tien_pt: settle.tien_pt, ghi_chu: 'Ngoài đợt điều chỉnh thu nhập: chỉ tính phụ trội' };
+          Object.keys(who).forEach(function (k) { xrow[k] = who[k]; });
+          tm.push(xrow);
+        }
+        return;
+      }
       var kn = (knBy[s.ma_nv] || []).filter(function (r) { return activeAt(r, ky.den_ngay); }).map(function (r) {
         var kg = b.ngach[r.ngach_ma];
         if (!kg) warnings.push(tag + ': ngạch kiêm nhiệm ' + r.ngach_ma + ' chưa có hệ số trong đề án');
@@ -2340,7 +2355,7 @@ var Report = (function () {
     if (!keyFn) throw new AppError('BAD_REQUEST', 'Nhóm tổng hợp không hợp lệ');
     var n = { cn: nameMap('CHI_NHANH'), tr: nameMap('TRUONG') }, map = {}, order = [], all = blank();
     rows.forEach(function (r) {
-      var g = keyFn(r, n);
+      var g = r.ngoai_dc === 'Có' ? { key: '~NGOAI', label: 'Ngoài đợt điều chỉnh (chỉ phụ trội)' } : keyFn(r, n);
       if (!map[g.key]) { map[g.key] = { label: g.label, a: blank() }; order.push(g.key); }
       add(map[g.key].a, r); add(all, r);
     });
@@ -2352,6 +2367,7 @@ var Report = (function () {
     var global = Auth.hasGlobal(user, 'money.view'), u = Staff.units(ky.den_ngay);
     return Db.filter('NHAN_SU', function (s) {
       if (have[s.ma_nv] || s.ngay_vao_lam > ky.den_ngay || (s.ngay_nghi_viec && s.ngay_nghi_viec < ky.tu_ngay)) return false;
+      if (u[s.ma_nv] && u[s.ma_nv].ap_dung_dc === 'Không') return false; // chỉ xếp ngạch để hưởng phụ trội: không thuộc diện tính thu nhập mới
       return global || Auth.canRow(user, 'money.view', { cn: s.chi_nhanh_ma, tr: u[s.ma_nv] ? u[s.ma_nv].truong_ma : '', nv: s.ma_nv });
     }).length;
   }
@@ -3149,7 +3165,7 @@ var Api = (function () {
         rows = order.map(function (k) {
           var q = qts[k] || {}, t = tm[k] || {}, row = [k, names[k] || '', num(q.thuc_day), num(q.trach_nhiem), num(q.dinh_muc), num(q.dm_quy_dinh), q.ly_do_dm || '',
             num(q.pt_trach_nhiem), num(q.pt_giang_day), num(q.tong_pt)];
-          if (seeMoney) { sum += Number(q.tien_pt) || 0; row = row.concat([money(q.tien_pt), money(t.thu_nhap_hien_tai), money(t.chinh_thuc)]); }
+          if (seeMoney) { sum += Number(q.tien_pt) || 0; row = row.concat([money(q.tien_pt), money(t.thu_nhap_hien_tai), t.ngoai_dc === 'Có' ? 'Ngoài đợt điều chỉnh' : money(t.chinh_thuc)]); }
           return row;
         });
         if (seeMoney) { rows = rows.slice(0, 500); rows.push(['', 'TỔNG', '', '', '', '', '', '', '', '', money(sum), '', '']); return { head: head, rows: rows, total: order.length }; }

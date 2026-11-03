@@ -185,6 +185,9 @@ var Calc = (function () {
       if (!cur.doi_tuong) { warnings.push(tag + ': dòng quá trình ngạch bậc chưa có "Đối tượng tính lương"'); return; }
       var who = { ho_ten: s.ho_ten, chi_nhanh_ma: s.chi_nhanh_ma, truong_ma: cur.truong_ma, doi_tuong: cur.doi_tuong };
 
+      // Nhân sự chỉ xếp ngạch để hưởng phụ trội: không tính thu nhập mới/trần; đợt Điều chỉnh bỏ qua hẳn.
+      var ngoaiDC = cur.ap_dung_dc === 'Không';
+      if (ngoaiDC && isAdj) return;
       var decls = (declsBy[s.ma_nv] || []).map(function (d) { return withQd(d, b.quyDoi); }), settle = { tien_pt: 0 }, nguon = 'Đã duyệt';
       if (decls.length) {
         if (decls.some(function (d) { return d.trang_thai !== 'Đã duyệt'; })) { nguon = 'Gồm dòng chưa duyệt'; unapproved++; }
@@ -195,6 +198,17 @@ var Calc = (function () {
         qt.push(row);
       }
 
+      if (ngoaiDC) {
+        if (decls.length) {
+          var hoTro = ky.so_thang_chia > 0 ? Math.round(settle.tien_pt / ky.so_thang_chia) : 0;
+          var xrow = { ky_ma: kyMa, ma_nv: s.ma_nv, de_an_ma: dean.ma, ngay_vao_lam: s.ngay_vao_lam, ngach_ma: cur.ngach_ma, ngach_ten: ngachName[cur.ngach_ma] || cur.ngach_ma,
+            tham_nien: Util.fullYears(s.ngay_vao_lam, ky.den_ngay), nguon: nguon, trang_thai: 'Tạm tính', phieu_ma: '', ngoai_dc: 'Có',
+            ho_tro_pt: hoTro, chi_phi_thang: hoTro, tien_pt: settle.tien_pt, ghi_chu: 'Ngoài đợt điều chỉnh thu nhập: chỉ tính phụ trội' };
+          Object.keys(who).forEach(function (k) { xrow[k] = who[k]; });
+          tm.push(xrow);
+        }
+        return;
+      }
       var kn = (knBy[s.ma_nv] || []).filter(function (r) { return activeAt(r, ky.den_ngay); }).map(function (r) {
         var kg = b.ngach[r.ngach_ma];
         if (!kg) warnings.push(tag + ': ngạch kiêm nhiệm ' + r.ngach_ma + ' chưa có hệ số trong đề án');

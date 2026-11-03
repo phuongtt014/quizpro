@@ -60,7 +60,7 @@ var Report = (function () {
     if (!keyFn) throw new AppError('BAD_REQUEST', 'Nhóm tổng hợp không hợp lệ');
     var n = { cn: nameMap('CHI_NHANH'), tr: nameMap('TRUONG') }, map = {}, order = [], all = blank();
     rows.forEach(function (r) {
-      var g = keyFn(r, n);
+      var g = r.ngoai_dc === 'Có' ? { key: '~NGOAI', label: 'Ngoài đợt điều chỉnh (chỉ phụ trội)' } : keyFn(r, n);
       if (!map[g.key]) { map[g.key] = { label: g.label, a: blank() }; order.push(g.key); }
       add(map[g.key].a, r); add(all, r);
     });
@@ -72,6 +72,7 @@ var Report = (function () {
     var global = Auth.hasGlobal(user, 'money.view'), u = Staff.units(ky.den_ngay);
     return Db.filter('NHAN_SU', function (s) {
       if (have[s.ma_nv] || s.ngay_vao_lam > ky.den_ngay || (s.ngay_nghi_viec && s.ngay_nghi_viec < ky.tu_ngay)) return false;
+      if (u[s.ma_nv] && u[s.ma_nv].ap_dung_dc === 'Không') return false; // chỉ xếp ngạch để hưởng phụ trội: không thuộc diện tính thu nhập mới
       return global || Auth.canRow(user, 'money.view', { cn: s.chi_nhanh_ma, tr: u[s.ma_nv] ? u[s.ma_nv].truong_ma : '', nv: s.ma_nv });
     }).length;
   }

@@ -319,6 +319,7 @@ var SCHEMA = (function () {
     cols: [nvRef(), ngachRef(),
       col_('truong_ma', 'Trường', 'ref', { ref: 'TRUONG.ma', hint: 'trường làm việc trong giai đoạn này; để trống nếu thuộc khối văn phòng/HĐHT' }),
       col_('doi_tuong', 'Đối tượng tính lương', 'enum', { values: ['GV Tiểu học nhiều môn', 'GV còn lại', 'Quản lý', 'Nhân viên', 'HĐHT'], req: true }),
+      col_('ap_dung_dc', 'Áp dụng điều chỉnh thu nhập', 'enum', { values: YN, def: 'Có', hint: 'Không = chỉ xếp ngạch để hưởng phụ trội, không tính thu nhập mới/trần' }),
       temporalFrom(), temporalTo(), col_('so_quyet_dinh', 'Số quyết định', 'text'), col_('ly_do', 'Lý do', 'text')],
     // Thâm niên tính từ ngày vào làm đến NGÀY HIỆU LỰC BẮT ĐẦU của từng dòng nên nằm ở đây, không ở hồ sơ.
     computed: [{ k: 'tham_nien', l: 'Thâm niên tại ngày hiệu lực (năm)', after: 'hieu_luc_tu' }],
@@ -502,7 +503,7 @@ var SCHEMA = (function () {
       col_('pa_moi', 'Phương án mới', 'money'), col_('thu_nhap_hien_tai', 'Thu nhập hiện tại (tổng)', 'money'), col_('hien_tai_gvcn', 'Trong đó hỗ trợ GVCN', 'money'), col_('hien_tai_khac', 'Trong đó hỗ trợ khác', 'money'), col_('ty_le_tran', 'Trần tăng', 'pct'),
       col_('max_income', 'Mức tối đa', 'money'), col_('chinh_thuc', 'Mức chính thức', 'money'), col_('chenh_lech', 'Chênh lệch so với hiện tại', 'money'),
       col_('luong_nen', 'Lương làm mốc cho đợt sau', 'money'), col_('chi_phi_thang', 'Chi phí/tháng (lương + phụ trội BQ)', 'money'),
-      col_('tien_pt', 'Tiền phụ trội cả kỳ', 'money')
+      col_('tien_pt', 'Tiền phụ trội cả kỳ', 'money'), col_('ngoai_dc', 'Ngoài đợt điều chỉnh (chỉ phụ trội)', 'enum', { values: YN })
     ]).concat(tail())
   };
 
