@@ -295,7 +295,7 @@ test('Định mức nằm trên dòng Thực dạy (tiết/tuần): theo quy đ�
   assert.match(JSON.stringify(bad), /Lý do/);
   assert.strictEqual(e.api('save', { table: 'KHAI_BAO', row: lo({ loai: 'Trách nhiệm', dinh_muc_tuan: '6', ly_do: 'x' }) }).ok, false); // chỉ dòng Thực dạy
   assert.ok(e.api('save', { table: 'KHAI_BAO', row: lo({ dinh_muc_tuan: '6', ly_do: 'Nghỉ lễ 2/9: định mức 6 tiết/tuần' }) }).ok);
-  // thêm môn thứ hai trùng thời gian (để trống định mức): không cộng đôi, tuần nghỉ lễ vẫn lấy mức nhỏ nhất (6)
+  // thêm môn thứ hai trùng thời gian (để trống định mức): không cộng đôi, tuần nghỉ lễ vẫn lấy mức của dòng chính (6)
   assert.ok(e.api('save', { table: 'KHAI_BAO', row: tl({ noi_dung: 'Toán 11', so_luong: '2', tu_ngay: '02/11/2026', den_ngay: '08/11/2026' }) }).ok);
   e.as('tro.ly@vaschools.edu.vn');
   assert.ok(e.api('calc.run', { ky_ma: KY, truong_ma: 'HCM_THPT', gom: 'tat_ca' }).ok);
@@ -370,4 +370,16 @@ test('Phiếu Phụ trội kỳ bị trả lại: khai báo về Nháp và kết
   assert.ok(e.api('phieu.reopen', { id: pid2, note: 'Sai' }).ok);
   assert.strictEqual(j(e.run('Db.all("KHAI_BAO")[0].trang_thai')), 'Nháp');
   assert.strictEqual(j(e.run('Db.all("QUYET_TOAN")[0].trang_thai')), 'Tạm tính');
+});
+
+test('Dòng dạy thêm (ôn thi HSG) cùng thời gian không làm mất/đổi định mức của dòng chính', () => {
+  const { e } = world();
+  e.as('gv.hcm@vaschools.edu.vn');
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: line({ noi_dung: 'Toán 10', so_luong: '19', dinh_muc_tuan: '20', tu_ngay: '07/09/2026', den_ngay: '01/11/2026' }) }).ok); // 8 tuần
+  // ôn thi HSG 1,5 tiết/tuần trong 4 tuần đầu; người nhập vô ý ghi định mức 0 (hoặc 1,5) cho dòng này
+  assert.ok(e.api('save', { table: 'KHAI_BAO', row: line({ noi_dung: 'Ôn thi HSG', so_luong: '1,5', dinh_muc_tuan: '0', ly_do: 'dạy thêm', tu_ngay: '07/09/2026', den_ngay: '04/10/2026' }) }).ok);
+  e.as('tro.ly@vaschools.edu.vn');
+  assert.ok(e.api('calc.run', { ky_ma: KY, truong_ma: 'HCM_THPT', gom: 'tat_ca' }).ok);
+  const qt = e.api('list', { table: 'QUYET_TOAN', filter: { ky_ma: KY } }).data.rows[0];
+  assert.deepStrictEqual(j([qt.thuc_day, qt.dinh_muc, qt.dm_quy_dinh, qt.tong_pt]), [158, 160, 160, 0]); // 19 × 8 + 1,5 × 4 ; 20 × 8
 });

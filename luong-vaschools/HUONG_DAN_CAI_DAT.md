@@ -95,7 +95,8 @@ Dán lại `Code.gs` / `Index.html` mới → **Triển khai → Quản lý tri�
 - **Định mức nằm ngay trên dòng Thực dạy.** Mỗi dòng có ô **Số tiết định mức (tiết/tuần)** điền sẵn theo *Đối tượng tính lương* của nhân sự (GV còn lại 20, GV Tiểu học nhiều môn 24… lấy từ đề án).
   Định mức của dòng = số tuần của dòng (từ ngày – đến ngày ÷ 7) × số tiết định mức. Muốn khác quy định (tuần nghỉ lễ, giảm tiết…) thì sửa số này và **bắt buộc nhập Lý do**; để trống hoặc bằng quy định thì không cần lý do.
   Ví dụ: 16 tiết/tuần (02/03–05/04), 22 tiết/tuần (06/04–26/04), tuần nghỉ lễ 9 tiết/tuần với định mức 6 (27/04–03/05) → định mức = 8 × 20 + 1 × 6 = 166 tiết.
-- Nhiều môn cùng thời gian: định mức **không cộng đôi**; mỗi ngày lấy mức định mức **nhỏ nhất** trong các dòng có nhập, dòng để trống dùng mức quy định. Khoảng nghỉ giữa các dòng (nghỉ việc, thai sản) tự không tính định mức.
+- Nhiều dòng cùng thời gian (nhiều môn, dạy thêm, ôn thi HSG…): mỗi ngày chỉ tính **một** mức định mức, lấy từ **dòng chính** = dòng có số tiết/tuần nhiều nhất trong các dòng có nhập định mức (dòng để trống không quyết định).
+  Dòng dạy thêm vì vậy không làm mất hay đổi định mức; muốn giảm định mức ở tuần nghỉ lễ thì sửa trên **dòng chính** của tuần đó. Khoảng nghỉ giữa các dòng (nghỉ việc, thai sản) tự không tính định mức.
   Giáo viên nghỉ việc giữa kỳ vì vậy có định mức đúng theo thời gian làm việc. *Số tuần quy định* của kỳ không dùng để tính định mức.
 - Nhập CSV có thêm cột **Số tiết định mức (tiết/tuần)** (không bắt buộc). Dòng loại *Định mức* của bản cũ vẫn hoạt động (thay hoàn toàn số tự tính, phải có lý do) nhưng không cần dùng nữa. Sau khi dán bản mới chạy **`setupEnsureSheets`** để thêm cột.
 - Tab **Tổng hợp theo người (xem trước)** trong Khai báo: số tiết thực dạy, trách nhiệm, định mức, phụ trội trách nhiệm/giảng dạy cho từng người (tính cả dòng Nháp). **Giáo vụ không thấy số tiền.**

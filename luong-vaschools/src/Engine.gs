@@ -22,26 +22,35 @@ var Engine = (function () {
 
   /**
    * Định mức của một người trong kỳ, tính TỪNG NGÀY từ các dòng Thực dạy (nếu không có thì dòng Trách nhiệm, theo mức quy định):
-   * mỗi ngày có khai báo được tính 1/7 tuần × số tiết định mức/tuần. Mức của ngày = "Số tiết định mức" nhỏ nhất trong các dòng Thực dạy
-   * phủ ngày đó có nhập; dòng để trống (hoặc không dòng nào nhập) thì dùng mức quy định theo đối tượng. Nhiều môn cùng thời gian không cộng đôi;
-   * khoảng nghỉ giữa các dòng không tính. Trả { tiet (theo mức đã nhập), tiet_qd (theo mức quy định), weeks, days, per_tuan, tu, den, ly_do }.
+   * mỗi ngày có khai báo được tính 1/7 tuần × số tiết định mức/tuần. Nhiều dòng cùng phủ một ngày (nhiều môn, dạy thêm, ôn thi…) thì ngày đó
+   * chỉ tính MỘT mức định mức: lấy từ dòng CHÍNH = dòng có số tiết/tuần nhiều nhất trong các dòng có nhập "Số tiết định mức" (bằng nhau thì lấy mức thấp hơn);
+   * dòng để trống không quyết định, nếu không dòng nào nhập thì dùng mức quy định theo đối tượng. Dòng dạy thêm vì vậy không làm mất hay đổi định mức.
+   * Khoảng nghỉ giữa các dòng không tính. Trả { tiet (theo mức đã nhập), tiet_qd (theo mức quy định), weeks, days, per_tuan, tu, den, ly_do }.
    */
   function quotaOf(decls, doiTuong, param) {
     var per = perTuan(doiTuong, param), use = decls.filter(function (d) { return d.loai === 'Thực dạy'; }), fb = false;
     if (!use.length) { use = decls.filter(function (d) { return d.loai === 'Trách nhiệm'; }); fb = true; }
-    var rate = {}, tu = '', den = '', why = [];
-    use.forEach(function (d) {
+    var rate = {}, tu = '', den = '', won = {};
+    use.forEach(function (d, i) {
       var spec = !fb && d.dinh_muc_tuan !== '' && d.dinh_muc_tuan !== undefined && d.dinh_muc_tuan !== null ? num(d.dinh_muc_tuan) : null;
-      for (var x = dayNum(d.tu_ngay), b = dayNum(d.den_ngay); x <= b; x++) {
+      var a = dayNum(d.tu_ngay), b = dayNum(d.den_ngay), w = tietOf(d, param) / (b - a + 1);
+      for (var x = a; x <= b; x++) {
         var cur = rate[x];
-        if (cur === undefined) rate[x] = spec; else if (spec !== null && (cur === null || spec < cur)) rate[x] = spec;
+        if (cur === undefined) rate[x] = spec === null ? null : { w: w, dm: spec, i: i };
+        else if (spec !== null && (cur === null || w > cur.w || (w === cur.w && spec < cur.dm))) rate[x] = { w: w, dm: spec, i: i };
       }
       if (!tu || d.tu_ngay < tu) tu = d.tu_ngay;
       if (!den || d.den_ngay > den) den = d.den_ngay;
-      if (spec !== null && Math.abs(spec - per) > 1e-9 && d.ly_do && why.indexOf(d.ly_do) < 0) why.push(d.ly_do);
     });
     var n = 0, sum = 0;
-    Object.keys(rate).forEach(function (k) { n++; sum += rate[k] === null ? per : rate[k]; });
+    Object.keys(rate).forEach(function (k) {
+      n++;
+      if (rate[k] === null) sum += per; else { sum += rate[k].dm; won[rate[k].i] = true; }
+    });
+    var why = [];
+    use.forEach(function (d, i) {
+      if (won[i] && Math.abs(num(d.dinh_muc_tuan) - per) > 1e-9 && d.ly_do && why.indexOf(d.ly_do) < 0) why.push(d.ly_do);
+    });
     return { tiet: sum / 7, tiet_qd: per * n / 7, weeks: n / 7, days: n, per_tuan: per, tu: tu, den: den, ly_do: why.join('; ') };
   }
 

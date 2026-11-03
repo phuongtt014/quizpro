@@ -452,7 +452,7 @@
           var nv = inputs.ma_nv.value;
           if (!nv || inputs.loai.value !== 'Thực dạy') { dmHint.textContent = inputs.loai.value === 'Thực dạy' ? '' : 'Chỉ nhập cho dòng Thực dạy.'; return; }
           api('dinhmuc.macdinh', { ky_ma: kyOf(), ma_nv: nv }).then(function (d) {
-            dmHint.textContent = d.per_tuan ? 'Quy định ' + d.per_tuan + ' tiết/tuần (' + d.doi_tuong + '). Sửa khác số này thì ghi Lý do.' : 'Đối tượng "' + (d.doi_tuong || 'chưa xác định') + '" không có định mức quy định.';
+            dmHint.textContent = d.per_tuan ? 'Quy định ' + d.per_tuan + ' tiết/tuần (' + d.doi_tuong + '). Sửa khác số này thì ghi Lý do. Dòng dạy thêm cùng thời gian: định mức lấy theo dòng chính (nhiều tiết nhất).' : 'Đối tượng "' + (d.doi_tuong || 'chưa xác định') + '" không có định mức quy định.';
             dmIn.placeholder = d.per_tuan ? 'quy định ' + d.per_tuan : '';
             if (!dmTouched && d.per_tuan) dmIn.value = String(d.per_tuan);
           }).catch(function () { /* bỏ qua: vẫn nhập tay được */ });
