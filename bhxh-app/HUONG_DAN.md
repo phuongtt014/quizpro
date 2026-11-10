@@ -215,13 +215,17 @@ Màn hình **Tổng quan** (trang chủ) trình bày theo mẫu Executive Summar
 
 - Nữ/Nam lấy theo trường **Giới tính** (mục 9f); NV chưa nhập giới tính được ghi chú riêng dưới thẻ.
 - Biểu đồ theo phòng ban chỉ hiện các phòng lớn nhất, các phòng còn lại gộp thành **"Khác (n phòng ban)"** cho dễ đọc. Rê chuột vào cột/phần bánh để xem tên đầy đủ và số liệu.
-- Bên dưới 4 cột vẫn giữ các biểu đồ: Biến động quỹ lương đóng, Tăng mới / Nghỉ việc theo tháng, Nhân viên theo thâm niên, Số lượng nhân sự theo mã phân loại.
+- Bên dưới 4 cột là 2 nhóm biểu đồ, cùng kiểu thẻ và bảng màu với phần trên:
+  - **Xu hướng theo tháng**: Biến động quỹ lương đóng (biểu đồ vùng) · Tăng mới / Nghỉ việc theo tháng (cột đôi, xanh ngọc = tăng mới, cam = nghỉ việc).
+  - **Cơ cấu nhân sự tại kỳ cuối**: Nhân viên theo thâm niên · Số lượng nhân sự theo mã phân loại (thanh ngang, xếp từ nhiều đến ít).
 
 ## 9d. Tab Nhân viên – đầy đủ lương/phụ cấp và khóa hồ sơ nhân viên nghỉ việc
 
 - **Bảng danh sách** hiện đầy đủ **Mức lương chính, PC Kiêm nhiệm, PC Chức vụ, PC Độc hại, PC Khác** ngay trước cột **Lương đóng BHXH**; cột **Email NV quản lý hồ sơ** không còn hiện trong bảng (vẫn xem/sửa được trong form chi tiết của từng NV, mục Admin). Có thêm dòng **TỔNG CỘNG** ở cuối bảng, cộng các cột lương/phụ cấp và Lương đóng theo đúng danh sách đang lọc.
 - **Khóa hồ sơ NV đã nghỉ việc:** với vai trò **Nhập liệu**, một NV có **Tháng dừng đóng** đã tới (≤ tháng hiện tại hoặc ≤ kỳ đang xem) sẽ bị **khóa**, hiện nhãn **"Đã khóa"** trên danh sách và form chỉ xem (không sửa/lưu được). Vai trò **Admin** và **Xem** không bị ảnh hưởng bởi khóa này.
 - Muốn sửa hồ sơ đã khóa, người **Nhập liệu** mở NV đó, bấm **"Gửi yêu cầu mở khóa"**, ghi rõ **lý do**. Admin vào **Thiết lập → Yêu cầu mở khóa** để **Duyệt** hoặc **Từ chối**; sau khi được Duyệt, NV đó tạm mở khóa cho đến khi Admin bấm **"Khóa lại"** trên chính màn hình đó.
+
+**Khóa / mở hồ sơ gốc (chỉ Admin):** khi xem **Hồ sơ gốc** ở tab Nhân viên, Admin có nút **"🔒 Khóa hồ sơ gốc"** / **"🔓 Mở khóa hồ sơ gốc"**. Khi đang khóa, **không ai (kể cả Admin)** Thêm/Sửa/Xóa/Nhập file trực tiếp trên hồ sơ gốc được – màn hình chỉ xem, có dòng nhắc "Hồ sơ gốc đang khóa". Việc sửa nhân viên ở **kỳ BHXH mới nhất** vẫn tự cập nhật sang hồ sơ gốc như bình thường, nên luồng làm việc hằng tháng không bị ảnh hưởng. Mỗi lần khóa/mở đều được ghi vào Nhật ký.
 
 ## 9e. Truy thu – Thoái thu: cột Chênh lệch
 

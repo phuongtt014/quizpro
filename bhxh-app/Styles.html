@@ -121,6 +121,12 @@
   .ex-note { font-size: 11px; color: var(--muted); margin-top: 4px; }
   .ex-chart { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; box-shadow: 0 2px 8px rgba(16,24,40,.08); flex: 1; }
   .ex-chart h4 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+  .ex-section { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 6px 0 10px;
+    padding: 8px 14px; border-radius: 10px; color: #fff; font-weight: 700; font-size: 16px;
+    background: linear-gradient(90deg, #0f3a4e, #1d5e7a); }
+  .ex-section .muted { color: rgba(255,255,255,.8); font-weight: 400; }
+  .ex-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 900px) { .ex-grid2 { grid-template-columns: 1fr; } }
   @media (max-width: 1200px) { .ex-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 640px) { .ex-grid { grid-template-columns: 1fr; } }
   @media (max-width: 700px) {

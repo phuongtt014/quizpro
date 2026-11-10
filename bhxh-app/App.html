@@ -172,22 +172,23 @@ function chartStackPB(list) {
     <line x1="${padL}" y1="${h - bottom}" x2="${w - padR}" y2="${h - bottom}" stroke="var(--line)"></line>${body}</svg>`;
 }
 // Thanh ngang theo phòng ban (giống "Hires by Business Unit")
-function chartHBarPB(list, color) {
+function chartHBarPB(list, color, opts) {
   const data = foldTop(list, 9, ['tong']);
   if (!data.length) return '<div class="muted small" style="padding:30px 0;text-align:center">Không có dữ liệu trong khoảng đã chọn.</div>';
-  const w = 360, rowH = 24, labW = 128, padR = 34, h = data.length * rowH + 8;
+  const w = (opts && opts.width) || 360, rowH = (opts && opts.rowH) || 24, labW = 128, padR = 34, h = data.length * rowH + 8;
   const max = Math.max(1, ...data.map((d) => d.tong));
   const body = data.map((d, i) => {
-    const y = 4 + i * rowH, bw = (w - labW - padR) * d.tong / max;
+    const y = 4 + i * rowH + (rowH - 24) / 2, bw = (w - labW - padR) * d.tong / max;
     return `<text x="${labW - 8}" y="${y + 15}" text-anchor="end" font-size="11" fill="var(--ink)"><title>${esc(d.phongBan)}</title>${esc(shortLabel(d.phongBan, 20))}</text>
-      <rect x="${labW}" y="${y + 3}" width="${Math.max(bw, 2).toFixed(1)}" height="${rowH - 8}" fill="${color}" rx="2"><title>${esc(d.phongBan)}: ${fmt(d.tong)}</title></rect>
+      <rect x="${labW}" y="${y + 3}" width="${Math.max(bw, 2).toFixed(1)}" height="16" fill="${color}" rx="2"><title>${esc(d.phongBan)}: ${fmt(d.tong)}</title></rect>
       <text x="${(labW + bw + 6).toFixed(1)}" y="${y + 15}" font-size="11" fill="var(--muted)">${fmt(d.tong)}</text>`;
   }).join('');
   return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto" role="img">${body}</svg>`;
 }
 // Vùng (area) theo tháng cho 2 chuỗi, chuỗi lớn vẽ trước (phía sau)
-function chartAreaMonths(labels, series) {
-  const w = 360, h = 250, padL = 8, padR = 8, top = 22, bottom = 30;
+function chartAreaMonths(labels, series, opts) {
+  opts = opts || {};
+  const w = opts.width || 360, h = opts.height || 250, padL = 8, padR = 8, top = 22, bottom = 30;
   const n = labels.length;
   const max = Math.max(1, ...series.reduce((a, s) => a.concat(s.values), []));
   const x = (i) => padL + 14 + (n <= 1 ? (w - padL - padR - 28) / 2 : (w - padL - padR - 28) * i / (n - 1));
@@ -202,10 +203,10 @@ function chartAreaMonths(labels, series) {
       <polyline points="${pts.join(' ')}" fill="none" stroke="${s.color}" stroke-width="2"></polyline>`;
     s.values.forEach((v, i) => {
       body += `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4" fill="${s.color}" stroke="var(--card)" stroke-width="2"><title>${esc(labels[i])} – ${esc(s.label)}: ${fmt(v)}</title></circle>`;
-      if (n <= 8) body += `<text x="${x(i).toFixed(1)}" y="${(y(v) - 9).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--muted)">${fmtShort(v)}</text>`;
+      if (n <= (opts.maxLabels || 8)) body += `<text x="${x(i).toFixed(1)}" y="${(y(v) - 9).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--muted)">${fmtShort(v)}</text>`;
     });
   });
-  const step = Math.ceil(n / 8);
+  const step = Math.ceil(n / (opts.maxLabels || 8));
   const xl = labels.map((m, i) => (i % step ? '' : `<text x="${x(i).toFixed(1)}" y="${base + 16}" text-anchor="middle" font-size="10" fill="var(--muted)">${esc(m)}</text>`)).join('');
   return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto" role="img">
     <line x1="${padL}" y1="${base}" x2="${w - padR}" y2="${base}" stroke="var(--line)"></line>${body}${xl}</svg>`;
@@ -473,10 +474,10 @@ async function loadDashboard() {
 function renderDashboard() {
   const d = S.dashData; const area = $('dashArea'); if (!d || !area) return;
   const labels = d.months.map((m) => fmtM(m.ky));
-  const seriesQL = [{ label: 'Quỹ lương đóng', color: CHART_COLORS[0], values: d.months.map((m) => m.quyLuong), bold: true }];
+  const seriesQL = [{ label: 'Quỹ lương đóng', color: EX_NAM, values: d.months.map((m) => m.quyLuong) }];
   const seriesTurnover = [
-    { label: 'Tăng mới', color: 'var(--ok)', values: d.months.map((m) => m.tangMoi || 0) },
-    { label: 'Nghỉ việc', color: 'var(--bad)', values: d.months.map((m) => m.nghiViec || 0) }
+    { label: 'Tăng mới', color: EX_NU, values: d.months.map((m) => m.tangMoi || 0) },
+    { label: 'Nghỉ việc', color: '#e0972a', values: d.months.map((m) => m.nghiViec || 0) }
   ];
   const thieuKyGoc = d.months.length > 0 && d.months[0].tangMoi === null;
   const t = d.tom;
@@ -523,16 +524,20 @@ function renderDashboard() {
         <div class="ex-chart"><h4>Nghỉ việc theo phòng ban${pbTxt}</h4>${chartDonutPB(t.nghiViec.theoPB)}</div>
       </div>
     </div>
-    <div class="card"><h3>Biến động quỹ lương đóng${pbTxt}</h3>${chartLine(labels, seriesQL, {})}</div>
-    <div class="card"><h3>Tăng mới / Nghỉ việc theo tháng${pbTxt}</h3>
-      ${chartGroupedBar(labels, seriesTurnover, {})}${chartLegend(seriesTurnover)}</div>
-    <div class="row" style="gap:16px;align-items:stretch">
-      <div class="card" style="flex:1;min-width:280px"><h3>Nhân viên theo thâm niên${S.dashPB ? ' – ' + esc(S.dashPB) : ''}</h3>
-        <span class="small muted">Tại kỳ ${fmtM(d.denKy)} · ${fmt(d.tongNVCuoiKy)} NV đang đóng</span>
-        ${chartBar(d.seniority.map((b) => ({ label: b.label, value: b.count })), { color: CHART_COLORS[1] })}</div>
-      <div class="card" style="flex:1;min-width:280px"><h3>Số lượng nhân sự theo mã phân loại${S.dashPB ? ' – ' + esc(S.dashPB) : ''}</h3>
-        <span class="small muted">Tại kỳ ${fmtM(d.denKy)}</span>
-        ${chartBar(d.byMaPL.map((b) => ({ label: b.maPL, value: b.count })), { color: CHART_COLORS[2] })}</div>
+    <div class="ex-section"><span>Xu hướng theo tháng</span><span class="muted small">${khoang}${pbTxt}</span></div>
+    <div class="ex-grid2">
+      <div class="ex-chart"><h4>Biến động quỹ lương đóng</h4>
+        <div class="muted small">Tổng lương đóng BHXH của NV đang đóng mỗi tháng</div>
+        ${chartAreaMonths(labels, seriesQL, { width: 700, height: 250, maxLabels: 12 })}</div>
+      <div class="ex-chart"><h4>Tăng mới / Nghỉ việc theo tháng</h4>${chartLegend(seriesTurnover)}
+        ${chartGroupedBar(labels, seriesTurnover, { height: 250 })}</div>
+    </div>
+    <div class="ex-section"><span>Cơ cấu nhân sự tại kỳ ${fmtM(d.denKy)}</span><span class="muted small">${fmt(d.tongNVCuoiKy)} NV đang đóng${pbTxt}</span></div>
+    <div class="ex-grid2">
+      <div class="ex-chart"><h4>Nhân viên theo thâm niên</h4>
+        ${chartBar(d.seniority.map((b) => ({ label: b.label, value: b.count })), { color: EX_NAM, width: 700, height: 240 })}</div>
+      <div class="ex-chart"><h4>Số lượng nhân sự theo mã phân loại</h4>
+        ${chartHBarPB(d.byMaPL.slice().sort((a, b) => b.count - a.count).map((b) => ({ phongBan: b.maPL, tong: b.count })), EX_NU, { width: 700, rowH: Math.max(24, Math.min(60, Math.floor(220 / Math.max(1, d.byMaPL.length)))) })}</div>
     </div>`;
   area.innerHTML = h;
 }
@@ -657,12 +662,31 @@ async function loadNV() {
 }
 function afterNVLoaded() {
   const d = S.nvData;
-  $('nvAdd').innerHTML = d.editable ? '<button class="btn pri" onclick="nvForm(null)">＋ Thêm nhân viên</button>' : '';
+  const nutKhoa = !d.ky && isRole('Admin')
+    ? (d.hoSoGocKhoa
+      ? '<button class="btn warn" onclick="khoaHoSoGoc(false)" title="Cho phép Thêm/Sửa/Xóa/Nhập file trực tiếp trên hồ sơ gốc">🔓 Mở khóa hồ sơ gốc</button>'
+      : '<button class="btn" onclick="khoaHoSoGoc(true)" title="Chặn Thêm/Sửa/Xóa/Nhập file trực tiếp trên hồ sơ gốc để tránh sửa nhầm">🔒 Khóa hồ sơ gốc</button>')
+    : '';
+  $('nvAdd').innerHTML = `<span class="row">${nutKhoa}${d.editable ? '<button class="btn pri" onclick="nvForm(null)">＋ Thêm nhân viên</button>' : ''}</span>`;
   $('nvImportBtn').innerHTML = d.editable ? '<button class="btn sm pri" onclick="nvImportForm()">⬆ Nhập từ file</button>' : '';
   $('nvNote').innerHTML = d.ky
     ? `Đang xem dữ liệu <b>kỳ ${fmtM(d.ky)}</b> ${kyBadge(d.trangThai)}. ${d.editable ? 'Sửa ở kỳ mới nhất sẽ đồng thời cập nhật hồ sơ gốc.' : 'Kỳ đã chốt – chỉ xem.'}`
-    : 'Đang xem <b>hồ sơ gốc</b> (tab Danh sách nhân viên). Kỳ đầu tiên sẽ được tạo từ danh sách này.';
+    : d.hoSoGocKhoa
+      ? '<span class="badge bad">🔒 Hồ sơ gốc đang khóa</span> Chỉ xem – để tránh sửa nhầm, mọi thay đổi hãy làm ở <b>kỳ BHXH đang mở</b> (sửa ở kỳ mới nhất sẽ tự cập nhật hồ sơ gốc).'
+      : 'Đang xem <b>hồ sơ gốc</b> (tab Danh sách nhân viên). Kỳ đầu tiên sẽ được tạo từ danh sách này.';
   renderNV();
+}
+
+function khoaHoSoGoc(khoa) {
+  if (!confirm(khoa
+    ? 'Khóa hồ sơ gốc?\n\nSau khi khóa, không ai (kể cả Admin) Thêm/Sửa/Xóa/Nhập file trực tiếp trên hồ sơ gốc được nữa cho tới khi mở khóa. Sửa nhân viên ở kỳ mới nhất vẫn tự cập nhật hồ sơ gốc như bình thường.'
+    : 'Mở khóa hồ sơ gốc?\n\nSau khi mở, có thể Thêm/Sửa/Xóa/Nhập file trực tiếp trên hồ sơ gốc. Nhớ khóa lại khi xong.')) return;
+  act(async () => {
+    await run('apiKhoaHoSoGoc', khoa);
+    delete S.cache['nv:'];
+    toast(khoa ? 'Đã khóa hồ sơ gốc.' : 'Đã mở khóa hồ sơ gốc.', 'ok');
+    loadNV();
+  });
 }
 
 // ---- Import / Xuất / File mẫu ----

@@ -1259,6 +1259,26 @@ function nvKhoaMsg_(nv) {
     + '), hồ sơ đã bị khóa. Hãy gửi yêu cầu mở khóa để Admin xét duyệt.';
 }
 
+// ---------------------------------------------------------------------
+// KHÓA HỒ SƠ GỐC (tab Danh sách nhân viên): Admin bật để tránh sửa nhầm trực tiếp lên hồ sơ gốc.
+// Khi khóa: không ai (kể cả Admin) Thêm/Sửa/Xóa/Nhập file khi đang xem "Hồ sơ gốc"; sửa NV ở kỳ mới
+// nhất vẫn được đồng bộ sang hồ sơ gốc như bình thường (đó là luồng làm việc chuẩn hằng tháng).
+// ---------------------------------------------------------------------
+function hoSoGocKhoa_() {
+  try { return PropertiesService.getScriptProperties().getProperty('hoSoGocKhoa') === '1'; } catch (e) { return false; }
+}
+function requireHoSoGocMo_() {
+  if (hoSoGocKhoa_()) throw new Error('Hồ sơ gốc đang bị khóa để tránh sửa nhầm. Hãy sửa ở kỳ BHXH đang mở, hoặc nhờ Admin mở khóa hồ sơ gốc.');
+}
+function apiKhoaHoSoGoc(khoa) {
+  const user = getUser_();
+  requireRole_(user, [ROLE.ADMIN]);
+  PropertiesService.getScriptProperties().setProperty('hoSoGocKhoa', khoa ? '1' : '0');
+  log_(user, khoa ? 'Khóa hồ sơ gốc' : 'Mở khóa hồ sơ gốc', '');
+  bumpDataVersion_();
+  return !!khoa;
+}
+
 function apiNhanVienImpl_(ky) {
   const t0 = Date.now();
   const user = getUser_();
@@ -1272,7 +1292,7 @@ function apiNhanVienImpl_(ky) {
     editable = k.trangThai !== KY_CHOT;
   } else {
     rows = load_(T.NV).rows;
-    editable = true;
+    editable = !hoSoGocKhoa_();
   }
   const t2 = Date.now();
   editable = editable && user.role !== ROLE.XEM;
@@ -1287,7 +1307,7 @@ function apiNhanVienImpl_(ky) {
   const t4 = Date.now();
   // __t: thời gian (ms) từng bước, chỉ để chẩn đoán tốc độ – App.html tự in ra Console (F12) nếu có,
   // không ảnh hưởng gì tới dữ liệu hay giao diện.
-  return { ky: ky, trangThai: trangThai, editable: editable, rows: rows,
+  return { ky: ky, trangThai: trangThai, editable: editable, rows: rows, hoSoGocKhoa: !ky && hoSoGocKhoa_(),
     __t: { xacThucNguoiDung: t1 - t0, docDuLieuNV: t2 - t1, docYeuCauMoKhoa: t3 - t2, xuLy: t4 - t3, tong: t4 - t0 } };
 }
 
@@ -1347,6 +1367,7 @@ function apiSaveNV(ky, o, isNew) {
   const user = getUser_();
   requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
   ky = normMonth_(ky);
+  if (!ky) requireHoSoGocMo_();
   o = cleanNV_(o, user);
   const t1 = Date.now();
   return withLock_(function () {
@@ -1452,6 +1473,7 @@ function apiDeleteNV(ky, maNV) {
   const user = getUser_();
   requireRole_(user, [ROLE.ADMIN]);
   ky = normMonth_(ky);
+  if (!ky) requireHoSoGocMo_();
   return withLock_(function () {
     let t = T.NV, rows;
     if (ky) { requireOpen_(ky); t = T.DLKY; rows = load_(T.DLKY).rows.filter(function (r) { return r.ky === ky && r.maNV === maNV; }); }
@@ -2413,6 +2435,7 @@ function importNVGrid_(ky, mode, grid, source, onlyEmpty) {
   const user = getUser_();
   requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
   ky = normMonth_(ky);
+  if (!ky) requireHoSoGocMo_();
   return withLock_(function () {
     if (ky) requireOpen_(ky);
     const parsed = gridToObjects_(T.NV.cols, grid, mode === 'motphan' ? ['Mã NV'] : ['Mã NV', 'Họ và tên']);
