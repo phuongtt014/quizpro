@@ -1642,14 +1642,16 @@ function apiDashboardImpl_(tuKy, denKy, phongBan) {
     };
   });
   const lastKyRows = kq.filter(function (r) { return r.ky === denKy && r.dong === CO; });
-  const dlky = load_(T.DLKY).rows.filter(function (r) { return r.ky === denKy; });
+  const dlkyAll = load_(T.DLKY).rows;
+  const dlky = dlkyAll.filter(function (r) { return r.ky === denKy; });
   const dlMap = {};
   dlky.forEach(function (r) { dlMap[r.maNV] = r; });
 
   // ---- Số liệu cho 4 thẻ tóm tắt (Nhân sự / Tăng mới / Chi phí BHXH / Nghỉ việc) ----
   // Giới tính lấy theo hồ sơ gốc (cột mới, các kỳ cũ có thể chưa có), thiếu thì lấy theo dữ liệu kỳ cuối.
   const gtMap = {};
-  load_(T.NV).rows.forEach(function (r) { if (r.gioiTinh) gtMap[r.maNV] = r.gioiTinh; });
+  const nvGoc = load_(T.NV).rows;
+  nvGoc.forEach(function (r) { if (r.gioiTinh) gtMap[r.maNV] = r.gioiTinh; });
   dlky.forEach(function (r) { if (!gtMap[r.maNV] && r.gioiTinh) gtMap[r.maNV] = r.gioiTinh; });
   const gioiTinhCua = function (maNV) { return gtMap[maNV] === NU ? 'nu' : gtMap[maNV] === NAM ? 'nam' : 'khac'; };
   const demGT = function (list) {
@@ -1668,14 +1670,45 @@ function apiDashboardImpl_(tuKy, denKy, phongBan) {
   };
   const rowByKy = {};
   kq.forEach(function (r) { if (r.dong === CO) rowByKy[r.ky + '|' + r.maNV] = r; });
-  const tuyenMoi = [], nghiViecDS = [];
+  const tuyenMoi = [], nghiViecDS = [], thoiDong = [];
   months.forEach(function (m, i) {
     if (m.tangMoi === null) return;
     const prevKy = i === 0 ? baselineKy : kys[i - 1].ky;
     const curSet = setByKy[m.ky] || {}, prevSet = setByKy[prevKy] || {};
     Object.keys(curSet).forEach(function (maNV) { if (!prevSet[maNV]) tuyenMoi.push(rowByKy[m.ky + '|' + maNV]); });
-    Object.keys(prevSet).forEach(function (maNV) { if (!curSet[maNV]) nghiViecDS.push(rowByKy[prevKy + '|' + maNV]); });
+    Object.keys(prevSet).forEach(function (maNV) { if (!curSet[maNV]) thoiDong.push(maNV); });
   });
+  // NGHỈ VIỆC tính theo đúng "Ngày nghỉ việc": NV có Ngày nghỉ việc rơi vào tháng nào thì tính vào tháng đó
+  // (không dựa vào việc thôi đóng BHXH – tạm dừng đóng như thai sản không bị tính là nghỉ việc). Ngày nghỉ
+  // việc lấy theo hồ sơ gốc, thiếu thì theo dữ liệu kỳ; phòng ban là phòng ban ở kỳ gần nhất trước/tại
+  // tháng nghỉ (người có thể đã đổi phòng ban), thiếu thì theo hồ sơ gốc.
+  const kyTrongKhoang = {};
+  months.forEach(function (m) { kyTrongKhoang[m.ky] = true; m.nghiViec = 0; });
+  const nguoi = {};
+  nvGoc.forEach(function (r) { if (canSee_(user, r)) nguoi[r.maNV] = { maNV: r.maNV, ngayNghi: r.ngayNghi, phongBanGoc: r.phongBan, dl: [] }; });
+  dlkyAll.forEach(function (r) {
+    if (!canSee_(user, r)) return;
+    const x = nguoi[r.maNV] || (nguoi[r.maNV] = { maNV: r.maNV, ngayNghi: '', phongBanGoc: '', dl: [] });
+    x.dl.push(r);
+  });
+  Object.keys(nguoi).forEach(function (maNV) {
+    const x = nguoi[maNV];
+    x.dl.sort(function (a, b) { return a.ky < b.ky ? 1 : -1; }); // mới nhất trước
+    const ngayNghi = x.ngayNghi || ((x.dl.find(function (r) { return r.ngayNghi; }) || {}).ngayNghi) || '';
+    const thangNghi = ngayNghi.slice(0, 7);
+    if (!thangNghi || !kyTrongKhoang[thangNghi]) return;
+    const dlTruoc = x.dl.find(function (r) { return r.ky <= thangNghi; }) || x.dl[x.dl.length - 1];
+    const pb = (dlTruoc && dlTruoc.phongBan) || x.phongBanGoc;
+    if (phongBan && pb !== phongBan) return;
+    nghiViecDS.push({ maNV: maNV, phongBan: pb, ngayNghi: ngayNghi });
+    months.find(function (m) { return m.ky === thangNghi; }).nghiViec++;
+  });
+  // Người đã thôi đóng BHXH trong khoảng nhưng CHƯA nhập Ngày nghỉ việc -> nhắc để bổ sung cho đủ số liệu
+  const coNgayNghi = function (maNV) {
+    const x = nguoi[maNV];
+    return !!(x && (x.ngayNghi || x.dl.some(function (r) { return r.ngayNghi; })));
+  };
+  const thieuNgayNghi = thoiDong.filter(function (maNV, i) { return thoiDong.indexOf(maNV) === i && !coNgayNghi(maNV); }).length;
   months.forEach(function (m) {
     const rows = kq.filter(function (r) { return r.ky === m.ky && r.dong === CO; });
     m.tongNLD = rows.reduce(function (s, r) { return s + (r.tongNLD || 0); }, 0);
@@ -1684,7 +1717,7 @@ function apiDashboardImpl_(tuKy, denKy, phongBan) {
   const tom = {
     nhanSu: Object.assign(demGT(lastKyRows), { theoPB: theoPB(lastKyRows) }),
     tangMoi: Object.assign(demGT(tuyenMoi), { theoPB: theoPB(tuyenMoi) }),
-    nghiViec: Object.assign(demGT(nghiViecDS), { theoPB: theoPB(nghiViecDS) }),
+    nghiViec: Object.assign(demGT(nghiViecDS), { theoPB: theoPB(nghiViecDS), thieuNgayNghi: thieuNgayNghi }),
     chiPhi: {
       nld: months.reduce(function (s, m) { return s + m.tongNLD; }, 0),
       dn: months.reduce(function (s, m) { return s + m.tongDN; }, 0)
@@ -1935,13 +1968,22 @@ function apiLichSuNhanSuImpl_(tuKy, denKy) {
   });
   const today = todayStr_();
   const kyHomNay = normMonth_(today.slice(0, 7));
+  const goc = {};
+  load_(T.NV).rows.forEach(function (r) { goc[r.maNV] = r; });
   const list = Object.keys(byNV).map(function (k) {
     const nv = byNV[k];
     delete nv._lastKy;
     nv.periods.sort(function (a, b) { return a.ky < b.ky ? -1 : 1; });
+    const g = goc[nv.maNV] || {};
+    nv.ngayNghi = g.ngayNghi || nv.ngayNghi; // hồ sơ gốc là thông tin mới nhất
+    nv.thangDung = g.thangDung || nv.thangDung;
+    nv.ngayVao = nv.ngayVao || g.ngayVao || ''; nv.ngayBHXH = nv.ngayBHXH || g.ngayBHXH || '';
     const start = nv.ngayVao || nv.ngayBHXH;
-    const dangLam = !nv.thangDung || nv.thangDung > kyHomNay;
-    const end = dangLam ? today : nv.thangDung + '-01';
+    // Thâm niên tính đến NGÀY NGHỈ VIỆC nếu đã nghỉ; chưa nhập ngày nghỉ nhưng đã dừng đóng thì tính đến
+    // đầu tháng dừng đóng; còn đang làm thì tính đến hôm nay.
+    const daNghi = !!(nv.ngayNghi && nv.ngayNghi <= today);
+    const dangLam = !daNghi && (!nv.thangDung || nv.thangDung > kyHomNay);
+    const end = daNghi ? nv.ngayNghi : (dangLam ? today : nv.thangDung + '-01');
     nv.dangLam = dangLam;
     nv.thamNien = tinhThamNien_(start, end);
     nv.thamNienNam = nv.thamNien ? Math.round((nv.thamNien.years + nv.thamNien.months / 12 + nv.thamNien.days / 365) * 100) / 100 : null;

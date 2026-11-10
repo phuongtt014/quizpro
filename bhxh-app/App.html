@@ -508,7 +508,8 @@ function renderDashboard() {
       <label class="small">Phòng ban <select onchange="S.dashPB=this.value;loadDashboard()">${opt(S.phongBan, S.dashPB, 'Tất cả phòng ban')}</select></label>
       <span class="spacer"></span><span class="small muted">Nhân sự tính tại kỳ ${fmtM(d.denKy)} · Tăng mới / Chi phí / Nghỉ việc cộng dồn ${khoang}</span>
     </div></div>
-    ${thieuKyGoc ? '<div class="alert warn small">Không có kỳ trước để so sánh cho tháng đầu tiên trong khoảng đã chọn – Tăng mới / Nghỉ việc của tháng đó chưa được tính.</div>' : ''}
+    ${thieuKyGoc ? '<div class="alert warn small">Không có kỳ trước để so sánh cho tháng đầu tiên trong khoảng đã chọn – Tăng mới của tháng đó chưa được tính.</div>' : ''}
+    ${t.nghiViec.thieuNgayNghi ? `<div class="alert warn small">Có <b>${fmt(t.nghiViec.thieuNgayNghi)}</b> NV đã thôi đóng BHXH trong khoảng đã chọn nhưng <b>chưa nhập Ngày nghỉ việc</b> nên chưa được tính vào Nghỉ việc. Nếu họ đã nghỉ việc, hãy bổ sung Ngày nghỉ việc ở tab Nhân viên (nếu chỉ tạm dừng đóng, như thai sản, thì không cần).</div>` : ''}
     <div class="ex-grid">
       <div class="ex-col">
         <div class="ex-pill ex-c1">Nhân sự</div>
@@ -527,7 +528,7 @@ function renderDashboard() {
       </div>
       <div class="ex-col">
         <div class="ex-pill ex-c4">Nghỉ việc</div>
-        ${kpi(fmt(t.nghiViec.tong), 'NV nghỉ việc (thôi đóng)', exIcon('nghiviec'), fmt(t.nghiViec.nu), 'Nữ', fmt(t.nghiViec.nam), 'Nam', chuaRo(t.nghiViec))}
+        ${kpi(fmt(t.nghiViec.tong), 'NV nghỉ việc', exIcon('nghiviec'), fmt(t.nghiViec.nu), 'Nữ', fmt(t.nghiViec.nam), 'Nam', [chuaRo(t.nghiViec), 'Theo ngày nghỉ việc'].filter(String).join(' · '))}
         <div class="ex-chart"><h4>Nghỉ việc theo phòng ban${pbTxt}</h4>${chartDonutPB(t.nghiViec.theoPB)}</div>
       </div>
     </div>
@@ -1507,7 +1508,7 @@ function renderNhanSu() {
     <div class="stat"><div class="lbl">Khoảng thời gian</div><div class="val">${fmtM(d.tuKy)} – ${fmtM(d.denKy)}</div></div>
     <div class="stat"><div class="lbl">Số nhân sự</div><div class="val">${rows.length}<span class="muted small"> / ${d.rows.length}</span></div></div>
     <div class="stat"><div class="lbl">Đang làm việc</div><div class="val">${rows.filter((nv) => nv.dangLam).length}</div></div>
-    <div class="stat"><div class="lbl">Đã dừng đóng</div><div class="val">${rows.filter((nv) => !nv.dangLam).length}</div></div></div>
+    <div class="stat"><div class="lbl">Đã nghỉ việc / dừng đóng</div><div class="val">${rows.filter((nv) => !nv.dangLam).length}</div></div></div>
     <div class="card no-print"><div class="row"><span class="small muted">Lọc theo thâm niên (năm, có thể để số thập phân, ví dụ 0.5 = 6 tháng):</span>
       <label class="small">Từ <input type="number" step="0.5" id="rpTnTu" style="width:80px" value="${tnTu === null ? '' : tnTu}" oninput="rpRefilter()"></label>
       <label class="small">Đến <input type="number" step="0.5" id="rpTnDen" style="width:80px" value="${tnDen === null ? '' : tnDen}" oninput="rpRefilter()"></label></div></div>`;
@@ -1520,7 +1521,7 @@ function renderNhanSu() {
     body += `<tr class="group"><td colspan="${totalCols}">${esc(nv.maNV)} – ${esc(nv.hoTen)}
       <span class="muted small">Vào làm ${fmtD(nv.ngayVao)}</span>
       · Thâm niên: <b>${tn ? tn.years + ' năm ' + tn.months + ' tháng ' + tn.days + ' ngày' : 'Chưa rõ ngày vào làm'}</b>
-      ${nv.dangLam ? '' : ' <span class="badge bad">Đã dừng đóng</span>'}</td></tr>`;
+      ${nv.dangLam ? '' : (nv.ngayNghi ? ` <span class="badge bad">Nghỉ việc ${fmtD(nv.ngayNghi)}</span>` : ' <span class="badge bad">Đã dừng đóng</span>')}</td></tr>`;
     nv.periods.forEach((p) => {
       body += `<tr class="${p.dong === 'Có' ? '' : 'off'}"><td>${fmtM(p.ky)}</td><td>${esc(p.chucDanh)}</td><td>${esc(p.phongBan)}</td>
         <td>${esc(p.maPL)}</td><td>${esc(p.dong)}</td>

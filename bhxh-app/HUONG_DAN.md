@@ -195,7 +195,7 @@ Kết quả tính ở màn hình **Truy thu** được tách thành 4 phần vì
 Tab mới, xem **quá trình đóng BHXH của từng nhân sự** theo thời gian:
 
 1. Chọn khoảng thời gian bằng 2 ô **"Từ kỳ" / "Đến kỳ"**, có thể tìm theo mã NV/họ tên và lọc theo mã PL.
-2. Mỗi nhân sự hiện một khối riêng: dòng đầu là **Mã NV – Họ tên**, Ngày vào làm và **Thâm niên** (tính theo số năm – tháng – ngày, tính đến hôm nay nếu đang làm, hoặc đến ngày dừng đóng nếu đã nghỉ). Nếu đã dừng đóng sẽ có nhãn **"Đã dừng đóng"**.
+2. Mỗi nhân sự hiện một khối riêng: dòng đầu là **Mã NV – Họ tên**, Ngày vào làm và **Thâm niên** (tính theo số năm – tháng – ngày: đến **Ngày nghỉ việc** nếu đã nghỉ việc; chưa nhập ngày nghỉ nhưng đã dừng đóng thì đến đầu tháng dừng đóng; còn đang làm thì đến hôm nay). Nếu đã dừng đóng sẽ có nhãn **"Đã dừng đóng"**.
 3. Bên dưới là các dòng chi tiết từng **kỳ** trong khoảng đã chọn, gồm cả **Chức danh** và **Phòng ban** *tại kỳ đó* (vì nhân sự có thể đổi phòng ban/chức danh giữa các kỳ, nên không cố định ở dòng đầu), cùng Mã PL, Đóng/Không, Lương đóng, Tổng NLĐ, Tổng DN, Tổng cộng, Cảnh báo.
 4. **Lọc theo thâm niên**: nhập số năm ở 2 ô **"Từ" / "Đến"** (có thể nhập số thập phân, ví dụ 0.5 = 6 tháng) để tìm nhân sự trong một khoảng thâm niên tùy chọn.
 5. Xuất Excel/PDF lấy đầy đủ Chức danh/Phòng ban theo từng kỳ và thâm niên (số năm dạng thập phân) để tiện lọc lại trên Excel.
@@ -211,9 +211,11 @@ Màn hình **Tổng quan** (trang chủ) trình bày theo mẫu Executive Summar
 | **Nhân sự** | Số NV đang đóng BHXH tại **kỳ cuối** của khoảng chọn | Nữ / Nam | Cột chồng Nữ/Nam theo phòng ban |
 | **Tăng mới** | Tổng số NV bắt đầu đóng mới, cộng dồn cả khoảng chọn | Nữ / Nam | Thanh ngang theo phòng ban |
 | **Chi phí BHXH** | Tổng trích đóng cả khoảng chọn (không gồm truy thu/thoái thu) | NLĐ đóng / DN đóng | Vùng theo tháng NLĐ / DN |
-| **Nghỉ việc** | Tổng số NV thôi đóng, cộng dồn cả khoảng chọn | Nữ / Nam | Bánh vòng theo phòng ban |
+| **Nghỉ việc** | Tổng số NV có **Ngày nghỉ việc** nằm trong khoảng chọn | Nữ / Nam | Bánh vòng theo phòng ban |
 
 - Nữ/Nam lấy theo trường **Giới tính** (mục 9f); NV chưa nhập giới tính được ghi chú riêng dưới thẻ.
+- **Nghỉ việc được tính theo đúng Ngày nghỉ việc** (cả ở thẻ, biểu đồ theo phòng ban và biểu đồ Tăng mới / Nghỉ việc theo tháng): NV có Ngày nghỉ việc rơi vào tháng nào thì tính vào tháng đó, kể cả khi vẫn đóng BHXH hết tháng đó; phòng ban là phòng ban của NV tại thời điểm nghỉ. NV chỉ **tạm dừng đóng** (vd. thai sản) mà không có Ngày nghỉ việc thì **không** bị tính là nghỉ việc – nếu có NV đã thôi đóng trong khoảng chọn nhưng chưa nhập Ngày nghỉ việc, trang Tổng quan hiện dòng nhắc kèm số lượng để bổ sung.
+- Báo cáo **Biến động tăng/giảm** vẫn tính "Giảm" theo tháng dừng đóng BHXH (đúng số liệu nộp cơ quan BHXH), cột lý do có ghi kèm Ngày nghỉ việc.
 - Biểu đồ theo phòng ban chỉ hiện các phòng lớn nhất, các phòng còn lại gộp thành **"Khác (n phòng ban)"** cho dễ đọc. Rê chuột vào cột/phần bánh để xem tên đầy đủ và số liệu.
 - Bên dưới 4 cột là 2 nhóm biểu đồ, cùng kiểu thẻ và bảng màu với phần trên:
   - **Xu hướng theo tháng**: Biến động quỹ lương đóng (biểu đồ vùng) · Tăng mới / Nghỉ việc theo tháng (cột đôi, xanh ngọc = tăng mới, cam = nghỉ việc).
