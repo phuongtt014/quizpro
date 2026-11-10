@@ -12,6 +12,7 @@
 const ROLE = { ADMIN: 'Admin', NHAP: 'Nhập liệu', XEM: 'Xem' };
 const KY_MO = 'Đang mở';
 const KY_CHOT = 'Đã chốt';
+const KY_CHO = 'Chờ duyệt'; // Nhập liệu đã gửi đề xuất, chờ Admin chốt hoặc trả hồ sơ
 const TT_AD = 'Đang áp dụng';
 const TT_NGUNG = 'Ngừng áp dụng';
 const TRAN_LUONG = 'Mức lương đóng tối đa';
@@ -101,6 +102,11 @@ const T = {
     ['nguoiTinh', 'Người tính', 'text'],
     ['ngayChot', 'Ngày chốt', 'text'],
     ['nguoiChot', 'Người chốt', 'text'],
+    ['ngayGui', 'Ngày gửi đề xuất', 'text'],
+    ['nguoiGui', 'Người gửi đề xuất', 'text'],
+    ['ngayTra', 'Ngày trả hồ sơ', 'text'],
+    ['nguoiTra', 'Người trả hồ sơ', 'text'],
+    ['lyDoTra', 'Lý do trả hồ sơ', 'text'],
     ['ghiChu', 'Ghi chú', 'text']] },
   DLKY: { name: 'Dữ liệu kỳ', cols: [['ky', 'Kỳ', 'month']].concat(NV_COLS) },
   KQ: { name: 'Kết quả tính', cols: [
@@ -318,7 +324,7 @@ function khoiTaoCauTruc() {
     vr(t, 'Mã phân loại', T.MAPL);
     vr(t, 'Đơn vị_Phòng ban', T.PB);
   });
-  v(T.KY, 'Trạng thái', [KY_MO, KY_CHOT]);
+  v(T.KY, 'Trạng thái', [KY_MO, KY_CHO, KY_CHOT]);
   v(T.PQ, 'Vai trò', LISTS.role);
   v(T.PQ, 'Trạng thái', LISTS.pqTrangThai);
   v(T.YCML, 'Trạng thái', LISTS.ycmlTrangThai);
@@ -751,6 +757,55 @@ function deleteRows_(t, rowNums) {
 }
 function strip_(o) { const c = Object.assign({}, o); delete c._row; return c; }
 
+// ---------------------------------------------------------------------
+// EMAIL THÔNG BÁO
+// Gửi bằng MailApp từ tài khoản chạy web app (chủ sở hữu script, "Thực thi dưới dạng: Tôi"). Lỗi gửi email
+// (hết hạn mức, chưa cấp quyền…) KHÔNG làm hỏng thao tác chính – chỉ được báo lại trong kết quả trả về.
+// ---------------------------------------------------------------------
+function emailTheoVaiTro_(vaiTro) {
+  const list = load_(T.PQ).rows.filter(function (r) { return r.vaiTro === vaiTro && r.trangThai !== PQ_KHOA && r.email; })
+    .map(function (r) { return String(r.email).toLowerCase().trim(); });
+  if (!list.length && vaiTro === ROLE.ADMIN) {
+    const owner = (Session.getEffectiveUser().getEmail() || '').toLowerCase();
+    if (owner) list.push(owner); // chưa khai báo Admin nào: chủ sở hữu script là Admin
+  }
+  return list;
+}
+function escHtml_(s) {
+  return String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+/**
+ * Gửi 1 email thông báo. `nguoiNhan`: danh sách email (tự bỏ trùng, bỏ người đang thao tác `boQua`).
+ * `dong`: các dòng nội dung [nhãn, giá trị] hiển thị dạng bảng; `ghiChu`: đoạn văn bản dài (giữ xuống dòng).
+ * Trả về { gui: số người nhận } hoặc { gui: 0, loi: '...' }.
+ */
+function guiEmail_(nguoiNhan, boQua, tieuDe, moDau, dong, ghiChu) {
+  const seen = {};
+  const to = (nguoiNhan || []).map(function (e) { return String(e || '').toLowerCase().trim(); })
+    .filter(function (e) { if (!e || e === boQua || seen[e]) return false; seen[e] = 1; return true; });
+  if (!to.length) return { gui: 0 };
+  try {
+    const info = getInfo_();
+    let url = '';
+    try { url = ScriptApp.getService().getUrl() || ''; } catch (e) { url = ''; }
+    const bang = (dong || []).filter(function (d) { return d[1] !== undefined && d[1] !== null && d[1] !== ''; }).map(function (d) {
+      return '<tr><td style="padding:4px 12px 4px 0;color:#667085;white-space:nowrap;vertical-align:top">' + escHtml_(d[0])
+        + '</td><td style="padding:4px 0">' + escHtml_(d[1]) + '</td></tr>';
+    }).join('');
+    const html = '<div style="font-family:Arial,sans-serif;font-size:14px;color:#1d2733;line-height:1.5">'
+      + '<p>' + escHtml_(moDau) + '</p>'
+      + (bang ? '<table style="border-collapse:collapse;margin:8px 0">' + bang + '</table>' : '')
+      + (ghiChu ? '<div style="margin:10px 0;padding:10px 12px;background:#fff4de;border-left:4px solid #9a5b00;white-space:pre-wrap">'
+        + escHtml_(ghiChu) + '</div>' : '')
+      + (url ? '<p><a href="' + url + '" style="display:inline-block;padding:8px 14px;background:#2f6fad;color:#fff;border-radius:6px;text-decoration:none">Mở ứng dụng BHXH</a></p>' : '')
+      + '<p style="color:#98a2b3;font-size:12px">Email tự động từ ứng dụng Quản lý BHXH' + (info.tenCty ? ' – ' + escHtml_(info.tenCty) : '') + '. Vui lòng không trả lời email này.</p></div>';
+    MailApp.sendEmail({ to: to.join(','), subject: '[BHXH] ' + tieuDe, htmlBody: html, name: 'Ứng dụng BHXH' });
+    return { gui: to.length, nguoiNhan: to };
+  } catch (e) {
+    return { gui: 0, loi: e.message };
+  }
+}
+
 function log_(user, action, detail) {
   try {
     append_(T.LOG, [{ thoiGian: now_(), email: user ? user.email : '', hanhDong: action, chiTiet: detail || '' }]);
@@ -808,10 +863,18 @@ function getKy_(ky) {
   if (!r) throw new Error('Không tìm thấy kỳ ' + monthDisp_(ky));
   return r;
 }
-function requireOpen_(ky) {
+function requireOpen_(ky, user) {
   const k = getKy_(ky);
   if (k.trangThai === KY_CHOT) throw new Error('Kỳ ' + monthDisp_(ky) + ' đã chốt, không thể chỉnh sửa. Phát sinh cho tháng cũ hãy nhập Truy thu/Thoái thu ở kỳ đang mở.');
+  if (k.trangThai === KY_CHO && (!user || user.role !== ROLE.ADMIN)) {
+    throw new Error('Kỳ ' + monthDisp_(ky) + ' đã gửi đề xuất, đang chờ Admin duyệt nên tạm khóa chỉnh sửa. Nếu Admin trả hồ sơ, kỳ sẽ được mở lại để sửa.');
+  }
   return k;
+}
+/** Kỳ có cho người dùng này sửa không (Đã chốt: không ai; Chờ duyệt: chỉ Admin) */
+function kySuaDuoc_(k, user) {
+  if (user.role === ROLE.XEM || k.trangThai === KY_CHOT) return false;
+  return k.trangThai !== KY_CHO || user.role === ROLE.ADMIN;
 }
 /** "BHXH_NLD; BHYT_NLD=1.2" -> [{ma, tiLe}] */
 function parseDS_(s) {
@@ -1115,7 +1178,7 @@ function apiTinhKy(ky) {
   requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
   ky = normMonth_(ky);
   return withLock_(function () {
-    requireOpen_(ky);
+    requireOpen_(ky, user);
     const res = tinhKy_(ky, user);
     log_(user, 'Tính kỳ', monthDisp_(ky) + ' – ' + res.soDong + '/' + res.soNV + ' NV đóng');
     return res;
@@ -1167,13 +1230,21 @@ function apiChotKy(ky) {
   const user = getUser_();
   requireRole_(user, [ROLE.ADMIN]);
   ky = normMonth_(ky);
-  return withLock_(function () {
-    requireOpen_(ky);
+  let nguoiGui = '';
+  const res = withLock_(function () {
+    const k = requireOpen_(ky, user);
+    nguoiGui = k.nguoiGui || '';
     const res = tinhKy_(ky, user); // tính lại lần cuối trước khi chốt
     update_(T.KY, getKy_(ky)._row, { trangThai: KY_CHOT, ngayChot: now_(), nguoiChot: user.email });
     log_(user, 'Chốt kỳ', monthDisp_(ky));
     return res;
   });
+  res.email = guiEmail_((nguoiGui ? [nguoiGui] : emailTheoVaiTro_(ROLE.NHAP)).concat(emailTheoVaiTro_(ROLE.ADMIN)), user.email,
+    'Kỳ ' + monthDisp_(ky) + ' đã được duyệt và chốt',
+    user.email + ' đã kiểm tra và chốt kỳ BHXH ' + monthDisp_(ky) + '. Số liệu kỳ này đã khóa; phát sinh cho tháng này (nếu có) hãy nhập Truy thu/Thoái thu ở kỳ sau.',
+    [['Kỳ', monthDisp_(ky)], ['Người gửi đề xuất', nguoiGui], ['Người chốt', user.email],
+      ['NV đóng / tổng', res.soDong + ' / ' + res.soNV], ['Tổng phải nộp', fmtNum_(res.tongNLD + res.tongDN + res.ttNLD + res.ttDN)]], '');
+  return res;
 }
 
 /** Mở lại một kỳ đã chốt để sửa/tính lại. Không giới hạn ở kỳ mới nhất (trường hợp khẩn cấp có thể cần sửa kỳ cũ). */
@@ -1181,13 +1252,72 @@ function apiMoLaiKy(ky) {
   const user = getUser_();
   requireRole_(user, [ROLE.ADMIN]);
   ky = normMonth_(ky);
-  return withLock_(function () {
+  withLock_(function () {
     const k = getKy_(ky);
     if (k.trangThai !== KY_CHOT) throw new Error('Kỳ ' + monthDisp_(ky) + ' đang mở, không cần mở lại.');
     update_(T.KY, k._row, { trangThai: KY_MO, ngayChot: '', nguoiChot: '' });
     log_(user, 'Mở lại kỳ', monthDisp_(ky));
-    return { ky: ky };
   });
+  const email = guiEmail_(emailTheoVaiTro_(ROLE.NHAP).concat(emailTheoVaiTro_(ROLE.ADMIN)), user.email,
+    'Kỳ ' + monthDisp_(ky) + ' đã được mở lại',
+    user.email + ' đã mở lại kỳ BHXH ' + monthDisp_(ky) + ' (trước đó đã chốt) để điều chỉnh. Sau khi sửa xong cần Tính, Gửi đề xuất và Chốt lại.',
+    [['Kỳ', monthDisp_(ky)], ['Người mở lại', user.email]], '');
+  return { ky: ky, email: email };
+}
+
+// ---------------------------------------------------------------------
+// QUY TRÌNH DUYỆT KỲ: Nhập liệu tính xong -> Gửi đề xuất (kỳ chuyển "Chờ duyệt", Nhập liệu không sửa được)
+// -> Admin kiểm tra: Chốt kỳ (xong) hoặc Trả hồ sơ kèm lý do (kỳ về "Đang mở" để sửa lại rồi gửi lại).
+// Mỗi bước đều gửi email cho các bên liên quan.
+// ---------------------------------------------------------------------
+function ensureCols_(t) {
+  const header = headerOf_(getSheet_(t));
+  if (t.cols.some(function (c) { return header.indexOf(c[1]) < 0; })) ensureSheet_(t);
+}
+function apiGuiDeXuat(ky, ghiChu) {
+  const user = getUser_();
+  requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
+  ky = normMonth_(ky);
+  ghiChu = String(ghiChu || '').trim();
+  const res = withLock_(function () {
+    ensureCols_(T.KY);
+    const k = getKy_(ky);
+    if (k.trangThai === KY_CHOT) throw new Error('Kỳ ' + monthDisp_(ky) + ' đã chốt.');
+    if (k.trangThai === KY_CHO) throw new Error('Kỳ ' + monthDisp_(ky) + ' đã gửi đề xuất, đang chờ Admin duyệt.');
+    const r = tinhKy_(ky, user); // tính lại lần cuối để Admin duyệt đúng số liệu mới nhất
+    update_(T.KY, getKy_(ky)._row, { trangThai: KY_CHO, ngayGui: now_(), nguoiGui: user.email, ghiChu: ghiChu || k.ghiChu });
+    log_(user, 'Gửi đề xuất duyệt kỳ', monthDisp_(ky) + (ghiChu ? ' – ' + ghiChu : ''));
+    return r;
+  });
+  res.email = guiEmail_(emailTheoVaiTro_(ROLE.ADMIN), user.email,
+    'Đề xuất duyệt kỳ ' + monthDisp_(ky) + ' – chờ Admin kiểm tra',
+    user.email + ' đã tính xong và gửi đề xuất duyệt kỳ BHXH ' + monthDisp_(ky) + '. Vui lòng kiểm tra: nếu đúng hãy Chốt kỳ, nếu chưa đúng hãy Trả hồ sơ kèm lý do.',
+    [['Kỳ', monthDisp_(ky)], ['Người gửi', user.email], ['NV đóng / tổng', res.soDong + ' / ' + res.soNV],
+      ['NLĐ đóng', fmtNum_(res.tongNLD)], ['DN đóng', fmtNum_(res.tongDN)], ['Truy thu (NLĐ + DN)', fmtNum_(res.ttNLD + res.ttDN)],
+      ['Tổng phải nộp', fmtNum_(res.tongNLD + res.tongDN + res.ttNLD + res.ttDN)], ['Số NV có cảnh báo', res.soCanhBao || '']],
+    ghiChu ? 'Ghi chú của người gửi:\n' + ghiChu : '');
+  return res;
+}
+function apiTraHoSo(ky, lyDo) {
+  const user = getUser_();
+  requireRole_(user, [ROLE.ADMIN]);
+  ky = normMonth_(ky);
+  lyDo = String(lyDo || '').trim();
+  if (!lyDo) throw new Error('Vui lòng ghi rõ lý do trả hồ sơ.');
+  const k = withLock_(function () {
+    ensureCols_(T.KY);
+    const k = getKy_(ky);
+    if (k.trangThai !== KY_CHO) throw new Error('Kỳ ' + monthDisp_(ky) + ' không ở trạng thái chờ duyệt.');
+    update_(T.KY, k._row, { trangThai: KY_MO, ngayTra: now_(), nguoiTra: user.email, lyDoTra: lyDo });
+    log_(user, 'Trả hồ sơ kỳ', monthDisp_(ky) + ' – ' + lyDo);
+    return k;
+  });
+  const email = guiEmail_([k.nguoiGui].concat(emailTheoVaiTro_(ROLE.ADMIN)), user.email,
+    'Kỳ ' + monthDisp_(ky) + ' bị trả hồ sơ – cần sửa lại',
+    user.email + ' đã trả hồ sơ kỳ BHXH ' + monthDisp_(ky) + '. Kỳ đã được mở lại để sửa; sau khi sửa xong hãy bấm Tính rồi Gửi đề xuất lại.',
+    [['Kỳ', monthDisp_(ky)], ['Người gửi đề xuất', k.nguoiGui], ['Người trả hồ sơ', user.email]],
+    'Lý do trả hồ sơ:\n' + lyDo);
+  return { ky: ky, email: email };
 }
 
 /**
@@ -1289,7 +1419,7 @@ function apiNhanVienImpl_(ky) {
     const k = getKy_(ky);
     trangThai = k.trangThai;
     rows = loadDLKYForKy_(ky);
-    editable = k.trangThai !== KY_CHOT;
+    editable = kySuaDuoc_(k, user);
   } else {
     rows = load_(T.NV).rows;
     editable = !hoSoGocKhoa_();
@@ -1319,17 +1449,23 @@ function apiYeuCauMoKhoa(maNV, lyDo) {
   requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
   lyDo = String(lyDo || '').trim();
   if (!lyDo) throw new Error('Vui lòng ghi lý do yêu cầu mở khóa.');
-  return withLock_(function () {
+  const nv = withLock_(function () {
     const nv = load_(T.NV).rows.find(function (r) { return r.maNV === maNV; });
     if (!nv) throw new Error('Không tìm thấy NV "' + maNV + '".');
     if (!canSee_(user, nv)) throw new Error('Bạn không quản lý hồ sơ NV này.');
     append_(T.YCML, [{
-      id: 'YC' + new Date().getTime(), maNV: maNV, hoTen: nv.hoTen, lyDo: lyDo,
+      id: 'YC' + new Date().getTime() + Math.floor(Math.random() * 1000), maNV: maNV, hoTen: nv.hoTen, lyDo: lyDo,
       nguoiYeuCau: user.email, thoiGianYC: now_(), trangThai: YCML_CHO
     }]);
     log_(user, 'Yêu cầu mở khóa NV', maNV + ' ' + nv.hoTen + ' – ' + lyDo);
-    return true;
+    return nv;
   });
+  const email = guiEmail_(emailTheoVaiTro_(ROLE.ADMIN), user.email,
+    'Yêu cầu mở khóa hồ sơ NV ' + maNV + ' – ' + nv.hoTen,
+    user.email + ' đề xuất mở khóa hồ sơ nhân viên đã nghỉ việc để chỉnh sửa. Vui lòng vào Thiết lập → Yêu cầu mở khóa để Duyệt hoặc Từ chối.',
+    [['Mã NV', maNV], ['Họ và tên', nv.hoTen], ['Phòng ban', nv.phongBan], ['Tháng dừng đóng', monthDisp_(nv.thangDung)], ['Người yêu cầu', user.email]],
+    'Lý do:\n' + lyDo);
+  return { ok: true, email: email };
 }
 function apiListYeuCauMoKhoaImpl_() {
   const user = getUser_();
@@ -1338,28 +1474,41 @@ function apiListYeuCauMoKhoaImpl_() {
   if (user.role !== ROLE.ADMIN) rows = rows.filter(function (r) { return r.nguoiYeuCau === user.email; });
   return rows.sort(function (a, b) { return a.thoiGianYC < b.thoiGianYC ? 1 : -1; });
 }
-function apiDuyetYeuCauMoKhoa(id, duyet) {
+function apiDuyetYeuCauMoKhoa(id, duyet, lyDoTuChoi) {
   const user = getUser_();
   requireRole_(user, [ROLE.ADMIN]);
-  return withLock_(function () {
+  lyDoTuChoi = duyet ? '' : String(lyDoTuChoi || '').trim();
+  const r = withLock_(function () {
     const r = load_(T.YCML).rows.find(function (x) { return x.id === id; });
     if (!r) throw new Error('Không tìm thấy yêu cầu.');
     const trangThai = duyet ? YCML_DUYET : YCML_TUCHOI;
-    update_(T.YCML, r._row, { trangThai: trangThai, nguoiDuyet: user.email, thoiGianDuyet: now_() });
-    log_(user, duyet ? 'Duyệt mở khóa NV' : 'Từ chối mở khóa NV', r.maNV + ' ' + r.hoTen);
-    return true;
+    update_(T.YCML, r._row, { trangThai: trangThai, nguoiDuyet: user.email, thoiGianDuyet: now_(), ghiChu: lyDoTuChoi || r.ghiChu });
+    log_(user, duyet ? 'Duyệt mở khóa NV' : 'Từ chối mở khóa NV', r.maNV + ' ' + r.hoTen + (lyDoTuChoi ? ' – ' + lyDoTuChoi : ''));
+    return r;
   });
+  const email = guiEmail_([r.nguoiYeuCau].concat(emailTheoVaiTro_(ROLE.ADMIN)), user.email,
+    (duyet ? 'Đã duyệt' : 'Từ chối') + ' mở khóa hồ sơ NV ' + r.maNV + ' – ' + r.hoTen,
+    duyet ? user.email + ' đã duyệt yêu cầu mở khóa. Bạn có thể sửa hồ sơ nhân viên này cho tới khi Admin khóa lại.'
+      : user.email + ' đã từ chối yêu cầu mở khóa hồ sơ nhân viên này.',
+    [['Mã NV', r.maNV], ['Họ và tên', r.hoTen], ['Người yêu cầu', r.nguoiYeuCau], ['Người ' + (duyet ? 'duyệt' : 'từ chối'), user.email]],
+    (r.lyDo ? 'Lý do yêu cầu:\n' + r.lyDo : '') + (lyDoTuChoi ? (r.lyDo ? '\n\n' : '') + 'Lý do từ chối:\n' + lyDoTuChoi : ''));
+  return { ok: true, email: email };
 }
 function apiKhoaLaiNV(maNV) {
   const user = getUser_();
   requireRole_(user, [ROLE.ADMIN]);
-  return withLock_(function () {
+  const r = withLock_(function () {
     const rows = ycmlRowsCuaNV_(maNV);
     if (!rows.length || rows[0].trangThai !== YCML_DUYET) throw new Error('Nhân viên này chưa được mở khóa.');
     update_(T.YCML, rows[0]._row, { trangThai: YCML_KHOALAI, nguoiDuyet: user.email, thoiGianDuyet: now_() });
     log_(user, 'Khóa lại NV', maNV);
-    return true;
+    return rows[0];
   });
+  const email = guiEmail_([r.nguoiYeuCau], user.email,
+    'Hồ sơ NV ' + maNV + ' – ' + r.hoTen + ' đã được khóa lại',
+    user.email + ' đã khóa lại hồ sơ nhân viên đã nghỉ việc này. Nếu cần sửa tiếp, hãy gửi yêu cầu mở khóa mới.',
+    [['Mã NV', maNV], ['Họ và tên', r.hoTen], ['Người khóa lại', user.email]], '');
+  return { ok: true, email: email };
 }
 
 function apiSaveNV(ky, o, isNew) {
@@ -1385,7 +1534,7 @@ function apiSaveNV(ky, o, isNew) {
     }
     const t4 = Date.now();
     if (ky) {
-      requireOpen_(ky);
+      requireOpen_(ky, user);
       const ex = loadDLKYForKy_(ky).find(function (r) { return r.maNV === o.maNV; });
       saveOne_(T.DLKY, ex, Object.assign({ ky: ky }, o), isNew, user);
     }
@@ -1476,7 +1625,7 @@ function apiDeleteNV(ky, maNV) {
   if (!ky) requireHoSoGocMo_();
   return withLock_(function () {
     let t = T.NV, rows;
-    if (ky) { requireOpen_(ky); t = T.DLKY; rows = load_(T.DLKY).rows.filter(function (r) { return r.ky === ky && r.maNV === maNV; }); }
+    if (ky) { requireOpen_(ky, user); t = T.DLKY; rows = load_(T.DLKY).rows.filter(function (r) { return r.ky === ky && r.maNV === maNV; }); }
     else rows = load_(T.NV).rows.filter(function (r) { return r.maNV === maNV; });
     if (!rows.length) throw new Error('Không tìm thấy NV.');
     deleteRows_(t, rows.map(function (r) { return r._row; }));
@@ -1498,7 +1647,7 @@ function apiTruyThuImpl_(ky) {
     if (r.maNV && canSee_(user, r)) nvMap[r.maNV] = { maNV: r.maNV, hoTen: r.hoTen, maPL: r.maPL, congDoan: r.congDoan, luongDong: luongDong_(r), emailQL: r.emailQL };
   });
   return {
-    ky: ky, trangThai: k.trangThai, editable: k.trangThai !== KY_CHOT && user.role !== ROLE.XEM,
+    ky: ky, trangThai: k.trangThai, editable: kySuaDuoc_(k, user),
     rows: rows, nvs: Object.keys(nvMap).map(function (x) { return nvMap[x]; })
   };
 }
@@ -1508,7 +1657,7 @@ function apiSaveTruyThu(ky, o) {
   requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
   ky = normMonth_(ky);
   return withLock_(function () {
-    requireOpen_(ky);
+    requireOpen_(ky, user);
     const tu = normMonth_(o.tuThang), den = normMonth_(o.denThang);
     if (!o.maNV) throw new Error('Chưa chọn nhân viên.');
     if (!tu || !den) throw new Error('Chưa nhập Từ tháng / Đến tháng.');
@@ -1551,7 +1700,7 @@ function apiDeleteTruyThu(ky, id) {
   requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
   ky = normMonth_(ky);
   return withLock_(function () {
-    requireOpen_(ky);
+    requireOpen_(ky, user);
     const ex = load_(T.TT).rows.find(function (r) { return r.id === id && r.ky === ky; });
     if (!ex || !canSee_(user, ex)) throw new Error('Không tìm thấy dòng truy thu.');
     deleteRows_(T.TT, [ex._row]);
@@ -2479,7 +2628,7 @@ function importNVGrid_(ky, mode, grid, source, onlyEmpty) {
   ky = normMonth_(ky);
   if (!ky) requireHoSoGocMo_();
   return withLock_(function () {
-    if (ky) requireOpen_(ky);
+    if (ky) requireOpen_(ky, user);
     const parsed = gridToObjects_(T.NV.cols, grid, mode === 'motphan' ? ['Mã NV'] : ['Mã NV', 'Họ và tên']);
     if (parsed.error) throw new Error(parsed.error);
     if (!parsed.objs.length) throw new Error('Không có dòng dữ liệu nào.');

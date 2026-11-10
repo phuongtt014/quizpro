@@ -85,7 +85,8 @@ Admin có thể đổi *Email NV quản lý hồ sơ* của bất kỳ NV nào �
    - Sửa ở kỳ mới nhất thì hồ sơ gốc cũng được cập nhật theo.
 4. **Truy thu / thoái thu** cho các tháng đã qua: nhập NV, từ tháng – đến tháng, lương cũ, lương mới. Để truy đóng tháng chưa đóng, nhập lương cũ = 0.
 5. Bấm **Tính**. Kiểm tra *Báo cáo → Bảng tính nộp BHXH* (cột Cảnh báo) và *Biến động tăng/giảm*.
-6. **Admin chốt kỳ**: app tính lại lần cuối rồi khóa kỳ. Kỳ đã chốt không sửa được nữa. Phát sinh cho tháng đó phải nhập truy thu ở kỳ sau.
+   - Người **Nhập liệu** kiểm tra xong thì bấm **📤 Gửi đề xuất** để Admin duyệt (xem mục 9h).
+6. **Admin chốt kỳ** (hoặc **Trả hồ sơ** kèm lý do nếu chưa đúng): app tính lại lần cuối rồi khóa kỳ. Kỳ đã chốt không sửa được nữa. Phát sinh cho tháng đó phải nhập truy thu ở kỳ sau.
 7. **Xuất Excel/PDF** ở màn hình *Báo cáo*.
 
 ## 5. Quy tắc tính
@@ -255,6 +256,33 @@ Sau khi Lưu/Xóa/Nhập file ở Nhân viên, Lưu/Xóa ở Truy thu, hay Tạo
 Nếu **chèn/xóa dòng bằng tay** trên Sheet (thao tác này Google không báo cho app), bấm nút **"🔄 Làm mới dữ liệu"** ở góc trên để đọc lại toàn bộ – nếu không bấm, app cũng tự đọc lại sau tối đa 30 phút.
 
 **Ghi chú cho người kiểm tra (F12 → tab Console của trình duyệt):** mỗi lệnh gọi lên Google đều được in ra thời gian chạy thực tế, ví dụ `[BHXH] apiSaveNV: 1850 ms`, kèm theo 1 dòng chi tiết từng bước phía server (ví dụ bước nào tốn bao nhiêu ms: đọc dữ liệu, kiểm tra khóa, ghi dữ liệu…) để biết chính xác đang chậm ở bước nào nếu vẫn thấy lâu.
+
+## 9h. Gửi đề xuất – Admin duyệt/chốt hoặc Trả hồ sơ – Email thông báo
+
+**Quy trình duyệt kỳ** (màn hình *Kỳ BHXH*):
+
+| Bước | Ai làm | Thao tác | Trạng thái kỳ | Email gửi tới |
+|---|---|---|---|---|
+| 1 | Nhập liệu | Sửa dữ liệu, bấm **Tính**, kiểm tra báo cáo | Đang mở | – |
+| 2 | Nhập liệu | Bấm **📤 Gửi đề xuất** (có thể ghi chú, xuống dòng được). Nút chỉ bấm được sau khi đã Tính. App tự tính lại lần cuối trước khi gửi | **Chờ duyệt** – tạm khóa, Nhập liệu không sửa/Tính/nhập file/truy thu được nữa | Tất cả Admin |
+| 3a | Admin | Kiểm tra đúng → bấm **✔ Duyệt & chốt kỳ** | Đã chốt | Người gửi đề xuất + các Admin khác |
+| 3b | Admin | Chưa đúng → bấm **↩ Trả hồ sơ**, **bắt buộc** ghi lý do (xuống dòng được để liệt kê từng ý) | Đang mở – mở khóa lại cho Nhập liệu sửa. Lý do trả hiện ngay dưới trạng thái kỳ | Người gửi đề xuất + các Admin khác |
+| 4 | Nhập liệu | Sửa theo lý do, Tính lại, **Gửi đề xuất** lần nữa | Chờ duyệt | Tất cả Admin |
+| – | Admin | **Mở lại kỳ** đã chốt (khi cần điều chỉnh gấp) | Đang mở | Nhập liệu + các Admin khác |
+
+- Trong lúc *Chờ duyệt*, Admin vẫn sửa/Tính được nếu cần chỉnh nhỏ trước khi chốt.
+- Admin vẫn có thể **Chốt kỳ** trực tiếp khi kỳ đang mở (không bắt buộc phải có đề xuất).
+
+**Yêu cầu mở khóa hồ sơ nhân viên đã nghỉ việc** (mục 9d) cũng gửi email ở mọi bước:
+- Nhập liệu gửi yêu cầu mở khóa (kèm lý do) → email tới tất cả Admin.
+- Admin **Duyệt** → email tới người yêu cầu. Admin **Từ chối** → nhập lý do từ chối (xuống dòng được) → email tới người yêu cầu kèm lý do; lý do cũng hiện trong bảng *Yêu cầu mở khóa*.
+- Admin **Khóa lại** hồ sơ → email tới người yêu cầu.
+
+**Về email:**
+- Người nhận lấy từ tab *Phân quyền* (chỉ tài khoản đang *Hoạt động*). Người thực hiện thao tác không tự nhận email của chính mình.
+- Email được gửi **từ tài khoản chủ sở hữu script** (người triển khai web app), có nút mở thẳng ứng dụng.
+- Lần đầu cập nhật bản này, chủ sở hữu cần **cấp quyền gửi email**: trong Apps Script chọn hàm bất kỳ (vd. `khoiTaoCauTruc`) → **Chạy** → **Cho phép** quyền "Gửi email thay mặt bạn", sau đó **Triển khai → Quản lý các bản triển khai → ✏ → Phiên bản mới**.
+- Google giới hạn số email mỗi ngày (khoảng 100 người nhận/ngày với Gmail thường, 1.500 với Google Workspace). Nếu gửi email lỗi (hết hạn mức, chưa cấp quyền…), **thao tác vẫn được thực hiện bình thường**; app chỉ báo "không gửi được email thông báo" kèm nguyên nhân.
 
 ## 10. Lưu ý
 
