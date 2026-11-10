@@ -293,7 +293,14 @@ function latestOpenKy() { const k = S.kys.find((x) => x.trangThai !== 'Đã ch�
 
 function api(fn, ...args) {
   return new Promise((resolve, reject) => {
-    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](...args);
+    const runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+    if (typeof runner[fn] !== 'function') {
+      // Giao diện (App.html) mới hơn phần xử lý (Code.gs) đang chạy: thiếu hàm phía Google
+      reject(new Error(`Phần xử lý trên Google chưa có chức năng "${fn}". Hãy dán bản Code.gs mới nhất vào Apps Script, `
+        + 'bấm Lưu, rồi Triển khai → Quản lý các bản triển khai → ✏ → Phiên bản mới → Triển khai, sau đó tải lại trang (F5).'));
+      return;
+    }
+    runner[fn](...args);
   });
 }
 let busyCount = 0;
