@@ -134,6 +134,128 @@ function chartGroupedBar(labels, series, opts) {
   return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:${h}px" role="img">
     <line x1="${padL}" y1="${zeroY}" x2="${w - padR}" y2="${zeroY}" stroke="var(--line)"></line>${bars}</svg>`;
 }
+// ---------- Biểu đồ cho trang Tổng quan dạng "Executive Summary" ----------
+// Màu đã kiểm tra bằng bộ kiểm tra bảng màu (phân biệt được với người mù màu); số liệu luôn có nhãn đi kèm.
+const EX_NAM = '#1278a8', EX_NU = '#14a89a', EX_KHAC = '#8a94a3';
+const EX_PALETTE = ['#1278a8', '#14a89a', '#e0972a', '#d1495b', '#6b4fbb'];
+const shortLabel = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+// Gộp các nhóm sau nhóm thứ `max` thành "Khác" để biểu đồ không bị chật
+function foldTop(list, max, keys) {
+  if (list.length <= max) return list;
+  const top = list.slice(0, max - 1), rest = list.slice(max - 1);
+  const khac = { phongBan: 'Khác (' + rest.length + ' phòng ban)' };
+  keys.forEach((k) => { khac[k] = rest.reduce((s, r) => s + (r[k] || 0), 0); });
+  return top.concat([khac]);
+}
+// Cột chồng theo phòng ban: mỗi cột chia đoạn Nữ / Nam (/ Chưa rõ), tổng ở đỉnh cột
+function chartStackPB(list) {
+  const data = foldTop(list, 7, ['tong', 'nu', 'nam', 'khac']);
+  const w = 360, h = 270, padL = 34, padR = 4, top = 22, bottom = 62;
+  const n = Math.max(1, data.length), slot = (w - padL - padR) / n, bw = Math.min(46, slot * 0.6);
+  const max = Math.max(1, ...data.map((d) => d.tong));
+  const H = h - top - bottom;
+  let body = '';
+  data.forEach((d, i) => {
+    const x = padL + i * slot + (slot - bw) / 2;
+    let y = h - bottom;
+    [['nu', EX_NU, 'Nữ'], ['nam', EX_NAM, 'Nam'], ['khac', EX_KHAC, 'Chưa rõ']].forEach(([k, c, lab]) => {
+      const v = d[k] || 0; if (!v) return;
+      const sh = H * v / max;
+      y -= sh;
+      body += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(sh - 2, 1).toFixed(1)}" fill="${c}" rx="2"><title>${esc(d.phongBan)} – ${lab}: ${fmt(v)}</title></rect>`;
+      if (sh >= 16) body += `<text x="${(x + bw / 2).toFixed(1)}" y="${(y + sh / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="#fff">${fmt(v)}</text>`;
+    });
+    body += `<text x="${(x + bw / 2).toFixed(1)}" y="${(y - 6).toFixed(1)}" text-anchor="middle" font-size="11" fill="var(--muted)">${fmt(d.tong)}</text>
+      <text transform="translate(${(x + bw / 2 + 4).toFixed(1)},${h - bottom + 10}) rotate(-35)" text-anchor="end" font-size="10.5" fill="var(--ink)"><title>${esc(d.phongBan)}</title>${esc(shortLabel(d.phongBan, 14))}</text>`;
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto" role="img">
+    <line x1="${padL}" y1="${h - bottom}" x2="${w - padR}" y2="${h - bottom}" stroke="var(--line)"></line>${body}</svg>`;
+}
+// Thanh ngang theo phòng ban (giống "Hires by Business Unit")
+function chartHBarPB(list, color) {
+  const data = foldTop(list, 9, ['tong']);
+  if (!data.length) return '<div class="muted small" style="padding:30px 0;text-align:center">Không có dữ liệu trong khoảng đã chọn.</div>';
+  const w = 360, rowH = 24, labW = 128, padR = 34, h = data.length * rowH + 8;
+  const max = Math.max(1, ...data.map((d) => d.tong));
+  const body = data.map((d, i) => {
+    const y = 4 + i * rowH, bw = (w - labW - padR) * d.tong / max;
+    return `<text x="${labW - 8}" y="${y + 15}" text-anchor="end" font-size="11" fill="var(--ink)"><title>${esc(d.phongBan)}</title>${esc(shortLabel(d.phongBan, 20))}</text>
+      <rect x="${labW}" y="${y + 3}" width="${Math.max(bw, 2).toFixed(1)}" height="${rowH - 8}" fill="${color}" rx="2"><title>${esc(d.phongBan)}: ${fmt(d.tong)}</title></rect>
+      <text x="${(labW + bw + 6).toFixed(1)}" y="${y + 15}" font-size="11" fill="var(--muted)">${fmt(d.tong)}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto" role="img">${body}</svg>`;
+}
+// Vùng (area) theo tháng cho 2 chuỗi, chuỗi lớn vẽ trước (phía sau)
+function chartAreaMonths(labels, series) {
+  const w = 360, h = 250, padL = 8, padR = 8, top = 22, bottom = 30;
+  const n = labels.length;
+  const max = Math.max(1, ...series.reduce((a, s) => a.concat(s.values), []));
+  const x = (i) => padL + 14 + (n <= 1 ? (w - padL - padR - 28) / 2 : (w - padL - padR - 28) * i / (n - 1));
+  const y = (v) => top + (h - top - bottom) * (1 - v / max);
+  const base = h - bottom;
+  const order = series.slice().sort((a, b) => b.values.reduce((s, v) => s + v, 0) - a.values.reduce((s, v) => s + v, 0));
+  const fmtShort = (v) => (v >= 1e9 ? (v / 1e9).toFixed(1) + ' tỷ' : v >= 1e6 ? Math.round(v / 1e6) + ' tr' : fmt(v));
+  let body = '';
+  order.forEach((s) => {
+    const pts = s.values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+    body += `<polygon points="${x(0).toFixed(1)},${base} ${pts.join(' ')} ${x(n - 1).toFixed(1)},${base}" fill="${s.color}" fill-opacity="0.28"></polygon>
+      <polyline points="${pts.join(' ')}" fill="none" stroke="${s.color}" stroke-width="2"></polyline>`;
+    s.values.forEach((v, i) => {
+      body += `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4" fill="${s.color}" stroke="var(--card)" stroke-width="2"><title>${esc(labels[i])} – ${esc(s.label)}: ${fmt(v)}</title></circle>`;
+      if (n <= 8) body += `<text x="${x(i).toFixed(1)}" y="${(y(v) - 9).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--muted)">${fmtShort(v)}</text>`;
+    });
+  });
+  const step = Math.ceil(n / 8);
+  const xl = labels.map((m, i) => (i % step ? '' : `<text x="${x(i).toFixed(1)}" y="${base + 16}" text-anchor="middle" font-size="10" fill="var(--muted)">${esc(m)}</text>`)).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto" role="img">
+    <line x1="${padL}" y1="${base}" x2="${w - padR}" y2="${base}" stroke="var(--line)"></line>${body}${xl}</svg>`;
+}
+// Bánh vòng (donut) theo phòng ban, có nhãn số ở từng phần
+function chartDonutPB(list) {
+  const data = foldTop(list, 5, ['tong']);
+  const total = data.reduce((s, d) => s + d.tong, 0);
+  if (!total) return '<div class="muted small" style="padding:30px 0;text-align:center">Không có dữ liệu trong khoảng đã chọn.</div>';
+  const w = 360, h = 230, cx = 180, cy = 112, R = 88, r = 44;
+  let a0 = -Math.PI / 2, body = '';
+  data.forEach((d, i) => {
+    const frac = d.tong / total, a1 = a0 + frac * Math.PI * 2;
+    const color = d.phongBan.startsWith('Khác (') ? EX_KHAC : EX_PALETTE[i % EX_PALETTE.length];
+    const p = (rad, ang) => `${(cx + rad * Math.cos(ang)).toFixed(1)},${(cy + rad * Math.sin(ang)).toFixed(1)}`;
+    const large = a1 - a0 > Math.PI ? 1 : 0;
+    const path = frac >= 0.9999
+      ? `M${p(R, 0)} A${R},${R} 0 1 1 ${p(R, Math.PI)} A${R},${R} 0 1 1 ${p(R, 0)} M${p(r, 0)} A${r},${r} 0 1 0 ${p(r, Math.PI)} A${r},${r} 0 1 0 ${p(r, 0)}Z`
+      : `M${p(R, a0)} A${R},${R} 0 ${large} 1 ${p(R, a1)} L${p(r, a1)} A${r},${r} 0 ${large} 0 ${p(r, a0)}Z`;
+    body += `<path d="${path}" fill="${color}" stroke="var(--card)" stroke-width="2" fill-rule="evenodd"><title>${esc(d.phongBan)}: ${fmt(d.tong)}</title></path>`;
+    const mid = (a0 + a1) / 2;
+    if (frac >= 0.04) body += `<text x="${(cx + (R + 14) * Math.cos(mid)).toFixed(1)}" y="${(cy + (R + 14) * Math.sin(mid) + 4).toFixed(1)}" text-anchor="${Math.cos(mid) >= 0 ? 'start' : 'end'}" font-size="11" fill="var(--ink)">${fmt(d.tong)}</text>`;
+    d._color = color;
+    a0 = a1;
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto" role="img">${body}</svg>
+    <div class="row small" style="gap:10px;justify-content:center">${data.map((d) => `<span title="${esc(d.phongBan)}"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${d._color};margin-right:4px"></span>${esc(shortLabel(d.phongBan, 18))}</span>`).join('')}</div>`;
+}
+// Biểu tượng nhỏ cho các thẻ (vẽ bằng SVG, không cần ảnh ngoài)
+function exPerson(color, x, s) {
+  return `<g transform="translate(${x},0) scale(${s})"><circle cx="10" cy="7" r="5.5" fill="${color}"/><path d="M1 30c0-7 4-12 9-12s9 5 9 12z" fill="${color}"/></g>`;
+}
+function exIcon(kind) {
+  if (kind === 'nhansu') {
+    let g = '';
+    for (let i = 0; i < 9; i++) g += exPerson(i === 6 ? '#e0972a' : (i % 2 ? EX_NU : EX_NAM), i * 19, 0.9);
+    return `<svg viewBox="0 0 172 30" width="172" height="34" aria-hidden="true">${g}</svg>`;
+  }
+  if (kind === 'tangmoi') {
+    return `<svg viewBox="0 0 64 34" width="64" height="38" aria-hidden="true">${exPerson(EX_NAM, 10, 1.05)}
+      <circle cx="46" cy="12" r="10" fill="#e0972a"/><path d="M46 7v10M41 12h10" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>`;
+  }
+  if (kind === 'chiphi') {
+    return `<svg viewBox="0 0 70 34" width="70" height="38" aria-hidden="true">
+      <rect x="4" y="9" width="40" height="22" rx="4" fill="${EX_NU}"/><circle cx="24" cy="20" r="6" fill="#fff" opacity=".9"/>
+      <circle cx="54" cy="12" r="9" fill="#e0972a"/><circle cx="54" cy="24" r="9" fill="#d08a20"/><text x="54" y="16" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">₫</text></svg>`;
+  }
+  const head = (c, x) => `${exPerson(c, x, 1)}<circle cx="${x + 17}" cy="24" r="5" fill="#fff"/><path d="M${x + 15} 22l4 4M${x + 19} 22l-4 4" stroke="${c}" stroke-width="1.6" stroke-linecap="round"/>`;
+  return `<svg viewBox="0 0 100 34" width="100" height="38" aria-hidden="true">${head('#d1495b', 2)}${head(EX_NAM, 36)}${head('#e0972a', 70)}</svg>`;
+}
 // Ô nhập số tiền: hiển thị có phân tách hàng ngàn, gõ tới đâu định dạng lại tới đó
 function moneyVal(v) { const n = Number(v) || 0; return n ? fmt(n) : ''; }
 function onMoneyInput(el) {
@@ -276,8 +398,26 @@ async function boot() {
     $('nav').innerHTML = NAV.filter((n) => !n[2] || n[2].includes(S.user.role))
       .map((n) => `<button data-v="${n[0]}" onclick="go('${n[0]}')">${n[1]}</button>`).join('');
     go('tongquan');
+    setTimeout(prefetchTabs, 1500);
   } catch (e) {
     V().innerHTML = `<div class="alert bad"><b>Không thể mở ứng dụng.</b><br>${esc(e.message || e)}</div>`;
+  }
+}
+// Sau khi mở trang, âm thầm tải sẵn dữ liệu các tab hay dùng nhất (lần lượt, không hiện overlay bận) vào bộ nhớ
+// tạm – để lần ĐẦU bấm sang các tab này cũng hiện ngay, không phải chờ. Bỏ qua tab đã có dữ liệu.
+async function prefetchTabs() {
+  if (!S.kys.length) return;
+  const ky = latestKy(), kyMo = latestOpenKy();
+  const jobs = [
+    ['ky-list', ['apiListKy']],
+    ['nv:' + ky, ['apiNhanVien', ky]],
+    ['tt:' + kyMo, ['apiTruyThu', kyMo]],
+    ['baocaochi:' + ky, ['apiBaoCaoChiTiet', ky]]
+  ];
+  for (const [key, args] of jobs) {
+    if (S.cache[key] !== undefined) continue;
+    const d = await runBg(...args);
+    if (d !== undefined && S.cache[key] === undefined) S.cache[key] = d;
   }
 }
 function go(v) {
@@ -291,10 +431,12 @@ async function refreshKys() { S.kys = await api('apiListKy'); S.cache['ky-list']
 // Nếu vừa sửa tay trên Google Sheet, bấm nút này để nạp lại mà không cần tải lại cả trang.
 async function refreshDanhMuc() {
   act(async () => {
+    await run('apiLamMoiCache'); // bỏ mọi kết quả đang nhớ tạm phía server, đọc lại toàn bộ từ Sheet
+    S.cache = {};
     const d = await run('apiBootstrap');
     Object.assign(S, d);
     $('ctyName').textContent = S.info.tenCty ? ' · ' + S.info.tenCty : '';
-    toast('Đã làm mới danh mục (Khoản trích đóng, Mã phân loại, Tỉ lệ Công đoàn, Phòng ban, Thông tin chung).', 'ok');
+    toast('Đã làm mới toàn bộ dữ liệu từ Google Sheet.', 'ok');
     go(S.view);
   });
 }
@@ -304,7 +446,7 @@ async function refreshDanhMuc() {
 // =====================================================================
 function vTongQuan() {
   // Không cần gọi server để biết đã có kỳ nào chưa – S.kys đã có sẵn từ lúc mở trang (apiBootstrap).
-  let h = '<h2>Tổng quan</h2>';
+  let h = `<div class="ex-head"><h2>Tổng quan nhân sự &amp; BHXH</h2>${S.info.tenCty ? `<span class="ex-brand">${esc(S.info.tenCty)}</span>` : ''}</div>`;
   if (!S.kys.length) {
     h += `<div class="alert info"><b>Chưa có kỳ BHXH nào.</b> Các bước bắt đầu:
       <ol class="steps"><li>Kiểm tra <b>Thiết lập</b>: Thông tin chung, Khoản trích đóng, Mã phân loại, Phòng ban.</li>
@@ -337,14 +479,52 @@ function renderDashboard() {
     { label: 'Nghỉ việc', color: 'var(--bad)', values: d.months.map((m) => m.nghiViec || 0) }
   ];
   const thieuKyGoc = d.months.length > 0 && d.months[0].tangMoi === null;
-  const h = `<div class="card"><div class="row">
+  const t = d.tom;
+  const pbTxt = S.dashPB ? ' – ' + esc(S.dashPB) : '';
+  const khoang = `${fmtM(d.tuKy)} – ${fmtM(d.denKy)}`;
+  const kpi = (val, lab, icon, aVal, aLab, bVal, bLab, note) => `<div class="ex-kpi">
+      <div class="ex-big">${val}</div><div class="ex-lab">${lab}</div>
+      <div class="ex-icon">${icon}</div>
+      <div class="ex-split"><div><b>${aVal}</b><span>${aLab}</span></div><div><b>${bVal}</b><span>${bLab}</span></div></div>
+      <div class="ex-note">${note || '&nbsp;'}</div></div>`;
+  const legendGT = chartLegend([{ label: 'Nữ', color: EX_NU }, { label: 'Nam', color: EX_NAM }]);
+  const chuaRo = (o) => (o.khac ? `${fmt(o.khac)} NV chưa nhập giới tính` : '');
+  const fmtTien = (v) => (v >= 1e9 ? (v / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 2 }) + ' tỷ' : fmt(v));
+  const seriesCP = [
+    { label: 'NLĐ đóng', color: EX_NU, values: d.months.map((m) => m.tongNLD || 0) },
+    { label: 'DN đóng', color: EX_NAM, values: d.months.map((m) => m.tongDN || 0) }
+  ];
+  const h = `<div class="card ex-filter"><div class="row">
       <label class="small">Từ kỳ <input type="month" value="${S.dashTuKy}" onchange="S.dashTuKy=this.value;loadDashboard()"></label>
       <label class="small">Đến kỳ <input type="month" value="${S.dashDenKy}" onchange="S.dashDenKy=this.value;loadDashboard()"></label>
       <label class="small">Phòng ban <select onchange="S.dashPB=this.value;loadDashboard()">${opt(S.phongBan, S.dashPB, 'Tất cả phòng ban')}</select></label>
+      <span class="spacer"></span><span class="small muted">Nhân sự tính tại kỳ ${fmtM(d.denKy)} · Tăng mới / Chi phí / Nghỉ việc cộng dồn ${khoang}</span>
     </div></div>
-    <div class="card"><h3>Biến động quỹ lương đóng${S.dashPB ? ' – ' + esc(S.dashPB) : ''}</h3>${chartLine(labels, seriesQL, {})}</div>
-    <div class="card"><h3>Biến động nhân sự: Tăng mới / Nghỉ việc theo tháng${S.dashPB ? ' – ' + esc(S.dashPB) : ''}</h3>
-      ${thieuKyGoc ? '<div class="alert warn small">Không có kỳ trước để so sánh cho tháng đầu tiên trong khoảng đã chọn.</div>' : ''}
+    ${thieuKyGoc ? '<div class="alert warn small">Không có kỳ trước để so sánh cho tháng đầu tiên trong khoảng đã chọn – Tăng mới / Nghỉ việc của tháng đó chưa được tính.</div>' : ''}
+    <div class="ex-grid">
+      <div class="ex-col">
+        <div class="ex-pill ex-c1">Nhân sự</div>
+        ${kpi(fmt(t.nhanSu.tong), 'NV đang đóng BHXH', exIcon('nhansu'), fmt(t.nhanSu.nu), 'Nữ', fmt(t.nhanSu.nam), 'Nam', chuaRo(t.nhanSu))}
+        <div class="ex-chart"><h4>Nhân sự theo phòng ban${pbTxt}</h4>${legendGT}${chartStackPB(t.nhanSu.theoPB)}</div>
+      </div>
+      <div class="ex-col">
+        <div class="ex-pill ex-c2">Tăng mới</div>
+        ${kpi(fmt(t.tangMoi.tong), 'NV tăng mới', exIcon('tangmoi'), fmt(t.tangMoi.nu), 'Nữ', fmt(t.tangMoi.nam), 'Nam', chuaRo(t.tangMoi))}
+        <div class="ex-chart"><h4>Tăng mới theo phòng ban${pbTxt}</h4>${chartHBarPB(t.tangMoi.theoPB, EX_NAM)}</div>
+      </div>
+      <div class="ex-col">
+        <div class="ex-pill ex-c3">Chi phí BHXH</div>
+        ${kpi(fmtTien(t.chiPhi.tong), 'Tổng trích đóng (VNĐ)', exIcon('chiphi'), fmtTien(t.chiPhi.nld), 'NLĐ đóng', fmtTien(t.chiPhi.dn), 'DN đóng', 'Không gồm truy thu/thoái thu')}
+        <div class="ex-chart"><h4>Chi phí BHXH theo tháng${pbTxt}</h4>${chartLegend(seriesCP)}${chartAreaMonths(labels, seriesCP)}</div>
+      </div>
+      <div class="ex-col">
+        <div class="ex-pill ex-c4">Nghỉ việc</div>
+        ${kpi(fmt(t.nghiViec.tong), 'NV nghỉ việc (thôi đóng)', exIcon('nghiviec'), fmt(t.nghiViec.nu), 'Nữ', fmt(t.nghiViec.nam), 'Nam', chuaRo(t.nghiViec))}
+        <div class="ex-chart"><h4>Nghỉ việc theo phòng ban${pbTxt}</h4>${chartDonutPB(t.nghiViec.theoPB)}</div>
+      </div>
+    </div>
+    <div class="card"><h3>Biến động quỹ lương đóng${pbTxt}</h3>${chartLine(labels, seriesQL, {})}</div>
+    <div class="card"><h3>Tăng mới / Nghỉ việc theo tháng${pbTxt}</h3>
       ${chartGroupedBar(labels, seriesTurnover, {})}${chartLegend(seriesTurnover)}</div>
     <div class="row" style="gap:16px;align-items:stretch">
       <div class="card" style="flex:1;min-width:280px"><h3>Nhân viên theo thâm niên${S.dashPB ? ' – ' + esc(S.dashPB) : ''}</h3>

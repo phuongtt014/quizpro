@@ -97,6 +97,32 @@
   .chk-item input[type=number] { padding: 4px 6px; width: 100%; }
   .steps { margin: 0; padding-left: 20px; }
   .steps li { margin: 4px 0; }
+  /* ---- Tổng quan dạng Executive Summary ---- */
+  .ex-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; border-bottom: 2px solid #e0972a; margin-bottom: 14px; padding-bottom: 6px; }
+  .ex-head h2 { margin: 0; font-size: 24px; }
+  .ex-brand { font-weight: 700; color: var(--pri); font-size: 15px; }
+  .ex-filter { padding: 10px 14px; }
+  .ex-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .ex-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .ex-pill { color: #fff; font-weight: 700; font-size: 18px; text-align: center; padding: 12px 8px; border-radius: 18px;
+    box-shadow: 0 3px 8px rgba(16,24,40,.18); border: 1px solid rgba(0,0,0,.25); }
+  .ex-c1 { background: linear-gradient(180deg, #1f8f84, #0d5c55); }
+  .ex-c2 { background: linear-gradient(180deg, #d27a63, #b45a44); }
+  .ex-c3 { background: linear-gradient(180deg, #1d5e7a, #0f3a4e); }
+  .ex-c4 { background: linear-gradient(180deg, #a4752d, #7a5418); }
+  .ex-kpi { background: var(--card); border: 1px solid #c9ced6; border-radius: 6px; padding: 10px 12px 8px; text-align: center; }
+  .ex-big { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .ex-lab { font-size: 16px; font-weight: 600; margin-top: 2px; }
+  .ex-icon { margin: 6px 0 2px; min-height: 40px; display: flex; align-items: center; justify-content: center; }
+  .ex-split { display: flex; justify-content: space-between; gap: 8px; }
+  .ex-split div { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+  .ex-split b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .ex-split span { font-size: 14px; font-weight: 600; }
+  .ex-note { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .ex-chart { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; box-shadow: 0 2px 8px rgba(16,24,40,.08); flex: 1; }
+  .ex-chart h4 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+  @media (max-width: 1200px) { .ex-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 640px) { .ex-grid { grid-template-columns: 1fr; } }
   @media (max-width: 700px) {
     .chk-grid { grid-template-columns: 1fr; }
     .userbox { display: none; }

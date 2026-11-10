@@ -447,11 +447,97 @@ function luongDong_(o) {
   const s = moneyNum_(o.luongChinh) + moneyNum_(o.pcKN) + moneyNum_(o.pcCV) + moneyNum_(o.pcDH) + moneyNum_(o.pcKhac);
   return s > 0 ? s : moneyNum_(o.luongDong);
 }
+let IN_LOCK_ = false;
 function withLock_(fn) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
-  try { return fn(); } finally { lock.releaseLock(); }
+  const outer = !IN_LOCK_;
+  IN_LOCK_ = true;
+  try { return fn(); } finally {
+    if (outer) { IN_LOCK_ = false; bumpDataVersion_(); } // đổi phiên bản dữ liệu 1 lần, SAU KHI ghi xong toàn bộ
+    lock.releaseLock();
+  }
 }
+/** Gọi sau mỗi lần ghi xuống Sheet: trong thao tác có khóa thì để withLock_ đổi phiên bản 1 lần ở cuối. */
+function markDirty_() { if (!IN_LOCK_) bumpDataVersion_(); }
+
+// ---------------------------------------------------------------------
+// BỘ NHỚ TẠM KẾT QUẢ ĐỌC (server)
+// Các API chỉ đọc (danh sách NV, báo cáo, tổng quan…) được nhớ lại kết quả trong CacheService, theo
+// từng người dùng và theo "phiên bản dữ liệu". Phiên bản dữ liệu đổi mỗi khi có bất kỳ ghi chép nào
+// (append_/update_/deleteRows_, kết thúc mọi thao tác có khóa, sửa tay trên Sheet qua onEdit, nút
+// "Làm mới dữ liệu") – nên kết quả nhớ tạm luôn khớp dữ liệu mới nhất, chỉ lần đọc đầu tiên sau mỗi
+// thay đổi mới phải tính lại từ Sheet; các lần mở lại tab sau đó trả về gần như tức thì.
+// ---------------------------------------------------------------------
+const RCACHE_TTL = 1800; // giây – tối đa 30 phút, phòng trường hợp sửa tay trên Sheet mà onEdit không bắt được
+const RCACHE_CHUNK = 30000; // ký tự/ô nhớ (CacheService giới hạn 100KB/ô, chữ tiếng Việt có thể tới 3 byte/ký tự)
+function dataVersion_() {
+  try { return PropertiesService.getScriptProperties().getProperty('dataVer') || '0'; } catch (e) { return ''; }
+}
+function bumpDataVersion_() {
+  try { PropertiesService.getScriptProperties().setProperty('dataVer', Date.now().toString(36) + Math.random().toString(36).slice(2, 6)); } catch (e) { /* bỏ qua */ }
+}
+function cachedRead_(name, args, compute) {
+  const t0 = Date.now();
+  const email = (Session.getActiveUser().getEmail() || '').toLowerCase().trim();
+  const ver = dataVersion_();
+  let cache = null;
+  try { cache = CacheService.getScriptCache(); } catch (e) { cache = null; }
+  if (!cache || !email || !ver) return compute.apply(null, args);
+  const raw = [name, email, ver, JSON.stringify(Array.prototype.slice.call(args))].join('|');
+  const key = 'r_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, raw, Utilities.Charset.UTF_8));
+  try {
+    const n = Number(cache.get(key));
+    if (n > 0) {
+      const keys = [];
+      for (let i = 0; i < n; i++) keys.push(key + '_' + i);
+      const got = cache.getAll(keys);
+      if (keys.every(function (k) { return got[k] !== undefined && got[k] !== null; })) {
+        const out = JSON.parse(keys.map(function (k) { return got[k]; }).join(''));
+        if (out && typeof out === 'object' && !Array.isArray(out)) out.__t = { tuBoNhoTam: true, tong: Date.now() - t0 };
+        return out;
+      }
+    }
+  } catch (e) { /* đọc cache lỗi -> tính lại như bình thường */ }
+  const result = compute.apply(null, args);
+  try {
+    const s = JSON.stringify(result);
+    if (s !== undefined && s.length <= RCACHE_CHUNK * 100) {
+      const parts = {};
+      let i = 0;
+      for (let p = 0; p < s.length; p += RCACHE_CHUNK) parts[key + '_' + (i++)] = s.slice(p, p + RCACHE_CHUNK);
+      cache.putAll(parts, RCACHE_TTL);
+      cache.put(key, String(i), RCACHE_TTL);
+    }
+  } catch (e) { /* ghi cache lỗi -> bỏ qua, không ảnh hưởng kết quả */ }
+  return result;
+}
+/** Sửa tay trực tiếp trên Google Sheet -> coi như dữ liệu đã đổi, bỏ các kết quả đang nhớ tạm. */
+function onEdit(e) {
+  bumpDataVersion_();
+  bumpDlkyVersion_();
+}
+/** Nút "Làm mới dữ liệu" trên web app: bắt buộc tính lại mọi thứ từ Sheet (vd. sau khi chèn/xóa dòng bằng tay). */
+function apiLamMoiCache() {
+  getUser_();
+  bumpDataVersion_();
+  bumpDlkyVersion_();
+  return true;
+}
+
+function apiBootstrap() { return cachedRead_('apiBootstrap', arguments, apiBootstrapImpl_); }
+function apiListKy() { return cachedRead_('apiListKy', arguments, apiListKyImpl_); }
+function apiNhanVien(ky) { return cachedRead_('apiNhanVien', arguments, apiNhanVienImpl_); }
+function apiListYeuCauMoKhoa() { return cachedRead_('apiListYeuCauMoKhoa', arguments, apiListYeuCauMoKhoaImpl_); }
+function apiTruyThu(ky) { return cachedRead_('apiTruyThu', arguments, apiTruyThuImpl_); }
+function apiDashboard(tuKy, denKy, phongBan) { return cachedRead_('apiDashboard', arguments, apiDashboardImpl_); }
+function apiBaoCaoChiTiet(ky) { return cachedRead_('apiBaoCaoChiTiet', arguments, apiBaoCaoChiTietImpl_); }
+function apiBienDong(ky) { return cachedRead_('apiBienDong', arguments, apiBienDongImpl_); }
+function apiTongHop(tuKy, denKy) { return cachedRead_('apiTongHop', arguments, apiTongHopImpl_); }
+function apiCongDoanChiTiet(ky) { return cachedRead_('apiCongDoanChiTiet', arguments, apiCongDoanChiTietImpl_); }
+function apiLichSuNhanSu(tuKy, denKy) { return cachedRead_('apiLichSuNhanSu', arguments, apiLichSuNhanSuImpl_); }
+function apiPhanQuyen() { return cachedRead_('apiPhanQuyen', arguments, apiPhanQuyenImpl_); }
+function apiNhatKy() { return cachedRead_('apiNhatKy', arguments, apiNhatKyImpl_); }
 
 // ---------------------------------------------------------------------
 // LỚP TRUY CẬP BẢNG (SHEET)
@@ -643,6 +729,7 @@ function append_(t, objs) {
   ensureRows_(sh, start + rows.length - 1);
   formatRange_(t, sh, header, start, rows.length);
   sh.getRange(start, 1, rows.length, header.length).setValues(rows);
+  markDirty_();
   if (t === T.DLKY) bumpDlkyVersion_(); // thêm dòng -> "dòng nào thuộc kỳ nào" đã nhớ trước đó không còn đúng nữa
 }
 function update_(t, rowNum, o) {
@@ -652,12 +739,14 @@ function update_(t, rowNum, o) {
   const ex = rg.getValues()[0];
   formatRange_(t, sh, header, rowNum, 1);
   rg.setValues([buildRow_(t, header, o, ex)]);
+  markDirty_();
   // Chỉ sửa NỘI DUNG 1 dòng đã có (không thêm/xóa dòng) -> vị trí "dòng nào thuộc kỳ nào" không đổi,
   // không cần tăng dlkyVersion_ (giữ cache tra cứu kỳ vẫn dùng được, kể cả khi Lưu/sửa thông tin NV).
 }
 function deleteRows_(t, rowNums) {
   const sh = getSheet_(t);
   rowNums.slice().sort(function (a, b) { return b - a; }).forEach(function (r) { sh.deleteRow(r); });
+  markDirty_();
   if (t === T.DLKY && rowNums.length) bumpDlkyVersion_();
 }
 function strip_(o) { const c = Object.assign({}, o); delete c._row; return c; }
@@ -941,12 +1030,13 @@ function writeKQ_(ky, out, codes) {
     codes.forEach(function (c) { sh.getRange(2, header.indexOf(c) + 1, all.length, 1).setNumberFormat('#,##0'); });
     sh.getRange(2, 1, all.length, header.length).setValues(all);
   }
+  markDirty_();
 }
 
 // ---------------------------------------------------------------------
 // API: KHỞI ĐỘNG
 // ---------------------------------------------------------------------
-function apiBootstrap() {
+function apiBootstrapImpl_() {
   // Lần đầu chủ sở hữu mở web app mà chưa có cấu trúc -> tự khởi tạo
   const ss = activeSS_();
   const me = (Session.getActiveUser().getEmail() || '').toLowerCase();
@@ -969,7 +1059,7 @@ function apiBootstrap() {
 // ---------------------------------------------------------------------
 // API: KỲ BHXH
 // ---------------------------------------------------------------------
-function apiListKy() { getUser_(); return listKy_(); }
+function apiListKyImpl_() { getUser_(); return listKy_(); }
 
 /**
  * Bổ sung vào kỳ những NV có trong hồ sơ gốc nhưng chưa có trong kỳ này (NV mới, hoặc NV thử việc đã vào làm
@@ -1169,7 +1259,7 @@ function nvKhoaMsg_(nv) {
     + '), hồ sơ đã bị khóa. Hãy gửi yêu cầu mở khóa để Admin xét duyệt.';
 }
 
-function apiNhanVien(ky) {
+function apiNhanVienImpl_(ky) {
   const t0 = Date.now();
   const user = getUser_();
   const t1 = Date.now();
@@ -1221,7 +1311,7 @@ function apiYeuCauMoKhoa(maNV, lyDo) {
     return true;
   });
 }
-function apiListYeuCauMoKhoa() {
+function apiListYeuCauMoKhoaImpl_() {
   const user = getUser_();
   requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
   let rows = load_(T.YCML).rows;
@@ -1376,7 +1466,7 @@ function apiDeleteNV(ky, maNV) {
 // ---------------------------------------------------------------------
 // API: TRUY THU / THOÁI THU
 // ---------------------------------------------------------------------
-function apiTruyThu(ky) {
+function apiTruyThuImpl_(ky) {
   const user = getUser_();
   ky = normMonth_(ky);
   const k = getKy_(ky);
@@ -1402,7 +1492,7 @@ function apiSaveTruyThu(ky, o) {
     if (!tu || !den) throw new Error('Chưa nhập Từ tháng / Đến tháng.');
     if (tu > den) throw new Error('Từ tháng phải nhỏ hơn hoặc bằng Đến tháng.');
     if (den >= ky) throw new Error('Truy thu/thoái thu chỉ áp dụng cho các tháng trước kỳ ' + monthDisp_(ky) + '.');
-    const nv = apiTruyThu(ky).nvs.find(function (x) { return x.maNV === o.maNV; });
+    const nv = apiTruyThuImpl_(ky).nvs.find(function (x) { return x.maNV === o.maNV; });
     if (!nv) throw new Error('Không tìm thấy NV hoặc bạn không quản lý hồ sơ NV này.');
     const maplMap = maplMap_();
     const rec = {
@@ -1498,7 +1588,7 @@ function tomTatKy_(kqRows, ttRows, cdSet, ten) {
 }
 
 /** Dữ liệu cho biểu đồ dashboard ở Tổng quan: biến động nhân sự/quỹ lương theo tháng, thâm niên, theo mã PL */
-function apiDashboard(tuKy, denKy, phongBan) {
+function apiDashboardImpl_(tuKy, denKy, phongBan) {
   const user = getUser_();
   const all = listKy_(); // mới nhất trước
   const minKy = all.length ? all[all.length - 1].ky : '', maxKy = all.length ? all[0].ky : '';
@@ -1533,6 +1623,53 @@ function apiDashboard(tuKy, denKy, phongBan) {
   const dlky = load_(T.DLKY).rows.filter(function (r) { return r.ky === denKy; });
   const dlMap = {};
   dlky.forEach(function (r) { dlMap[r.maNV] = r; });
+
+  // ---- Số liệu cho 4 thẻ tóm tắt (Nhân sự / Tăng mới / Chi phí BHXH / Nghỉ việc) ----
+  // Giới tính lấy theo hồ sơ gốc (cột mới, các kỳ cũ có thể chưa có), thiếu thì lấy theo dữ liệu kỳ cuối.
+  const gtMap = {};
+  load_(T.NV).rows.forEach(function (r) { if (r.gioiTinh) gtMap[r.maNV] = r.gioiTinh; });
+  dlky.forEach(function (r) { if (!gtMap[r.maNV] && r.gioiTinh) gtMap[r.maNV] = r.gioiTinh; });
+  const gioiTinhCua = function (maNV) { return gtMap[maNV] === NU ? 'nu' : gtMap[maNV] === NAM ? 'nam' : 'khac'; };
+  const demGT = function (list) {
+    const o = { tong: list.length, nu: 0, nam: 0, khac: 0 };
+    list.forEach(function (r) { o[gioiTinhCua(r.maNV)]++; });
+    return o;
+  };
+  const theoPB = function (list) {
+    const m = {};
+    list.forEach(function (r) {
+      const pb = r.phongBan || '(Chưa có phòng ban)';
+      const x = m[pb] || (m[pb] = { phongBan: pb, tong: 0, nu: 0, nam: 0, khac: 0 });
+      x.tong++; x[gioiTinhCua(r.maNV)]++;
+    });
+    return Object.keys(m).map(function (k) { return m[k]; }).sort(function (a, b) { return b.tong - a.tong; });
+  };
+  const rowByKy = {};
+  kq.forEach(function (r) { if (r.dong === CO) rowByKy[r.ky + '|' + r.maNV] = r; });
+  const tuyenMoi = [], nghiViecDS = [];
+  months.forEach(function (m, i) {
+    if (m.tangMoi === null) return;
+    const prevKy = i === 0 ? baselineKy : kys[i - 1].ky;
+    const curSet = setByKy[m.ky] || {}, prevSet = setByKy[prevKy] || {};
+    Object.keys(curSet).forEach(function (maNV) { if (!prevSet[maNV]) tuyenMoi.push(rowByKy[m.ky + '|' + maNV]); });
+    Object.keys(prevSet).forEach(function (maNV) { if (!curSet[maNV]) nghiViecDS.push(rowByKy[prevKy + '|' + maNV]); });
+  });
+  months.forEach(function (m) {
+    const rows = kq.filter(function (r) { return r.ky === m.ky && r.dong === CO; });
+    m.tongNLD = rows.reduce(function (s, r) { return s + (r.tongNLD || 0); }, 0);
+    m.tongDN = rows.reduce(function (s, r) { return s + (r.tongDN || 0); }, 0);
+  });
+  const tom = {
+    nhanSu: Object.assign(demGT(lastKyRows), { theoPB: theoPB(lastKyRows) }),
+    tangMoi: Object.assign(demGT(tuyenMoi), { theoPB: theoPB(tuyenMoi) }),
+    nghiViec: Object.assign(demGT(nghiViecDS), { theoPB: theoPB(nghiViecDS) }),
+    chiPhi: {
+      nld: months.reduce(function (s, m) { return s + m.tongNLD; }, 0),
+      dn: months.reduce(function (s, m) { return s + m.tongDN; }, 0)
+    },
+    thieuKyGoc: months.length > 0 && months[0].tangMoi === null
+  };
+  tom.chiPhi.tong = tom.chiPhi.nld + tom.chiPhi.dn;
   const today = todayStr_();
   const buckets = [
     { label: '< 1 năm', min: 0, max: 1 }, { label: '1 - 3 năm', min: 1, max: 3 }, { label: '3 - 5 năm', min: 3, max: 5 },
@@ -1553,11 +1690,11 @@ function apiDashboard(tuKy, denKy, phongBan) {
   const byMaPL = Object.keys(byMaPLMap).map(function (k) { return { maPL: k, count: byMaPLMap[k] }; });
   return {
     tuKy: tuKy, denKy: denKy, minKy: minKy, maxKy: maxKy, months: months,
-    seniority: bucketCounts, byMaPL: byMaPL, tongNVCuoiKy: lastKyRows.length
+    seniority: bucketCounts, byMaPL: byMaPL, tongNVCuoiKy: lastKyRows.length, tom: tom
   };
 }
 
-function apiBaoCaoChiTiet(ky) {
+function apiBaoCaoChiTietImpl_(ky) {
   const user = getUser_();
   ky = normMonth_(ky);
   const k = getKy_(ky);
@@ -1591,7 +1728,7 @@ function apiBaoCaoChiTiet(ky) {
   return { info: getInfo_(), ky: ky, kyInfo: k, codes: codes, codesCD: codesCD, rows: rows, truyThu: tt };
 }
 
-function apiBienDong(ky) {
+function apiBienDongImpl_(ky) {
   const user = getUser_();
   ky = normMonth_(ky);
   const k = getKy_(ky);
@@ -1646,7 +1783,7 @@ function apiBienDong(ky) {
   return { info: getInfo_(), ky: ky, prev: prev, kyInfo: k, rows: out };
 }
 
-function apiTongHop(tuKy, denKy) {
+function apiTongHopImpl_(tuKy, denKy) {
   const user = getUser_();
   const all = listKy_(); // mới nhất trước
   const minKy = all.length ? all[all.length - 1].ky : '', maxKy = all.length ? all[0].ky : '';
@@ -1697,7 +1834,7 @@ function congDoanCodes_(khoanRows) {
 }
 
 /** Bảng phân tách quỹ Công đoàn chi tiết theo từng nhân viên/phòng ban trong một kỳ */
-function apiCongDoanChiTiet(ky) {
+function apiCongDoanChiTietImpl_(ky) {
   const user = getUser_();
   ky = normMonth_(ky);
   const k = getKy_(ky);
@@ -1747,7 +1884,7 @@ function tinhThamNien_(startStr, endStr) {
 function thamNienStr_(t) { return t ? (t.years + ' năm ' + t.months + ' tháng ' + t.days + ' ngày') : ''; }
 
 /** Tổng hợp theo nhân sự: lịch sử từng kỳ đóng trong khoảng thời gian + thâm niên tính đến cuối khoảng (hoặc hôm nay) */
-function apiLichSuNhanSu(tuKy, denKy) {
+function apiLichSuNhanSuImpl_(tuKy, denKy) {
   const user = getUser_();
   const all = listKy_(); // mới nhất trước
   const minKy = all.length ? all[all.length - 1].ky : '', maxKy = all.length ? all[0].ky : '';
@@ -2582,7 +2719,7 @@ function apiDeleteMaPL(ma) {
   });
 }
 
-function apiPhanQuyen() {
+function apiPhanQuyenImpl_() {
   const user = getUser_();
   requireRole_(user, [ROLE.ADMIN]);
   return load_(T.PQ).rows;
@@ -2620,7 +2757,7 @@ function apiDeletePQ(email) {
   });
 }
 
-function apiNhatKy() {
+function apiNhatKyImpl_() {
   const user = getUser_();
   requireRole_(user, [ROLE.ADMIN]);
   return load_(T.LOG).rows.slice(-500).reverse();

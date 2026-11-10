@@ -202,15 +202,20 @@ Tab mới, xem **quá trình đóng BHXH của từng nhân sự** theo thời g
 
 Thâm niên tính từ **Ngày vào làm** (nếu có), hoặc **Ngày bắt đầu BHXH** nếu chưa nhập Ngày vào làm.
 
-## 9c. Tổng quan – dashboard biểu đồ nhân sự
+## 9c. Tổng quan – dạng "Executive Summary"
 
-Màn hình **Tổng quan** (trang chủ) chỉ gồm bộ lọc và biểu đồ (không còn bảng số liệu):
+Màn hình **Tổng quan** (trang chủ) trình bày theo mẫu Executive Summary: phía trên là bộ lọc **Từ kỳ / Đến kỳ / Phòng ban**, bên dưới là **4 cột**, mỗi cột gồm thanh tiêu đề màu, 1 thẻ số liệu chính (số lớn + 2 số tách nhỏ) và 1 biểu đồ:
 
-- **Bộ lọc**: chọn **Từ kỳ / Đến kỳ** và **Phòng ban** (hoặc "Tất cả phòng ban") – đổi bộ lọc sẽ tự tính lại toàn bộ biểu đồ.
-- **Biến động quỹ lương đóng**: biểu đồ đường quỹ lương đóng BHXH theo từng tháng (theo phòng ban đã lọc, hoặc toàn công ty).
-- **Biến động nhân sự: Tăng mới / Nghỉ việc theo tháng**: biểu đồ cột nhóm (2 cột mỗi tháng) so sánh số NV bắt đầu đóng mới và số NV thôi đóng so với tháng liền trước (theo phòng ban đã lọc, hoặc toàn công ty). Tháng đầu tiên trong khoảng đã chọn cần có kỳ liền trước để so sánh; nếu kỳ đó không tồn tại (ví dụ chọn ngay từ kỳ đầu tiên của công ty) app sẽ báo "Không có kỳ trước để so sánh" cho tháng đó.
-- **Nhân viên theo thâm niên**: biểu đồ cột số NV đang đóng tại kỳ cuối của khoảng đã chọn, chia theo mốc thâm niên (&lt;1 năm, 1–3, 3–5, 5–10, &gt;10 năm; "Chưa rõ" nếu thiếu Ngày vào làm/Ngày bắt đầu BHXH).
-- **Số lượng nhân sự theo mã phân loại**: biểu đồ cột số NV đang đóng tại kỳ cuối, chia theo Mã PL.
+| Cột | Số chính | Tách theo | Biểu đồ |
+|---|---|---|---|
+| **Nhân sự** | Số NV đang đóng BHXH tại **kỳ cuối** của khoảng chọn | Nữ / Nam | Cột chồng Nữ/Nam theo phòng ban |
+| **Tăng mới** | Tổng số NV bắt đầu đóng mới, cộng dồn cả khoảng chọn | Nữ / Nam | Thanh ngang theo phòng ban |
+| **Chi phí BHXH** | Tổng trích đóng cả khoảng chọn (không gồm truy thu/thoái thu) | NLĐ đóng / DN đóng | Vùng theo tháng NLĐ / DN |
+| **Nghỉ việc** | Tổng số NV thôi đóng, cộng dồn cả khoảng chọn | Nữ / Nam | Bánh vòng theo phòng ban |
+
+- Nữ/Nam lấy theo trường **Giới tính** (mục 9f); NV chưa nhập giới tính được ghi chú riêng dưới thẻ.
+- Biểu đồ theo phòng ban chỉ hiện các phòng lớn nhất, các phòng còn lại gộp thành **"Khác (n phòng ban)"** cho dễ đọc. Rê chuột vào cột/phần bánh để xem tên đầy đủ và số liệu.
+- Bên dưới 4 cột vẫn giữ các biểu đồ: Biến động quỹ lương đóng, Tăng mới / Nghỉ việc theo tháng, Nhân viên theo thâm niên, Số lượng nhân sự theo mã phân loại.
 
 ## 9d. Tab Nhân viên – đầy đủ lương/phụ cấp và khóa hồ sơ nhân viên nghỉ việc
 
@@ -239,6 +244,9 @@ Sau khi Lưu/Xóa/Nhập file ở Nhân viên, Lưu/Xóa ở Truy thu, hay Tạo
 **Chỉ đọc đúng 1 kỳ cần xem, không đọc lại toàn bộ lịch sử:** tab "Dữ liệu kỳ" cộng dồn dữ liệu của **tất cả các kỳ** từ trước tới nay trên cùng 1 sheet. Trước đây mỗi lần mở tab Nhân viên theo 1 kỳ, hoặc Lưu hồ sơ NV ở 1 kỳ, ứng dụng đọc **toàn bộ** sheet này (gồm cả dữ liệu những kỳ khác không liên quan) rồi mới lọc ra đúng kỳ cần – công ty dùng app càng lâu (càng nhiều kỳ cộng dồn) thì việc mở/Lưu ở tab Nhân viên càng chậm dần, dù chỉ đang xem/sửa 1 kỳ. Nay ứng dụng đọc trước cột "Kỳ" (nhẹ) để xác định đúng các dòng cần, rồi chỉ đọc đầy đủ đúng các dòng của kỳ đang xem – không phụ thuộc số kỳ đã tích lũy trước đó, và vẫn đúng dữ liệu kể cả khi có sửa tay làm xáo trộn thứ tự các dòng trên Sheet.
 
 **Nhớ lại "dòng nào thuộc kỳ nào" để khỏi phải dò lại mỗi lần:** bước đọc riêng cột "Kỳ" nói trên vẫn phải quét qua toàn bộ chiều dài cột đó mỗi lần – để khỏi phải quét lại liên tục, kết quả (dòng nào thuộc kỳ nào) được nhớ tạm lại trong tối đa 30 phút. Chỉ khi có nhân viên được **thêm vào hoặc xóa khỏi** T.DLKY (ở bất kỳ kỳ nào) thì phần nhớ tạm này mới bị bỏ và quét lại cho đúng; còn **chỉ sửa thông tin** một nhân viên đã có (trường hợp phổ biến nhất khi "mở nhân viên lên để thay đổi thông tin") thì không cần quét lại – nhờ vậy càng sửa thông tin nhiều lần liên tiếp thì các lần sau càng nhanh dần, không phụ thuộc đã tích lũy bao nhiêu kỳ.
+
+**Nhớ tạm kết quả phía Google (server) – mở lại tab gần như tức thì:** kết quả của các màn hình chỉ xem (Tổng quan, Kỳ BHXH, Nhân viên, Truy thu, các báo cáo, Phân quyền, Nhật ký…) được Google nhớ lại theo từng người dùng. Bất kỳ thay đổi dữ liệu nào – Lưu/Xóa/Nhập file/Tính/Chốt trên web app, hoặc **sửa tay trực tiếp trên Google Sheet** – đều tự làm mới phần nhớ này, nên số liệu luôn đúng; chỉ lần mở đầu tiên sau mỗi thay đổi mới phải đọc lại Sheet. Ngoài ra, ngay sau khi mở trang, app **tải sẵn ngầm** dữ liệu Kỳ BHXH, Nhân viên (kỳ mới nhất), Truy thu và Bảng tính nộp BHXH để lần đầu bấm sang các tab này cũng không phải chờ.
+Nếu **chèn/xóa dòng bằng tay** trên Sheet (thao tác này Google không báo cho app), bấm nút **"🔄 Làm mới dữ liệu"** ở góc trên để đọc lại toàn bộ – nếu không bấm, app cũng tự đọc lại sau tối đa 30 phút.
 
 **Ghi chú cho người kiểm tra (F12 → tab Console của trình duyệt):** mỗi lệnh gọi lên Google đều được in ra thời gian chạy thực tế, ví dụ `[BHXH] apiSaveNV: 1850 ms`, kèm theo 1 dòng chi tiết từng bước phía server (ví dụ bước nào tốn bao nhiêu ms: đọc dữ liệu, kiểm tra khóa, ghi dữ liệu…) để biết chính xác đang chậm ở bước nào nếu vẫn thấy lâu.
 
