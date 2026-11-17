@@ -307,6 +307,13 @@ function lyDoForm(title, label, placeholder, required, btnText, btnClass, onOk) 
 function isRole(...r) { return S.user && r.includes(S.user.role); }
 // Quyền theo ma trận phân quyền (Admin luôn đủ quyền)
 function can(p) { return !!S.user && (S.user.role === 'Admin' || !!(S.user.perms || {})[p]); }
+// Tiêu đề báo cáo / tiêu đề bảng theo Thiết lập → Tiêu đề báo cáo (thiếu thì lấy mặc định, cuối cùng là chính mã)
+function td(key) {
+  const v = (S.tieuDe || {})[key];
+  if (v) return v;
+  const d = (S.tieuDeList || []).find((x) => x.ma === key);
+  return d ? d.macDinh : key;
+}
 function latestKy() { return S.kys.length ? S.kys[0].ky : ''; }
 function latestOpenKy() { const k = S.kys.find((x) => x.trangThai !== 'Đã chốt'); return k ? k.ky : latestKy(); }
 
@@ -1095,8 +1102,8 @@ function vBaoCao() {
 function inBaoCao() {
   const body = $('rpBody');
   if (!body || !body.querySelector('table')) return toast('Chưa có dữ liệu để in.', 'err');
-  const ten = { chitiet: 'BẢNG TÍNH NỘP BHXH', congdoan: 'BẢNG PHÂN TÁCH QUỸ CÔNG ĐOÀN', chiphi: 'BÁO CÁO CHI PHÍ BHXH',
-    biendong: 'BÁO CÁO BIẾN ĐỘNG TĂNG/GIẢM', tonghop: 'TỔNG HỢP BHXH', nhansu: 'TỔNG HỢP THEO NHÂN SỰ' }[S.rpTab] || 'BÁO CÁO';
+  const ten = { chitiet: esc(td('chitiet.title')), congdoan: esc(td('congdoan.title')), chiphi: esc(td('chiphi.title')),
+    biendong: esc(td('biendong.title')), tonghop: esc(td('tonghop.title')), nhansu: esc(td('nhansu.title')) }[S.rpTab] || 'BÁO CÁO';
   const khoang = S.rpTab === 'tonghop' || S.rpTab === 'nhansu'
     ? `Từ kỳ ${fmtM(S.rpTuKy)} đến kỳ ${fmtM(S.rpDenKy)}` : `Kỳ ${fmtM(S.rpKy)}`;
   const clone = body.cloneNode(true);
@@ -1215,10 +1222,10 @@ function renderCongDoan() {
       <td class="num">${fmt(baseGiuLaiNLD + ttGiuLaiNLD + baseGiuLaiDN + ttGiuLaiDN)}</td>
       <td class="num"><b>${fmt(baseNopNLD + ttNopNLD + baseNopDN + ttNopDN)}</b></td></tr>`;
   }
-  h += `<div class="card"><div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div></div>`;
+  h += `<div class="card"><h3>${esc(td('congdoan.bang'))} <span class="muted small">(${rows.length} người)</span></h3><div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div></div>`;
   if (d.truyThu && d.truyThu.length) {
     const sumTT = (f) => d.truyThu.reduce((s, t) => s + (Number(f(t)) || 0), 0);
-    h += `<div class="card"><h3>Truy thu / Thoái thu Công đoàn trong kỳ</h3><div class="tbl-wrap"><table><thead><tr><th>Mã NV</th><th>Họ và tên</th>
+    h += `<div class="card"><h3>${esc(td('congdoan.tt'))}</h3><div class="tbl-wrap"><table><thead><tr><th>Mã NV</th><th>Họ và tên</th>
       <th>Từ – Đến</th><th class="num">Lương cũ</th><th class="num">Lương mới</th>
       <th class="num">Đoàn phí – giữ lại (NLĐ)</th><th class="num">Đoàn phí – nộp CĐVN (NLĐ)</th>
       <th class="num">Kinh phí – giữ lại (DN)</th><th class="num">Kinh phí – nộp CĐVN (DN)</th><th>Chi tiết</th></tr></thead><tbody>
@@ -1326,10 +1333,10 @@ function renderChiTiet() {
     body += `<tr class="tt-row"><td colspan="5">Truy thu / Thoái thu (${ttF.length} dòng – chi tiết ở bảng dưới)</td>${cells(vTT)}<td></td></tr>`;
     body += `<tr class="total"><td colspan="5">TỔNG CỘNG SAU TRUY THU</td>${cells(vSau)}<td></td></tr>`;
   }
-  h += `<div class="card"><div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div></div>`;
+  h += `<div class="card"><h3>${esc(td('chitiet.bang'))} <span class="muted small">(${rows.filter((r) => r.dong === 'Có').length} người)</span></h3><div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div></div>`;
   if (d.truyThu.length) {
     const sumTT = (f) => d.truyThu.reduce((s, t) => s + (Number(f(t)) || 0), 0);
-    h += `<div class="card"><h3>Truy thu / Thoái thu BHXH trong kỳ <span class="muted small">(nộp cơ quan BHXH – không gồm Công đoàn, xem ở Báo cáo Công đoàn)</span></h3><div class="tbl-wrap"><table><thead><tr><th>Mã NV</th><th>Họ và tên</th>
+    h += `<div class="card"><h3>${esc(td('chitiet.tt'))} <span class="muted small">(nộp cơ quan BHXH – không gồm Công đoàn, xem ở Báo cáo Công đoàn)</span></h3><div class="tbl-wrap"><table><thead><tr><th>Mã NV</th><th>Họ và tên</th>
       <th>Từ – Đến</th><th class="num">Lương cũ</th><th class="num">Lương mới</th>
       <th class="num">BHXH NLĐ</th><th class="num">BHXH DN</th><th>Chi tiết</th></tr></thead><tbody>
       ${d.truyThu.map((t) => `<tr><td>${esc(t.maNV)}</td><td>${esc(t.hoTen)}</td><td>${fmtM(t.tuThang)} – ${fmtM(t.denThang)}</td>
@@ -1426,10 +1433,10 @@ function renderChiPhi() {
       <td class="num">${fmt(bTongNLD + ttTongNLD)}</td><td class="num">${fmt(bTongDN + ttTongDN)}</td>
       <td class="num"><b>${fmt(bTongNLD + ttTongNLD + bTongDN + ttTongDN)}</b></td></tr>`;
   }
-  h += `<div class="card"><div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div></div>`;
+  h += `<div class="card"><h3>${esc(td('chiphi.bang'))} <span class="muted small">(${rows.filter((r) => r.dong === 'Có').length} người)</span></h3><div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div></div>`;
   if (d.truyThu.length) {
     const sumTT = (f) => d.truyThu.reduce((s, t) => s + (Number(f(t)) || 0), 0);
-    h += `<div class="card"><h3>Truy thu / Thoái thu trong kỳ <span class="muted small">(đầy đủ, gồm cả Công đoàn)</span></h3><div class="tbl-wrap"><table><thead><tr><th>Mã NV</th><th>Họ và tên</th>
+    h += `<div class="card"><h3>${esc(td('chiphi.tt'))} <span class="muted small">(đầy đủ, gồm cả Công đoàn)</span></h3><div class="tbl-wrap"><table><thead><tr><th>Mã NV</th><th>Họ và tên</th>
       <th>Từ – Đến</th><th class="num">Lương cũ</th><th class="num">Lương mới</th>
       <th class="num">BHXH NLĐ</th><th class="num">BHXH DN</th><th class="num">Đoàn phí (giữ lại/nộp)</th><th class="num">Kinh phí (giữ lại/nộp)</th>
       <th class="num tot">Tổng NLĐ</th><th class="num tot">Tổng DN</th><th class="num tot">Tổng cộng</th><th>Chi tiết</th></tr></thead><tbody>
@@ -1522,7 +1529,7 @@ function renderTongHop() {
     <div class="stat"><div class="lbl">Truy thu BHXH</div><div class="val">${fmt(t.ttBhxh)}</div></div>
     <div class="stat"><div class="lbl">Truy thu Công đoàn</div><div class="val">${fmt(t.ttCd)}</div></div>
     <div class="stat"><div class="lbl">Tổng nộp cơ quan BHXH</div><div class="val">${fmt(t.tongNopCoQuanBHXH)}</div></div></div>
-    <div class="card"><h3>Tổng hợp theo tháng</h3>${zfBar('tonghop_thang', cols)}<div class="tbl-wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th class="num">NV đóng</th>
+    <div class="card"><h3>${esc(td('tonghop.thang'))}</h3>${zfBar('tonghop_thang', cols)}<div class="tbl-wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th class="num">NV đóng</th>
     <th class="num">Quỹ lương đóng</th><th class="num tot">Tổng BHXH NLĐ</th><th class="num">Truy thu BHXH NLĐ</th>
     <th class="num tot">Tổng BHXH DN</th><th class="num">Truy thu BHXH DN</th><th class="num tot">Tổng nộp BHXH</th>
     <th class="num">DPCD_NLD</th><th class="num">Truy thu DPCD_NLD</th><th class="num tot">Tổng DPCD_NLD</th>
@@ -1544,7 +1551,7 @@ function renderTongHop() {
       <td class="num">${fmt(t.tongNLD)}</td><td class="num">${fmt(t.tongDN)}</td><td class="num">${fmt(t.tongCong)}</td></tr>
     </tbody></table></div></div>`;
   if (d.phongBan.length) {
-    h += `<div class="card"><h3>Tổng hợp theo phòng ban <span class="muted small">(cả khoảng thời gian đã chọn)</span></h3>${zfBar('tonghop_pb', cols)}<div class="tbl-wrap"><table><thead><tr>
+    h += `<div class="card"><h3>${esc(td('tonghop.pb'))} <span class="muted small">(cả khoảng thời gian đã chọn)</span></h3>${zfBar('tonghop_pb', cols)}<div class="tbl-wrap"><table><thead><tr>
       <th>Phòng ban</th><th class="num">Quỹ lương đóng</th><th class="num tot">Tổng BHXH NLĐ</th><th class="num">Truy thu BHXH NLĐ</th>
       <th class="num tot">Tổng BHXH DN</th><th class="num">Truy thu BHXH DN</th><th class="num tot">Tổng nộp BHXH</th>
       <th class="num">DPCD_NLD</th><th class="num">Truy thu DPCD_NLD</th><th class="num tot">Tổng DPCD_NLD</th>
@@ -1566,7 +1573,7 @@ function renderTongHop() {
       </tbody></table></div></div>`;
   }
   if (d.codes.length) {
-    h += `<div class="card"><h3>Chi tiết theo khoản trích <span class="muted small">(không gồm truy thu)</span></h3><div class="tbl-wrap"><table><thead><tr>
+    h += `<div class="card"><h3>${esc(td('tonghop.khoan'))} <span class="muted small">(không gồm truy thu)</span></h3><div class="tbl-wrap"><table><thead><tr>
       <th>Khoản</th><th>Đối tượng</th>${d.months.map((m) => `<th class="num">${fmtM(m.ky)}</th>`).join('')}<th class="num">Cả kỳ</th></tr></thead><tbody>
       ${d.codes.map((c) => { const v = d.months.map((m) => m.items[c.ma] || 0);
         return `<tr><td><b>${esc(c.ma)}</b><br><span class="small muted">${esc(c.ten)}</span></td><td>${esc(c.doiTuong)}</td>
@@ -1635,12 +1642,13 @@ function renderNhanSu() {
 function vThietLap() {
   const tabs = [['info', 'Thông tin chung'], ['pb', 'Phòng ban'], ['khoan', 'Khoản trích đóng'], ['mapl', 'Mã phân loại'], ['tlcd', 'Tỉ lệ Công đoàn']];
   tabs.push(['trinhky', 'Trình ký']);
+  tabs.push(['tieude', 'Tiêu đề báo cáo']);
   if (can('yc_gui') || can('yc_duyet')) tabs.push(['ycml', 'Yêu cầu mở khóa']);
   if (isRole('Admin')) tabs.push(['pq', 'Phân quyền']);
   if (!tabs.some((t) => t[0] === S.setTab)) S.setTab = 'info';
   V().innerHTML = `<h2>Thiết lập</h2><div class="tabs">${tabs.map((t) => `<button class="${S.setTab === t[0] ? 'active' : ''}" onclick="S.setTab='${t[0]}';vThietLap()">${t[1]}</button>`).join('')}</div>
     ${can('tl_sua') ? '' : '<div class="alert info">Bạn đang ở chế độ chỉ xem. Cần quyền "Sửa Thiết lập" để thay đổi.</div>'}<div id="setBody"></div>`;
-  ({ info: setInfo, pb: setPB, khoan: setKhoan, mapl: setMaPL, tlcd: setTLCD, trinhky: setTrinhKy, ycml: setYCML, pq: setPQ }[S.setTab])();
+  ({ info: setInfo, pb: setPB, khoan: setKhoan, mapl: setMaPL, tlcd: setTLCD, trinhky: setTrinhKy, tieude: setTieuDe, ycml: setYCML, pq: setPQ }[S.setTab])();
 }
 async function setYCML() {
   try {
@@ -1889,6 +1897,44 @@ function tkPreview() { $('tkPrev').innerHTML = signBlockHtml(S._tk) || '<span cl
 function tkMove(i, d) { const a = S._tk; [a[i], a[i + d]] = [a[i + d], a[i]]; renderTrinhKy(); }
 function saveTrinhKy() {
   act(async () => { S.trinhKy = await run('apiSaveTrinhKy', S._tk); setTrinhKy(); toast('Đã lưu trình ký.', 'ok'); });
+}
+function setTieuDe() {
+  const ed = can('tl_sua'), dis = ed ? '' : 'disabled';
+  const list = S.tieuDeList || [];
+  if (!list.length) {
+    $('setBody').innerHTML = '<div class="alert warn">Phần xử lý trên Google (Code.gs) chưa có chức năng Tiêu đề báo cáo. Hãy cập nhật Code.gs rồi tải lại trang (F5).</div>';
+    return;
+  }
+  let last = '';
+  const rows = list.map((x) => {
+    const g = x.nhom !== last ? `<tr class="group"><td colspan="${ed ? 3 : 2}">${esc(x.nhom)}</td></tr>` : '';
+    last = x.nhom;
+    const cur = (S.tieuDe || {})[x.ma] || x.macDinh;
+    return g + `<tr><td>${esc(x.moTa)}</td>
+      <td><input data-td="${esc(x.ma)}" value="${esc(cur)}" placeholder="${esc(x.macDinh)}" maxlength="200" ${dis} style="width:100%"></td>
+      ${ed ? `<td><button class="btn sm" title="Về mặc định: ${esc(x.macDinh)}" onclick="tdReset('${esc(x.ma)}')">↺</button></td>` : ''}</tr>`;
+  }).join('');
+  $('setBody').innerHTML = `<div class="card"><p class="muted small">Đặt lại tiêu đề các báo cáo và tiêu đề từng bảng bên trong. Dùng trên màn hình Báo cáo,
+    khi bấm <b>🖨 In</b> và trong file Excel/PDF xuất ra. Phần tự sinh như <b>– KỲ 11/2026</b>, <b>(12 người)</b> được thêm tự động phía sau.
+    Để trống = dùng mặc định.</p>
+    <div class="tbl-wrap"><table><thead><tr><th>Trường</th><th>Tiêu đề</th>${ed ? '<th></th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>
+    ${ed ? `<div class="row" style="margin-top:10px"><button class="btn pri" onclick="saveTieuDe()">Lưu</button>
+      <button class="btn" onclick="tdMacDinh()">Khôi phục tất cả mặc định</button></div>` : ''}</div>`;
+}
+function tdReset(ma) {
+  const el = document.querySelector(`#setBody input[data-td="${ma}"]`);
+  const x = (S.tieuDeList || []).find((t) => t.ma === ma);
+  if (el && x) el.value = x.macDinh;
+}
+function tdApply(r) { S.tieuDe = r.tieuDe; S.tieuDeList = r.list; S.cache = {}; setTieuDe(); }
+function saveTieuDe() {
+  const m = {};
+  document.querySelectorAll('#setBody input[data-td]').forEach((el) => { m[el.dataset.td] = el.value; });
+  act(async () => { tdApply(await run('apiSaveTieuDe', m)); toast('Đã lưu tiêu đề báo cáo.', 'ok'); });
+}
+function tdMacDinh() {
+  if (!confirm('Khôi phục toàn bộ tiêu đề báo cáo về mặc định?')) return;
+  act(async () => { tdApply(await run('apiMacDinhTieuDe')); toast('Đã khôi phục tiêu đề mặc định.', 'ok'); });
 }
 function renderPQM() {
   const d = S.pqm;
