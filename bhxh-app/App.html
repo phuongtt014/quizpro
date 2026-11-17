@@ -1101,6 +1101,17 @@ function inBaoCao() {
     ? `Từ kỳ ${fmtM(S.rpTuKy)} đến kỳ ${fmtM(S.rpDenKy)}` : `Kỳ ${fmtM(S.rpKy)}`;
   const clone = body.cloneNode(true);
   clone.querySelectorAll('.no-print, .stats, .alert, button, input, select, svg').forEach((e) => e.remove());
+  // Cột "Họ và tên": không xuống dòng (chỉ áp cho dòng dữ liệu có đủ số cột như tiêu đề)
+  clone.querySelectorAll('table').forEach((tb) => {
+    const ths = Array.from(tb.querySelectorAll('thead tr:first-child th'));
+    const idx = ths.findIndex((th) => /^họ (và )?tên$/i.test(th.textContent.trim()));
+    if (idx < 0) return;
+    ths[idx].classList.add('nowrap');
+    tb.querySelectorAll('tbody tr').forEach((tr) => { if (tr.cells.length === ths.length) tr.cells[idx].classList.add('nowrap'); });
+  });
+  // Bảng cuối cùng: 3 dòng cuối luôn đi cùng khối trình ký (không để chữ ký rớt sang trang mới một mình)
+  const tbs = clone.querySelectorAll('table');
+  if (tbs.length) tbs[tbs.length - 1].classList.add('keep-end');
   const i = S.info || {};
   let pa = $('printArea');
   if (!pa) { pa = document.createElement('div'); pa.id = 'printArea'; document.body.appendChild(pa); }
@@ -1113,13 +1124,13 @@ function inBaoCao() {
   window.addEventListener('afterprint', done);
   setTimeout(() => window.print(), 50);
 }
-/** Khối chữ ký: mỗi người 1 cột – Vai trò, Ngày, (Ký, ghi rõ họ tên), chỗ ký, Họ tên */
+/** Khối chữ ký: mỗi người 1 cột – Vai trò, (Ký, ghi rõ họ tên), chỗ ký, Họ tên, Ngày */
 function signBlockHtml(list) {
   const l = (list || []).filter((x) => x.vaiTro || x.hoTen);
   if (!l.length) return '';
   return `<div class="sign-block">${l.map((x) => `<div class="sign"><div class="sg-vt">${esc(x.vaiTro)}</div>
-    <div class="sg-ngay">Ngày: ....../......./..........</div><div class="sg-hd">(Ký, ghi rõ họ tên)</div>
-    <div class="sg-space"></div><div class="sg-ten">${esc(x.hoTen)}</div></div>`).join('')}</div>`;
+    <div class="sg-hd">(Ký, ghi rõ họ tên)</div><div class="sg-space"></div>
+    <div class="sg-ten">${esc(x.hoTen) || '&nbsp;'}</div><div class="sg-ngay">Ngày: ....../......./..........</div></div>`).join('')}</div>`;
 }
 function rpRefilter() {
   if (S.rpTab === 'chitiet') renderChiTiet();

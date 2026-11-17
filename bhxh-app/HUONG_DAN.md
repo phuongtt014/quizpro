@@ -337,7 +337,7 @@ Khai báo danh sách người ký gồm **Vai trò ký** và **Họ tên**, tố
 
 - Mặc định (sau khi chạy `khoiTaoCauTruc`): **Người lập biểu, Kế toán trưởng, Giám đốc** (họ tên để trống).
 - Dữ liệu lưu ở tab Sheet mới **"Trình ký"**. Cần quyền **"Sửa Thiết lập"** để sửa.
-- Mỗi người ký in thành 1 cột: **VAI TRÒ** (in hoa, đậm) / Ngày: ....../......./.......... / (Ký, ghi rõ họ tên) / khoảng trống để ký / **Họ tên** (đậm). Để trống Họ tên nếu muốn ký tay.
+- Mỗi người ký in thành 1 cột: **VAI TRÒ** (in hoa, đậm) / (Ký, ghi rõ họ tên) / khoảng trống để ký / **Họ tên** (đậm, không xuống dòng) / Ngày: ....../......./.......... (nằm ngay dưới họ tên). Để trống Họ tên nếu muốn ký tay.
 
 ### In báo cáo (nút 🖨 In)
 
@@ -346,7 +346,7 @@ Mỗi tab Báo cáo (Biến động tăng/giảm, Bảng tính nộp BHXH, Công
 - Bảng số liệu **đúng như đang lọc trên màn hình** (bỏ các ô thống kê, cảnh báo, nút bấm).
 - Khối trình ký và dòng "In lúc … – người in".
 
-Khổ **A4 ngang**, tiêu đề cột lặp lại mỗi trang, khối chữ ký không bị cắt đôi qua 2 trang.
+Khổ **A4 ngang**, tiêu đề cột lặp lại mỗi trang. Cột **Họ và tên** luôn nằm trên 1 dòng (không bị rớt dòng). Khối chữ ký không bị cắt đôi qua 2 trang và **không bao giờ rớt sang trang mới một mình**: nếu trang hiện tại không đủ chỗ, ứng dụng tự kéo 3 dòng cuối của bảng cuối cùng (thường là các dòng TỔNG) sang trang mới cùng với chữ ký.
 
 **Mẹo khi in bằng Chrome:** chọn máy in **"Lưu dưới dạng PDF"** để lưu file; nếu bảng quá rộng, giảm **Tỉ lệ (Scale)**, ví dụ 80%; bật **"Đồ họa nền" (Background graphics)** để in màu nền dòng tổng. File tải về bằng nút **⬇ PDF / ⬇ Excel** cũng có khối trình ký ở cuối.
 

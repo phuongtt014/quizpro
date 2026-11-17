@@ -2464,7 +2464,7 @@ function makeFile_(doc, format) {
     if (end >= start) styles.push({ type: 'num', start: start, end: end, cols: s.numCols || [], len: s.header.length });
     push([]);
   });
-  // Khối trình ký: mỗi người ký 1 cột (gộp ô), gồm Vai trò – Ngày – (Ký, ghi rõ họ tên) – khoảng trống ký – Họ tên
+  // Khối trình ký: mỗi người ký 1 cột (gộp ô), gồm Vai trò – (Ký, ghi rõ họ tên) – khoảng trống ký – Họ tên – Ngày
   if (signers.length) {
     const n = signers.length, seg = Math.floor(width / n);
     const segs = signers.map(function (x, i) { return [i * seg, i === n - 1 ? width - i * seg : seg]; });
@@ -2475,10 +2475,10 @@ function makeFile_(doc, format) {
       push(a); styles.push({ row: grid.length, type: 'sign', segs: segs, fmt: fmt });
     };
     signRow(signers.map(function (x) { return String(x.vaiTro || '').toUpperCase(); }), 'b');
-    signRow(signers.map(function () { return 'Ngày: ....../......./..........'; }), '');
     signRow(signers.map(function () { return '(Ký, ghi rõ họ tên)'; }), 'i');
     push([]); push([]); push([]); push([]);
     signRow(signers.map(function (x) { return x.hoTen || ''; }), 'b');
+    signRow(signers.map(function () { return 'Ngày: ....../......./..........'; }), '');
   }
 
   const tmp = SpreadsheetApp.create(doc.fileName);

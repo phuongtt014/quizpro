@@ -145,10 +145,10 @@
   .sign-block { display: flex; justify-content: space-around; gap: 16px; text-align: center; margin-top: 18px; }
   .sign { flex: 1; min-width: 0; }
   .sg-vt { font-weight: 700; text-transform: uppercase; }
-  .sg-ngay { margin-top: 2px; }
+  .sg-ngay { margin-top: 4px; white-space: nowrap; }
   .sg-hd { font-style: italic; font-size: .9em; }
   .sg-space { height: 72px; }
-  .sg-ten { font-weight: 700; }
+  .sg-ten { font-weight: 700; white-space: nowrap; }
   .tk-prev { border: 1px dashed #b8c2d0; border-radius: 8px; padding: 12px 8px; background: #fff; }
   #printArea { display: none; }
   @media print {
@@ -165,11 +165,14 @@
     #printArea table { width: 100%; border-collapse: collapse; font-size: 8pt; }
     #printArea th, #printArea td { border: 1px solid #555; padding: 2px 4px; position: static !important; color: #000 !important; }
     #printArea thead { display: table-header-group; }
-    #printArea tr { page-break-inside: avoid; }
+    #printArea tr { page-break-inside: avoid; break-inside: avoid; }
+    #printArea .nowrap { white-space: nowrap; }
+    /* Không để khối chữ ký rớt sang trang mới một mình: kéo theo 3 dòng cuối của bảng cuối */
+    #printArea table.keep-end > tbody > tr:nth-last-child(-n+2) { break-before: avoid; page-break-before: avoid; }
     #printArea th, #printArea tr.total td, #printArea tr.sub td, #printArea tr.group td, #printArea tr.tt-row td {
       -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    #printArea .sign-block { page-break-inside: avoid; margin-top: 22px; }
-    #printArea .pr-foot { margin-top: 14px; font-size: 8pt; color: #555; }
+    #printArea .sign-block { page-break-inside: avoid; break-inside: avoid; break-before: avoid; page-break-before: avoid; margin-top: 22px; }
+    #printArea .pr-foot { margin-top: 14px; font-size: 8pt; color: #555; break-before: avoid; page-break-before: avoid; }
     .topbar, .no-print, .tabs { display: none !important; }
     .tbl-wrap { max-height: none; overflow: visible; border: 0; }
     body { background: #fff; }
