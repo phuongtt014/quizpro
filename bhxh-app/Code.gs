@@ -29,11 +29,34 @@ const PERMS = [
   ['tt_sua', 'Truy thu', 'Thêm / sửa / xóa Truy thu – Thoái thu', true, false],
   ['bc_xem', 'Báo cáo', 'Xem, In, Xuất Excel/PDF các báo cáo', true, true],
   ['tl_xem', 'Thiết lập', 'Xem tab Thiết lập', true, true],
-  ['tl_sua', 'Thiết lập', 'Sửa Thiết lập (thông tin chung, phòng ban, khoản trích, mã PL, tỉ lệ CĐ, trình ký)', false, false],
+  ['tl_sua', 'Thiết lập', 'Sửa Thiết lập (thông tin chung, phòng ban, khoản trích, mã PL, tỉ lệ CĐ, trình ký, tiêu đề báo cáo)', false, false],
   ['nk_xem', 'Nhật ký', 'Xem Nhật ký thao tác', false, false]
 ];
 const PQM_PROP = 'PQ_MATRIX';
 let PQM_MEMO_ = null;
+/**
+ * Tiêu đề báo cáo và tiêu đề các bảng bên trong (Thiết lập → Tiêu đề báo cáo): [mã, nhóm báo cáo, mô tả trường, mặc định].
+ * Phần sinh tự động như "– KỲ 11/2026", "(12 người)" KHÔNG lưu ở đây mà được code nối thêm vào sau tiêu đề.
+ */
+const TIEU_DE_BC = [
+  ['biendong.title', 'Biến động tăng/giảm', 'Tiêu đề báo cáo', 'BÁO CÁO BIẾN ĐỘNG TĂNG/GIẢM'],
+  ['chitiet.title', 'Bảng tính nộp BHXH', 'Tiêu đề báo cáo', 'BẢNG TÍNH NỘP BHXH'],
+  ['chitiet.bang', 'Bảng tính nộp BHXH', 'Bảng danh sách NV đóng BHXH', 'Danh sách NV đóng BHXH – dùng để nộp cơ quan BHXH'],
+  ['chitiet.tt', 'Bảng tính nộp BHXH', 'Bảng Truy thu / Thoái thu', 'Truy thu / Thoái thu BHXH trong kỳ'],
+  ['congdoan.title', 'Công đoàn', 'Tiêu đề báo cáo', 'BẢNG PHÂN TÁCH QUỸ CÔNG ĐOÀN'],
+  ['congdoan.bang', 'Công đoàn', 'Bảng phân tách theo nhân viên', 'Phân tách quỹ Công đoàn theo nhân viên'],
+  ['congdoan.tt', 'Công đoàn', 'Bảng Truy thu / Thoái thu', 'Truy thu / Thoái thu Công đoàn trong kỳ'],
+  ['chiphi.title', 'Báo cáo chi phí', 'Tiêu đề báo cáo', 'BÁO CÁO CHI PHÍ BHXH'],
+  ['chiphi.bang', 'Báo cáo chi phí', 'Bảng chi phí theo nhân viên', 'Chi phí theo nhân viên'],
+  ['chiphi.tt', 'Báo cáo chi phí', 'Bảng Truy thu / Thoái thu', 'Truy thu / Thoái thu trong kỳ'],
+  ['tonghop.title', 'Tổng hợp', 'Tiêu đề báo cáo', 'TỔNG HỢP BHXH'],
+  ['tonghop.thang', 'Tổng hợp', 'Bảng tổng hợp theo tháng', 'Tổng hợp theo tháng'],
+  ['tonghop.pb', 'Tổng hợp', 'Bảng tổng hợp theo phòng ban', 'Tổng hợp theo phòng ban'],
+  ['tonghop.khoan', 'Tổng hợp', 'Bảng chi tiết theo khoản trích', 'Chi tiết theo khoản trích'],
+  ['nhansu.title', 'Theo nhân sự', 'Tiêu đề báo cáo', 'TỔNG HỢP THEO NHÂN SỰ']
+];
+const TD_PROP = 'TIEU_DE_BC';
+let TD_MEMO_ = null;
 const KY_MO = 'Đang mở';
 const KY_CHOT = 'Đã chốt';
 const KY_CHO = 'Chờ duyệt'; // Nhập liệu đã gửi đề xuất, chờ Admin chốt hoặc trả hồ sơ
@@ -1190,6 +1213,8 @@ function apiBootstrapImpl_() {
     tlcd: load_(T.TLCD).rows,
     phongBan: load_(T.PB).rows.map(function (r) { return r.ten; }).filter(String),
     trinhKy: trinhKy_(),
+    tieuDe: tieuDe_(),
+    tieuDeList: tieuDeList_(),
     lists: LISTS,
     today: Utilities.formatDate(new Date(), tz_(), 'yyyy-MM')
   };
@@ -2230,6 +2255,7 @@ function apiXuat(loai, thamSo, format) {
 }
 
 function buildDoc_(loai, p) {
+  const td = tieuDe_();
   if (loai === 'chitiet') {
     const d = apiBaoCaoChiTiet(p);
     const codesNLD = d.codes.filter(function (c) { return c.doiTuong !== DT_DN; });
@@ -2270,7 +2296,7 @@ function buildDoc_(loai, p) {
     }
     const numCols = [];
     for (let c = 6; c < header.length - 1; c++) numCols.push(c);
-    const sections = [{ title: 'Danh sách NV đóng BHXH (' + dong.length + ' người) – dùng để nộp cơ quan BHXH', header: header, rows: rows, total: totals, numCols: numCols }];
+    const sections = [{ title: td['chitiet.bang'] + ' (' + dong.length + ' người)', header: header, rows: rows, total: totals, numCols: numCols }];
     if (d.truyThu.length) {
       const h2 = ['STT', 'Mã NV', 'Họ và tên', 'Từ tháng', 'Đến tháng', 'Số tháng', 'Lương cũ', 'Lương mới',
         'Truy thu BHXH NLĐ', 'Truy thu BHXH DN', 'Chi tiết', 'Ghi chú'];
@@ -2281,11 +2307,11 @@ function buildDoc_(loai, p) {
       const s2 = function (i) { return r2.reduce(function (s, r) { return s + r[i]; }, 0); };
       const tot2 = ['', '', 'TỔNG', '', '', '', '', '', s2(8), s2(9), '', ''];
       sections.push({
-        title: 'Truy thu / Thoái thu BHXH (nộp cơ quan BHXH – không gồm Công đoàn, xem ở Báo cáo Công đoàn)',
+        title: td['chitiet.tt'] + ' (nộp cơ quan BHXH – không gồm Công đoàn, xem ở Báo cáo Công đoàn)',
         header: h2, rows: r2, total: tot2, numCols: [6, 7, 8, 9]
       });
     }
-    return { info: d.info, title: 'BẢNG TÍNH NỘP BHXH – KỲ ' + monthDisp_(d.ky), fileName: 'BHXH_ChiTiet_' + d.ky, sections: sections };
+    return { info: d.info, title: td['chitiet.title'] + ' – KỲ ' + monthDisp_(d.ky), fileName: 'BHXH_ChiTiet_' + d.ky, sections: sections };
   }
   if (loai === 'chiphi') {
     const d = apiBaoCaoChiTiet(p);
@@ -2311,7 +2337,7 @@ function buildDoc_(loai, p) {
       totals.push(['', '', 'TỔNG CỘNG SAU TRUY THU', '', '', '', sum(6), sum(7) + ttNLD, sum(8) + ttDN, sum(9) + ttNLD + ttDN,
         sum(10) + ttCdNLD, sum(11) + ttCdDN, sum(12) + ttTongNLD, sum(13) + ttTongDN, sum(14) + ttTongNLD + ttTongDN]);
     }
-    const sections = [{ title: 'Chi phí theo nhân viên (' + dong.length + ' người)', header: header, rows: rows, total: totals, numCols: [6, 7, 8, 9, 10, 11, 12, 13, 14] }];
+    const sections = [{ title: td['chiphi.bang'] + ' (' + dong.length + ' người)', header: header, rows: rows, total: totals, numCols: [6, 7, 8, 9, 10, 11, 12, 13, 14] }];
     if (d.truyThu.length) {
       const h2 = ['STT', 'Mã NV', 'Họ và tên', 'Từ tháng', 'Đến tháng', 'Số tháng', 'Lương cũ', 'Lương mới',
         'BHXH NLĐ', 'BHXH DN', 'DPCD giữ lại', 'DPCD nộp CĐVN', 'KPCD giữ lại', 'KPCD nộp CĐVN', 'Tổng NLĐ', 'Tổng DN', 'Tổng cộng', 'Chi tiết'];
@@ -2322,11 +2348,11 @@ function buildDoc_(loai, p) {
       const s2 = function (i) { return r2.reduce(function (s, r) { return s + r[i]; }, 0); };
       const tot2 = ['', '', 'TỔNG', '', '', '', '', '', s2(8), s2(9), s2(10), s2(11), s2(12), s2(13), s2(14), s2(15), s2(16), ''];
       sections.push({
-        title: 'Truy thu / Thoái thu (đầy đủ, gồm cả Công đoàn)',
+        title: td['chiphi.tt'] + ' (đầy đủ, gồm cả Công đoàn)',
         header: h2, rows: r2, total: tot2, numCols: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
       });
     }
-    return { info: d.info, title: 'BÁO CÁO CHI PHÍ BHXH – KỲ ' + monthDisp_(d.ky), fileName: 'BHXH_ChiPhi_' + d.ky, sections: sections };
+    return { info: d.info, title: td['chiphi.title'] + ' – KỲ ' + monthDisp_(d.ky), fileName: 'BHXH_ChiPhi_' + d.ky, sections: sections };
   }
   if (loai === 'biendong') {
     const d = apiBienDong(p);
@@ -2337,7 +2363,7 @@ function buildDoc_(loai, p) {
         r.maPLCu, r.maPLMoi, monthDisp_(r.tuThang), monthDisp_(r.denThang), r.ghiChu];
     });
     return {
-      info: d.info, title: 'BÁO CÁO BIẾN ĐỘNG TĂNG/GIẢM – KỲ ' + monthDisp_(d.ky),
+      info: d.info, title: td['biendong.title'] + ' – KỲ ' + monthDisp_(d.ky),
       subtitle: d.prev ? 'So với kỳ ' + monthDisp_(d.prev) : 'Không có kỳ trước để so sánh',
       fileName: 'BHXH_BienDong_' + d.ky, sections: [{ title: '', header: header, rows: rows, numCols: [7, 8] }]
     };
@@ -2369,11 +2395,11 @@ function buildDoc_(loai, p) {
     const nc2 = [];
     for (let i = 3; i < h2.length; i++) nc2.push(i);
     return {
-      info: d.info, title: 'TỔNG HỢP BHXH – TỪ ' + monthDisp_(d.tuKy) + ' ĐẾN ' + monthDisp_(d.denKy), fileName: 'BHXH_TongHop_' + d.tuKy + '_' + d.denKy,
+      info: d.info, title: td['tonghop.title'] + ' – TỪ ' + monthDisp_(d.tuKy) + ' ĐẾN ' + monthDisp_(d.denKy), fileName: 'BHXH_TongHop_' + d.tuKy + '_' + d.denKy,
       sections: [
-        { title: 'Tổng hợp theo tháng', header: h1, rows: r1, total: t1, numCols: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17] },
-        { title: 'Tổng hợp theo phòng ban (cả khoảng thời gian)', header: h3, rows: r3, total: t3, numCols: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] },
-        { title: 'Chi tiết theo khoản trích (không gồm truy thu)', header: h2, rows: r2, numCols: nc2 }
+        { title: td['tonghop.thang'], header: h1, rows: r1, total: t1, numCols: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17] },
+        { title: td['tonghop.pb'] + ' (cả khoảng thời gian)', header: h3, rows: r3, total: t3, numCols: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] },
+        { title: td['tonghop.khoan'] + ' (không gồm truy thu)', header: h2, rows: r2, numCols: nc2 }
       ]
     };
   }
@@ -2401,7 +2427,7 @@ function buildDoc_(loai, p) {
       totals.push(['', '', 'TỔNG CỘNG SAU TRUY THU', '', '', '', s(6), s(7) + ttCdNLD, '', s(9) + ttGiuLaiNLD, s(10) + ttNopNLD,
         s(11) + ttCdDN, '', s(13) + ttGiuLaiDN, s(14) + ttNopDN]);
     }
-    const sections = [{ title: '', header: header, rows: rows, total: totals, numCols: [6, 7, 9, 10, 11, 13, 14] }];
+    const sections = [{ title: td['congdoan.bang'] + ' (' + rows.length + ' người)', header: header, rows: rows, total: totals, numCols: [6, 7, 9, 10, 11, 13, 14] }];
     if (d.truyThu.length) {
       const h2 = ['STT', 'Mã NV', 'Họ và tên', 'Từ tháng', 'Đến tháng', 'Số tháng', 'Lương cũ', 'Lương mới',
         'Đoàn phí – giữ lại (NLĐ)', 'Đoàn phí – nộp CĐVN (NLĐ)', 'Kinh phí – giữ lại (DN)', 'Kinh phí – nộp CĐVN (DN)', 'Chi tiết'];
@@ -2411,10 +2437,10 @@ function buildDoc_(loai, p) {
       });
       const s2 = function (i) { return r2.reduce(function (s, r) { return s + r[i]; }, 0); };
       const tot2 = ['', '', 'TỔNG', '', '', '', '', '', s2(8), s2(9), s2(10), s2(11), ''];
-      sections.push({ title: 'Truy thu / Thoái thu Công đoàn', header: h2, rows: r2, total: tot2, numCols: [6, 7, 8, 9, 10, 11] });
+      sections.push({ title: td['congdoan.tt'], header: h2, rows: r2, total: tot2, numCols: [6, 7, 8, 9, 10, 11] });
     }
     return {
-      info: d.info, title: 'BẢNG PHÂN TÁCH QUỸ CÔNG ĐOÀN – KỲ ' + monthDisp_(d.ky), fileName: 'CongDoan_' + d.ky,
+      info: d.info, title: td['congdoan.title'] + ' – KỲ ' + monthDisp_(d.ky), fileName: 'CongDoan_' + d.ky,
       sections: sections
     };
   }
@@ -2433,7 +2459,7 @@ function buildDoc_(loai, p) {
       });
     });
     return {
-      info: d.info, title: 'TỔNG HỢP THEO NHÂN SỰ – TỪ ' + monthDisp_(d.tuKy) + ' ĐẾN ' + monthDisp_(d.denKy),
+      info: d.info, title: td['nhansu.title'] + ' – TỪ ' + monthDisp_(d.tuKy) + ' ĐẾN ' + monthDisp_(d.denKy),
       fileName: 'BHXH_NhanSu_' + d.tuKy + '_' + d.denKy,
       sections: [{ title: '', header: header, rows: rows, numCols: [7, 13, 14, 15, 16] }]
     };
@@ -3134,6 +3160,55 @@ function apiSaveTrinhKy(list) {
     append_(T.TK, rows.map(function (r, i) { return { thuTu: i + 1, vaiTro: r.vaiTro, hoTen: r.hoTen }; }));
     log_(user, 'Cập nhật trình ký', rows.map(function (r) { return r.vaiTro + (r.hoTen ? ': ' + r.hoTen : ''); }).join('; '));
     return trinhKy_();
+  });
+}
+
+// ----- Tiêu đề báo cáo (dùng trên màn hình, khi In và khi xuất Excel/PDF) -----
+/** Tiêu đề đã lưu (Script Properties) gộp với mặc định: {mã: tiêu đề} */
+function tieuDe_() {
+  if (TD_MEMO_) return TD_MEMO_;
+  let saved = {};
+  try { saved = JSON.parse(PropertiesService.getScriptProperties().getProperty(TD_PROP) || '{}') || {}; } catch (e) { saved = {}; }
+  const m = {};
+  TIEU_DE_BC.forEach(function (x) {
+    const v = typeof saved[x[0]] === 'string' ? saved[x[0]].trim() : '';
+    m[x[0]] = v || x[3];
+  });
+  TD_MEMO_ = m;
+  return m;
+}
+function tieuDeList_() {
+  return TIEU_DE_BC.map(function (x) { return { ma: x[0], nhom: x[1], moTa: x[2], macDinh: x[3] }; });
+}
+/** Lưu tiêu đề: map = {mã: tiêu đề}; bỏ trống hoặc trùng mặc định -> dùng mặc định (không lưu) */
+function apiSaveTieuDe(map) {
+  const user = getUser_();
+  requirePerm_(user, 'tl_sua');
+  const out = {};
+  TIEU_DE_BC.forEach(function (x) {
+    const v = map && map[x[0]] !== undefined && map[x[0]] !== null ? String(map[x[0]]).replace(/\s+/g, ' ').trim() : '';
+    if (v.length > 200) throw new Error('Tiêu đề "' + x[2] + '" (' + x[1] + ') quá dài (tối đa 200 ký tự).');
+    if (v && v !== x[3]) out[x[0]] = v;
+  });
+  return withLock_(function () {
+    const props = PropertiesService.getScriptProperties();
+    if (Object.keys(out).length) props.setProperty(TD_PROP, JSON.stringify(out));
+    else props.deleteProperty(TD_PROP);
+    TD_MEMO_ = null;
+    log_(user, 'Cập nhật tiêu đề báo cáo', Object.keys(out).length
+      ? Object.keys(out).map(function (k) { return k + ': ' + out[k]; }).join('; ') : 'Dùng toàn bộ mặc định');
+    return { list: tieuDeList_(), tieuDe: tieuDe_() };
+  });
+}
+/** Khôi phục toàn bộ tiêu đề báo cáo mặc định */
+function apiMacDinhTieuDe() {
+  const user = getUser_();
+  requirePerm_(user, 'tl_sua');
+  return withLock_(function () {
+    PropertiesService.getScriptProperties().deleteProperty(TD_PROP);
+    TD_MEMO_ = null;
+    log_(user, 'Cập nhật tiêu đề báo cáo', 'Khôi phục mặc định');
+    return { list: tieuDeList_(), tieuDe: tieuDe_() };
   });
 }
 
