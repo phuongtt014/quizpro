@@ -87,7 +87,7 @@ Admin có thể đổi *Email NV quản lý hồ sơ* của bất kỳ NV nào �
 5. Bấm **Tính**. Kiểm tra *Báo cáo → Bảng tính nộp BHXH* (cột Cảnh báo) và *Biến động tăng/giảm*.
    - Người **Nhập liệu** kiểm tra xong thì bấm **📤 Gửi đề xuất** để Admin duyệt (xem mục 9h).
 6. **Admin chốt kỳ** (hoặc **Trả hồ sơ** kèm lý do nếu chưa đúng): app tính lại lần cuối rồi khóa kỳ. Kỳ đã chốt không sửa được nữa. Phát sinh cho tháng đó phải nhập truy thu ở kỳ sau.
-7. **Xuất Excel/PDF** ở màn hình *Báo cáo*.
+7. **Xuất Excel/PDF** hoặc bấm **🖨 In** (bản in có khối trình ký, xem mục 9i) ở màn hình *Báo cáo*.
 
 ## 5. Quy tắc tính
 
@@ -283,6 +283,79 @@ Nếu **chèn/xóa dòng bằng tay** trên Sheet (thao tác này Google không 
 - Email được gửi **từ tài khoản chủ sở hữu script** (người triển khai web app), có nút mở thẳng ứng dụng.
 - Lần đầu cập nhật bản này, chủ sở hữu cần **cấp quyền gửi email**: trong Apps Script chọn hàm bất kỳ (vd. `khoiTaoCauTruc`) → **Chạy** → **Cho phép** quyền "Gửi email thay mặt bạn", sau đó **Triển khai → Quản lý các bản triển khai → ✏ → Phiên bản mới**.
 - Google giới hạn số email mỗi ngày (khoảng 100 người nhận/ngày với Gmail thường, 1.500 với Google Workspace). Nếu gửi email lỗi (hết hạn mức, chưa cấp quyền…), **thao tác vẫn được thực hiện bình thường**; app chỉ báo "không gửi được email thông báo" kèm nguyên nhân.
+
+## 9i. Ma trận phân quyền, Trình ký và In báo cáo
+
+### Bảng tính nộp BHXH – dòng Truy thu và Tổng cộng sau truy thu
+
+Ở **Báo cáo → Bảng tính nộp BHXH**, nếu kỳ có truy thu/thoái thu, ngay dưới dòng **TỔNG CỘNG** của bảng chính có thêm 2 dòng:
+- **"Truy thu / Thoái thu (n dòng)"**: tách theo từng khoản trích (BHXH, BHYT, BHTN… của NLĐ và DN), Tổng BHXH NLĐ, Tổng BHXH DN, Tổng nộp BHXH và các khoản Công đoàn.
+- **"TỔNG CỘNG SAU TRUY THU"** = Tổng cộng + Truy thu/Thoái thu, theo từng cột.
+
+Bảng chi tiết truy thu vẫn nằm bên dưới như cũ. Dòng truy thu áp dụng cùng bộ lọc tìm kiếm/mã PL đang chọn. File Excel/PDF xuất ra cũng có 2 dòng này.
+
+*Ví dụ:* NV đóng nhầm mã **CT** tháng 10/2026, lương 5.400.000, đúng ra là **HT_CĐ**. Ở kỳ 11/2026 nhập 2 dòng truy thu: dòng 1 mã CT, lương cũ 5.400.000, lương mới 0; dòng 2 mã HT_CĐ, lương cũ 0, lương mới 5.400.000. Dòng Truy thu hiện: Tổng BHXH NLĐ **−567.000**, Tổng BHXH DN (không gồm KPCĐ) **−1.161.000**, Kinh phí CĐ DN **−108.000**, Đoàn phí NLĐ = 0.
+
+### Ma trận phân quyền (Thiết lập → Phân quyền – chỉ Admin thấy)
+
+Dưới danh sách tài khoản có bảng **"Ma trận phân quyền theo vai trò"** với 3 cột **Admin / Nhập liệu / Xem**. Tick ô để cấp quyền, bỏ tick để thu hồi, rồi bấm **"Lưu ma trận"**. Nút **"Khôi phục mặc định"** đưa về như bảng dưới.
+
+| Nhóm | Quyền | Nhập liệu | Xem |
+|---|---|:-:|:-:|
+| Tổng quan | Xem tab Tổng quan | ✔ | ✔ |
+| Kỳ BHXH | Tạo kỳ mới | – | – |
+| Kỳ BHXH | Bấm Tính kỳ | ✔ | – |
+| Kỳ BHXH | Gửi đề xuất duyệt kỳ | ✔ | – |
+| Kỳ BHXH | Duyệt & chốt kỳ / Trả hồ sơ (được sửa cả khi kỳ đang Chờ duyệt) | – | – |
+| Kỳ BHXH | Mở lại kỳ đã chốt | – | – |
+| Kỳ BHXH | Xóa kỳ mới nhất | – | – |
+| Nhân viên | Thêm / sửa nhân viên, nhập file Excel/CSV | ✔ | – |
+| Nhân viên | Xóa nhân viên | – | – |
+| Nhân viên | Khóa / mở khóa hồ sơ gốc | – | – |
+| Nhân viên | Xem toàn bộ nhân viên (bỏ chọn = chỉ thấy NV có "Email NV quản lý hồ sơ" là mình) | – | ✔ |
+| Mở khóa hồ sơ NV | Gửi yêu cầu mở khóa | ✔ | – |
+| Mở khóa hồ sơ NV | Duyệt / từ chối / khóa lại (được sửa hồ sơ NV đã khóa) | – | – |
+| Truy thu | Thêm / sửa / xóa | ✔ | – |
+| Báo cáo | Xem, In, Xuất Excel/PDF | ✔ | ✔ |
+| Thiết lập | Xem tab Thiết lập | ✔ | ✔ |
+| Thiết lập | Sửa Thiết lập (thông tin chung, phòng ban, khoản trích, mã PL, tỉ lệ CĐ, trình ký) | – | – |
+| Nhật ký | Xem Nhật ký thao tác | – | – |
+
+✔ = có, – = không (giá trị mặc định).
+
+- Mặc định giữ đúng cách phân quyền như trước. Riêng **Nhập liệu** nay được xem tab Thiết lập (chế độ chỉ xem) – muốn cho sửa thì tick **"Sửa Thiết lập"**.
+- **Admin luôn có toàn quyền** (ô bị khóa, không bỏ được) để tránh tự khóa mình. Quản lý tài khoản và ma trận phân quyền chỉ Admin làm được.
+- Thanh menu tự ẩn các tab mà người dùng không có quyền.
+- Người đang mở app cần tải lại trang (**F5**) để nhận quyền mới. Mỗi thay đổi ma trận được ghi vào **Nhật ký**.
+- Ma trận lưu trong **Script Properties** của Apps Script (không phải một tab trên Sheet).
+- Email **"Gửi đề xuất"** gửi tới Admin + những ai có vai trò được quyền *Duyệt & chốt kỳ*. Email **"Yêu cầu mở khóa"** gửi tới Admin + những ai có quyền *Duyệt yêu cầu mở khóa*.
+- Nút **📤 Gửi đề xuất** chỉ hiện với người có quyền Gửi đề xuất nhưng **không** có quyền Duyệt; người có quyền Duyệt thì Chốt kỳ trực tiếp.
+
+### Trình ký (Thiết lập → Trình ký)
+
+Khai báo danh sách người ký gồm **Vai trò ký** và **Họ tên**, tối đa **6 người**. Sắp thứ tự bằng nút **↑ ↓**, bấm **Xóa** để bỏ, **"＋ Thêm người ký"** để thêm, rồi **"Lưu"**. Khung **"Xem trước khi in"** cho thấy ngay khối chữ ký sẽ in ra.
+
+- Mặc định (sau khi chạy `khoiTaoCauTruc`): **Người lập biểu, Kế toán trưởng, Giám đốc** (họ tên để trống).
+- Dữ liệu lưu ở tab Sheet mới **"Trình ký"**. Cần quyền **"Sửa Thiết lập"** để sửa.
+- Mỗi người ký in thành 1 cột: **VAI TRÒ** (in hoa, đậm) / Ngày: ....../......./.......... / (Ký, ghi rõ họ tên) / khoảng trống để ký / **Họ tên** (đậm). Để trống Họ tên nếu muốn ký tay.
+
+### In báo cáo (nút 🖨 In)
+
+Mỗi tab Báo cáo (Biến động tăng/giảm, Bảng tính nộp BHXH, Công đoàn, Báo cáo chi phí, Tổng hợp, Theo nhân sự) có nút **🖨 In** cạnh nút Excel/PDF. Bản in gồm:
+- Tên công ty, MST, địa chỉ (lấy từ *Thông tin chung*); tiêu đề báo cáo + kỳ (hoặc khoảng kỳ).
+- Bảng số liệu **đúng như đang lọc trên màn hình** (bỏ các ô thống kê, cảnh báo, nút bấm).
+- Khối trình ký và dòng "In lúc … – người in".
+
+Khổ **A4 ngang**, tiêu đề cột lặp lại mỗi trang, khối chữ ký không bị cắt đôi qua 2 trang.
+
+**Mẹo khi in bằng Chrome:** chọn máy in **"Lưu dưới dạng PDF"** để lưu file; nếu bảng quá rộng, giảm **Tỉ lệ (Scale)**, ví dụ 80%; bật **"Đồ họa nền" (Background graphics)** để in màu nền dòng tổng. File tải về bằng nút **⬇ PDF / ⬇ Excel** cũng có khối trình ký ở cuối.
+
+### Cách cập nhật
+
+1. Dán đè **Code.gs**, **App.html**, **Styles.html**.
+2. Trong Apps Script chạy hàm `khoiTaoCauTruc` một lần (tạo tab **"Trình ký"** với 3 người ký mẫu).
+3. **Triển khai → Quản lý các bản triển khai → ✏ → Phiên bản mới**.
+4. Tải lại web app (**F5**).
 
 ## 10. Lưu ý
 

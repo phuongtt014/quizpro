@@ -10,6 +10,30 @@
 // HẰNG SỐ
 // ---------------------------------------------------------------------
 const ROLE = { ADMIN: 'Admin', NHAP: 'Nhập liệu', XEM: 'Xem' };
+// Ma trận phân quyền: [mã quyền, nhóm, mô tả, mặc định cho Nhập liệu, mặc định cho Xem].
+// Admin luôn có đủ mọi quyền (không chỉnh được, tránh tự khóa mình). Admin chỉnh lại ở Thiết lập → Phân quyền.
+const PERMS = [
+  ['tq_xem', 'Tổng quan', 'Xem tab Tổng quan (dashboard)', true, true],
+  ['ky_tao', 'Kỳ BHXH', 'Tạo kỳ mới', false, false],
+  ['ky_tinh', 'Kỳ BHXH', 'Bấm Tính kỳ', true, false],
+  ['ky_guiDeXuat', 'Kỳ BHXH', 'Gửi đề xuất duyệt kỳ', true, false],
+  ['ky_duyet', 'Kỳ BHXH', 'Duyệt & chốt kỳ / Trả hồ sơ (được sửa cả khi kỳ đang Chờ duyệt)', false, false],
+  ['ky_moLai', 'Kỳ BHXH', 'Mở lại kỳ đã chốt', false, false],
+  ['ky_xoa', 'Kỳ BHXH', 'Xóa kỳ mới nhất', false, false],
+  ['nv_sua', 'Nhân viên', 'Thêm / sửa nhân viên, nhập file Excel/CSV', true, false],
+  ['nv_xoa', 'Nhân viên', 'Xóa nhân viên', false, false],
+  ['nv_khoaGoc', 'Nhân viên', 'Khóa / mở khóa hồ sơ gốc', false, false],
+  ['nv_tatCa', 'Nhân viên', 'Xem toàn bộ nhân viên (bỏ chọn = chỉ thấy NV có "Email NV quản lý hồ sơ" là mình)', false, true],
+  ['yc_gui', 'Mở khóa hồ sơ NV', 'Gửi yêu cầu mở khóa hồ sơ NV đã nghỉ việc', true, false],
+  ['yc_duyet', 'Mở khóa hồ sơ NV', 'Duyệt / từ chối yêu cầu, khóa lại hồ sơ (được sửa hồ sơ NV đã khóa)', false, false],
+  ['tt_sua', 'Truy thu', 'Thêm / sửa / xóa Truy thu – Thoái thu', true, false],
+  ['bc_xem', 'Báo cáo', 'Xem, In, Xuất Excel/PDF các báo cáo', true, true],
+  ['tl_xem', 'Thiết lập', 'Xem tab Thiết lập', true, true],
+  ['tl_sua', 'Thiết lập', 'Sửa Thiết lập (thông tin chung, phòng ban, khoản trích, mã PL, tỉ lệ CĐ, trình ký)', false, false],
+  ['nk_xem', 'Nhật ký', 'Xem Nhật ký thao tác', false, false]
+];
+const PQM_PROP = 'PQ_MATRIX';
+let PQM_MEMO_ = null;
 const KY_MO = 'Đang mở';
 const KY_CHOT = 'Đã chốt';
 const KY_CHO = 'Chờ duyệt'; // Nhập liệu đã gửi đề xuất, chờ Admin chốt hoặc trả hồ sơ
@@ -151,6 +175,11 @@ const T = {
     ['ghiChu', 'Ghi chú', 'text'],
     ['nguoiTao', 'Người tạo', 'text'],
     ['emailQL', 'Email NV quản lý hồ sơ', 'text']] },
+  TK: { name: 'Trình ký', cols: [
+    ['thuTu', 'Thứ tự', 'num'],
+    ['vaiTro', 'Vai trò ký (VD: Người lập biểu)', 'text'],
+    ['hoTen', 'Họ tên', 'text'],
+    ['ghiChu', 'Ghi chú', 'text']] },
   PQ: { name: 'Phân quyền', cols: [
     ['email', 'Email', 'text'],
     ['hoTen', 'Họ tên', 'text'],
@@ -257,6 +286,10 @@ function khoiTaoCauTruc() {
   const created = {};
   Object.keys(T).forEach(function (k) { created[k] = ensureSheet_(T[k]); });
 
+  if (created.TK) {
+    append_(T.TK, [{ thuTu: 1, vaiTro: 'Người lập biểu', hoTen: '' }, { thuTu: 2, vaiTro: 'Kế toán trưởng', hoTen: '' },
+      { thuTu: 3, vaiTro: 'Giám đốc', hoTen: '' }]);
+  }
   if (created.PB) {
     append_(T.PB, ['Ban Giám đốc', 'Phòng Hành chính - Nhân sự', 'Phòng Kế toán'].map(function (x) { return { ten: x }; }));
   }
@@ -536,12 +569,12 @@ function apiListKy() { return cachedRead_('apiListKy', arguments, apiListKyImpl_
 function apiNhanVien(ky) { return cachedRead_('apiNhanVien', arguments, apiNhanVienImpl_); }
 function apiListYeuCauMoKhoa() { return cachedRead_('apiListYeuCauMoKhoa', arguments, apiListYeuCauMoKhoaImpl_); }
 function apiTruyThu(ky) { return cachedRead_('apiTruyThu', arguments, apiTruyThuImpl_); }
-function apiDashboard(tuKy, denKy, phongBan) { return cachedRead_('apiDashboard', arguments, apiDashboardImpl_); }
-function apiBaoCaoChiTiet(ky) { return cachedRead_('apiBaoCaoChiTiet', arguments, apiBaoCaoChiTietImpl_); }
-function apiBienDong(ky) { return cachedRead_('apiBienDong', arguments, apiBienDongImpl_); }
-function apiTongHop(tuKy, denKy) { return cachedRead_('apiTongHop', arguments, apiTongHopImpl_); }
-function apiCongDoanChiTiet(ky) { return cachedRead_('apiCongDoanChiTiet', arguments, apiCongDoanChiTietImpl_); }
-function apiLichSuNhanSu(tuKy, denKy) { return cachedRead_('apiLichSuNhanSu', arguments, apiLichSuNhanSuImpl_); }
+function apiDashboard(tuKy, denKy, phongBan) { requirePerm_(getUser_(), 'tq_xem'); return cachedRead_('apiDashboard', arguments, apiDashboardImpl_); }
+function apiBaoCaoChiTiet(ky) { requirePerm_(getUser_(), 'bc_xem'); return cachedRead_('apiBaoCaoChiTiet', arguments, apiBaoCaoChiTietImpl_); }
+function apiBienDong(ky) { requirePerm_(getUser_(), 'bc_xem'); return cachedRead_('apiBienDong', arguments, apiBienDongImpl_); }
+function apiTongHop(tuKy, denKy) { requirePerm_(getUser_(), 'bc_xem'); return cachedRead_('apiTongHop', arguments, apiTongHopImpl_); }
+function apiCongDoanChiTiet(ky) { requirePerm_(getUser_(), 'bc_xem'); return cachedRead_('apiCongDoanChiTiet', arguments, apiCongDoanChiTietImpl_); }
+function apiLichSuNhanSu(tuKy, denKy) { requirePerm_(getUser_(), 'bc_xem'); return cachedRead_('apiLichSuNhanSu', arguments, apiLichSuNhanSuImpl_); }
 function apiPhanQuyen() { return cachedRead_('apiPhanQuyen', arguments, apiPhanQuyenImpl_); }
 function apiNhatKy() { return cachedRead_('apiNhatKy', arguments, apiNhatKyImpl_); }
 
@@ -771,6 +804,12 @@ function emailTheoVaiTro_(vaiTro) {
   }
   return list;
 }
+/** Email những người có quyền key (Admin luôn có) */
+function emailTheoQuyen_(key) {
+  let list = emailTheoVaiTro_(ROLE.ADMIN);
+  [ROLE.NHAP, ROLE.XEM].forEach(function (r) { if (permsOf_(r)[key]) list = list.concat(emailTheoVaiTro_(r)); });
+  return list;
+}
 function escHtml_(s) {
   return String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -824,19 +863,43 @@ function getUser_() {
   const rows = load_(T.PQ).rows;
   const r = rows.find(function (x) { return x.email.toLowerCase() === email; });
   if (r && r.trangThai !== PQ_KHOA && LISTS.role.indexOf(r.vaiTro) >= 0) {
-    return { email: email, role: r.vaiTro, hoTen: r.hoTen || email };
+    return { email: email, role: r.vaiTro, hoTen: r.hoTen || email, perms: permsOf_(r.vaiTro) };
   }
   // Chưa có Admin nào: chủ sở hữu script được coi là Admin
   const owner = (Session.getEffectiveUser().getEmail() || '').toLowerCase();
   const hasAdmin = rows.some(function (x) { return x.vaiTro === ROLE.ADMIN && x.trangThai !== PQ_KHOA; });
-  if (!hasAdmin && email === owner) return { email: email, role: ROLE.ADMIN, hoTen: 'Chủ sở hữu' };
+  if (!hasAdmin && email === owner) return { email: email, role: ROLE.ADMIN, hoTen: 'Chủ sở hữu', perms: permsOf_(ROLE.ADMIN) };
   throw new Error('Tài khoản ' + email + ' chưa được cấp quyền hoặc đã bị khóa. Vui lòng liên hệ Admin.');
 }
 function requireRole_(user, roles) {
   if (roles.indexOf(user.role) < 0) throw new Error('Bạn không có quyền thực hiện thao tác này (vai trò: ' + user.role + ').');
 }
+/** Ma trận quyền hiện hành {vaiTro: {maQuyen: true/false}} (lưu ở Script Properties, thiếu thì lấy mặc định) */
+function pqMatrix_() {
+  if (PQM_MEMO_) return PQM_MEMO_;
+  let saved = {};
+  try { saved = JSON.parse(PropertiesService.getScriptProperties().getProperty(PQM_PROP) || '{}') || {}; } catch (e) { saved = {}; }
+  const m = {};
+  m[ROLE.ADMIN] = {}; m[ROLE.NHAP] = {}; m[ROLE.XEM] = {};
+  PERMS.forEach(function (p) {
+    m[ROLE.ADMIN][p[0]] = true;
+    [[ROLE.NHAP, 3], [ROLE.XEM, 4]].forEach(function (x) {
+      const sv = saved[x[0]];
+      m[x[0]][p[0]] = sv && typeof sv[p[0]] === 'boolean' ? sv[p[0]] : p[x[1]];
+    });
+  });
+  PQM_MEMO_ = m;
+  return m;
+}
+function permsOf_(role) { return pqMatrix_()[role] || {}; }
+function can_(user, key) { return !!user && (user.role === ROLE.ADMIN || !!permsOf_(user.role)[key]); }
+function requirePerm_(user, key) {
+  if (can_(user, key)) return;
+  const p = PERMS.find(function (x) { return x[0] === key; });
+  throw new Error('Bạn chưa được cấp quyền "' + (p ? p[2] : key) + '" (vai trò: ' + user.role + '). Liên hệ Admin để cấp quyền ở Thiết lập → Phân quyền.');
+}
 function canSee_(user, r) {
-  if (user.role !== ROLE.NHAP) return true;
+  if (can_(user, 'nv_tatCa')) return true;
   return String(r.emailQL || '').toLowerCase() === user.email;
 }
 
@@ -866,15 +929,15 @@ function getKy_(ky) {
 function requireOpen_(ky, user) {
   const k = getKy_(ky);
   if (k.trangThai === KY_CHOT) throw new Error('Kỳ ' + monthDisp_(ky) + ' đã chốt, không thể chỉnh sửa. Phát sinh cho tháng cũ hãy nhập Truy thu/Thoái thu ở kỳ đang mở.');
-  if (k.trangThai === KY_CHO && (!user || user.role !== ROLE.ADMIN)) {
+  if (k.trangThai === KY_CHO && !can_(user, 'ky_duyet')) {
     throw new Error('Kỳ ' + monthDisp_(ky) + ' đã gửi đề xuất, đang chờ Admin duyệt nên tạm khóa chỉnh sửa. Nếu Admin trả hồ sơ, kỳ sẽ được mở lại để sửa.');
   }
   return k;
 }
 /** Kỳ có cho người dùng này sửa không (Đã chốt: không ai; Chờ duyệt: chỉ Admin) */
-function kySuaDuoc_(k, user) {
-  if (user.role === ROLE.XEM || k.trangThai === KY_CHOT) return false;
-  return k.trangThai !== KY_CHO || user.role === ROLE.ADMIN;
+function kySuaDuoc_(k, user, quyen) {
+  if (!can_(user, quyen || 'nv_sua') || k.trangThai === KY_CHOT) return false;
+  return k.trangThai !== KY_CHO || can_(user, 'ky_duyet');
 }
 /** "BHXH_NLD; BHYT_NLD=1.2" -> [{ma, tiLe}] */
 function parseDS_(s) {
@@ -1032,6 +1095,18 @@ function tinhTruyThu_(r, ctxFn, maplMap, cdCodes, ten, tlRows) {
     chiTiet: Object.keys(sum).filter(function (c) { return sum[c]; }).map(function (c) { return c + ': ' + fmtNum_(sum[c]); }).join('; ')
   };
 }
+/** "BHXH_NLD: -567.000; DPCD_NLD: 27.000" -> {BHXH_NLD: -567000, DPCD_NLD: 27000} */
+function parseChiTiet_(s) {
+  const o = {};
+  String(s || '').split(';').forEach(function (part) {
+    const i = part.lastIndexOf(':');
+    if (i < 0) return;
+    const c = part.slice(0, i).trim();
+    const v = Number(part.slice(i + 1).replace(/[.\s]/g, '').replace(',', '.'));
+    if (c && !isNaN(v) && v) o[c] = (o[c] || 0) + v;
+  });
+  return o;
+}
 function ctxFactory_() {
   const khoanRows = load_(T.KHOAN).rows;
   const cache = {};
@@ -1114,6 +1189,7 @@ function apiBootstrapImpl_() {
     mapl: load_(T.MAPL).rows,
     tlcd: load_(T.TLCD).rows,
     phongBan: load_(T.PB).rows.map(function (r) { return r.ten; }).filter(String),
+    trinhKy: trinhKy_(),
     lists: LISTS,
     today: Utilities.formatDate(new Date(), tz_(), 'yyyy-MM')
   };
@@ -1147,7 +1223,7 @@ function themTuHoSoVaoKy_(ky, have) {
 
 function apiTaoKy(ky) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'ky_tao');
   ky = normMonth_(ky);
   if (!ky) throw new Error('Kỳ không hợp lệ.');
   return withLock_(function () {
@@ -1175,7 +1251,7 @@ function apiTaoKy(ky) {
 
 function apiTinhKy(ky) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
+  requirePerm_(user, 'ky_tinh');
   ky = normMonth_(ky);
   return withLock_(function () {
     requireOpen_(ky, user);
@@ -1228,7 +1304,7 @@ function tinhKy_(ky, user) {
 
 function apiChotKy(ky) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'ky_duyet');
   ky = normMonth_(ky);
   let nguoiGui = '';
   const res = withLock_(function () {
@@ -1250,7 +1326,7 @@ function apiChotKy(ky) {
 /** Mở lại một kỳ đã chốt để sửa/tính lại. Không giới hạn ở kỳ mới nhất (trường hợp khẩn cấp có thể cần sửa kỳ cũ). */
 function apiMoLaiKy(ky) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'ky_moLai');
   ky = normMonth_(ky);
   withLock_(function () {
     const k = getKy_(ky);
@@ -1276,7 +1352,7 @@ function ensureCols_(t) {
 }
 function apiGuiDeXuat(ky, ghiChu) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
+  requirePerm_(user, 'ky_guiDeXuat');
   ky = normMonth_(ky);
   ghiChu = String(ghiChu || '').trim();
   const res = withLock_(function () {
@@ -1289,7 +1365,7 @@ function apiGuiDeXuat(ky, ghiChu) {
     log_(user, 'Gửi đề xuất duyệt kỳ', monthDisp_(ky) + (ghiChu ? ' – ' + ghiChu : ''));
     return r;
   });
-  res.email = guiEmail_(emailTheoVaiTro_(ROLE.ADMIN), user.email,
+  res.email = guiEmail_(emailTheoQuyen_('ky_duyet'), user.email,
     'Đề xuất duyệt kỳ ' + monthDisp_(ky) + ' – chờ Admin kiểm tra',
     user.email + ' đã tính xong và gửi đề xuất duyệt kỳ BHXH ' + monthDisp_(ky) + '. Vui lòng kiểm tra: nếu đúng hãy Chốt kỳ, nếu chưa đúng hãy Trả hồ sơ kèm lý do.',
     [['Kỳ', monthDisp_(ky)], ['Người gửi', user.email], ['NV đóng / tổng', res.soDong + ' / ' + res.soNV],
@@ -1300,7 +1376,7 @@ function apiGuiDeXuat(ky, ghiChu) {
 }
 function apiTraHoSo(ky, lyDo) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'ky_duyet');
   ky = normMonth_(ky);
   lyDo = String(lyDo || '').trim();
   if (!lyDo) throw new Error('Vui lòng ghi rõ lý do trả hồ sơ.');
@@ -1326,7 +1402,7 @@ function apiTraHoSo(ky, lyDo) {
  */
 function apiXoaKy(ky) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'ky_xoa');
   ky = normMonth_(ky);
   return withLock_(function () {
     const kys = listKy_(); // mới nhất trước
@@ -1380,7 +1456,7 @@ function ycmlLatestMap_() {
   return m;
 }
 function nvCoTheSua_(nv, ky, user) {
-  if (user.role !== ROLE.NHAP) return true;
+  if (can_(user, 'yc_duyet')) return true;
   if (!nvDaKhoa_(nv, ky)) return true;
   return nvDangMoKhoa_(nv.maNV);
 }
@@ -1402,7 +1478,7 @@ function requireHoSoGocMo_() {
 }
 function apiKhoaHoSoGoc(khoa) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'nv_khoaGoc');
   PropertiesService.getScriptProperties().setProperty('hoSoGocKhoa', khoa ? '1' : '0');
   log_(user, khoa ? 'Khóa hồ sơ gốc' : 'Mở khóa hồ sơ gốc', '');
   bumpDataVersion_();
@@ -1425,7 +1501,7 @@ function apiNhanVienImpl_(ky) {
     editable = !hoSoGocKhoa_();
   }
   const t2 = Date.now();
-  editable = editable && user.role !== ROLE.XEM;
+  editable = editable && can_(user, 'nv_sua');
   const ycmlMap = ycmlLatestMap_(); // đọc tab Yêu cầu mở khóa NV đúng 1 lần cho cả danh sách, không lặp lại theo từng NV
   const t3 = Date.now();
   rows = rows.filter(function (r) { return canSee_(user, r); }).map(function (r) {
@@ -1446,7 +1522,7 @@ function apiNhanVienImpl_(ky) {
 // ---------------------------------------------------------------------
 function apiYeuCauMoKhoa(maNV, lyDo) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
+  requirePerm_(user, 'yc_gui');
   lyDo = String(lyDo || '').trim();
   if (!lyDo) throw new Error('Vui lòng ghi lý do yêu cầu mở khóa.');
   const nv = withLock_(function () {
@@ -1460,7 +1536,7 @@ function apiYeuCauMoKhoa(maNV, lyDo) {
     log_(user, 'Yêu cầu mở khóa NV', maNV + ' ' + nv.hoTen + ' – ' + lyDo);
     return nv;
   });
-  const email = guiEmail_(emailTheoVaiTro_(ROLE.ADMIN), user.email,
+  const email = guiEmail_(emailTheoQuyen_('yc_duyet'), user.email,
     'Yêu cầu mở khóa hồ sơ NV ' + maNV + ' – ' + nv.hoTen,
     user.email + ' đề xuất mở khóa hồ sơ nhân viên đã nghỉ việc để chỉnh sửa. Vui lòng vào Thiết lập → Yêu cầu mở khóa để Duyệt hoặc Từ chối.',
     [['Mã NV', maNV], ['Họ và tên', nv.hoTen], ['Phòng ban', nv.phongBan], ['Tháng dừng đóng', monthDisp_(nv.thangDung)], ['Người yêu cầu', user.email]],
@@ -1469,14 +1545,14 @@ function apiYeuCauMoKhoa(maNV, lyDo) {
 }
 function apiListYeuCauMoKhoaImpl_() {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
+  if (!can_(user, 'yc_gui') && !can_(user, 'yc_duyet')) requirePerm_(user, 'yc_gui');
   let rows = load_(T.YCML).rows;
-  if (user.role !== ROLE.ADMIN) rows = rows.filter(function (r) { return r.nguoiYeuCau === user.email; });
+  if (!can_(user, 'yc_duyet')) rows = rows.filter(function (r) { return r.nguoiYeuCau === user.email; });
   return rows.sort(function (a, b) { return a.thoiGianYC < b.thoiGianYC ? 1 : -1; });
 }
 function apiDuyetYeuCauMoKhoa(id, duyet, lyDoTuChoi) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'yc_duyet');
   lyDoTuChoi = duyet ? '' : String(lyDoTuChoi || '').trim();
   const r = withLock_(function () {
     const r = load_(T.YCML).rows.find(function (x) { return x.id === id; });
@@ -1496,7 +1572,7 @@ function apiDuyetYeuCauMoKhoa(id, duyet, lyDoTuChoi) {
 }
 function apiKhoaLaiNV(maNV) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'yc_duyet');
   const r = withLock_(function () {
     const rows = ycmlRowsCuaNV_(maNV);
     if (!rows.length || rows[0].trangThai !== YCML_DUYET) throw new Error('Nhân viên này chưa được mở khóa.');
@@ -1514,7 +1590,7 @@ function apiKhoaLaiNV(maNV) {
 function apiSaveNV(ky, o, isNew) {
   const t0 = Date.now();
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
+  requirePerm_(user, 'nv_sua');
   ky = normMonth_(ky);
   if (!ky) requireHoSoGocMo_();
   o = cleanNV_(o, user);
@@ -1609,7 +1685,7 @@ function cleanNV_(o, user, maplMapObj, pbMapObj) {
   r.congDoan = checkCongDoan_(r.congDoan);
   r.gioiTinh = checkGioiTinh_(r.gioiTinh);
   r.emailQL = String(r.emailQL || '').toLowerCase().trim();
-  if (user.role === ROLE.NHAP) r.emailQL = user.email;
+  if (!can_(user, 'nv_tatCa')) r.emailQL = user.email;
   const mm = maplMapObj || maplMap_();
   if (r.maPL && !mm[r.maPL]) throw new Error('Mã phân loại "' + r.maPL + '" không tồn tại.');
   if (r.thangDung && r.ngayBHXH && normMonth_(r.thangDung) < r.ngayBHXH.slice(0, 7)) {
@@ -1620,7 +1696,7 @@ function cleanNV_(o, user, maplMapObj, pbMapObj) {
 
 function apiDeleteNV(ky, maNV) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'nv_xoa');
   ky = normMonth_(ky);
   if (!ky) requireHoSoGocMo_();
   return withLock_(function () {
@@ -1647,14 +1723,14 @@ function apiTruyThuImpl_(ky) {
     if (r.maNV && canSee_(user, r)) nvMap[r.maNV] = { maNV: r.maNV, hoTen: r.hoTen, maPL: r.maPL, congDoan: r.congDoan, luongDong: luongDong_(r), emailQL: r.emailQL };
   });
   return {
-    ky: ky, trangThai: k.trangThai, editable: kySuaDuoc_(k, user),
+    ky: ky, trangThai: k.trangThai, editable: kySuaDuoc_(k, user, 'tt_sua'),
     rows: rows, nvs: Object.keys(nvMap).map(function (x) { return nvMap[x]; })
   };
 }
 
 function apiSaveTruyThu(ky, o) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
+  requirePerm_(user, 'tt_sua');
   ky = normMonth_(ky);
   return withLock_(function () {
     requireOpen_(ky, user);
@@ -1697,7 +1773,7 @@ function apiSaveTruyThu(ky, o) {
 
 function apiDeleteTruyThu(ky, id) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
+  requirePerm_(user, 'tt_sua');
   ky = normMonth_(ky);
   return withLock_(function () {
     requireOpen_(ky, user);
@@ -1907,9 +1983,13 @@ function apiBaoCaoChiTietImpl_(ky) {
   const khoanRows = load_(T.KHOAN).rows;
   const ten = khoanTen_(khoanRows);
   const cdSet = congDoanCodes_(khoanRows);
+  const tt = load_(T.TT).rows.filter(function (r) { return r.ky === ky && canSee_(user, r); });
+  tt.forEach(function (t) { t.items = parseChiTiet_(t.chiTiet); });
   const tong = {};
-  rows.forEach(function (r) { Object.keys(r.items).forEach(function (c) { tong[c] = (tong[c] || 0) + Math.abs(r.items[c]); }); });
-  const allCodes = kq.codes.filter(function (c) { return tong[c]; }).map(function (c) {
+  rows.concat(tt).forEach(function (r) { Object.keys(r.items).forEach(function (c) { tong[c] = (tong[c] || 0) + Math.abs(r.items[c]); }); });
+  const codeList = kq.codes.slice();
+  tt.forEach(function (t) { Object.keys(t.items).forEach(function (c) { if (codeList.indexOf(c) < 0) codeList.push(c); }); });
+  const allCodes = codeList.filter(function (c) { return tong[c]; }).map(function (c) {
     return ten[c] || { ma: c, ten: c, doiTuong: c.slice(-2) === 'DN' ? DT_DN : DT_NLD };
   });
   // Tách riêng các khoản "Thuộc quỹ Công đoàn" (đoàn phí NLĐ, kinh phí công đoàn DN) ra sau cùng
@@ -1928,7 +2008,6 @@ function apiBaoCaoChiTietImpl_(ky) {
     r.tongDNChinh = r.tongDN - cdDN; // Tổng BHXH DN không gồm kinh phí công đoàn
     r.tongNopBHXH = r.tongNLDChinh + r.tongDNChinh; // Tổng nộp BHXH (NLĐ + DN, không gồm Công đoàn)
   });
-  const tt = load_(T.TT).rows.filter(function (r) { return r.ky === ky && canSee_(user, r); });
   return { info: getInfo_(), ky: ky, kyInfo: k, codes: codes, codesCD: codesCD, rows: rows, truyThu: tt };
 }
 
@@ -2145,6 +2224,7 @@ function apiLichSuNhanSuImpl_(tuKy, denKy) {
 // API: XUẤT EXCEL / PDF
 // ---------------------------------------------------------------------
 function apiXuat(loai, thamSo, format) {
+  requirePerm_(getUser_(), 'bc_xem');
   const doc = buildDoc_(loai, thamSo);
   return makeFile_(doc, format === 'pdf' ? 'pdf' : 'xlsx');
 }
@@ -2176,9 +2256,21 @@ function buildDoc_(loai, p) {
     const total = ['', '', 'TỔNG CỘNG', '', '', '', sum(6)];
     for (let c = 7; c < header.length - 1; c++) total.push(sum(c));
     total.push('');
+    const totals = [total];
+    if (d.truyThu.length) {
+      const st = function (f) { return d.truyThu.reduce(function (s, t) { return s + (Number(f(t)) || 0); }, 0); };
+      const it = function (c) { return st(function (t) { return (t.items || {})[c.ma]; }); };
+      const ttN = st(function (t) { return t.bhxhNLD; }), ttD = st(function (t) { return t.bhxhDN; });
+      const ttRow = ['', '', 'Truy thu / Thoái thu (' + d.truyThu.length + ' dòng)', '', '', '', '']
+        .concat(codesNLD.map(it)).concat([ttN]).concat(codesDN.map(it))
+        .concat([ttD, ttN + ttD]).concat(d.codesCD.map(it)).concat(['']);
+      const after = total.map(function (v, c) { return c >= 7 && c < header.length - 1 ? (Number(v) || 0) + (Number(ttRow[c]) || 0) : v; });
+      after[2] = 'TỔNG CỘNG SAU TRUY THU';
+      totals.push(ttRow, after);
+    }
     const numCols = [];
     for (let c = 6; c < header.length - 1; c++) numCols.push(c);
-    const sections = [{ title: 'Danh sách NV đóng BHXH (' + dong.length + ' người) – dùng để nộp cơ quan BHXH', header: header, rows: rows, total: total, numCols: numCols }];
+    const sections = [{ title: 'Danh sách NV đóng BHXH (' + dong.length + ' người) – dùng để nộp cơ quan BHXH', header: header, rows: rows, total: totals, numCols: numCols }];
     if (d.truyThu.length) {
       const h2 = ['STT', 'Mã NV', 'Họ và tên', 'Từ tháng', 'Đến tháng', 'Số tháng', 'Lương cũ', 'Lương mới',
         'Truy thu BHXH NLĐ', 'Truy thu BHXH DN', 'Chi tiết', 'Ghi chú'];
@@ -2349,7 +2441,8 @@ function buildDoc_(loai, p) {
   throw new Error('Loại báo cáo không hợp lệ.');
 }
 function makeFile_(doc, format) {
-  const width = Math.max.apply(null, doc.sections.map(function (s) { return s.header.length; }).concat([4]));
+  const signers = trinhKy_();
+  const width = Math.max.apply(null, doc.sections.map(function (s) { return s.header.length; }).concat([4, signers.length]));
   const grid = [];
   const styles = []; // {row, type, len, numCols}
   const push = function (arr) { const a = arr.slice(); while (a.length < width) a.push(''); grid.push(a); };
@@ -2371,6 +2464,22 @@ function makeFile_(doc, format) {
     if (end >= start) styles.push({ type: 'num', start: start, end: end, cols: s.numCols || [], len: s.header.length });
     push([]);
   });
+  // Khối trình ký: mỗi người ký 1 cột (gộp ô), gồm Vai trò – Ngày – (Ký, ghi rõ họ tên) – khoảng trống ký – Họ tên
+  if (signers.length) {
+    const n = signers.length, seg = Math.floor(width / n);
+    const segs = signers.map(function (x, i) { return [i * seg, i === n - 1 ? width - i * seg : seg]; });
+    const signRow = function (texts, fmt) {
+      const a = [];
+      for (let c = 0; c < width; c++) a.push('');
+      texts.forEach(function (t, i) { a[segs[i][0]] = t; });
+      push(a); styles.push({ row: grid.length, type: 'sign', segs: segs, fmt: fmt });
+    };
+    signRow(signers.map(function (x) { return String(x.vaiTro || '').toUpperCase(); }), 'b');
+    signRow(signers.map(function () { return 'Ngày: ....../......./..........'; }), '');
+    signRow(signers.map(function () { return '(Ký, ghi rõ họ tên)'; }), 'i');
+    push([]); push([]); push([]); push([]);
+    signRow(signers.map(function (x) { return x.hoTen || ''; }), 'b');
+  }
 
   const tmp = SpreadsheetApp.create(doc.fileName);
   try {
@@ -2391,6 +2500,15 @@ function makeFile_(doc, format) {
       if (st.type === 'head') sh.getRange(st.row, 1, 1, st.len).setFontWeight('bold').setBackground('#dbe5f1').setWrap(true).setHorizontalAlignment('center');
       if (st.type === 'total') sh.getRange(st.row, 1, 1, st.len).setFontWeight('bold').setBackground('#f2f2f2');
       if (st.type === 'num') sh.getRange(st.start - 1, 1, st.end - st.start + 2, st.len).setBorder(true, true, true, true, true, true, '#999999', SpreadsheetApp.BorderStyle.SOLID);
+      if (st.type === 'sign') {
+        st.segs.forEach(function (g) {
+          const r = sh.getRange(st.row, g[0] + 1, 1, g[1]);
+          if (g[1] > 1) r.merge();
+          r.setHorizontalAlignment('center');
+          if (st.fmt === 'b') r.setFontWeight('bold');
+          if (st.fmt === 'i') r.setFontStyle('italic');
+        });
+      }
     });
     sh.autoResizeColumns(1, width);
     sh.setColumnWidth(1, 60);
@@ -2624,7 +2742,7 @@ function apiImportNVText(ky, mode, text, onlyEmpty) {
 
 function importNVGrid_(ky, mode, grid, source, onlyEmpty) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN, ROLE.NHAP]);
+  requirePerm_(user, 'nv_sua');
   ky = normMonth_(ky);
   if (!ky) requireHoSoGocMo_();
   return withLock_(function () {
@@ -2664,8 +2782,8 @@ function importNVGrid_(ky, mode, grid, source, onlyEmpty) {
 
     if (mode === 'thaythe') {
       if (errors.length) return { mode: mode, added: 0, updated: 0, deleted: 0, total: parsed.objs.length, errors: errors };
-      const delNV = user.role === ROLE.ADMIN ? dNV.rows : dNV.rows.filter(function (r) { return canSee_(user, r); });
-      const delDL = user.role === ROLE.ADMIN ? dlRowsForKy : dlRowsForKy.filter(function (r) { return canSee_(user, r); });
+      const delNV = can_(user, 'nv_tatCa') ? dNV.rows : dNV.rows.filter(function (r) { return canSee_(user, r); });
+      const delDL = can_(user, 'nv_tatCa') ? dlRowsForKy : dlRowsForKy.filter(function (r) { return canSee_(user, r); });
       if (applyToMaster && delNV.length) deleteRows_(T.NV, delNV.map(function (r) { return r._row; }));
       if (ky && delDL.length) deleteRows_(T.DLKY, delDL.map(function (r) { return r._row; }));
       const toInsert = cleaned.map(function (c) { return c.obj; });
@@ -2755,7 +2873,7 @@ function mergeNVPartial_(existing, raw, matchedKeys, user, mm, onlyEmpty, pbMapO
   if (patch.gioiTinh !== undefined) patch.gioiTinh = checkGioiTinh_(patch.gioiTinh);
   if (patch.emailQL !== undefined) {
     patch.emailQL = String(patch.emailQL || '').toLowerCase().trim();
-    if (user.role === ROLE.NHAP) patch.emailQL = user.email;
+    if (!can_(user, 'nv_tatCa')) patch.emailQL = user.email;
   }
   if (patch.maPL !== undefined && patch.maPL && !mm[patch.maPL]) throw new Error('Mã phân loại "' + patch.maPL + '" không tồn tại.');
   if (['luongChinh', 'pcKN', 'pcCV', 'pcDH', 'pcKhac'].some(function (k) { return patch[k] !== undefined; })) {
@@ -2775,7 +2893,7 @@ function mergeNVPartial_(existing, raw, matchedKeys, user, mm, onlyEmpty, pbMapO
 // ---------------------------------------------------------------------
 function apiSaveInfo(o) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'tl_sua');
   const sh = SpreadsheetApp.getActive().getSheetByName(INFO_SHEET);
   if (!sh) throw new Error('Không tìm thấy tab "' + INFO_SHEET + '".');
   const lr = Math.max(sh.getLastRow(), 1);
@@ -2795,7 +2913,7 @@ function apiSaveInfo(o) {
 
 function apiSavePhongBan(list) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'tl_sua');
   const names = [];
   (list || []).forEach(function (x) { x = String(x).trim(); if (x && names.indexOf(x) < 0) names.push(x); });
   return withLock_(function () {
@@ -2812,7 +2930,7 @@ function apiSavePhongBan(list) {
 
 function apiSaveKhoan(o) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'tl_sua');
   const r = {
     ten: String(o.ten || '').trim(), ma: String(o.ma || '').trim().toUpperCase(), doiTuong: o.doiTuong,
     tiLe: num_(o.tiLe), loaiTran: o.loaiTran || TRAN_KHONG, mucToiDa: moneyNum_(o.mucToiDa),
@@ -2845,7 +2963,7 @@ function apiSaveKhoan(o) {
 
 function apiDeleteKhoan(row) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'tl_sua');
   return withLock_(function () {
     const ex = load_(T.KHOAN).rows.find(function (x) { return x._row === Number(row); });
     if (!ex) throw new Error('Không tìm thấy dòng.');
@@ -2859,7 +2977,7 @@ function apiListTyLeCD() { getUser_(); return load_(T.TLCD).rows; }
 
 function apiSaveTyLeCD(o) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'tl_sua');
   const r = { tyLeGiuLaiNLD: num_(o.tyLeGiuLaiNLD), tyLeGiuLaiDN: num_(o.tyLeGiuLaiDN), ngayHL: normDate_(o.ngayHL), ghiChu: o.ghiChu || '' };
   if (r.tyLeGiuLaiNLD < 0 || r.tyLeGiuLaiNLD > 100) throw new Error('Tỉ lệ giữ lại Đoàn phí (NLĐ) phải trong khoảng 0 – 100.');
   if (r.tyLeGiuLaiDN < 0 || r.tyLeGiuLaiDN > 100) throw new Error('Tỉ lệ giữ lại Kinh phí công đoàn (DN) phải trong khoảng 0 – 100.');
@@ -2885,7 +3003,7 @@ function apiSaveTyLeCD(o) {
 
 function apiDeleteTyLeCD(row) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'tl_sua');
   return withLock_(function () {
     const ex = load_(T.TLCD).rows.find(function (x) { return x._row === Number(row); });
     if (!ex) throw new Error('Không tìm thấy dòng.');
@@ -2897,7 +3015,7 @@ function apiDeleteTyLeCD(row) {
 
 function apiSaveMaPL(o, isNew) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'tl_sua');
   const ma = String(o.ma || '').trim();
   if (!ma) throw new Error('Chưa nhập Mã phân loại.');
   const ten = khoanTen_(load_(T.KHOAN).rows);
@@ -2921,7 +3039,7 @@ function apiSaveMaPL(o, isNew) {
 
 function apiDeleteMaPL(ma) {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'tl_sua');
   return withLock_(function () {
     const used = load_(T.NV).rows.concat(load_(T.DLKY).rows).some(function (r) { return r.maPL === ma; });
     if (used) throw new Error('Mã "' + ma + '" đang được sử dụng. Hãy chuyển Trạng thái sang "Ngừng áp dụng" thay vì xóa.');
@@ -2957,6 +3075,68 @@ function apiSavePQ(o) {
   });
 }
 
+/** Ma trận phân quyền để hiển thị/sửa (chỉ Admin) */
+function apiMaTranPQ() {
+  requireRole_(getUser_(), [ROLE.ADMIN]);
+  return {
+    perms: PERMS.map(function (p) { return { ma: p[0], nhom: p[1], moTa: p[2], macDinh: {'Nhập liệu': p[3], 'Xem': p[4]} }; }),
+    vaiTro: [ROLE.ADMIN, ROLE.NHAP, ROLE.XEM],
+    matrix: pqMatrix_()
+  };
+}
+/** Lưu ma trận: m = {vaiTro: {maQuyen: bool}}; Admin luôn đủ quyền nên bỏ qua */
+function apiSaveMaTranPQ(m) {
+  const user = getUser_();
+  requireRole_(user, [ROLE.ADMIN]);
+  const out = {};
+  [ROLE.NHAP, ROLE.XEM].forEach(function (r) {
+    out[r] = {};
+    PERMS.forEach(function (p) { out[r][p[0]] = !!(m && m[r] && m[r][p[0]]); });
+  });
+  return withLock_(function () {
+    PropertiesService.getScriptProperties().setProperty(PQM_PROP, JSON.stringify(out));
+    PQM_MEMO_ = null;
+    const mo = function (r) { return PERMS.filter(function (p) { return out[r][p[0]]; }).map(function (p) { return p[0]; }).join(', '); };
+    log_(user, 'Ma trận phân quyền', 'Nhập liệu: ' + mo(ROLE.NHAP) + ' | Xem: ' + mo(ROLE.XEM));
+    return apiMaTranPQ();
+  });
+}
+/** Khôi phục ma trận phân quyền mặc định */
+function apiMacDinhMaTranPQ() {
+  const user = getUser_();
+  requireRole_(user, [ROLE.ADMIN]);
+  return withLock_(function () {
+    PropertiesService.getScriptProperties().deleteProperty(PQM_PROP);
+    PQM_MEMO_ = null;
+    log_(user, 'Ma trận phân quyền', 'Khôi phục mặc định');
+    return apiMaTranPQ();
+  });
+}
+
+// ----- Trình ký (khối chữ ký cuối báo cáo khi In / xuất PDF) -----
+function trinhKy_() {
+  const sh = activeSS_().getSheetByName(T.TK.name);
+  if (!sh) return [];
+  return load_(T.TK).rows.filter(function (r) { return r.vaiTro || r.hoTen; })
+    .sort(function (a, b) { return (Number(a.thuTu) || 0) - (Number(b.thuTu) || 0); })
+    .map(function (r) { return { vaiTro: r.vaiTro || '', hoTen: r.hoTen || '' }; });
+}
+function apiSaveTrinhKy(list) {
+  const user = getUser_();
+  requirePerm_(user, 'tl_sua');
+  const rows = (list || []).map(function (x) { return { vaiTro: String(x.vaiTro || '').trim(), hoTen: String(x.hoTen || '').trim() }; })
+    .filter(function (x) { return x.vaiTro || x.hoTen; });
+  if (rows.length > 6) throw new Error('Tối đa 6 người ký để vừa trang in.');
+  return withLock_(function () {
+    ensureSheet_(T.TK);
+    const sh = getSheet_(T.TK);
+    if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).clearContent();
+    append_(T.TK, rows.map(function (r, i) { return { thuTu: i + 1, vaiTro: r.vaiTro, hoTen: r.hoTen }; }));
+    log_(user, 'Cập nhật trình ký', rows.map(function (r) { return r.vaiTro + (r.hoTen ? ': ' + r.hoTen : ''); }).join('; '));
+    return trinhKy_();
+  });
+}
+
 function apiDeletePQ(email) {
   const user = getUser_();
   requireRole_(user, [ROLE.ADMIN]);
@@ -2973,6 +3153,6 @@ function apiDeletePQ(email) {
 
 function apiNhatKyImpl_() {
   const user = getUser_();
-  requireRole_(user, [ROLE.ADMIN]);
+  requirePerm_(user, 'nk_xem');
   return load_(T.LOG).rows.slice(-500).reverse();
 }

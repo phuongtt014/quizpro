@@ -305,6 +305,8 @@ function lyDoForm(title, label, placeholder, required, btnText, btnClass, onOk) 
        if(${required ? 'true' : 'false'} && !v) return toast('Vui lòng nhập nội dung.','err'); S._lyDoOk(v);})()">${btnText}</button>`);
 }
 function isRole(...r) { return S.user && r.includes(S.user.role); }
+// Quyền theo ma trận phân quyền (Admin luôn đủ quyền)
+function can(p) { return !!S.user && (S.user.role === 'Admin' || !!(S.user.perms || {})[p]); }
 function latestKy() { return S.kys.length ? S.kys[0].ky : ''; }
 function latestOpenKy() { const k = S.kys.find((x) => x.trangThai !== 'Đã chốt'); return k ? k.ky : latestKy(); }
 
@@ -411,8 +413,8 @@ function xuat(loai, thamSo, format) {
 
 // ---------- Khởi động ----------
 const NAV = [
-  ['tongquan', 'Tổng quan'], ['ky', 'Kỳ BHXH'], ['nhanvien', 'Nhân viên'], ['truythu', 'Truy thu'],
-  ['baocao', 'Báo cáo'], ['thietlap', 'Thiết lập'], ['nhatky', 'Nhật ký', ['Admin']]
+  ['tongquan', 'Tổng quan', 'tq_xem'], ['ky', 'Kỳ BHXH'], ['nhanvien', 'Nhân viên'], ['truythu', 'Truy thu'],
+  ['baocao', 'Báo cáo', 'bc_xem'], ['thietlap', 'Thiết lập', 'tl_xem'], ['nhatky', 'Nhật ký', 'nk_xem']
 ];
 async function boot() {
   try {
@@ -420,9 +422,9 @@ async function boot() {
     Object.assign(S, d);
     $('ctyName').textContent = S.info.tenCty ? ' · ' + S.info.tenCty : '';
     $('userBox').innerHTML = `<b>${esc(S.user.hoTen)}</b>${esc(S.user.email)} · ${esc(S.user.role)}`;
-    $('nav').innerHTML = NAV.filter((n) => !n[2] || n[2].includes(S.user.role))
-      .map((n) => `<button data-v="${n[0]}" onclick="go('${n[0]}')">${n[1]}</button>`).join('');
-    go('tongquan');
+    const navs = NAV.filter((n) => !n[2] || can(n[2]));
+    $('nav').innerHTML = navs.map((n) => `<button data-v="${n[0]}" onclick="go('${n[0]}')">${n[1]}</button>`).join('');
+    go(navs[0][0]);
     setTimeout(prefetchTabs, 1500);
   } catch (e) {
     V().innerHTML = `<div class="alert bad"><b>Không thể mở ứng dụng.</b><br>${esc(e.message || e)}</div>`;
@@ -438,7 +440,7 @@ async function prefetchTabs() {
     ['nv:' + ky, ['apiNhanVien', ky]],
     ['tt:' + kyMo, ['apiTruyThu', kyMo]],
     ['baocaochi:' + ky, ['apiBaoCaoChiTiet', ky]]
-  ];
+  ].filter((j) => can('bc_xem') || j[0].indexOf('baocaochi:') !== 0);
   for (const [key, args] of jobs) {
     if (S.cache[key] !== undefined) continue;
     const d = await runBg(...args);
@@ -579,7 +581,7 @@ async function vKy() {
 function renderKy() {
   const def = S.kys.length ? nextMonth(S.kys[0].ky) : S.today;
   let h = '<h2>Kỳ BHXH</h2>';
-  if (isRole('Admin')) {
+  if (can('ky_tao')) {
     h += `<div class="card"><h3>Tạo kỳ mới</h3><div class="row">
       <input type="month" id="newKy" value="${def}">
       <button class="btn pri" onclick="taoKy()">＋ Tạo kỳ</button>
@@ -603,16 +605,16 @@ function renderKy() {
       <td class="small">${k.ngayTinh ? esc(k.ngayTinh) + '<br><span class="muted">' + esc(k.nguoiTinh) + '</span>' : '<span class="badge warn">Chưa tính</span>'}</td>
       <td class="small">${k.ngayChot ? esc(k.ngayChot) + '<br><span class="muted">' + esc(k.nguoiChot) + '</span>' : ''}</td>
       <td><div class="row">
-        ${(open || (cho && isRole('Admin'))) && isRole('Admin', 'Nhập liệu') ? `<button class="btn sm pri" onclick="tinhKy('${k.ky}')">Tính</button>` : ''}
-        ${open && isRole('Nhập liệu') ? `<button class="btn sm ok" onclick="guiDeXuat('${k.ky}')" ${k.ngayTinh ? '' : 'disabled title="Hãy bấm Tính trước"'}>📤 Gửi đề xuất</button>` : ''}
-        ${cho && isRole('Nhập liệu') ? '<span class="badge warn">Đang chờ Admin duyệt – tạm khóa</span>' : ''}
-        ${(open || cho) && isRole('Admin') ? `<button class="btn sm ok" onclick="chotKy('${k.ky}')">${cho ? '✔ Duyệt & chốt kỳ' : 'Chốt kỳ'}</button>` : ''}
-        ${cho && isRole('Admin') ? `<button class="btn sm danger" onclick="traHoSo('${k.ky}')">↩ Trả hồ sơ</button>` : ''}
-        ${k.trangThai === 'Đã chốt' && isRole('Admin') ? `<button class="btn sm warn" onclick="moLaiKy('${k.ky}')">Mở lại kỳ</button>` : ''}
+        ${(open || (cho && can('ky_duyet'))) && can('ky_tinh') ? `<button class="btn sm pri" onclick="tinhKy('${k.ky}')">Tính</button>` : ''}
+        ${open && can('ky_guiDeXuat') && !can('ky_duyet') ? `<button class="btn sm ok" onclick="guiDeXuat('${k.ky}')" ${k.ngayTinh ? '' : 'disabled title="Hãy bấm Tính trước"'}>📤 Gửi đề xuất</button>` : ''}
+        ${cho && !can('ky_duyet') ? '<span class="badge warn">Đang chờ Admin duyệt – tạm khóa</span>' : ''}
+        ${(open || cho) && can('ky_duyet') ? `<button class="btn sm ok" onclick="chotKy('${k.ky}')">${cho ? '✔ Duyệt & chốt kỳ' : 'Chốt kỳ'}</button>` : ''}
+        ${cho && can('ky_duyet') ? `<button class="btn sm danger" onclick="traHoSo('${k.ky}')">↩ Trả hồ sơ</button>` : ''}
+        ${k.trangThai === 'Đã chốt' && can('ky_moLai') ? `<button class="btn sm warn" onclick="moLaiKy('${k.ky}')">Mở lại kỳ</button>` : ''}
         <button class="btn sm" onclick="S.nvKy='${k.ky}';go('nhanvien')">Nhân viên</button>
         <button class="btn sm" onclick="S.rpKy='${k.ky}';S.rpTab='chitiet';go('baocao')">Bảng tính</button>
         <button class="btn sm" onclick="S.rpKy='${k.ky}';S.rpTab='biendong';go('baocao')">Biến động</button>
-        ${isLatest && isRole('Admin') ? `<button class="btn sm danger" onclick="xoaKy('${k.ky}')">Xóa kỳ</button>` : ''}
+        ${isLatest && can('ky_xoa') ? `<button class="btn sm danger" onclick="xoaKy('${k.ky}')">Xóa kỳ</button>` : ''}
       </div></td></tr>`;
   });
   h += '</tbody></table></div></div>';
@@ -716,7 +718,7 @@ async function loadNV() {
 }
 function afterNVLoaded() {
   const d = S.nvData;
-  const nutKhoa = !d.ky && isRole('Admin')
+  const nutKhoa = !d.ky && can('nv_khoaGoc')
     ? (d.hoSoGocKhoa
       ? '<button class="btn warn" onclick="khoaHoSoGoc(false)" title="Cho phép Thêm/Sửa/Xóa/Nhập file trực tiếp trên hồ sơ gốc">🔓 Mở khóa hồ sơ gốc</button>'
       : '<button class="btn" onclick="khoaHoSoGoc(true)" title="Chặn Thêm/Sửa/Xóa/Nhập file trực tiếp trên hồ sơ gốc để tránh sửa nhầm">🔒 Khóa hồ sơ gốc</button>')
@@ -866,7 +868,7 @@ function renderNV() {
       <td>${esc(r.congDoan)}</td>
       <td><div class="row">${locked ? '<span class="badge bad" title="' + esc(nvKhoaTitle(r)) + '">Đã khóa</span>' : ''}
       <button class="btn sm" onclick="nvForm('${esc(r.maNV)}')">${d.editable ? 'Sửa' : 'Xem'}</button>
-      ${d.editable && isRole('Admin') ? `<button class="btn sm danger" onclick="nvDel('${esc(r.maNV)}')">Xóa</button>` : ''}</div></td></tr>`;
+      ${d.editable && can('nv_xoa') ? `<button class="btn sm danger" onclick="nvDel('${esc(r.maNV)}')">Xóa</button>` : ''}</div></td></tr>`;
   });
   if (rows.length) h += `<tr class="total"><td colspan="7">TỔNG CỘNG</td>
     <td class="num">${fmt(sumCol('luongChinh'))}</td><td class="num">${fmt(sumCol('pcKN'))}</td><td class="num">${fmt(sumCol('pcCV'))}</td>
@@ -882,8 +884,8 @@ async function nvForm(maNV) {
     try { busy(true); S.pq = await run('apiPhanQuyen'); } catch (e) { toast(e.message, 'err'); S.pq = []; } finally { busy(false); }
   }
   const d = S.nvData;
-  const r = maNV ? d.rows.find((x) => x.maNV === maNV) : { congDoan: 'Không', emailQL: S.user.role === 'Nhập liệu' ? S.user.email : '' };
-  const locked = !!(r.khoa && !r.moKhoa && S.user.role === 'Nhập liệu');
+  const r = maNV ? d.rows.find((x) => x.maNV === maNV) : { congDoan: 'Không', emailQL: can('nv_tatCa') ? '' : S.user.email };
+  const locked = !!(r.khoa && !r.moKhoa && !can('yc_duyet') && can('yc_gui') && d.editable);
   const ro = !d.editable || locked;
   const dis = ro ? 'disabled' : '';
   const plList = S.mapl.filter((m) => m.trangThai !== 'Ngừng áp dụng' || m.ma === r.maPL).map((m) => m.ma);
@@ -1064,7 +1066,8 @@ function vBaoCao() {
   V().innerHTML = `<h2>Báo cáo</h2><div class="tabs">${tab('biendong', 'Biến động tăng/giảm')}${tab('chitiet', 'Bảng tính nộp BHXH')}${tab('congdoan', 'Công đoàn')}${tab('chiphi', 'Báo cáo chi phí')}${tab('tonghop', 'Tổng hợp')}${tab('nhansu', 'Theo nhân sự')}</div>
     <div id="rpBar" class="card no-print"></div><div id="rpBody"></div>`;
   if (!S.kys.length) { $('rpBar').innerHTML = 'Chưa có kỳ BHXH nào.'; return; }
-  const exp = (loai, p) => `<button class="btn" onclick="xuat('${loai}','${p}','xlsx')">⬇ Excel</button>
+  const exp = (loai, p) => `<button class="btn pri" onclick="inBaoCao()" title="In báo cáo đang xem (kèm khối trình ký ở Thiết lập → Trình ký)">🖨 In</button>
+    <button class="btn" onclick="xuat('${loai}','${p}','xlsx')">⬇ Excel</button>
     <button class="btn" onclick="xuat('${loai}','${p}','pdf')">⬇ PDF</button>`;
   if (S.rpTab === 'tonghop' || S.rpTab === 'nhansu') {
     if (!S.rpTuKy) S.rpTuKy = S.kys[S.kys.length - 1].ky;
@@ -1087,6 +1090,36 @@ function vBaoCao() {
       <span class="spacer"></span>${exp(S.rpTab, S.rpKy)}</div>`;
     ({ chitiet: rpChiTiet, chiphi: rpChiPhi, biendong: rpBienDong, congdoan: rpCongDoan }[S.rpTab])();
   }
+}
+// In báo cáo đang xem: tiêu đề + bảng (đúng bộ lọc trên màn hình) + khối trình ký, khổ A4 ngang
+function inBaoCao() {
+  const body = $('rpBody');
+  if (!body || !body.querySelector('table')) return toast('Chưa có dữ liệu để in.', 'err');
+  const ten = { chitiet: 'BẢNG TÍNH NỘP BHXH', congdoan: 'BẢNG PHÂN TÁCH QUỸ CÔNG ĐOÀN', chiphi: 'BÁO CÁO CHI PHÍ BHXH',
+    biendong: 'BÁO CÁO BIẾN ĐỘNG TĂNG/GIẢM', tonghop: 'TỔNG HỢP BHXH', nhansu: 'TỔNG HỢP THEO NHÂN SỰ' }[S.rpTab] || 'BÁO CÁO';
+  const khoang = S.rpTab === 'tonghop' || S.rpTab === 'nhansu'
+    ? `Từ kỳ ${fmtM(S.rpTuKy)} đến kỳ ${fmtM(S.rpDenKy)}` : `Kỳ ${fmtM(S.rpKy)}`;
+  const clone = body.cloneNode(true);
+  clone.querySelectorAll('.no-print, .stats, .alert, button, input, select, svg').forEach((e) => e.remove());
+  const i = S.info || {};
+  let pa = $('printArea');
+  if (!pa) { pa = document.createElement('div'); pa.id = 'printArea'; document.body.appendChild(pa); }
+  pa.innerHTML = `<div class="pr-cty"><b>${esc(i.tenCty || '')}</b>${i.mst ? '<br>MST: ' + esc(i.mst) : ''}${i.diaChi ? '<br>Địa chỉ: ' + esc(i.diaChi) : ''}</div>
+    <h1 class="pr-title">${ten}</h1><div class="pr-sub">${khoang}</div>
+    ${clone.innerHTML}${signBlockHtml(S.trinhKy)}
+    <div class="pr-foot">In lúc ${esc(new Date().toLocaleString('vi-VN'))} – ${esc(S.user.hoTen || S.user.email)}</div>`;
+  document.body.classList.add('printing');
+  const done = () => { document.body.classList.remove('printing'); pa.innerHTML = ''; window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  setTimeout(() => window.print(), 50);
+}
+/** Khối chữ ký: mỗi người 1 cột – Vai trò, Ngày, (Ký, ghi rõ họ tên), chỗ ký, Họ tên */
+function signBlockHtml(list) {
+  const l = (list || []).filter((x) => x.vaiTro || x.hoTen);
+  if (!l.length) return '';
+  return `<div class="sign-block">${l.map((x) => `<div class="sign"><div class="sg-vt">${esc(x.vaiTro)}</div>
+    <div class="sg-ngay">Ngày: ....../......./..........</div><div class="sg-hd">(Ký, ghi rõ họ tên)</div>
+    <div class="sg-space"></div><div class="sg-ten">${esc(x.hoTen)}</div></div>`).join('')}</div>`;
 }
 function rpRefilter() {
   if (S.rpTab === 'chitiet') renderChiTiet();
@@ -1277,6 +1310,22 @@ function renderChiTiet() {
     body += `<tr class="sub"><td colspan="5">Cộng ${esc(g)}</td>${cellsSum(groups[g])}<td></td></tr>`;
   });
   body += `<tr class="total"><td colspan="5">TỔNG CỘNG</td>${cellsSum(rows)}<td></td></tr>`;
+  // Truy thu / Thoái thu trong kỳ (cùng bộ lọc tìm kiếm, mã PL) + Tổng cộng sau truy thu
+  const ttF = d.truyThu.filter((t) => (!q || [t.maNV, t.hoTen].join(' ').toLowerCase().includes(q)) && (!pl || t.maPL === pl));
+  if (ttF.length) {
+    const vRows = (arr) => { const a = arr.filter((r) => r.dong === 'Có'); return [sum(a, (r) => r.luongDong)]
+      .concat(codesNLD.map((c) => sum(arr, (r) => r.items[c.ma])), [sum(arr, (r) => r.tongNLDChinh)],
+        codesDN.map((c) => sum(arr, (r) => r.items[c.ma])), [sum(arr, (r) => r.tongDNChinh), sum(arr, (r) => r.tongNopBHXH)],
+        codesCD.map((c) => sum(arr, (r) => r.items[c.ma]))); };
+    const tN = sum(ttF, (t) => t.bhxhNLD), tD = sum(ttF, (t) => t.bhxhDN);
+    const it = (c) => sum(ttF, (t) => (t.items || {})[c.ma]);
+    const vTT = [null].concat(codesNLD.map(it), [tN], codesDN.map(it), [tD, tN + tD], codesCD.map(it));
+    const vSau = vRows(rows).map((v, i) => v + (vTT[i] || 0));
+    const totIdx = new Set([1 + codesNLD.length, 2 + codesNLD.length + codesDN.length, 3 + codesNLD.length + codesDN.length]);
+    const cells = (v) => v.map((x, i) => `<td class="num${totIdx.has(i) ? ' tot' : ''}">${x === null ? '' : fmt(x)}</td>`).join('');
+    body += `<tr class="tt-row"><td colspan="5">Truy thu / Thoái thu (${ttF.length} dòng – chi tiết ở bảng dưới)</td>${cells(vTT)}<td></td></tr>`;
+    body += `<tr class="total"><td colspan="5">TỔNG CỘNG SAU TRUY THU</td>${cells(vSau)}<td></td></tr>`;
+  }
   h += `<div class="card"><div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div></div>`;
   if (d.truyThu.length) {
     const sumTT = (f) => d.truyThu.reduce((s, t) => s + (Number(f(t)) || 0), 0);
@@ -1585,11 +1634,13 @@ function renderNhanSu() {
 // =====================================================================
 function vThietLap() {
   const tabs = [['info', 'Thông tin chung'], ['pb', 'Phòng ban'], ['khoan', 'Khoản trích đóng'], ['mapl', 'Mã phân loại'], ['tlcd', 'Tỉ lệ Công đoàn']];
-  if (isRole('Admin') || isRole('Nhập liệu')) tabs.push(['ycml', 'Yêu cầu mở khóa']);
+  tabs.push(['trinhky', 'Trình ký']);
+  if (can('yc_gui') || can('yc_duyet')) tabs.push(['ycml', 'Yêu cầu mở khóa']);
   if (isRole('Admin')) tabs.push(['pq', 'Phân quyền']);
+  if (!tabs.some((t) => t[0] === S.setTab)) S.setTab = 'info';
   V().innerHTML = `<h2>Thiết lập</h2><div class="tabs">${tabs.map((t) => `<button class="${S.setTab === t[0] ? 'active' : ''}" onclick="S.setTab='${t[0]}';vThietLap()">${t[1]}</button>`).join('')}</div>
-    ${isRole('Admin') ? '' : '<div class="alert info">Bạn đang ở chế độ chỉ xem. Chỉ Admin được thay đổi thiết lập.</div>'}<div id="setBody"></div>`;
-  ({ info: setInfo, pb: setPB, khoan: setKhoan, mapl: setMaPL, tlcd: setTLCD, ycml: setYCML, pq: setPQ }[S.setTab])();
+    ${can('tl_sua') ? '' : '<div class="alert info">Bạn đang ở chế độ chỉ xem. Cần quyền "Sửa Thiết lập" để thay đổi.</div>'}<div id="setBody"></div>`;
+  ({ info: setInfo, pb: setPB, khoan: setKhoan, mapl: setMaPL, tlcd: setTLCD, trinhky: setTrinhKy, ycml: setYCML, pq: setPQ }[S.setTab])();
 }
 async function setYCML() {
   try {
@@ -1598,7 +1649,7 @@ async function setYCML() {
   } catch (e) { /* đã báo lỗi qua toast trong run() */ }
 }
 function renderYCML() {
-  const admin = isRole('Admin');
+  const admin = can('yc_duyet');
   const badge = (t) => ({ 'Chờ duyệt': 'warn', 'Đã duyệt': 'open', 'Từ chối': 'bad', 'Đã khóa lại': 'closed' }[t] || 'info');
   $('setBody').innerHTML = `<div class="card"><div class="small muted" style="margin-bottom:10px">
     ${admin ? 'Duyệt hoặc từ chối yêu cầu mở khóa hồ sơ nhân viên đã nghỉ việc do vai trò Nhập liệu gửi lên.'
@@ -1633,7 +1684,7 @@ function ycKhoaLai(maNV) {
   });
 }
 function setTLCD() {
-  const admin = isRole('Admin');
+  const admin = can('tl_sua');
   const rows = S.tlcd.slice().sort((a, b) => (a.ngayHL || '') < (b.ngayHL || '') ? 1 : -1);
   const end = S.today + '-31';
   const hienTai = rows.find((r) => (r.ngayHL || '') <= end);
@@ -1671,7 +1722,7 @@ function tlcdDel(row) {
   act(async () => { S.tlcd = await run('apiDeleteTyLeCD', row); toast('Đã xóa.', 'ok'); setTLCD(); });
 }
 function setInfo() {
-  const i = S.info, dis = isRole('Admin') ? '' : 'disabled';
+  const i = S.info, dis = can('tl_sua') ? '' : 'disabled';
   const f = (k, l, t) => `<label>${l}<input name="${k}" type="${t || 'text'}" value="${esc(i[k] ?? '')}" ${dis}></label>`;
   $('setBody').innerHTML = `<div class="card"><form id="infoF" onsubmit="return false"><div class="form">
     ${f('maCty', 'Mã công ty')}${f('tenCty', 'Tên công ty')}${f('mst', 'Mã số thuế')}
@@ -1679,7 +1730,7 @@ function setInfo() {
     ${f('vung', 'Vùng lương tối thiểu')}${f('luongToiThieu', 'Mức lương tối thiểu vùng (để cảnh báo)', 'number')}
     ${f('luongCoSo', 'Mức lương cơ sở (tham khảo)', 'number')}
     </div></form>
-    ${isRole('Admin') ? '<div class="row" style="margin-top:14px"><button class="btn pri" onclick="saveInfo()">Lưu</button></div>' : ''}</div>`;
+    ${can('tl_sua') ? '<div class="row" style="margin-top:14px"><button class="btn pri" onclick="saveInfo()">Lưu</button></div>' : ''}</div>`;
 }
 function saveInfo() {
   act(async () => {
@@ -1689,10 +1740,10 @@ function saveInfo() {
   });
 }
 function setPB() {
-  const dis = isRole('Admin') ? '' : 'disabled';
+  const dis = can('tl_sua') ? '' : 'disabled';
   $('setBody').innerHTML = `<div class="card"><p class="muted small">Mỗi dòng một Đơn vị/Phòng ban. Danh sách này dùng cho dropdown ở hồ sơ nhân viên.</p>
     <textarea id="pbTxt" rows="14" style="width:100%" ${dis}>${esc(S.phongBan.join('\n'))}</textarea>
-    ${isRole('Admin') ? '<div class="row" style="margin-top:10px"><button class="btn pri" onclick="savePB()">Lưu</button></div>' : ''}</div>`;
+    ${can('tl_sua') ? '<div class="row" style="margin-top:10px"><button class="btn pri" onclick="savePB()">Lưu</button></div>' : ''}</div>`;
 }
 function savePB() {
   act(async () => { S.phongBan = await run('apiSavePhongBan', $('pbTxt').value.split('\n')); toast('Đã lưu phòng ban.', 'ok'); setPB(); });
@@ -1703,7 +1754,7 @@ function hieuLucHienTai(ma) {
     .sort((a, b) => ((a.ngayHL || '') < (b.ngayHL || '') ? 1 : -1))[0];
 }
 function setKhoan() {
-  const admin = isRole('Admin');
+  const admin = can('tl_sua');
   const rows = S.khoan.slice().sort((a, b) => (a.doiTuong + a.ma).localeCompare(b.doiTuong + b.ma) || ((a.ngayHL || '') < (b.ngayHL || '') ? 1 : -1));
   let h = `<div class="card"><div class="row between" style="margin-bottom:10px"><div class="small muted">
     Mỗi khoản có thể có nhiều dòng (phiên bản) cùng Mã nhận diện với Ngày hiệu lực khác nhau. Mỗi tháng app tự dùng phiên bản có ngày hiệu lực gần nhất ≤ cuối tháng.
@@ -1760,7 +1811,7 @@ function khoanDel(row) {
   act(async () => { S.khoan = await run('apiDeleteKhoan', row); toast('Đã xóa.', 'ok'); setKhoan(); });
 }
 function setMaPL() {
-  const admin = isRole('Admin');
+  const admin = can('tl_sua');
   const ten = {};
   S.khoan.forEach((k) => { ten[k.ma] = k.ten; });
   const show = (s) => String(s || '').split(';').map((x) => x.trim()).filter(Boolean)
@@ -1812,6 +1863,60 @@ function maplDel(ma) {
   if (!confirm('Xóa mã phân loại ' + ma + '?')) return;
   act(async () => { S.mapl = await run('apiDeleteMaPL', ma); toast('Đã xóa.', 'ok'); setMaPL(); });
 }
+function setTrinhKy() {
+  S._tk = (S.trinhKy || []).map((x) => ({ vaiTro: x.vaiTro, hoTen: x.hoTen }));
+  renderTrinhKy();
+}
+function renderTrinhKy() {
+  const ed = can('tl_sua'), dis = ed ? '' : 'disabled';
+  $('setBody').innerHTML = `<div class="card"><p class="muted small">Khối chữ ký in ở cuối mọi báo cáo (nút <b>🖨 In</b> trong tab Báo cáo và file Excel/PDF).
+    Xếp từ trái sang phải theo thứ tự dưới đây, tối đa 6 người. Để trống Họ tên nếu muốn ký tay.</p>
+    <div class="tbl-wrap"><table><thead><tr><th>#</th><th>Vai trò ký</th><th>Họ tên</th><th></th></tr></thead><tbody>
+    ${S._tk.map((x, i) => `<tr><td>${i + 1}</td>
+      <td><input value="${esc(x.vaiTro)}" ${dis} placeholder="VD: Người lập biểu" style="width:100%" oninput="S._tk[${i}].vaiTro=this.value;tkPreview()"></td>
+      <td><input value="${esc(x.hoTen)}" ${dis} placeholder="VD: Nguyễn Văn A" style="width:100%" oninput="S._tk[${i}].hoTen=this.value;tkPreview()"></td>
+      <td>${ed ? `<div class="row"><button class="btn sm" onclick="tkMove(${i},-1)" ${i ? '' : 'disabled'}>↑</button>
+        <button class="btn sm" onclick="tkMove(${i},1)" ${i < S._tk.length - 1 ? '' : 'disabled'}>↓</button>
+        <button class="btn sm danger" onclick="S._tk.splice(${i},1);renderTrinhKy()">Xóa</button></div>` : ''}</td></tr>`).join('')
+      || '<tr><td colspan="4" class="muted">Chưa có người ký.</td></tr>'}
+    </tbody></table></div>
+    ${ed ? `<div class="row" style="margin-top:10px"><button class="btn" onclick="S._tk.push({vaiTro:'',hoTen:''});renderTrinhKy()" ${S._tk.length >= 6 ? 'disabled' : ''}>＋ Thêm người ký</button>
+      <button class="btn pri" onclick="saveTrinhKy()">Lưu</button></div>` : ''}
+    <h3 style="margin-top:18px">Xem trước khi in</h3><div id="tkPrev" class="tk-prev"></div></div>`;
+  tkPreview();
+}
+function tkPreview() { $('tkPrev').innerHTML = signBlockHtml(S._tk) || '<span class="muted small">(Không in khối chữ ký)</span>'; }
+function tkMove(i, d) { const a = S._tk; [a[i], a[i + d]] = [a[i + d], a[i]]; renderTrinhKy(); }
+function saveTrinhKy() {
+  act(async () => { S.trinhKy = await run('apiSaveTrinhKy', S._tk); setTrinhKy(); toast('Đã lưu trình ký.', 'ok'); });
+}
+function renderPQM() {
+  const d = S.pqm;
+  if (!d || !$('pqmBox')) return;
+  const roles = ['Nhập liệu', 'Xem'];
+  let last = '';
+  const rows = d.perms.map((p) => {
+    const g = p.nhom !== last ? `<tr class="group"><td colspan="4">${esc(p.nhom)}</td></tr>` : '';
+    last = p.nhom;
+    return g + `<tr><td>${esc(p.moTa)}</td><td class="c"><input type="checkbox" checked disabled title="Admin luôn có toàn quyền"></td>
+      ${roles.map((r) => `<td class="c"><input type="checkbox" data-r="${r}" data-p="${p.ma}" ${d.matrix[r][p.ma] ? 'checked' : ''}></td>`).join('')}</tr>`;
+  }).join('');
+  $('pqmBox').innerHTML = `<div class="card"><div class="row between"><h3 style="margin:0">Ma trận phân quyền theo vai trò</h3>
+      <div class="row"><button class="btn" onclick="pqmMacDinh()">Khôi phục mặc định</button><button class="btn pri" onclick="pqmSave()">Lưu ma trận</button></div></div>
+    <p class="small muted">Tick để cấp quyền cho từng vai trò. <b>Admin</b> luôn có toàn quyền (không chỉnh được) để tránh tự khóa mình;
+      quản lý tài khoản và ma trận này chỉ dành cho Admin. Người đang mở ứng dụng cần tải lại trang (F5) để nhận quyền mới.</p>
+    <div class="tbl-wrap"><table class="pqm"><thead><tr><th>Quyền</th><th class="c">Admin</th><th class="c">Nhập liệu</th><th class="c">Xem</th></tr></thead>
+    <tbody>${rows}</tbody></table></div></div>`;
+}
+function pqmSave() {
+  const m = { 'Nhập liệu': {}, 'Xem': {} };
+  document.querySelectorAll('#pqmBox input[data-r]').forEach((el) => { m[el.dataset.r][el.dataset.p] = el.checked; });
+  act(async () => { S.pqm = await run('apiSaveMaTranPQ', m); S.cache = {}; renderPQM(); toast('Đã lưu ma trận phân quyền. Người dùng khác cần tải lại trang (F5).', 'ok'); });
+}
+function pqmMacDinh() {
+  if (!confirm('Khôi phục ma trận phân quyền về mặc định?')) return;
+  act(async () => { S.pqm = await run('apiMacDinhMaTranPQ'); S.cache = {}; renderPQM(); toast('Đã khôi phục ma trận mặc định.', 'ok'); });
+}
 async function setPQ() {
   try {
     await swrFetch('pq', ['apiPhanQuyen'], (d) => { S.pq = d; renderPQ(); },
@@ -1820,14 +1925,18 @@ async function setPQ() {
 }
 function renderPQ() {
   $('setBody').innerHTML = `<div class="card"><div class="row between" style="margin-bottom:10px"><div class="small muted">
-    <b>Admin</b>: thiết lập, tạo/chốt kỳ, toàn quyền. <b>Nhập liệu</b>: sửa hồ sơ NV có "Email NV quản lý hồ sơ" = email của mình, tính kỳ, nhập truy thu.
-    <b>Xem</b>: chỉ xem toàn bộ dữ liệu & báo cáo (Kế toán, Ban Giám đốc).</div>
+    Mỗi tài khoản có 1 vai trò. Quyền chi tiết của từng vai trò chỉnh ở <b>Ma trận phân quyền</b> bên dưới.</div>
     <button class="btn pri" onclick="pqForm(null)">＋ Thêm người dùng</button></div>
     <div class="tbl-wrap"><table><thead><tr><th>Email</th><th>Họ tên</th><th>Vai trò</th><th>Trạng thái</th><th>Ghi chú</th><th></th></tr></thead><tbody>
     ${S.pq.map((p) => `<tr class="${p.trangThai === 'Khóa' ? 'off' : ''}"><td>${esc(p.email)}</td><td>${esc(p.hoTen)}</td>
       <td><span class="badge info">${esc(p.vaiTro)}</span></td><td>${esc(p.trangThai)}</td><td class="small">${esc(p.ghiChu)}</td>
       <td><div class="row"><button class="btn sm" onclick="pqForm('${esc(p.email)}')">Sửa</button>
-      <button class="btn sm danger" onclick="pqDel('${esc(p.email)}')">Xóa</button></div></td></tr>`).join('')}</tbody></table></div></div>`;
+      <button class="btn sm danger" onclick="pqDel('${esc(p.email)}')">Xóa</button></div></td></tr>`).join('')}</tbody></table></div></div>
+    <div id="pqmBox"><div class="card muted">Đang tải ma trận phân quyền…</div></div>`;
+  if (S.pqm) renderPQM();
+  else runBg('apiMaTranPQ').then((d) => {
+    if (d) { S.pqm = d; renderPQM(); } else if ($('pqmBox')) $('pqmBox').innerHTML = '<div class="alert bad">Không tải được ma trận phân quyền. Hãy cập nhật Code.gs mới nhất rồi triển khai Phiên bản mới.</div>';
+  });
 }
 function pqForm(email) {
   const p = email ? S.pq.find((x) => x.email === email) : { vaiTro: 'Nhập liệu', trangThai: 'Hoạt động' };
