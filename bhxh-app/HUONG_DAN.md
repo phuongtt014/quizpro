@@ -331,6 +331,14 @@ Dưới danh sách tài khoản có bảng **"Ma trận phân quyền theo vai t
 - Email **"Gửi đề xuất"** gửi tới Admin + những ai có vai trò được quyền *Duyệt & chốt kỳ*. Email **"Yêu cầu mở khóa"** gửi tới Admin + những ai có quyền *Duyệt yêu cầu mở khóa*.
 - Nút **📤 Gửi đề xuất** chỉ hiện với người có quyền Gửi đề xuất nhưng **không** có quyền Duyệt; người có quyền Duyệt thì Chốt kỳ trực tiếp.
 
+### Tiêu đề báo cáo (Thiết lập → Tiêu đề báo cáo)
+
+- Đổi **tiêu đề chính** của từng báo cáo (VD: "BẢNG TÍNH NỘP BHXH") và **tiêu đề các bảng bên trong** (VD: "Danh sách NV đóng BHXH – dùng để nộp cơ quan BHXH", "Truy thu / Thoái thu BHXH trong kỳ", "Tổng hợp theo tháng"…).
+- Tiêu đề mới dùng trên màn hình Báo cáo, khi bấm **🖨 In** và trong file Excel/PDF.
+- Phần tự sinh như "– KỲ 11/2026", "(12 người)" được ứng dụng tự thêm phía sau, không cần gõ.
+- Nút **↺** trả 1 dòng về mặc định; **Khôi phục tất cả mặc định** trả toàn bộ. Để trống = dùng mặc định.
+- Cần quyền **"Sửa Thiết lập"**. Tiêu đề lưu trong Script Properties của Apps Script (không phải tab Sheet).
+
 ### Trình ký (Thiết lập → Trình ký)
 
 Khai báo danh sách người ký gồm **Vai trò ký** và **Họ tên**, tối đa **6 người**. Sắp thứ tự bằng nút **↑ ↓**, bấm **Xóa** để bỏ, **"＋ Thêm người ký"** để thêm, rồi **"Lưu"**. Khung **"Xem trước khi in"** cho thấy ngay khối chữ ký sẽ in ra.
